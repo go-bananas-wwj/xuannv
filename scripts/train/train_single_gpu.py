@@ -20,6 +20,10 @@ import random
 import sys
 from pathlib import Path
 
+# 强制无缓冲输出
+sys.stdout = open(sys.stdout.fileno(), mode='w', buffering=1, encoding='utf-8', errors='replace')
+sys.stderr = open(sys.stderr.fileno(), mode='w', buffering=1, encoding='utf-8', errors='replace')
+
 sys.path.insert(0, "/workspace/xuannv")
 
 import numpy as np
