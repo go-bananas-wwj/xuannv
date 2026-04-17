@@ -370,13 +370,23 @@ class SingleGPUTrainer:
 
     def load_checkpoint(self, path: str) -> int:
         ckpt = torch.load(path, map_location=self.device, weights_only=False)
-        self.model.load_state_dict(ckpt["model_state_dict"])
+        # 加载 backbone（跳过不存在的 key，如 DINO head）
+        missing, unexpected = self.model.load_state_dict(ckpt["model_state_dict"], strict=False)
+        if missing:
+            print(f"[load_checkpoint] Missing keys (new params, will init randomly): {len(missing)}")
+        if unexpected:
+            print(f"[load_checkpoint] Unexpected keys (old params skipped): {len(unexpected)}")
         self.teacher = copy.deepcopy(self.model)
         self.teacher.eval()
         for p in self.teacher.parameters():
             p.requires_grad = False
         if "optimizer_state_dict" in ckpt:
-            self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+            try:
+                self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+                print(f"[load_checkpoint] Optimizer state loaded.")
+            except ValueError as e:
+                print(f"[load_checkpoint] Optimizer state mismatch (expected for new losses/heads): {e}")
+                print(f"[load_checkpoint] Continuing with freshly initialized optimizer.")
         return ckpt.get("epoch", 0)
 
 
