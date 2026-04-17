@@ -1,0 +1,102 @@
+experiment:
+  name: aef_qwen_v2_hr_finetune
+  seed: 42
+  output_dir: /workspace/outputs/aef_qwen_v2_hr_finetune
+
+data:
+  dataset_type: harbin_patches
+  manifest_path: /workspace/raw/harbin_scenes
+  stats_dir: /workspace/statistics/harbin_scenes
+  batch_size: 2
+  num_workers: 4
+  image_size: 128
+  max_frames: 32
+  num_samples: 424
+  num_classes: 11
+  input_dim: 12
+  metadata_dim: 4
+  num_input_sources: 3          # S2(12ch), S1(3ch), Landsat(6ch)
+  num_target_sources: 7         # 输入3类 + 静态4类
+  random_target_frame: true
+  spatial_augmentation: true
+  temporal_window_augmentation: true
+  temporal_window_prob: 0.5
+  temporal_window_min_frames: 4
+  temporal_window_max_frames: 24
+  non_overlapping_windows: true
+  cloud_filter_threshold: 0.0
+  variance_weighted: false
+  filter_2025_monthly: false
+  source_channels:
+    s2: 12
+    s1: 3
+    landsat: 6
+  merge_hr_into_lr: true        # 在数据加载阶段把 s2_hr/s1_hr 拼入 s2/s1
+
+model:
+  input_dim: 12
+  stem_dim: 128
+  precision_dim: 256
+  time_dim: 256
+  space_dim: 256
+  embedding_dim: 128
+  time_code_dim: 64
+  window_code_dim: 64
+  relative_time_code_dim: 16
+  num_blocks: 8
+  num_heads: 8
+  vmf_kappa: 2000.0
+  bottleneck_noise_scale: 0.02
+  reconstruction_channels: 6
+  metadata_dim: 4
+  num_sensor_types: 16
+  gradient_checkpointing: true
+  per_source_decoders: false
+  decoder_hidden_mult: 1
+  skip_l2_norm_training: true
+  spatial_dropout_rate: 0.0
+  stem_channels: 6
+  source_channels:
+    s2: 12
+    s1: 3
+    landsat: 6
+
+training:
+  epochs: 150
+  gradient_accumulation_steps: 4
+  lr: 0.00005
+  weight_decay: 0.01
+  grad_clip_norm: 1.0
+  teacher_dropout_rate: 0.1
+  student_frame_drop_rate: 0.4
+  student_source_drop_rate: 0.3
+  lr_schedule: cosine_no_restart
+  warmup_epochs: 10
+  recon_warmup_epochs: 10
+  save_every: 20
+  checkpoint_interval: 20
+  early_stop_patience: 150
+  # 损失权重 (对齐 v2_temporal 成功经验)
+  reconstruction_weight: 0.5
+  uniformity_weight: 0.5
+  pre_norm_uniform_weight: 5.0
+  encoder_uniform_weight: 3.0
+  decorrelation_weight: 0.01
+  variance_weight: 2.0
+  orthogonality_weight: 2.0
+  consistency_weight: 0.0
+  classification_weight: 0.0
+  aux_classification_weight: 0.0
+  bottleneck_cls_weight: 0.0
+  # ★ 时序对比损失 (核心修复: Anti-Diagonal InfoNCE)
+  temporal_contrastive_weight: 5.0
+  temporal_contrastive_temperature: 0.05
+  temporal_loss_type: info_nce_antidiagonal
+  pixel_temporal_weight: 3.0
+  pixel_temporal_samples: 16
+  # best 保存阈值
+  save_best_balanced: true
+  best_balanced_uniform_min: -5.0
+  best_balanced_uniform_max: -1.0
+
+pretrained: /workspace/outputs/aef_qwen_v2/best.pt

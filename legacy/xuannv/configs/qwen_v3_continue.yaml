@@ -1,0 +1,12 @@
+# Continue training from E599 with larger patience
+_base_: qwen_v3_temporal.yaml
+
+data:
+  manifest_path: /workspace/raw/harbin_scenes
+  stats_dir: /workspace/statistics/harbin_scenes
+  batch_size: 1
+  gradient_accumulation_steps: 8
+
+training:
+  epochs: 800
+  early_stop_patience: 200
