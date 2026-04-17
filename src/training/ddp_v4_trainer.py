@@ -258,6 +258,15 @@ class DDPv4Trainer:
                 if ct_recon_w > 0 and "spatial_mask" in batch and "valid_start_w2" in batch:
                     ct_recon = self._cross_temporal_masked_recon(batch, student_out)
 
+                # Dummy loss for unused classification heads — 让 DDP 所有参数都参与梯度
+                dummy_cls = torch.tensor(0.0, device=self.device)
+                if student_out.logits is not None:
+                    dummy_cls = dummy_cls + student_out.logits.sum() * 0.0
+                if student_out.aux_logits is not None:
+                    dummy_cls = dummy_cls + student_out.aux_logits.sum() * 0.0
+                if student_out.bottleneck_logits is not None:
+                    dummy_cls = dummy_cls + student_out.bottleneck_logits.sum() * 0.0
+
                 # Recon warmup
                 recon_warmup = min(1.0, (epoch + 1) / max(t.recon_warmup_epochs, 1))
                 recon_weight = t.reconstruction_weight * recon_warmup
@@ -269,6 +278,7 @@ class DDPv4Trainer:
                     + getattr(t, "vicreg_weight", 1.0) * vicreg
                     + getattr(t, "koleo_weight", 0.1) * koleo
                     + temporal_w * temporal
+                    + dummy_cls
                 )
                 total = total / accum_steps
 

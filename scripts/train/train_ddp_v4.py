@@ -21,9 +21,7 @@ import random
 import sys
 from pathlib import Path
 
-# 强制无缓冲输出
-sys.stdout = open(sys.stdout.fileno(), mode='w', buffering=1, encoding='utf-8', errors='replace')
-sys.stderr = open(sys.stderr.fileno(), mode='w', buffering=1, encoding='utf-8', errors='replace')
+# torchrun 已带 -u (unbuffered)，无需手动重定向 stdout
 
 sys.path.insert(0, "/workspace/xuannv")
 
@@ -48,6 +46,27 @@ def parse_args():
     return parser.parse_args()
 
 
+class FileLogger:
+    """同时写入 stdout 和文件的 logger（仅 rank 0）."""
+    def __init__(self, filepath: str, rank: int):
+        self.rank = rank
+        self.file = None
+        if rank == 0:
+            Path(filepath).parent.mkdir(parents=True, exist_ok=True)
+            self.file = open(filepath, "a", buffering=1, encoding="utf-8")
+
+    def write(self, msg: str):
+        if self.rank == 0:
+            sys.stdout.write(msg)
+            sys.stdout.flush()
+            if self.file:
+                self.file.write(msg)
+                self.file.flush()
+
+    def print(self, msg: str):
+        self.write(msg + "\n")
+
+
 def main():
     args = parse_args()
 
@@ -59,7 +78,14 @@ def main():
     global_rank = dist.get_rank()
     world_size = dist.get_world_size()
 
+    logger = FileLogger("/workspace/outputs/aef_qwen_v4_cd_upgrade/train.log", global_rank)
+
     cfg = load_config(args.config)
+
+    # 关闭 gradient checkpointing 以兼容 DDP find_unused_parameters=True
+    cfg.model.gradient_checkpointing = False
+    # 减小 batch size 避免 OOM
+    cfg.data.batch_size = 1
 
     # 覆盖参数
     if args.epochs is not None:
@@ -76,17 +102,17 @@ def main():
         torch.cuda.manual_seed_all(seed)
 
     if global_rank == 0:
-        print("=" * 70)
-        print(f"  DDP V4 训练  [GPU 6,7]  —  {cfg.experiment.name}")
-        print(f"  World size: {world_size}  |  Rank: {global_rank}")
-        print("=" * 70)
-        print(f"  Config: {args.config}")
-        print(f"  Epochs: {cfg.training.epochs}")
-        print(f"  Batch per GPU: {cfg.data.batch_size}")
-        print(f"  Grad accum: {getattr(cfg.training, 'gradient_accumulation_steps', 4)}")
-        print(f"  Effective batch: {cfg.data.batch_size * world_size * getattr(cfg.training, 'gradient_accumulation_steps', 4)}")
-        print(f"  Window mode: {getattr(cfg.data, 'window_mode', 'random_split')}")
-        print("=" * 70)
+        logger.print("=" * 70)
+        logger.print(f"  DDP V4 训练  [GPU 6,7]  —  {cfg.experiment.name}")
+        logger.print(f"  World size: {world_size}  |  Rank: {global_rank}")
+        logger.print("=" * 70)
+        logger.print(f"  Config: {args.config}")
+        logger.print(f"  Epochs: {cfg.training.epochs}")
+        logger.print(f"  Batch per GPU: {cfg.data.batch_size}")
+        logger.print(f"  Grad accum: {getattr(cfg.training, 'gradient_accumulation_steps', 4)}")
+        logger.print(f"  Effective batch: {cfg.data.batch_size * world_size * getattr(cfg.training, 'gradient_accumulation_steps', 4)}")
+        logger.print(f"  Window mode: {getattr(cfg.data, 'window_mode', 'random_split')}")
+        logger.print("=" * 70)
 
     # DataLoader (distributed)
     dataloader = build_dataloader(
@@ -104,14 +130,14 @@ def main():
     if args.resume:
         start_epoch = trainer.load_checkpoint(args.resume)
         if global_rank == 0:
-            print(f"[train] Resumed from {args.resume}, starting at epoch {start_epoch + 1}")
+            logger.print(f"[train] Resumed from {args.resume}, starting at epoch {start_epoch + 1}")
         dist.barrier()
 
     total_epochs = cfg.training.epochs
     if args.resume and start_epoch > 0:
         total_epochs = start_epoch + cfg.training.epochs
         if global_rank == 0:
-            print(f"[train] Will train from epoch {start_epoch + 1} to {total_epochs}")
+            logger.print(f"[train] Will train from epoch {start_epoch + 1} to {total_epochs}")
 
     best_loss = float("inf")
     save_every = args.save_every if args.save_every is not None else getattr(cfg.training, "save_every", 20)
@@ -123,13 +149,12 @@ def main():
         losses = trainer.train_epoch(epoch, dataloader)
 
         if global_rank == 0:
-            print(
+            logger.print(
                 f"Epoch {epoch + 1:03d}/{total_epochs} | "
                 f"total={losses['total']:.4f} recon={losses['recon']:.4f} "
                 f"ct_recon={losses['ct_recon']:.4f} dino={losses['dino']:.4f} "
                 f"vicreg={losses['vicreg']:.4f} koleo={losses['koleo']:.4f} "
-                f"temporal={losses['temporal']:.4f} lr={losses['lr']:.6f}",
-                flush=True,
+                f"temporal={losses['temporal']:.4f} lr={losses['lr']:.6f}"
             )
 
         if (epoch + 1) % save_every == 0:
@@ -143,7 +168,7 @@ def main():
             trainer.scheduler.step()
 
     if global_rank == 0:
-        print("[train] Training complete.")
+        logger.print("[train] Training complete.")
 
     dist.destroy_process_group()
 

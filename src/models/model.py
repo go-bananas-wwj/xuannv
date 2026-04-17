@@ -193,6 +193,9 @@ class AEFModel(nn.Module):
         attn = torch.softmax(attn_scores, dim=-1)
         summary = torch.einsum("bt,btchw->bchw", attn, x)
 
+        # Dummy 使用 time_codes，确保 time_encoder 参数参与梯度流
+        summary = summary + time_codes.sum() * 0.0
+
         return summary, window_code, attn
 
     def forward(
@@ -224,6 +227,13 @@ class AEFModel(nn.Module):
         # 瓶颈
         embedding_map, embedding, pre_norm, pre_norm_map = self.bottleneck(summary_map)
 
+        # Dummy 激活所有 sensor encoder 参数（避免 DDP 未使用参数报错）
+        dummy_sensor = torch.tensor(0.0, device=source_frames.device)
+        for encoder in self.sensor_encoder_bank.encoders.values():
+            for p in encoder.parameters():
+                dummy_sensor = dummy_sensor + p.sum() * 0.0
+        summary_map = summary_map + dummy_sensor
+
         # 解码
         B = summary_map.shape[0]
         if target_relative_time.dim() == 1:
@@ -247,20 +257,26 @@ class AEFModel(nn.Module):
         max_ch = max(self._per_source_out_channels)
         flat_recon = torch.zeros(B * T_tgt, max_ch, *flat_map.shape[2:], device=flat_map.device, dtype=flat_map.dtype)
 
+        dummy_dec = torch.tensor(0.0, device=flat_map.device)
         if target_source_idx is not None:
             flat_src_idx = target_source_idx.reshape(B * T_tgt)
             for src_id, dec in enumerate(self.per_source_decoders):
                 mask = (flat_src_idx == src_id)
-                if not mask.any():
-                    continue
-                out = dec(flat_map[mask], flat_window[mask], flat_relative[mask], flat_metadata[mask])
-                out_ch = self._per_source_out_channels[src_id]
-                flat_recon[mask, :out_ch] = out.to(flat_recon.dtype)
+                if mask.any():
+                    out = dec(flat_map[mask], flat_window[mask], flat_relative[mask], flat_metadata[mask])
+                    out_ch = self._per_source_out_channels[src_id]
+                    flat_recon[mask, :out_ch] = out.to(flat_recon.dtype)
+                # dummy loss to ensure decoder params always have gradients
+                for p in dec.parameters():
+                    dummy_dec = dummy_dec + p.sum() * 0.0
         else:
             # 默认: 全部用第一个 decoder
             out = self.per_source_decoders[0](flat_map, flat_window, flat_relative, flat_metadata)
             flat_recon[:, :self._per_source_out_channels[0]] = out.to(flat_recon.dtype)
+            for p in self.per_source_decoders[0].parameters():
+                dummy_dec = dummy_dec + p.sum() * 0.0
 
+        flat_recon = flat_recon + dummy_dec
         reconstructions = flat_recon.reshape(B, T_tgt, *flat_recon.shape[1:])
 
         # 分类头
