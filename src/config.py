@@ -1,0 +1,194 @@
+"""配置系统 — YAML 驱动的数据类."""
+from __future__ import annotations
+
+import yaml
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+
+@dataclass
+class ExperimentConfig:
+    name: str = "aef_qwen_v1"
+    seed: int = 42
+    output_dir: str = "/workspace/outputs/aef_qwen_v1"
+
+
+@dataclass
+class DataConfig:
+    dataset_type: str = "harbin_patches"
+    manifest_path: str = ""
+    stats_dir: str = ""
+    batch_size: int = 2
+    num_workers: int = 4
+    image_size: int = 128
+    max_frames: int = 32
+    num_samples: int = 424
+    num_classes: int = 11
+    input_dim: int = 6
+    metadata_dim: int = 4
+    num_input_sources: int = 7
+    num_target_sources: int = 7
+    random_target_frame: bool = True
+    spatial_augmentation: bool = True
+    # 时序窗口增强
+    temporal_window_augmentation: bool = True
+    temporal_window_prob: float = 0.5
+    temporal_window_min_frames: int = 4
+    temporal_window_max_frames: int = 24
+    # 云过滤
+    cloud_filter_threshold: float = 0.0
+    # 方差加权采样
+    variance_weighted: bool = False
+    filter_2025_monthly: bool = False
+    source_channels: dict = field(default_factory=dict)
+    merge_hr_into_lr: bool = False
+    input_sources: list | None = None
+    target_sources: list | None = None
+    # 双窗口采样模式
+    window_mode: str = "random_split"
+    # 跨时相掩码重建
+    ct_mask_ratio: float = 0.0
+    ct_mask_patch_size: int = 8
+
+
+@dataclass
+class ModelConfig:
+    input_dim: int = 6
+    stem_dim: int = 128
+    precision_dim: int = 256
+    time_dim: int = 256
+    space_dim: int = 256
+    embedding_dim: int = 128
+    time_code_dim: int = 64
+    window_code_dim: int = 64
+    relative_time_code_dim: int = 16
+    num_blocks: int = 8
+    num_heads: int = 8
+    vmf_kappa: float = 2000.0
+    bottleneck_noise_scale: float = 0.02
+    reconstruction_channels: int = 6
+    metadata_dim: int = 4
+    num_sensor_types: int = 16
+    gradient_checkpointing: bool = True
+    per_source_decoders: bool = False
+    decoder_hidden_mult: int = 1
+    source_channels: dict = field(default_factory=dict)
+    stem_channels: int = 6
+    # 反坍缩
+    skip_l2_norm_training: bool = True
+    spatial_dropout_rate: float = 0.0
+
+
+@dataclass
+class TrainingConfig:
+    epochs: int = 400
+    gradient_accumulation_steps: int = 6
+    lr: float = 5e-5
+    weight_decay: float = 0.01
+    grad_clip_norm: float = 1.0
+    teacher_dropout_rate: float = 0.1
+    student_frame_drop_rate: float = 0.4
+    student_source_drop_rate: float = 0.3
+    student_front_drop_prob: float = 0.2
+    student_back_drop_prob: float = 0.2
+    # 损失权重
+    reconstruction_weight: float = 1.0
+    uniformity_weight: float = 0.3
+    uniformity_adaptive: bool = True
+    consistency_weight: float = 0.15
+    classification_weight: float = 0.05
+    text_contrastive_weight: float = 0.0
+    # 反坍缩四件套
+    orthogonality_weight: float = 1.0
+    variance_weight: float = 1.0
+    decorrelation_weight: float = 0.01
+    spatial_dropout_rate: float = 0.5
+    bottleneck_cls_weight: float = 0.2
+    aux_classification_weight: float = 0.1
+    # 时序对比损失
+    temporal_contrastive_weight: float = 0.0
+    temporal_contrastive_temperature: float = 0.1
+    temporal_loss_type: str = "hinge"
+    pixel_temporal_weight: float = 0.0
+    pixel_temporal_samples: int = 16
+    # 预归一化 uniformity
+    pre_norm_uniform_weight: float = 3.0
+    encoder_uniform_weight: float = 2.0
+    # Warmup
+    recon_warmup_epochs: int = 20
+    warmup_epochs: int = 10
+    lr_schedule: str = "cosine_no_restart"
+    # 检查点
+    save_best_balanced: bool = True
+    best_balanced_uniform_min: float = -0.6
+    best_balanced_uniform_max: float = 0.3
+    early_stop_patience: int = 150
+    save_every: int = 50
+    checkpoint_interval: int = 20
+    # EMA Teacher
+    teacher_momentum: float = 0.996
+    # DINO
+    dino_weight: float = 0.0
+    # VICReg + KoLeo
+    vicreg_weight: float = 0.0
+    koleo_weight: float = 0.0
+    expander_dim: int = 0
+    # 跨时相掩码重建
+    ct_reconstruction_weight: float = 0.0
+
+
+@dataclass
+class EvaluationConfig:
+    knn_k: int = 5
+    bootstrap_samples: int = 100
+
+
+@dataclass
+class Config:
+    experiment: ExperimentConfig = field(default_factory=ExperimentConfig)
+    data: DataConfig = field(default_factory=DataConfig)
+    model: ModelConfig = field(default_factory=ModelConfig)
+    training: TrainingConfig = field(default_factory=TrainingConfig)
+    evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
+    pretrained: str | None = None
+
+
+def _merge_dict(base: dict, override: dict) -> dict:
+    result = dict(base)
+    for key, val in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(val, dict):
+            result[key] = _merge_dict(result[key], val)
+        else:
+            result[key] = val
+    return result
+
+
+def load_config(path: str | Path) -> Config:
+    with open(path, "r") as f:
+        raw = yaml.safe_load(f)
+
+    # 处理 _base_ 继承
+    base_path = raw.pop("_base_", None)
+    if base_path:
+        base_dir = Path(path).parent
+        with open(base_dir / base_path, "r") as f:
+            base_raw = yaml.safe_load(f)
+        raw = _merge_dict(base_raw, raw)
+
+    cfg = Config()
+    for section, values in raw.items():
+        if not isinstance(values, dict):
+            continue
+        section_cls = {
+            "experiment": ExperimentConfig,
+            "data": DataConfig,
+            "model": ModelConfig,
+            "training": TrainingConfig,
+            "evaluation": EvaluationConfig,
+        }.get(section)
+        if section_cls:
+            known = {f.name for f in section_cls.__dataclass_fields__.values()}
+            filtered = {k: v for k, v in values.items() if k in known}
+            setattr(cfg, section, section_cls(**filtered))
+    return cfg

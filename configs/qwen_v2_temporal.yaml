@@ -1,0 +1,54 @@
+# ============================================================
+# AEF_qwen V2 — 时序对比损失 (Temporal Contrastive)
+# ============================================================
+# 核心改进:
+#   - 训练时对同一 patch 用前后两个时间窗口分别编码
+#   - 加 temporal_contrastive_loss 强制不同窗口产生不同 embedding
+#   - 目标: 让模型对时间敏感，能做变化检测
+#
+# 基于: qwen_v1_scenes.yaml (epoch_399.pt checkpoint)
+# 启动:
+#   CUDA_VISIBLE_DEVICES=5,6,7 torchrun --nproc_per_node=3 \
+#     scripts/train_ddp.py --config configs/qwen_v2_temporal.yaml \
+#     --resume /workspace/outputs/aef_qwen_v1/epoch_399.pt \
+#     --save-every 50 --warmup-epochs 5
+# ============================================================
+
+_base_: qwen_v1_scenes.yaml
+
+experiment:
+  name: aef_qwen_v2_temporal
+  output_dir: /workspace/outputs/aef_qwen_v2
+
+training:
+  # 从 V1 checkpoint 微调 (V1 训练了 400 epochs)
+  lr: 0.00001                  # 更低学习率
+  warmup_epochs: 5
+  epochs: 500                  # 400 (V1) + 100 (V2 微调)
+  early_stop_patience: 50
+
+  # 原有损失权重 (降低，保持稳定)
+  reconstruction_weight: 0.5
+  uniformity_weight: 0.15
+  pre_norm_uniform_weight: 1.5
+  encoder_uniform_weight: 1.0
+  decorrelation_weight: 0.005
+  variance_weight: 0.5
+  orthogonality_weight: 0.5
+  consistency_weight: 0.0
+
+  # ★ 新增: 时序对比损失
+  temporal_contrastive_weight: 0.5    # 核心: 拉开不同时间窗口
+  temporal_contrastive_temperature: 0.1
+
+  best_balanced_uniform_min: -5.0
+  best_balanced_uniform_max: -1.0
+
+# --- 新增: 单卡训练 + 变化检测升级配置 ---
+data:
+  window_mode: "adjacent_month"      # 双窗口模式: random_split | adjacent_month | non_overlap
+  ct_mask_ratio: 0.3                 # 跨时相掩码比例 (0=关闭)
+  ct_mask_patch_size: 8              # 掩码 patch 尺寸
+
+training:
+  # EMA Teacher
