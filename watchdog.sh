@@ -30,7 +30,8 @@ log() {
 get_latest_checkpoint() {
     local latest=""
     if [ -d "$OUTPUT_DIR" ]; then
-        latest=$(ls -t "$OUTPUT_DIR"/epoch_*.pt 2>/dev/null | head -1)
+        # 排除含 "best" 的文件（epoch 值可能为字符串，导致 resume 失败）
+        latest=$(ls -t "$OUTPUT_DIR"/epoch_*.pt 2>/dev/null | grep -v "best" | head -1)
     fi
     echo "$latest"
 }

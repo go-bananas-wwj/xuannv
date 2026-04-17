@@ -238,6 +238,11 @@ def temporal_info_nce_loss(emb_w1: torch.Tensor, emb_w2: torch.Tensor,
     flat_w1 = F.normalize(flat_w1, p=2, dim=-1)
     flat_w2 = F.normalize(flat_w2, p=2, dim=-1)
 
+    # 当 batch_size=1 时，InfoNCE 退化为 0，改用 cosine similarity 替代
+    if B <= 1:
+        sim = (flat_w1 * flat_w2).sum(dim=-1)  # [-1, 1]，越高表示越相似
+        return (1.0 - sim).mean()  # 希望相似度低 -> loss 高
+
     logits = (flat_w1 @ flat_w2.T) / temperature  # [B, B]
     labels = torch.arange(B, device=emb_w1.device)
     return F.cross_entropy(-logits, labels)

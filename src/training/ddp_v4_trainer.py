@@ -374,4 +374,8 @@ class DDPv4Trainer:
             except ValueError as e:
                 if self.global_rank == 0:
                     print(f"[load_checkpoint] Optimizer mismatch: {e}")
-        return ckpt.get("epoch", 0)
+        epoch = ckpt.get("epoch", 0)
+        # 兼容 "best" 等非整数字符串 epoch
+        if not isinstance(epoch, int):
+            epoch = 0
+        return epoch

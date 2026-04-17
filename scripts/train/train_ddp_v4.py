@@ -162,7 +162,8 @@ def main():
 
         if losses["total"] < best_loss:
             best_loss = losses["total"]
-            trainer.save_checkpoint("best", losses)
+            # 保存 best 时传入实际 epoch 数字，避免 resume 时字符串问题
+            trainer.save_checkpoint(f"best_epoch{epoch + 1}", losses)
 
         if trainer.scheduler is not None:
             trainer.scheduler.step()
