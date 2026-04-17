@@ -84,11 +84,16 @@ def main():
         start_epoch = trainer.load_checkpoint(args.resume)
         print(f"[train] Resumed from {args.resume}, starting at epoch {start_epoch + 1}")
 
+    total_epochs = cfg.training.epochs
+    if args.resume and start_epoch > 0:
+        total_epochs = start_epoch + cfg.training.epochs
+        print(f"[train] Will train from epoch {start_epoch + 1} to {total_epochs}")
+
     best_loss = float("inf")
-    for epoch in range(start_epoch, cfg.training.epochs):
+    for epoch in range(start_epoch, total_epochs):
         losses = trainer.train_epoch(epoch, dataloader)
         print(
-            f"Epoch {epoch + 1:03d}/{cfg.training.epochs} | "
+            f"Epoch {epoch + 1:03d}/{total_epochs} | "
             f"total={losses['total']:.4f} recon={losses['recon']:.4f} "
             f"ct_recon={losses['ct_recon']:.4f} dino={losses['dino']:.4f} "
             f"vicreg={losses['vicreg']:.4f} koleo={losses['koleo']:.4f} "
