@@ -165,16 +165,19 @@ def _merge_dict(base: dict, override: dict) -> dict:
 
 
 def load_config(path: str | Path) -> Config:
-    with open(path, "r") as f:
-        raw = yaml.safe_load(f)
+    base_dir = Path(path).parent
 
-    # 处理 _base_ 继承
-    base_path = raw.pop("_base_", None)
-    if base_path:
-        base_dir = Path(path).parent
-        with open(base_dir / base_path, "r") as f:
-            base_raw = yaml.safe_load(f)
-        raw = _merge_dict(base_raw, raw)
+    def _load_recursive(p: Path) -> dict:
+        with open(p, "r") as f:
+            raw = yaml.safe_load(f)
+        base_path = raw.pop("_base_", None)
+        if base_path:
+            with open(p.parent / base_path, "r") as f:
+                base_raw = yaml.safe_load(f)
+            raw = _merge_dict(_load_recursive(p.parent / base_path), raw)
+        return raw
+
+    raw = _load_recursive(Path(path))
 
     cfg = Config()
     for section, values in raw.items():
