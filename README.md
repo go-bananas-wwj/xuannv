@@ -1,11 +1,11 @@
-# AEF_qwen — AlphaEarth Foundations 改进版
+# xuannv_embdding — AlphaEarth Foundations 改进版
 
 > 从零实现的 AlphaEarth Foundations 改进版本，核心解决**嵌入坍缩**与**时间敏感性不足**两大问题。
 > 所有代码位于 `/workspace/xuannv/`，不影响原有 `/workspace/AEF/` 的代码。
 
 ## 与原版的差异
 
-| 方面 | 原版 AEF (`/workspace/AEF/`) | AEF_qwen (`/workspace/xuannv/`) |
+| 方面 | 原版 AEF (`/workspace/AEF/`) | xuannv_embdding (`/workspace/xuannv/`) |
 |------|----------|----------|
 | **Uniformity Loss** | `batch_uniformity_loss` (球面空间，L2 norm后) | `raw_uniformity_loss` (欧氏空间，自适应t) |
 | **Bottleneck 训练** | L2 norm + VMF noise | 跳过 L2 norm，保留原始幅度 |
@@ -51,7 +51,7 @@ raw_uniformity_loss 原理:
 ## 目录结构
 
 ```
-aef_qwen/
+xuannv_embdding/
 ├── README.md
 ├── pyproject.toml
 ├── configs/
@@ -144,4 +144,4 @@ python scripts/inference/extract_monthly_embeddings_all_patches.py \
 
 - **完全独立实现**: 所有代码从零编写，不复制原版
 - **参考接口设计**: 数据加载协议、模型输入输出格式与原版兼容
-- **可并行使用**: 训练输出到 `/workspace/outputs/aef_qwen_v1/`，不影响原版输出
+- **可并行使用**: 训练输出到 `/workspace/outputs/xuannv_embdding_v1/`，不影响原版输出

@@ -1,9 +1,9 @@
 ---
 name: aef-qwen
-description: AlphaEarth Foundations 改进版 (AEF_qwen) 项目专家知识 — 解决嵌入坍缩与时间敏感性问题
+description: AlphaEarth Foundations 改进版 (xuannv_embdding) 项目专家知识 — 解决嵌入坍缩与时间敏感性问题
 ---
 
-# AEF_qwen 项目专家指南
+# xuannv_embdding 项目专家指南
 
 ## 项目定位
 
@@ -61,7 +61,7 @@ cd /workspace/xuannv
 export CUDA_VISIBLE_DEVICES=5,6,7
 torchrun --nproc_per_node=3 scripts/train_ddp.py \
   --config configs/qwen_v3_temporal.yaml \
-  --resume /workspace/outputs/aef_qwen_v2/epoch_499.pt \
+  --resume /workspace/outputs/xuannv_embdding_v2/epoch_499.pt \
   --save-every 50 --warmup-epochs 5
 ```
 
@@ -94,8 +94,8 @@ torchrun --nproc_per_node=3 scripts/train_ddp.py \
 
 1. 使用 `validate_v2.py`
 2. 默认对比两个 checkpoint:
-   - V1: `/workspace/outputs/aef_qwen_v1/epoch_399.pt`
-   - V2: `/workspace/outputs/aef_qwen_v2/epoch_499.pt`
+   - V1: `/workspace/outputs/xuannv_embdding_v1/epoch_399.pt`
+   - V2: `/workspace/outputs/xuannv_embdding_v2/epoch_499.pt`
 3. 时间窗口:
    - Before: `2023Q3-Q4`
    - After: `2024Q3-2025Q4`
@@ -131,13 +131,13 @@ python3 -u demo/app.py --port 7868
 
 ```bash
 # 监控训练日志
-tail -f /workspace/outputs/aef_qwen_v1/training.log
+tail -f /workspace/outputs/xuannv_embdding_v1/training.log
 
 # 快速单卡测试
 CUDA_VISIBLE_DEVICES=5 python3 scripts/train_ddp.py --config configs/qwen_v1_scenes.yaml
 
 # 查看已保存 checkpoint
-ls -lah /workspace/outputs/aef_qwen_v1/*.pt
+ls -lah /workspace/outputs/xuannv_embdding_v1/*.pt
 
 # 运行变化检测验证
 python3 validate_v2.py

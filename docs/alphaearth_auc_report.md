@@ -1,4 +1,4 @@
-# AlphaEarth vs AEF_qwen_v2 Change Detection AUC Report
+# AlphaEarth vs xuannv_embdding_v2 Change Detection AUC Report
 
 **Evaluated patches**: 87
 **Before window**: 2023 全年
@@ -11,7 +11,7 @@
 - Min AUC: 0.0473
 - Max AUC: 0.9968
 
-## Local AEF_qwen_v2 Embedding (cosine distance)
+## Local xuannv_embdding_v2 Embedding (cosine distance)
 - Mean AUC: 0.4865
 - Std AUC:  0.1181
 - Median AUC: 0.4816

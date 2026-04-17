@@ -1,4 +1,4 @@
-# AEF_qwen 项目目录整理计划
+# xuannv_embdding 项目目录整理计划
 
 > **备份已创建**: `/workspace/xuannv_backup_20260417_192921.zip` (396KB，不含 logs/precomputed_cd)
 
@@ -17,7 +17,7 @@
 ## 二、目标目录结构
 
 ```
-aef_qwen/
+xuannv_embdding/
 ├── README.md                    # 项目说明
 ├── AGENTS.md                    # Agent 上下文
 ├── pyproject.toml               # 依赖配置

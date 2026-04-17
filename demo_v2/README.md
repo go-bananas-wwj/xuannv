@@ -1,4 +1,4 @@
-# AEF_qwen Demo V2 — 统一可视化平台
+# xuannv_embdding Demo V2 — 统一可视化平台
 
 基于 Gradio 的交互式 Web 界面，整合模型概览、数据浏览、Embedding 可视化、变化检测、模型对比和下游任务评估。
 
@@ -33,13 +33,13 @@ python demo_v2/app.py --port 7870 --share
 ```bash
 python scripts/export_embeddings.py \
     --config configs/qwen_v2_temporal.yaml \
-    --checkpoint /workspace/outputs/aef_qwen_v2/best.pt \
-    --output-dir /workspace/outputs/aef_qwen_v2/embeddings
+    --checkpoint /workspace/outputs/xuannv_embdding_v2/best.pt \
+    --output-dir /workspace/outputs/xuannv_embdding_v2/embeddings
 
 python scripts/export_embeddings.py \
     --config configs/qwen_v3_temporal.yaml \
-    --checkpoint /workspace/outputs/aef_qwen_v3/epoch_599.pt \
-    --output-dir /workspace/outputs/aef_qwen_v3/embeddings
+    --checkpoint /workspace/outputs/xuannv_embdding_v3/epoch_599.pt \
+    --output-dir /workspace/outputs/xuannv_embdding_v3/embeddings
 ```
 
 ## 目录结构

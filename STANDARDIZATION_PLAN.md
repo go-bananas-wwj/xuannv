@@ -11,7 +11,7 @@
 
 ### Step 0.1: 创建完整备份
 ```bash
-cd /workspace && zip -r xuannv_standardization_backup_$(date +%Y%m%d_%H%M%S).zip aef_qwen/
+cd /workspace && zip -r xuannv_standardization_backup_$(date +%Y%m%d_%H%M%S).zip xuannv_embdding/
 ```
 
 ### Step 0.2: 全局替换路径引用
@@ -26,7 +26,7 @@ cd /workspace && zip -r xuannv_standardization_backup_$(date +%Y%m%d_%H%M%S).zip
 ### Step 0.3: 重命名文件夹
 ```bash
 cd /workspace
-mv aef_qwen xuannv
+mv xuannv_embdding xuannv
 ```
 
 ### Step 0.4: 清理缓存
@@ -202,8 +202,8 @@ python -c "from src.data.datamodule import HarbinDataModule; print('OK')"
 ```python
 from src.inference.engine import load_backbone, load_cd_head
 # 加载旧 checkpoint
-model = load_backbone("configs/qwen_v1_scenes.yaml", "/workspace/outputs/aef_qwen_v2/epoch_499.pt", "cpu")
-head = load_cd_head("/workspace/outputs/aef_qwen_v2/monthly_cd_head/best_cv_fold0_v3_ohem_head.pt", "cpu")
+model = load_backbone("configs/qwen_v1_scenes.yaml", "/workspace/outputs/xuannv_embdding_v2/epoch_499.pt", "cpu")
+head = load_cd_head("/workspace/outputs/xuannv_embdding_v2/monthly_cd_head/best_cv_fold0_v3_ohem_head.pt", "cpu")
 print("Checkpoint compatible!")
 ```
 
@@ -230,7 +230,7 @@ cd /workspace
 rm -rf xuannv
 # 从最新备份恢复
 unzip xuannv_standardization_backup_YYYYMMDD_HHMMSS.zip
-mv aef_qwen xuannv  # 或保持原样
+mv xuannv_embdding xuannv  # 或保持原样
 ```
 
 ---

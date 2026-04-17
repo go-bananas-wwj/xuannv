@@ -1,7 +1,7 @@
-# AlphaEarth Foundations (AEF_qwen) 改进项目失败原因分析报告
+# AlphaEarth Foundations (xuannv_embdding) 改进项目失败原因分析报告
 
 > **汇报日期**：2026-04-15  
-> **项目**：AEF_qwen 时序嵌入改进与变化检测能力提升  
+> **项目**：xuannv_embdding 时序嵌入改进与变化检测能力提升  
 > **汇报人**：技术研发团队  
 > **版本**：V1.0（供领导决策用）
 
@@ -162,4 +162,4 @@ filter_2025_monthly: true
 **附件目录**：
 - `/workspace/xuannv/experiment_summary_20250415.md` — 详细技术实验记录
 - `/workspace/xuannv/taskhead_integration_summary_20250415.md` — TaskHead 集成与性能数据
-- `/workspace/outputs/aef_qwen_v2_taskheads/benchmark_all/summary.json` — 70 patch 量化指标
+- `/workspace/outputs/xuannv_embdding_v2_taskheads/benchmark_all/summary.json` — 70 patch 量化指标

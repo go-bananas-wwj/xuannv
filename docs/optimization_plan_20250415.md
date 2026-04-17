@@ -1,4 +1,4 @@
-# AEF_qwen 优化计划书
+# xuannv_embdding 优化计划书
 
 > 日期：2025-04-15  
 > 范围：Gradio 前端展示界面优化 + 任务头微调（Task Head Finetuning）  

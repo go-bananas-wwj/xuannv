@@ -1,4 +1,4 @@
-# AEF_qwen 双实验总结报告
+# xuannv_embdding 双实验总结报告
 
 > 生成时间：2025-04-15  
 > 实验范围：HR-only Small Model (GPUs 3,4) + 主 Finetune (GPUs 5,6,7)  
@@ -158,7 +158,7 @@ loss = rank_loss + margin_loss
 
 HR-only small 的相邻月份变化强度和分割图保存在：
 ```
-/workspace/outputs/aef_qwen_v2_hr_only_small/visualizations/
+/workspace/outputs/xuannv_embdding_v2_hr_only_small/visualizations/
 ```
 包含：
 - `patch_000146_change_intensity_annotated.png`

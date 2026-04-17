@@ -7,7 +7,7 @@
 
 ## 一、权重选择
 
-**最终选定**：`/workspace/outputs/aef_qwen_v2/best.pt` (epoch 499)
+**最终选定**：`/workspace/outputs/xuannv_embdding_v2/best.pt` (epoch 499)
 
 | 权重 | 500-shot AUC | 备注 |
 |------|-------------|------|
@@ -117,7 +117,7 @@ V2 的预训练表征质量最优，是任务头微调的最佳基座。
 │   ├── task_head_engine.py                          # 新：Head 加载器
 │   ├── change_detection.py   (已改)                 # batch GPU + 自动 fallback
 │   └── fewshot_engine.py     (已改)                 # hybrid shot 策略
-└── outputs/aef_qwen_v2_taskheads/
+└── outputs/xuannv_embdding_v2_taskheads/
     ├── task_heads.pt                                # 最终统一权重 (CD head)
     ├── best_cd_head.pt                              # 最佳 CD head (epoch 9, AUC 0.6118)
     ├── eval_result.json                             # 验证指标

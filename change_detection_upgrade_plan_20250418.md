@@ -1,4 +1,4 @@
-# AEF_qwen 变化检测能力升级计划（Embedding 模型 + CD Head 双轨升级）
+# xuannv_embdding 变化检测能力升级计划（Embedding 模型 + CD Head 双轨升级）
 
 > **核心目标**：让 backbone 产出的 embedding **天然具备时间敏感度**，同时让 CD Head 具备**更强的双时相特征交互能力**，最终使变化检测 AUC 突破 0.85+（主模型）/ 0.90+（分类头）。
 > 
