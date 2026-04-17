@@ -72,4 +72,4 @@ training:
   lr: 0.0001
   warmup_epochs: 10
   recon_warmup_epochs: 10
-  save_every: 20
+  save_every: 50

@@ -248,6 +248,14 @@ class DDPv4Trainer:
                             valid_end_w2=batch["valid_end_w2"],
                         )
                         temporal = self._temporal_loss(pre_w1, pre_w2, t)
+                        if self.global_rank == 0 and temporal.item() == 0.0:
+                            # Debug: print why temporal is zero
+                            f1 = F.adaptive_avg_pool2d(pre_w1, 1).view(pre_w1.shape[0], -1)
+                            f2 = F.adaptive_avg_pool2d(pre_w2, 1).view(pre_w2.shape[0], -1)
+                            f1 = F.normalize(f1, p=2, dim=-1)
+                            f2 = F.normalize(f2, p=2, dim=-1)
+                            sim = (f1 * f2).sum(dim=-1).mean().item()
+                            print(f"  [Temporal DEBUG] sim={sim:.4f} pre_w1_mean={pre_w1.mean().item():.4f} pre_w2_mean={pre_w2.mean().item():.4f}")
                     except Exception as e:
                         if self.global_rank == 0:
                             print(f"  [Temporal] Error: {e}")
@@ -354,6 +362,16 @@ class DDPv4Trainer:
             "losses": losses,
         }, path)
         print(f"[ddp_v4] Saved checkpoint to {path}")
+        
+        # 自动清理：只保留最新的 3 个数字 epoch checkpoint（best 保留）
+        import glob
+        ckpts = sorted(
+            [p for p in self.output_dir.glob("epoch_*.pt") if not p.name.startswith("epoch_best")],
+            key=lambda p: p.stat().st_mtime
+        )
+        for old_ckpt in ckpts[:-3]:
+            old_ckpt.unlink()
+            print(f"[ddp_v4] Removed old checkpoint: {old_ckpt}")
 
     def load_checkpoint(self, path: str) -> int:
         ckpt = torch.load(path, map_location=self.device, weights_only=False)
