@@ -268,6 +268,7 @@ class DDPv4Trainer:
                 "total": total.item() * accum_steps,
                 "recon": recon.item(),
                 "ct_recon": ct_recon.item(),
+                "dino": 0.0,
                 "vicreg": vicreg.item(),
                 "koleo": koleo.item(),
                 "temporal": temporal.item(),

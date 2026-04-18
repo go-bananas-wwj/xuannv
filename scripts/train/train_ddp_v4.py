@@ -146,7 +146,7 @@ def main():
             logger.print(
                 f"Epoch {epoch + 1:03d}/{cfg.training.epochs} | "
                 f"total={losses['total']:.4f} recon={losses['recon']:.4f} "
-                f"ct_recon={losses['ct_recon']:.4f} dino={losses['dino']:.4f} "
+                f"ct_recon={losses['ct_recon']:.4f} dino={losses.get('dino', 0.0):.4f} "
                 f"vicreg={losses['vicreg']:.4f} koleo={losses['koleo']:.4f} "
                 f"temporal={losses['temporal']:.4f} lr={losses['lr']:.6f}"
             )
