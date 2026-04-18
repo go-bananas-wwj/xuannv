@@ -35,14 +35,14 @@ def build_dataloader(
 
     sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=training) if distributed else None
 
+    # Data is pre-loaded in memory (dataset._cache), no need for background workers
+    num_workers = 0
     return DataLoader(
         dataset,
         batch_size=cfg.data.batch_size,
         sampler=sampler,
         shuffle=(sampler is None and training),
-        num_workers=cfg.data.num_workers,
+        num_workers=num_workers,
         pin_memory=True,
         drop_last=training,
-        persistent_workers=True if cfg.data.num_workers > 0 else False,
-        prefetch_factor=4 if cfg.data.num_workers > 0 else None,
     )
