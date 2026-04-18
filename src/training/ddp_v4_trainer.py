@@ -99,7 +99,7 @@ class DDPv4Trainer:
         # Student 模型
         self.model = AEFModel(cfg).to(self.device)
         self.model = DistributedDataParallel(
-            self.model, device_ids=[local_rank], find_unused_parameters=True
+            self.model, device_ids=[local_rank], find_unused_parameters=False
         )
 
         # 加载预训练权重

@@ -82,11 +82,6 @@ def main():
 
     cfg = load_config(args.config)
 
-    # 关闭 gradient checkpointing 以兼容 DDP find_unused_parameters=True
-    cfg.model.gradient_checkpointing = False
-    # 减小 batch size 避免 OOM
-    cfg.data.batch_size = 1
-
     # 覆盖参数
     if args.epochs is not None:
         cfg.training.epochs = args.epochs
