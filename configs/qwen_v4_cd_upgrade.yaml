@@ -45,7 +45,7 @@ training:
   teacher_momentum: 0.996
 
   # ★ DINO/iBOT
-  dino_weight: 0.0  # DINO disabled: caused persistent NaN/stall issues
+  dino_weight: 0.0  # DINO removed: persistent stagnation at ~8.14 (random guess level)
 
   # ★ VICReg + KoLeo（替换旧反坍缩四件套）
   vicreg_weight: 1.0
@@ -68,8 +68,8 @@ training:
   temporal_contrastive_temperature: 0.1
   temporal_loss_type: info_nce_antidiagonal
 
-  # 学习率（effective batch=32，但 NaN 历史要求保守）
-  lr: 0.00005
+  # 学习率（effective batch=32，恢复 DINO 后适当提高以打破 plateau）
+  lr: 0.0001
   warmup_epochs: 10
   recon_warmup_epochs: 10
   save_every: 20

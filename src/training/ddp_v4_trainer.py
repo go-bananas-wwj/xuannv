@@ -86,7 +86,7 @@ class DDPv4Trainer:
             p.requires_grad = False
         self.teacher_momentum = getattr(cfg.training, "teacher_momentum", 0.996)
 
-        # 优化器: backbone only (DINO removed)
+        # 优化器: backbone only
         params = list(self.model.parameters())
         self.optimizer = build_optimizer_from_params(params, cfg)
         self.scheduler = build_scheduler(self.optimizer, cfg)
