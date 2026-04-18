@@ -151,14 +151,14 @@ class HarbinPatchDataset(Dataset):
         return [frames[i] for i in indices], [ts[i] for i in indices]
 
     def _preload_all(self) -> None:
-        """预加载所有数据到内存 — 支持持久化缓存."""
+        """预加载所有数据到内存 — 支持持久化缓存 (DDP 安全: 仅 rank 0 预加载)."""
         import time, hashlib
-        # 生成缓存文件名 (基于数据路径和patch列表)
         cache_key = hashlib.md5(
             (str(self.data_root) + ",".join(self.patches)).encode()
         ).hexdigest()[:16]
         cache_file = Path("/workspace/outputs/aef_qwen_v4_cd_upgrade") / f"dataset_cache_{cache_key}.pt"
 
+        # 尝试加载已有缓存
         if cache_file.exists():
             start = time.time()
             ckpt = torch.load(cache_file, weights_only=False)
@@ -166,17 +166,38 @@ class HarbinPatchDataset(Dataset):
             print(f"[Dataset] Loaded cache from {cache_file} ({cache_file.stat().st_size/1e9:.1f}GB) in {time.time()-start:.1f}s")
             return
 
+        # 检测是否在 DDP 环境中
+        try:
+            import torch.distributed as dist
+            is_ddp = dist.is_initialized() and dist.get_world_size() > 1
+            rank = dist.get_rank() if is_ddp else 0
+        except Exception:
+            is_ddp = False
+            rank = 0
+
+        if is_ddp and rank > 0:
+            # rank > 0: 等待 rank 0 写完缓存文件，然后加载
+            print(f"[Dataset] Rank {rank} waiting for cache file...")
+            wait_start = time.time()
+            while not cache_file.exists():
+                time.sleep(2)
+                if time.time() - wait_start > 600:
+                    raise RuntimeError("Timeout waiting for dataset cache")
+            ckpt = torch.load(cache_file, weights_only=False)
+            self._cache = ckpt["cache"]
+            print(f"[Dataset] Rank {rank} loaded cache in {time.time()-wait_start:.1f}s")
+            return
+
+        # rank 0 (或非 DDP): 执行预加载并保存 (原子写入，防止 rank 1 读到不完整文件)
         start = time.time()
         n_cached = 0
         for patch_id in self.patches:
             self._cache[patch_id] = {}
-            # 1) 输入源
             for src_name in self.input_sources:
                 result = self._load_input_frames_impl(patch_id, src_name)
                 if len(result[0]) > 0:
                     self._cache[patch_id][src_name] = result
                     n_cached += 1
-            # 2) 目标源 (dem/worldcover/jrc_water/dynamic_world)
             for tgt_name, loss_type, sensor_src in self.target_sources:
                 if tgt_name in self._cache[patch_id]:
                     continue
@@ -210,9 +231,10 @@ class HarbinPatchDataset(Dataset):
         elapsed = time.time() - start
         print(f"[Dataset] Pre-loaded {len(self.patches)} patches, {n_cached} sources in {elapsed:.1f}s ({elapsed/60:.1f}min)")
 
-        # 保存持久化缓存
         save_start = time.time()
-        torch.save({"cache": self._cache}, cache_file)
+        tmp_file = cache_file.with_suffix(".tmp")
+        torch.save({"cache": self._cache}, tmp_file)
+        tmp_file.rename(cache_file)  # 原子重命名
         print(f"[Dataset] Saved cache to {cache_file} ({cache_file.stat().st_size/1e9:.1f}GB) in {time.time()-save_start:.1f}s")
 
     def _load_input_frames(self, patch_id: str, source_name: str) -> tuple[np.ndarray, np.ndarray]:
