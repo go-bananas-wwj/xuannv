@@ -47,45 +47,6 @@ def vicreg_loss(z_student: torch.Tensor, z_teacher: torch.Tensor,
     return lambda_inv * inv + mu_var * var + nu_cov * cov_loss
 
 
-class DINOHead(nn.Module):
-    def __init__(self, in_dim: int = 128, hidden_dim: int = 256, bottleneck_dim: int = 128,
-                 n_prototypes: int = 4096) -> None:
-        super().__init__()
-        self.projector = nn.Sequential(
-            nn.Linear(in_dim, hidden_dim), nn.GELU(),
-            nn.Linear(hidden_dim, hidden_dim), nn.GELU(),
-            nn.Linear(hidden_dim, bottleneck_dim),
-        )
-        self.prototypes = nn.Linear(bottleneck_dim, n_prototypes, bias=False)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.projector(x)
-        x = F.normalize(x, p=2, dim=-1)
-        return self.prototypes(x)
-
-
-class DINOLoss(nn.Module):
-    def __init__(self, n_prototypes: int = 4096, teacher_temp: float = 0.07,
-                 student_temp: float = 0.1, center_momentum: float = 0.9) -> None:
-        super().__init__()
-        self.register_buffer("center", torch.zeros(1, n_prototypes))
-        self.teacher_temp = teacher_temp
-        self.student_temp = student_temp
-        self.center_momentum = center_momentum
-
-    def forward(self, student_logits: torch.Tensor, teacher_logits: torch.Tensor) -> torch.Tensor:
-        # Force fp32 for numerical stability of softmax / log-softmax under autocast
-        s = student_logits.float()
-        t = teacher_logits.float()
-        student_probs = F.log_softmax(s / self.student_temp, dim=-1)
-        teacher_probs = F.softmax((t - self.center) / self.teacher_temp, dim=-1)
-        loss = -torch.sum(teacher_probs * student_probs, dim=-1).mean()
-        with torch.no_grad():
-            batch_center = teacher_probs.mean(dim=0, keepdim=True)
-            self.center.mul_(self.center_momentum).add_(batch_center, alpha=1 - self.center_momentum)
-        return loss
-
-
 def build_optimizer_from_params(params, cfg):
     t = cfg.training
     # eps=1e-4 for fp16 stability (default 1e-8 underflows in half precision)
@@ -125,16 +86,8 @@ class DDPv4Trainer:
             p.requires_grad = False
         self.teacher_momentum = getattr(cfg.training, "teacher_momentum", 0.996)
 
-        # DINO Head（需要 DDP 包装以同步梯度）
-        emb_dim = cfg.model.embedding_dim
-        self.dino_head = DINOHead(in_dim=emb_dim).to(self.device)
-        self.dino_head = DistributedDataParallel(
-            self.dino_head, device_ids=[local_rank], find_unused_parameters=False
-        )
-        self.dino_loss = DINOLoss().to(self.device)
-
-        # 优化器: backbone + DINO head
-        params = list(self.model.parameters()) + list(self.dino_head.parameters())
+        # 优化器: backbone only (DINO removed)
+        params = list(self.model.parameters())
         self.optimizer = build_optimizer_from_params(params, cfg)
         self.scheduler = build_scheduler(self.optimizer, cfg)
 
@@ -226,16 +179,6 @@ class DDPv4Trainer:
                         target_metadata=batch["target_metadata"],
                     )
 
-            # DINO (disabled if weight == 0)
-            dino_w = getattr(t, "dino_weight", 0.1)
-            dino = torch.tensor(0.0, device=self.device)
-            if dino_w > 0:
-                s_emb = student_out.embedding.float()
-                t_emb = teacher_out.embedding.float()
-                s_logits = self.dino_head(s_emb)
-                t_logits = self.dino_head(t_emb)
-                dino = self.dino_loss(s_logits, t_logits)
-
             with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True):
 
                 # VICReg + KoLeo
@@ -298,7 +241,6 @@ class DDPv4Trainer:
                 total = (
                     recon_weight * recon
                     + ct_recon_w * ct_recon
-                    + getattr(t, "dino_weight", 0.1) * dino
                     + getattr(t, "vicreg_weight", 1.0) * vicreg
                     + getattr(t, "koleo_weight", 0.1) * koleo
                     + temporal_w * temporal
@@ -311,7 +253,7 @@ class DDPv4Trainer:
             if (step + 1) % accum_steps == 0 or (step + 1) == len(dataloader):
                 self.scaler.unscale_(self.optimizer)
                 torch.nn.utils.clip_grad_norm_(
-                    list(self.model.parameters()) + list(self.dino_head.parameters())
+                    list(self.model.parameters())
                     + (list(self.expander.parameters()) if self.expander is not None else []),
                     getattr(t, "grad_clip_norm", 1.0)
                 )
@@ -324,7 +266,6 @@ class DDPv4Trainer:
                 "total": total.item() * accum_steps,
                 "recon": recon.item(),
                 "ct_recon": ct_recon.item(),
-                "dino": dino.item(),
                 "vicreg": vicreg.item(),
                 "koleo": koleo.item(),
                 "temporal": temporal.item(),
@@ -375,11 +316,8 @@ class DDPv4Trainer:
             return
         path = self.output_dir / f"epoch_{epoch}.pt"
         
-        # 收集所有需要保存的 state dict（包括 model 以外的 head/loss）
-        extra_state = {
-            "dino_head": self.dino_head.state_dict(),
-            "dino_loss": self.dino_loss.state_dict(),
-        }
+        # 收集所有需要保存的 state dict
+        extra_state = {}
         if self.expander is not None:
             extra_state["expander"] = self.expander.state_dict()
         
@@ -419,17 +357,9 @@ class DDPv4Trainer:
         if unexpected and self.global_rank == 0:
             print(f"[load_checkpoint] Unexpected keys: {len(unexpected)}")
         
-        # 加载 DINO head / loss / expander
+        # 加载 expander
         if "extra_state" in ckpt:
             es = ckpt["extra_state"]
-            if "dino_head" in es:
-                self.dino_head.load_state_dict(es["dino_head"])
-                if self.global_rank == 0:
-                    print("[load_checkpoint] DINO head loaded.")
-            if "dino_loss" in es:
-                self.dino_loss.load_state_dict(es["dino_loss"])
-                if self.global_rank == 0:
-                    print("[load_checkpoint] DINO loss loaded.")
             if "expander" in es and self.expander is not None:
                 self.expander.load_state_dict(es["expander"])
                 if self.global_rank == 0:
