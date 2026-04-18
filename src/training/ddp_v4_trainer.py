@@ -355,11 +355,21 @@ class DDPv4Trainer:
         if self.global_rank != 0:
             return
         path = self.output_dir / f"epoch_{epoch}.pt"
+        
+        # 收集所有需要保存的 state dict（包括 model 以外的 head/loss）
+        extra_state = {
+            "dino_head": self.dino_head.state_dict(),
+            "dino_loss": self.dino_loss.state_dict(),
+        }
+        if self.expander is not None:
+            extra_state["expander"] = self.expander.state_dict()
+        
         torch.save({
             "epoch": epoch,
             "model_state_dict": self.model.module.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
             "losses": losses,
+            "extra_state": extra_state,
         }, path)
         print(f"[ddp_v4] Saved checkpoint to {path}")
         
@@ -380,6 +390,23 @@ class DDPv4Trainer:
             print(f"[load_checkpoint] Missing keys: {len(missing)}")
         if unexpected and self.global_rank == 0:
             print(f"[load_checkpoint] Unexpected keys: {len(unexpected)}")
+        
+        # 加载 DINO head / loss / expander
+        if "extra_state" in ckpt:
+            es = ckpt["extra_state"]
+            if "dino_head" in es:
+                self.dino_head.load_state_dict(es["dino_head"])
+                if self.global_rank == 0:
+                    print("[load_checkpoint] DINO head loaded.")
+            if "dino_loss" in es:
+                self.dino_loss.load_state_dict(es["dino_loss"])
+                if self.global_rank == 0:
+                    print("[load_checkpoint] DINO loss loaded.")
+            if "expander" in es and self.expander is not None:
+                self.expander.load_state_dict(es["expander"])
+                if self.global_rank == 0:
+                    print("[load_checkpoint] Expander loaded.")
+        
         self.teacher = copy.deepcopy(self.model.module)
         self.teacher.eval()
         for p in self.teacher.parameters():
@@ -393,7 +420,9 @@ class DDPv4Trainer:
                 if self.global_rank == 0:
                     print(f"[load_checkpoint] Optimizer mismatch: {e}")
         epoch = ckpt.get("epoch", 0)
-        # 兼容 "best" 等非整数字符串 epoch
+        # 兼容 "best_epoch47" 等非整数字符串 epoch
         if not isinstance(epoch, int):
-            epoch = 0
+            import re
+            m = re.search(r'(\d+)', str(epoch))
+            epoch = int(m.group(1)) if m else 0
         return epoch
