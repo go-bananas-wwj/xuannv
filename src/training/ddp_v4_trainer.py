@@ -226,10 +226,14 @@ class DDPv4Trainer:
                         target_metadata=batch["target_metadata"],
                     )
 
-                # DINO
-                s_logits = self.dino_head(student_out.embedding)
-                t_logits = self.dino_head(teacher_out.embedding)
-                dino = self.dino_loss(s_logits, t_logits)
+            # DINO: run head + loss in fp32 outside autocast for numerical stability
+            s_emb = student_out.embedding.float()
+            t_emb = teacher_out.embedding.float()
+            s_logits = self.dino_head(s_emb)
+            t_logits = self.dino_head(t_emb)
+            dino = self.dino_loss(s_logits, t_logits)
+
+            with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True):
 
                 # VICReg + KoLeo
                 z_s = student_out.pre_norm_embedding
