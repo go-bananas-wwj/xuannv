@@ -22,6 +22,9 @@ experiment:
   output_dir: /workspace/outputs/aef_qwen_v4_cd_upgrade
 
 data:
+  # ★ 数据加载优化
+  num_workers: 8
+
   # ★ 相邻月份双窗口 — 与下游月度变化检测对齐
   window_mode: "adjacent_month"
 
