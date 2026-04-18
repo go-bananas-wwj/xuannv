@@ -130,7 +130,6 @@ def main():
 
     total_epochs = cfg.training.epochs
     if args.resume and start_epoch > 0:
-        total_epochs = start_epoch + cfg.training.epochs
         if global_rank == 0:
             logger.print(f"[train] Will train from epoch {start_epoch + 1} to {total_epochs}")
 
@@ -145,7 +144,7 @@ def main():
 
         if global_rank == 0:
             logger.print(
-                f"Epoch {epoch + 1:03d}/{total_epochs} | "
+                f"Epoch {epoch + 1:03d}/{cfg.training.epochs} | "
                 f"total={losses['total']:.4f} recon={losses['recon']:.4f} "
                 f"ct_recon={losses['ct_recon']:.4f} dino={losses['dino']:.4f} "
                 f"vicreg={losses['vicreg']:.4f} koleo={losses['koleo']:.4f} "
