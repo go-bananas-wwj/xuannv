@@ -151,8 +151,21 @@ class HarbinPatchDataset(Dataset):
         return [frames[i] for i in indices], [ts[i] for i in indices]
 
     def _preload_all(self) -> None:
-        """预加载所有数据到内存 — 消除磁盘 IO 瓶颈."""
-        import time
+        """预加载所有数据到内存 — 支持持久化缓存."""
+        import time, hashlib
+        # 生成缓存文件名 (基于数据路径和patch列表)
+        cache_key = hashlib.md5(
+            (str(self.data_root) + ",".join(self.patches)).encode()
+        ).hexdigest()[:16]
+        cache_file = Path("/workspace/outputs/aef_qwen_v4_cd_upgrade") / f"dataset_cache_{cache_key}.pt"
+
+        if cache_file.exists():
+            start = time.time()
+            ckpt = torch.load(cache_file, weights_only=False)
+            self._cache = ckpt["cache"]
+            print(f"[Dataset] Loaded cache from {cache_file} ({cache_file.stat().st_size/1e9:.1f}GB) in {time.time()-start:.1f}s")
+            return
+
         start = time.time()
         n_cached = 0
         for patch_id in self.patches:
@@ -172,7 +185,7 @@ class HarbinPatchDataset(Dataset):
                     if src_dir.exists():
                         tif_files = sorted(src_dir.glob("*.tif"))
                         if tif_files:
-                            data = read_tif(tif_files[0], 0)  # 原始尺寸，保持和原来一致
+                            data = read_tif(tif_files[0], 0)
                             if data is not None:
                                 data = self._normalize(data, tgt_name)
                                 data = self._pad_channels(data, self.reconstruction_channels)
@@ -196,6 +209,11 @@ class HarbinPatchDataset(Dataset):
                             n_cached += 1
         elapsed = time.time() - start
         print(f"[Dataset] Pre-loaded {len(self.patches)} patches, {n_cached} sources in {elapsed:.1f}s ({elapsed/60:.1f}min)")
+
+        # 保存持久化缓存
+        save_start = time.time()
+        torch.save({"cache": self._cache}, cache_file)
+        print(f"[Dataset] Saved cache to {cache_file} ({cache_file.stat().st_size/1e9:.1f}GB) in {time.time()-save_start:.1f}s")
 
     def _load_input_frames(self, patch_id: str, source_name: str) -> tuple[np.ndarray, np.ndarray]:
         """带缓存的输入帧加载."""
