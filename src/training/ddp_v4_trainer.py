@@ -25,6 +25,8 @@ from src.training.optimizer import build_optimizer, build_scheduler, get_cosine_
 
 
 def koleo_loss(x: torch.Tensor) -> torch.Tensor:
+    # Force fp32 for cdist / log numerical stability under autocast
+    x = x.float()
     x = F.normalize(x, p=2, dim=-1)
     dists = torch.cdist(x, x, p=2)
     eye = torch.eye(dists.shape[0], device=dists.device)
@@ -72,8 +74,11 @@ class DINOLoss(nn.Module):
         self.center_momentum = center_momentum
 
     def forward(self, student_logits: torch.Tensor, teacher_logits: torch.Tensor) -> torch.Tensor:
-        student_probs = F.log_softmax(student_logits / self.student_temp, dim=-1)
-        teacher_probs = F.softmax((teacher_logits - self.center) / self.teacher_temp, dim=-1)
+        # Force fp32 for numerical stability of softmax / log-softmax under autocast
+        s = student_logits.float()
+        t = teacher_logits.float()
+        student_probs = F.log_softmax(s / self.student_temp, dim=-1)
+        teacher_probs = F.softmax((t - self.center) / self.teacher_temp, dim=-1)
         loss = -torch.sum(teacher_probs * student_probs, dim=-1).mean()
         with torch.no_grad():
             batch_center = teacher_probs.mean(dim=0, keepdim=True)
@@ -83,7 +88,8 @@ class DINOLoss(nn.Module):
 
 def build_optimizer_from_params(params, cfg):
     t = cfg.training
-    return torch.optim.AdamW(params, lr=t.lr, weight_decay=t.weight_decay)
+    # eps=1e-4 for fp16 stability (default 1e-8 underflows in half precision)
+    return torch.optim.AdamW(params, lr=t.lr, weight_decay=t.weight_decay, eps=1e-4)
 
 
 class DDPv4Trainer:
@@ -131,6 +137,9 @@ class DDPv4Trainer:
         params = list(self.model.parameters()) + list(self.dino_head.parameters())
         self.optimizer = build_optimizer_from_params(params, cfg)
         self.scheduler = build_scheduler(self.optimizer, cfg)
+
+        # GradScaler for mixed-precision training stability
+        self.scaler = torch.cuda.amp.GradScaler()
 
         # 输出目录
         self.output_dir = Path(cfg.experiment.output_dir)
@@ -290,14 +299,17 @@ class DDPv4Trainer:
                 )
                 total = total / accum_steps
 
-            total.backward()
+            self.scaler.scale(total).backward()
 
             if (step + 1) % accum_steps == 0 or (step + 1) == len(dataloader):
+                self.scaler.unscale_(self.optimizer)
                 torch.nn.utils.clip_grad_norm_(
-                    list(self.model.parameters()) + list(self.dino_head.parameters()),
+                    list(self.model.parameters()) + list(self.dino_head.parameters())
+                    + (list(self.expander.parameters()) if self.expander is not None else []),
                     getattr(t, "grad_clip_norm", 1.0)
                 )
-                self.optimizer.step()
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
                 self.optimizer.zero_grad()
                 self.update_teacher()
 
@@ -368,6 +380,7 @@ class DDPv4Trainer:
             "epoch": epoch,
             "model_state_dict": self.model.module.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
+            "scaler_state_dict": self.scaler.state_dict(),
             "losses": losses,
             "extra_state": extra_state,
         }, path)
@@ -427,6 +440,10 @@ class DDPv4Trainer:
             except ValueError as e:
                 if self.global_rank == 0:
                     print(f"[load_checkpoint] Optimizer mismatch: {e}")
+        if "scaler_state_dict" in ckpt:
+            self.scaler.load_state_dict(ckpt["scaler_state_dict"])
+            if self.global_rank == 0:
+                print("[load_checkpoint] GradScaler state loaded.")
         epoch = ckpt.get("epoch", 0)
         # 兼容 "best_epoch47" 等非整数字符串 epoch
         if not isinstance(epoch, int):
