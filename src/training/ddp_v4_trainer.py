@@ -99,6 +99,8 @@ class DDPv4Trainer:
         if self.global_rank == 0:
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
+        emb_dim = cfg.model.embedding_dim
+
         # Expander for VICReg
         expander_dim = getattr(cfg.training, "expander_dim", 0)
         if expander_dim > 0:
