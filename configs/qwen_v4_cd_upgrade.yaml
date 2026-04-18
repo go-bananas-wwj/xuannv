@@ -45,7 +45,7 @@ training:
   teacher_momentum: 0.996
 
   # ★ DINO/iBOT
-  dino_weight: 0.1
+  dino_weight: 0.0  # DINO disabled: caused persistent NaN/stall issues
 
   # ★ VICReg + KoLeo（替换旧反坍缩四件套）
   vicreg_weight: 1.0
