@@ -60,13 +60,18 @@ class HarbinPatchDataset(Dataset):
         self.temporal_window_min_frames = d.temporal_window_min_frames
         self.temporal_window_max_frames = d.temporal_window_max_frames
 
-        # 双窗口采样模式: "random_split" | "adjacent_month" | "non_overlap"
+        # 双窗口采样模式: "random_split" | "adjacent_month" | "non_overlap" | "mixed_scale"
         self.window_mode = getattr(d, "window_mode", "random_split")
         # non_overlap 参数
         self._non_overlapping_windows = getattr(d, "non_overlap", True) if self.window_mode == "non_overlap" else False
         self._min_window_frames = getattr(d, "non_overlap_min_frames", 4)
         self._max_window_frames = getattr(d, "non_overlap_max_frames", 12)
         self._min_window_gap_ms = getattr(d, "non_overlap_min_gap_ms", 6 * 30 * 24 * 3600 * 1000)
+        # mixed_scale 参数
+        self._mixed_scale_long_prob = getattr(d, "mixed_scale_long_prob", 0.5)
+        self._mixed_scale_short_prob = getattr(d, "mixed_scale_short_prob", 0.5)
+        self._mixed_scale_short_max_gap_ms = getattr(d, "mixed_scale_short_max_gap_ms", 3 * 30 * 24 * 3600 * 1000)
+        self._mixed_scale_long_min_gap_ms = getattr(d, "mixed_scale_long_min_gap_ms", 6 * 30 * 24 * 3600 * 1000)
         # 跨时相掩码重建配置
         self.ct_mask_ratio = getattr(d, "ct_mask_ratio", 0.3)   # 掩码比例
         self.ct_mask_patch_size = getattr(d, "ct_mask_patch_size", 8)  # 掩码 patch 尺寸
@@ -347,19 +352,123 @@ class HarbinPatchDataset(Dataset):
             pass
         return 0
 
+    def _sample_long_gap_windows(self, ts_sorted: list[int]) -> tuple[float, float, float, float]:
+        """长间隔窗口采样 (gap ≥ long_min_gap_ms)."""
+        min_frames = getattr(self, '_min_window_frames', 4)
+        max_frames = getattr(self, '_max_window_frames', 12)
+        min_gap_ms = getattr(self, '_mixed_scale_long_min_gap_ms', 6 * 30 * 24 * 3600 * 1000)
+
+        if len(ts_sorted) >= min_frames * 2:
+            for _ in range(20):
+                split_point = random.randint(min_frames, len(ts_sorted) - min_frames)
+                early_frames = ts_sorted[:split_point]
+                late_frames = ts_sorted[split_point:]
+
+                w1_size = random.randint(min_frames, min(max_frames, len(early_frames)))
+                w2_size = random.randint(min_frames, min(max_frames, len(late_frames)))
+
+                w1_start_idx = random.randint(0, len(early_frames) - w1_size)
+                w2_start_idx = random.randint(0, len(late_frames) - w2_size)
+
+                cand_w1_start = float(early_frames[w1_start_idx])
+                cand_w1_end = float(early_frames[w1_start_idx + w1_size - 1])
+                cand_w2_start = float(late_frames[w2_start_idx])
+                cand_w2_end = float(late_frames[w2_start_idx + w2_size - 1])
+
+                center1 = (cand_w1_start + cand_w1_end) / 2.0
+                center2 = (cand_w2_start + cand_w2_end) / 2.0
+                if abs(center2 - center1) >= min_gap_ms:
+                    return cand_w1_start, cand_w1_end, cand_w2_start, cand_w2_end
+        # fallback
+        w1_start = float(ts_sorted[0])
+        w1_end = float(ts_sorted[min_frames - 1])
+        w2_start = float(ts_sorted[-min_frames])
+        w2_end = float(ts_sorted[-1])
+        return w1_start, w1_end, w2_start, w2_end
+
+    def _sample_short_gap_windows(self, ts_sorted: list[int]) -> tuple[float, float, float, float]:
+        """短间隔窗口采样: 选相邻/近邻的 1-3 个月合并为 w1/w2, gap ≤ 3个月."""
+        from collections import defaultdict
+        from datetime import datetime
+
+        min_frames = getattr(self, '_min_window_frames', 4)
+        short_max_gap_ms = getattr(self, '_mixed_scale_short_max_gap_ms', 3 * 30 * 24 * 3600 * 1000)
+
+        # 按月份分组
+        month_groups: dict[str, list[int]] = defaultdict(list)
+        for ts in ts_sorted:
+            dt = datetime.fromtimestamp(ts / 1000.0)
+            key = f"{dt.year:04d}-{dt.month:02d}"
+            month_groups[key].append(ts)
+
+        months = sorted(month_groups.keys())
+
+        # 策略: w1/w2 各包含 1-3 个月, 可以紧挨着或隔 0-1 个月
+        if len(months) >= 2:
+            for _ in range(50):
+                w1_months = random.randint(1, 3)
+                w2_months = random.randint(1, 3)
+                gap_months = random.randint(0, 1)  # 0=紧挨, 1=隔1个月
+
+                total_months_needed = w1_months + gap_months + w2_months
+                if total_months_needed > len(months):
+                    continue
+
+                start_idx = random.randint(0, len(months) - total_months_needed)
+                w2_start_idx = start_idx + w1_months + gap_months
+
+                # 收集帧
+                m1_frames = []
+                for k in range(start_idx, start_idx + w1_months):
+                    m1_frames.extend(month_groups[months[k]])
+
+                m2_frames = []
+                for k in range(w2_start_idx, w2_start_idx + w2_months):
+                    m2_frames.extend(month_groups[months[k]])
+
+                if len(m1_frames) >= min_frames and len(m2_frames) >= min_frames:
+                    w1_start = float(m1_frames[0])
+                    w1_end = float(m1_frames[-1])
+                    w2_start = float(m2_frames[0])
+                    w2_end = float(m2_frames[-1])
+
+                    # 检查 center gap 是否在短间隔范围内
+                    center1 = (w1_start + w1_end) / 2.0
+                    center2 = (w2_start + w2_end) / 2.0
+                    gap_ms = abs(center2 - center1)
+
+                    if gap_ms <= short_max_gap_ms:
+                        return w1_start, w1_end, w2_start, w2_end
+
+        # fallback: 中点分割
+        mid = len(ts_sorted) // 2
+        return float(ts_sorted[0]), float(ts_sorted[mid - 1]), float(ts_sorted[mid]), float(ts_sorted[-1])
+
     def _sample_dual_windows(self, ts_sorted: list[int]) -> tuple[float, float, float, float]:
         """根据 window_mode 采样两个时间窗口.
 
-        支持三种模式:
+        支持四种模式:
         - "adjacent_month": 选择相邻两个月的帧作为 w1/w2（与下游月度变化检测对齐）
         - "non_overlap": 非重叠长间隔窗口（原 v3 模式）
         - "random_split": 随机中点分割（默认）
+        - "mixed_scale": 混合尺度 — 随机选择长间隔(≥6月)或短间隔(1-3月)
         """
         if len(ts_sorted) < 2:
             t = float(ts_sorted[0]) if ts_sorted else 1672531200000.0
             return t, t, t, t
 
         w1_start = w1_end = w2_start = w2_end = float(ts_sorted[0])
+
+        if self.window_mode == "mixed_scale" and self.training:
+            # 混合尺度: 以概率选择长间隔或短间隔
+            r = random.random()
+            long_prob = getattr(self, '_mixed_scale_long_prob', 0.5)
+            if r < long_prob:
+                # 长间隔模式: 使用 non_overlap 逻辑 (gap ≥ long_min_gap_ms)
+                return self._sample_long_gap_windows(ts_sorted)
+            else:
+                # 短间隔模式: gap 在 [1月, short_max_gap_ms] 之间
+                return self._sample_short_gap_windows(ts_sorted)
 
         if self.window_mode == "adjacent_month" and self.training:
             # 按月份分组 (YYYY-MM)

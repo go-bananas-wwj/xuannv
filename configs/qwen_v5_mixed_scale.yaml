@@ -1,0 +1,95 @@
+# ============================================================
+# AEF_qwen V5 Mixed Scale — 混合尺度时间窗口训练
+# ============================================================
+# 核心变更 (vs V4):
+#   1. 混合尺度双窗口: 长间隔(≥6月) + 短间隔(1-3月)
+#   2. 新增 Temporal Magnitude Loss (CaCo 思想)
+#   3. Scale-aware Consistency Weight
+#   4. 保留教师-学生一致性 + 反坍缩三件套
+#   5. 渐进 VMF kappa 50→500
+#   6. 从 V4 best checkpoint 软重启
+# ============================================================
+
+_base_: qwen_v2_temporal.yaml
+
+experiment:
+  name: aef_qwen_v5_mixed_scale
+  output_dir: /workspace/outputs/aef_qwen_v5_mixed_scale
+
+data:
+  # 混合尺度双窗口: 随机选择长间隔或短间隔
+  window_mode: "mixed_scale"
+  mixed_scale_long_prob: 0.5       # 长间隔概率
+  mixed_scale_short_prob: 0.5      # 短间隔概率
+  mixed_scale_short_max_gap_ms: 7776000000   # 3个月
+  mixed_scale_long_min_gap_ms: 15552000000   # 6个月
+  # 保留 non_overlap 参数供 fallback 使用
+  non_overlap_min_frames: 4
+  non_overlap_max_frames: 12
+
+  # 时序窗口增强
+  temporal_window_augmentation: true
+  temporal_window_prob: 0.5
+  temporal_window_min_frames: 4
+  temporal_window_max_frames: 12
+
+training:
+  epochs: 300
+  
+  # 梯度累积: batch=2 * 2GPU * accum=8 = effective batch=32
+  gradient_accumulation_steps: 8
+  
+  # EMA Teacher
+  teacher_momentum: 0.996
+  
+  # --- 核心损失权重 ---
+  reconstruction_weight: 1.0
+  
+  # 教师-学生一致性
+  consistency_weight: 0.05
+  
+  # Temporal Magnitude Loss (CaCo 思想)
+  temporal_magnitude_weight: 0.5   # 初始权重, 可 warmup
+  temporal_max_gap_ms: 15552000000  # 6个月 (归一化分母)
+  temporal_margin: 0.1
+  
+  # 分类监督
+  classification_weight: 0.03
+  
+  # 反坍缩三件套
+  uniformity_weight: 1.0        # raw_uniformity_loss
+  variance_weight: 0.25         # VICReg variance
+  decorrelation_weight: 0.05     # Barlow Twins
+  orthogonality_weight: 0.01    # bottleneck 权重正交
+  
+  # --- 已移除的损失 ---
+  dino_weight: 0.0
+  vicreg_weight: 0.0
+  koleo_weight: 0.0
+  temporal_contrastive_weight: 0.0
+  l2_temporal_weight: 0.0
+  ct_reconstruction_weight: 0.0
+  
+  # --- Student 扰动参数 (参考旧版本) ---
+  student_frame_drop_rate: 0.4
+  student_source_drop_rate: 0.25
+  student_front_drop_prob: 0.15
+  student_back_drop_prob: 0.15
+  
+  # --- 渐进 VMF Kappa ---
+  kappa_start: 50.0
+  kappa_end: 500.0
+  kappa_warmup_epochs: 100
+  
+  # --- 学习率 ---
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 10
+  save_every: 20
+  grad_clip_norm: 1.0
+  weight_decay: 0.05
+
+model:
+  # 初始 kappa 由 training.kappa_start 控制
+  vmf_kappa: 50.0

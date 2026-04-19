@@ -338,3 +338,51 @@ def pixel_temporal_info_nce_loss(
         logits = (f1[:, i, :] @ f2[:, i, :].T) / temperature
         loss += F.cross_entropy(-logits, labels)
     return loss / max(N, 1)
+
+
+def temporal_magnitude_loss(
+    pre_w1: torch.Tensor,
+    pre_w2: torch.Tensor,
+    time_gap_ms: torch.Tensor,
+    max_gap_ms: float = 6 * 30 * 24 * 3600 * 1000,  # 默认 6 个月
+    margin: float = 0.1,
+) -> torch.Tensor:
+    """时序幅度损失 — 约束 embedding distance ≤ time_gap_norm + margin.
+
+    核心思想 (CaCo / 变化检测):
+    同一地点不同时间的 embedding 距离应与真实时间间隔正相关。
+    但只设上限约束 (hinge)，因为实际地表变化不是严格线性的。
+
+    Args:
+        pre_w1: [B, D, H, W] pre-norm embedding (window 1)
+        pre_w2: [B, D, H, W] pre-norm embedding (window 2)
+        time_gap_ms: [B] 两个窗口中心点之间的时间间隔 (毫秒)
+        max_gap_ms: 归一化分母，将时间 gap 映射到 [0, 1]
+        margin: 允许的松弛量
+
+    Returns:
+        scalar loss
+    """
+    if pre_w1.shape[0] < 1:
+        return pre_w1.new_tensor(0.0)
+
+    B, D, H, W = pre_w1.shape
+
+    # Global mean over spatial dimensions -> [B, D]
+    flat_w1 = pre_w1.reshape(B, D, -1).mean(dim=-1)
+    flat_w2 = pre_w2.reshape(B, D, -1).mean(dim=-1)
+
+    # Cosine similarity in pre-norm space
+    flat_w1_norm = F.normalize(flat_w1, p=2, dim=-1)
+    flat_w2_norm = F.normalize(flat_w2, p=2, dim=-1)
+    cos_sim = (flat_w1_norm * flat_w2_norm).sum(dim=-1)  # [B]
+
+    # Distance in [0, 1]: (1 - cos_sim) / 2
+    dist = (1.0 - cos_sim) * 0.5  # [B]
+
+    # Normalized time gap: [0, 1]
+    time_gap_norm = (time_gap_ms / max_gap_ms).clamp(0.0, 1.0)  # [B]
+
+    # Hinge loss: 只惩罚 dist > time_gap_norm + margin 的部分
+    loss = F.relu(dist - time_gap_norm - margin).mean()
+    return loss

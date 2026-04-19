@@ -51,6 +51,11 @@ class DataConfig:
     non_overlap_min_frames: int = 4
     non_overlap_max_frames: int = 12
     non_overlap_min_gap_ms: int = 15552000000
+    # mixed_scale 参数
+    mixed_scale_long_prob: float = 0.5
+    mixed_scale_short_prob: float = 0.5
+    mixed_scale_short_max_gap_ms: int = 7776000000
+    mixed_scale_long_min_gap_ms: int = 15552000000
     # 跨时相掩码重建
     ct_mask_ratio: float = 0.0
     ct_mask_patch_size: int = 8
@@ -118,6 +123,9 @@ class TrainingConfig:
     l2_temporal_weight: float = 0.0
     pixel_temporal_weight: float = 0.0
     pixel_temporal_samples: int = 16
+    # Temporal Magnitude Loss (V5)
+    temporal_magnitude_weight: float = 0.0
+    temporal_max_gap_ms: int = 15552000000
     # 预归一化 uniformity
     pre_norm_uniform_weight: float = 3.0
     encoder_uniform_weight: float = 2.0
