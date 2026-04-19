@@ -183,18 +183,21 @@ class DDPv4Trainer:
 
             with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True):
 
-                # VICReg + KoLeo
+                # KoLeo (VICReg 已关闭 — 饱和不再提供有效梯度)
                 z_s = student_out.pre_norm_embedding
                 z_t = teacher_out.pre_norm_embedding
                 if self.expander is not None:
                     z_s = self.expander(z_s)
                     z_t = self.expander(z_t)
-                vicreg = vicreg_loss(z_s, z_t)
+                vicreg_w = getattr(t, "vicreg_weight", 0.0)
+                vicreg = vicreg_loss(z_s, z_t) if vicreg_w > 0 else torch.tensor(0.0, device=self.device)
                 koleo = koleo_loss(torch.cat([z_s, z_t], dim=0))
 
-                # Temporal
+                # Temporal — L2 distance loss (Rev B fix: 避免 F.normalize Jacobian 压缩梯度)
                 temporal = torch.tensor(0.0, device=self.device)
+                temporal_l2 = torch.tensor(0.0, device=self.device)
                 temporal_w = getattr(t, 'temporal_contrastive_weight', 0.0)
+                l2_temporal_w = getattr(t, 'l2_temporal_weight', 0.5)
                 if temporal_w > 0 and "valid_start_w1" in batch:
                     try:
                         emb_w1, emb_w2, pre_w1, pre_w2 = self.model.module.encode_dual_window(
@@ -208,15 +211,22 @@ class DDPv4Trainer:
                             valid_start_w2=batch["valid_start_w2"],
                             valid_end_w2=batch["valid_end_w2"],
                         )
-                        temporal = self._temporal_loss(pre_w1, pre_w2, t)
-                        if self.global_rank == 0 and temporal.item() == 0.0:
-                            # Debug: print why temporal is zero
+                        # pre_norm 空间: pixel-level cosine loss (每个像素独立优化方向)
+                        temporal = self._temporal_cosine_pixel_loss(pre_w1, pre_w2, t)
+                        # L2 空间: 同样的 loss
+                        if l2_temporal_w > 0:
+                            temporal_l2 = self._temporal_cosine_pixel_loss(emb_w1, emb_w2, t)
+
+                        if self.global_rank == 0 and step % 20 == 0:
                             f1 = F.adaptive_avg_pool2d(pre_w1, 1).view(pre_w1.shape[0], -1)
                             f2 = F.adaptive_avg_pool2d(pre_w2, 1).view(pre_w2.shape[0], -1)
-                            f1 = F.normalize(f1, p=2, dim=-1)
-                            f2 = F.normalize(f2, p=2, dim=-1)
-                            sim = (f1 * f2).sum(dim=-1).mean().item()
-                            print(f"  [Temporal DEBUG] sim={sim:.4f} pre_w1_mean={pre_w1.mean().item():.4f} pre_w2_mean={pre_w2.mean().item():.4f}")
+                            f1_n = F.normalize(f1, p=2, dim=-1)
+                            f2_n = F.normalize(f2, p=2, dim=-1)
+                            pre_sim = (f1_n * f2_n).sum(dim=-1).mean().item()
+                            e1 = F.adaptive_avg_pool2d(emb_w1, 1).view(emb_w1.shape[0], -1)
+                            e2 = F.adaptive_avg_pool2d(emb_w2, 1).view(emb_w2.shape[0], -1)
+                            l2_sim = (e1 * e2).sum(dim=-1).mean().item()
+                            print(f"  [Temporal] pre_sim={pre_sim:.3f} l2_sim={l2_sim:.3f} temporal={temporal.item():.3f} temporal_l2={temporal_l2.item():.3f}")
                     except Exception as e:
                         if self.global_rank == 0:
                             print(f"  [Temporal] Error: {e}")
@@ -243,9 +253,10 @@ class DDPv4Trainer:
                 total = (
                     recon_weight * recon
                     + ct_recon_w * ct_recon
-                    + getattr(t, "vicreg_weight", 1.0) * vicreg
+                    + vicreg_w * vicreg
                     + getattr(t, "koleo_weight", 0.1) * koleo
                     + temporal_w * temporal
+                    + l2_temporal_w * temporal_l2
                     + dummy_cls
                 )
                 total = total / accum_steps
@@ -272,6 +283,7 @@ class DDPv4Trainer:
                 "vicreg": vicreg.item(),
                 "koleo": koleo.item(),
                 "temporal": temporal.item(),
+                "temporal_l2": temporal_l2.item(),
                 "lr": lr,
             }.items():
                 loss_accum[k] = loss_accum.get(k, 0.0) + v
@@ -290,13 +302,10 @@ class DDPv4Trainer:
             batch.get("target_loss_type"), self.cfg.data.num_classes,
         )
 
-    def _temporal_loss(self, pre_w1, pre_w2, t_cfg):
-        from src.training.losses import temporal_info_nce_loss, temporal_contrastive_loss
-        loss_type = getattr(t_cfg, 'temporal_loss_type', 'hinge')
-        temp = getattr(t_cfg, 'temporal_contrastive_temperature', 0.1)
-        if loss_type == 'info_nce_antidiagonal':
-            return temporal_info_nce_loss(pre_w1, pre_w2, temperature=temp)
-        return temporal_contrastive_loss(pre_w1, pre_w2, temperature=temp)
+    def _temporal_cosine_pixel_loss(self, emb_w1, emb_w2, t_cfg):
+        from src.training.losses import temporal_cosine_pixel_loss
+        temp = getattr(t_cfg, 'temporal_contrastive_temperature', 0.05)
+        return temporal_cosine_pixel_loss(emb_w1, emb_w2, temperature=temp)
 
     def _cross_temporal_masked_recon(self, batch, student_out) -> torch.Tensor:
         spatial_mask = batch["spatial_mask"]

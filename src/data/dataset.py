@@ -24,6 +24,7 @@ from src.data.transforms import (
     label_to_timestamp_ms,
     read_tif,
     normalize_data,
+    WC_CLASS_MAP,
 )
 
 
@@ -61,6 +62,11 @@ class HarbinPatchDataset(Dataset):
 
         # 双窗口采样模式: "random_split" | "adjacent_month" | "non_overlap"
         self.window_mode = getattr(d, "window_mode", "random_split")
+        # non_overlap 参数
+        self._non_overlapping_windows = getattr(d, "non_overlap", True) if self.window_mode == "non_overlap" else False
+        self._min_window_frames = getattr(d, "non_overlap_min_frames", 4)
+        self._max_window_frames = getattr(d, "non_overlap_max_frames", 12)
+        self._min_window_gap_ms = getattr(d, "non_overlap_min_gap_ms", 6 * 30 * 24 * 3600 * 1000)
         # 跨时相掩码重建配置
         self.ct_mask_ratio = getattr(d, "ct_mask_ratio", 0.3)   # 掩码比例
         self.ct_mask_patch_size = getattr(d, "ct_mask_patch_size", 8)  # 掩码 patch 尺寸
@@ -320,6 +326,27 @@ class HarbinPatchDataset(Dataset):
 
         return tif_files
 
+    def _get_worldcover_label(self, patch_id: str) -> int:
+        """从原始 WorldCover TIFF 提取 patch-level 众数类别标签."""
+        try:
+            wc_dir = self.data_root / "worldcover" / patch_id
+            if wc_dir.exists():
+                tif_files = list(wc_dir.glob("*.tif"))
+                if tif_files:
+                    data = read_tif(tif_files[0], 0)
+                    if data is not None:
+                        raw = data[0] if data.ndim == 3 else data
+                        mapped = np.full_like(raw, -1, dtype=np.int64)
+                        for val, idx in WC_CLASS_MAP.items():
+                            mapped[raw == val] = idx
+                        valid = mapped >= 0
+                        if valid.any():
+                            unique, counts = np.unique(mapped[valid], return_counts=True)
+                            return int(unique[np.argmax(counts)])
+        except Exception:
+            pass
+        return 0
+
     def _sample_dual_windows(self, ts_sorted: list[int]) -> tuple[float, float, float, float]:
         """根据 window_mode 采样两个时间窗口.
 
@@ -546,6 +573,9 @@ class HarbinPatchDataset(Dataset):
         target_mask = np.zeros(S_tgt, dtype=bool)
         target_loss_type = np.zeros(S_tgt, dtype=np.int64)
         target_source_idx = np.zeros(S_tgt, dtype=np.int64)
+        
+        # 从原始 WorldCover 文件提取 patch-level label (避开 cache 中的 one-hot 数据)
+        patch_label = self._get_worldcover_label(patch_id)
 
         support_duration = max(ts_sorted[-1] - ts_sorted[0], 1) if len(ts_sorted) >= 2 else 1
 
@@ -665,5 +695,5 @@ class HarbinPatchDataset(Dataset):
             "target_mask": torch.from_numpy(target_mask),
             "target_loss_type": torch.from_numpy(target_loss_type),
             "target_source_idx": torch.from_numpy(target_source_idx),
-            "label": torch.tensor(0, dtype=torch.long),
+            "label": torch.tensor(patch_label, dtype=torch.long),
         }

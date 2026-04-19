@@ -1,18 +1,18 @@
 # ============================================================
-# AEF_qwen V4 — 变化检测能力升级配置
+# AEF_qwen V4 — 变化检测能力升级配置 (Rev B)
 # ============================================================
-# 核心升级:
-#   1. 相邻月份双窗口采样 (window_mode: adjacent_month)
-#   2. 跨时相掩码重建 (ct_mask_ratio: 0.3)
-#   3. EMA Teacher + DINO 自蒸馏
-#   4. VICReg + KoLeo 反坍缩正则
-#   5. 单卡训练 (GPU6, batch=2, accum=8)
+# 2025-04-15 修正:
+#   1. 关闭 VICReg (已饱和 ~0.974，不再提供有效梯度)
+#   2. temporal loss 同时约束 pre_norm + L2 空间
+#   3. 改为 non_overlap 双窗口 (长间隔，信号更强)
+#   4. 增大 reconstruction + koleo 权重
+#   5. 更保守的 grad_clip (3.0 -> 1.0)
 #
 # 启动:
 #   cd /workspace/xuannv
-#   CUDA_VISIBLE_DEVICES=6 python scripts/train/train_single_gpu.py \
-#     --config configs/qwen_v4_cd_upgrade.yaml \
-#     --resume /workspace/outputs/aef_qwen_v2/epoch_499.pt
+#   CUDA_VISIBLE_DEVICES=6,7 torchrun --nproc_per_node=2 \
+#     scripts/train/train_ddp_v4.py --config configs/qwen_v4_cd_upgrade.yaml \
+#     --resume /workspace/outputs/aef_qwen_v4_cd_upgrade/epoch_100.pt
 # ============================================================
 
 _base_: qwen_v2_temporal.yaml
@@ -22,8 +22,12 @@ experiment:
   output_dir: /workspace/outputs/aef_qwen_v4_cd_upgrade
 
 data:
-  # ★ 相邻月份双窗口 — 与下游月度变化检测对齐
-  window_mode: "adjacent_month"
+  # ★ 非重叠长间隔双窗口 — 信号更强
+  window_mode: "non_overlap"
+  # non_overlap 参数
+  non_overlap_min_frames: 4
+  non_overlap_max_frames: 12
+  non_overlap_min_gap_ms: 15552000000  # 6个月 (ms)
 
   # ★ 跨时相掩码重建
   ct_mask_ratio: 0.3
@@ -38,39 +42,39 @@ data:
 training:
   epochs: 200
 
-  # 单卡梯度累积: batch=2 * accum=8 = effective batch=16
+  # 梯度累积: batch=2 * 2GPU * accum=8 = effective batch=32
   gradient_accumulation_steps: 8
 
   # ★ EMA Teacher
   teacher_momentum: 0.996
 
-  # ★ DINO/iBOT
-  dino_weight: 0.0  # DINO removed: persistent stagnation at ~8.14 (random guess level)
+  # ★ DINO/iBOT — 已移除
+  dino_weight: 0.0
 
-  # ★ VICReg + KoLeo（替换旧反坍缩四件套）
-  vicreg_weight: 1.0
-  koleo_weight: 0.05
-  expander_dim: 512
+  # ★ VICReg — 已饱和，关闭
+  vicreg_weight: 0.0
+  koleo_weight: 0.15       # 增大推力
+  expander_dim: 512        # expander 保留给 KoLeo 用
 
   # ★ 跨时相掩码重建
   ct_reconstruction_weight: 0.5
 
-  # 旧损失权重（可设为 0 以完全切换到新损失）
+  # 旧损失权重（全部关闭）
   uniformity_weight: 0.0
   decorrelation_weight: 0.0
   variance_weight: 0.0
   orthogonality_weight: 0.0
   consistency_weight: 0.0
 
-  # 保留重建 + 时序对比
-  reconstruction_weight: 0.5
-  temporal_contrastive_weight: 0.5
-  temporal_contrastive_temperature: 0.1
-  temporal_loss_type: info_nce_antidiagonal
+  # 保留重建 + 时序对比（权重增大）
+  reconstruction_weight: 1.0
+  temporal_contrastive_weight: 1.0
+  temporal_margin: 1.0                     # L2 distance hinge margin
+  l2_temporal_weight: 0.5                 # L2 空间 temporal 约束权重
 
-  # 学习率（effective batch=32，恢复 DINO 后适当提高以打破 plateau）
+  # 学习率
   lr: 0.0001
-  warmup_epochs: 10
-  recon_warmup_epochs: 10
+  warmup_epochs: 5          # 缩短 warmup，更快进入正轨
+  recon_warmup_epochs: 5
   save_every: 20
-  grad_clip_norm: 3.0
+  grad_clip_norm: 1.0       # 更保守的裁剪，防止 KoLeo 发散

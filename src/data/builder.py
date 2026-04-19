@@ -28,10 +28,15 @@ def build_dataloader(
     """
     dataset = HarbinPatchDataset(cfg)
     dataset.training = training
+    # 透传 non_overlap 参数 (如果 config 中显式设置)
     if training:
-        dataset._non_overlapping_windows = getattr(cfg.data, 'non_overlapping_windows', False)
-        dataset._min_window_frames = getattr(cfg.data, 'min_window_frames', 4)
-        dataset._max_window_frames = getattr(cfg.data, 'max_window_frames', 12)
+        if hasattr(cfg.data, 'non_overlap_min_frames'):
+            dataset._min_window_frames = cfg.data.non_overlap_min_frames
+        if hasattr(cfg.data, 'non_overlap_max_frames'):
+            dataset._max_window_frames = cfg.data.non_overlap_max_frames
+        if hasattr(cfg.data, 'non_overlap_min_gap_ms'):
+            dataset._min_window_gap_ms = cfg.data.non_overlap_min_gap_ms
+        # window_mode 已在 dataset.__init__ 中设置，training 模式保持一致
 
     sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=training) if distributed else None
 

@@ -16,7 +16,8 @@ build/
 # Data / Outputs
 /workspace/outputs/
 outputs/
-data/
+/data/
+!/src/data/
 *.npy
 *.tif
 *.tiff

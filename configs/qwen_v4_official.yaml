@@ -1,0 +1,87 @@
+# ============================================================
+# AEF_qwen V4 Official — 参考官方训练设置 (C-1 软重启方案)
+# ============================================================
+# 核心变更:
+#   1. 恢复教师-学生一致性 (consistency_weight=0.05)
+#   2. 恢复分类头训练 (classification_weight=0.05)
+#   3. 恢复 raw_uniformity + variance + decorrelation
+#   4. 移除 temporal loss (论文无此损失)
+#   5. 移除 koleo (与 uniformity 冲突)
+#   6. 渐进 VMF kappa 50→500
+#   7. Student 输入扰动 (丢帧/丢源)
+# ============================================================
+
+_base_: qwen_v2_temporal.yaml
+
+experiment:
+  name: aef_qwen_v4_official
+  output_dir: /workspace/outputs/aef_qwen_v4_official
+
+data:
+  # 非重叠长间隔双窗口
+  window_mode: "non_overlap"
+  non_overlap_min_frames: 4
+  non_overlap_max_frames: 12
+  non_overlap_min_gap_ms: 15552000000  # 6个月
+
+  # 时序窗口增强
+  temporal_window_augmentation: true
+  temporal_window_prob: 0.5
+  temporal_window_min_frames: 4
+  temporal_window_max_frames: 12
+
+training:
+  epochs: 300
+  
+  # 梯度累积: batch=2 * 2GPU * accum=8 = effective batch=32
+  gradient_accumulation_steps: 8
+  
+  # EMA Teacher
+  teacher_momentum: 0.996
+  
+  # --- 核心损失权重 (参考官方/V7) ---
+  reconstruction_weight: 1.0
+  
+  # 教师-学生一致性 (论文核心)
+  consistency_weight: 0.05
+  
+  # 分类监督
+  classification_weight: 0.03
+  
+  # 反坍缩三件套
+  uniformity_weight: 1.0        # raw_uniformity_loss
+  variance_weight: 0.25         # VICReg variance
+  decorrelation_weight: 0.05     # Barlow Twins
+  orthogonality_weight: 0.01    # bottleneck 权重正交
+  
+  # --- 已移除的损失 ---
+  dino_weight: 0.0
+  vicreg_weight: 0.0
+  koleo_weight: 0.0
+  temporal_contrastive_weight: 0.0
+  l2_temporal_weight: 0.0
+  ct_reconstruction_weight: 0.0
+  
+  # --- Student 扰动参数 (参考旧版本) ---
+  student_frame_drop_rate: 0.4
+  student_source_drop_rate: 0.25
+  student_front_drop_prob: 0.15
+  student_back_drop_prob: 0.15
+  
+  # --- 渐进 VMF Kappa ---
+  kappa_start: 50.0
+  kappa_end: 500.0
+  kappa_warmup_epochs: 100
+  
+  # --- 学习率 ---
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 10
+  save_every: 20
+  grad_clip_norm: 1.0
+  weight_decay: 0.05
+
+model:
+  # 初始 kappa 由 training.kappa_start 控制
+  vmf_kappa: 50.0

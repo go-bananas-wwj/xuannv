@@ -193,17 +193,15 @@ def temporal_contrastive_loss(
     emb_w1: torch.Tensor,
     emb_w2: torch.Tensor,
     temperature: float = 0.05,
-    target_margin: float = -0.5,
+    target_margin: float = 0.2,
 ) -> torch.Tensor:
     """强时序对比损失 — 基于 global mean embedding 的 Hinge Loss.
 
-    关键改进 (2025-04-15):
-    - 从 per-pixel 改为 global mean: 梯度更集中, 不稀释空间信号
-    - target_margin 从 0.5 改为 -0.5: 强迫不同时间窗口的表征正交甚至相反
-      (cos_sim ≤ -0.5, 对应角度 ≥ 120°)
-    - temperature 从 0.2 降到 0.05: 梯度更强, 加速学习
-
-    受 CACo (CVPR 2023) 启发: 长时序差异应该体现在 global representation 上.
+    关键改进 (Rev B, 2025-04-15):
+    - target_margin = 0.2: 要求不同窗口的 cos_sim ≤ 0.2 (角度 ≥ 78°)
+      之前 -0.5 (120°) 太极端，难以达到
+    - temperature = 0.05: 更尖锐的对比
+    - Global mean: 梯度集中，不稀释空间信号
     """
     if emb_w1.shape[0] < 1:
         return emb_w1.new_tensor(0.0)
@@ -218,8 +216,62 @@ def temporal_contrastive_loss(
     cos_sim = (flat_w1 * flat_w2).sum(-1)  # [B]
 
     # Hinge loss: 只惩罚 cos_sim > target_margin 的部分
-    # target_margin = -0.5 意味着必须把 cos_sim 推到 -0.5 以下才算合格
     loss = F.relu(cos_sim - target_margin).mean() / temperature
+    return loss
+
+
+def l2_temporal_contrastive_loss(
+    emb_w1: torch.Tensor,
+    emb_w2: torch.Tensor,
+    temperature: float = 0.05,
+    target_margin: float = 0.2,
+) -> torch.Tensor:
+    """L2 空间时序对比损失 — 直接在 L2-normalized embedding map 上计算.
+
+    与 temporal_contrastive_loss 的区别:
+    - 输入已经是 L2-normalized (如 encode_dual_window 返回的 emb_w1/emb_w2)
+    - 确保推理时的 embedding 也有时间敏感性
+    """
+    if emb_w1.shape[0] < 1:
+        return emb_w1.new_tensor(0.0)
+
+    B, D, H, W = emb_w1.shape
+    # 已经在 L2 空间，直接 global mean
+    flat_w1 = emb_w1.reshape(B, D, -1).mean(dim=-1)  # [B, D]
+    flat_w2 = emb_w2.reshape(B, D, -1).mean(dim=-1)
+
+    cos_sim = (flat_w1 * flat_w2).sum(-1)  # [B]
+
+    loss = F.relu(cos_sim - target_margin).mean() / temperature
+    return loss
+
+
+def temporal_cosine_pixel_loss(
+    emb_w1: torch.Tensor,
+    emb_w2: torch.Tensor,
+    temperature: float = 0.05,
+) -> torch.Tensor:
+    """Pixel-level cosine temporal loss — 每个像素独立优化方向差异.
+
+    核心改进 (Rev B fix):
+    - 每个像素位置独立 F.normalize (||x|| 是单像素 norm，不大，Jacobian 不压缩)
+    - 不使用 spatial mean (避免梯度稀释 1/(H*W))
+    - 非 hinge loss (所有像素持续有梯度，不会因达到 margin 而停止)
+    - 直接优化 cosine similarity -> 0 (方向正交)
+
+    梯度大小: 与 emb 绝对 scale 无关，只与像素级方向差异有关.
+    """
+    if emb_w1.shape[0] < 1:
+        return emb_w1.new_tensor(0.0)
+
+    B, D, H, W = emb_w1.shape
+    # 每个像素位置独立 normalize: [B, D, H, W]
+    f1 = F.normalize(emb_w1, p=2, dim=1)
+    f2 = F.normalize(emb_w2, p=2, dim=1)
+    # 逐像素 cos_sim: [B, H, W]
+    cos_map = (f1 * f2).sum(dim=1)
+    # 直接最小化所有像素的 cos_sim (非 hinge)
+    loss = cos_map.mean() / temperature
     return loss
 
 

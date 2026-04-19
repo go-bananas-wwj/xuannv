@@ -47,6 +47,10 @@ class DataConfig:
     target_sources: list | None = None
     # 双窗口采样模式
     window_mode: str = "random_split"
+    # non_overlap 参数
+    non_overlap_min_frames: int = 4
+    non_overlap_max_frames: int = 12
+    non_overlap_min_gap_ms: int = 15552000000
     # 跨时相掩码重建
     ct_mask_ratio: float = 0.0
     ct_mask_patch_size: int = 8
@@ -110,6 +114,8 @@ class TrainingConfig:
     temporal_contrastive_weight: float = 0.0
     temporal_contrastive_temperature: float = 0.1
     temporal_loss_type: str = "hinge"
+    temporal_margin: float = 1.0
+    l2_temporal_weight: float = 0.0
     pixel_temporal_weight: float = 0.0
     pixel_temporal_samples: int = 16
     # 预归一化 uniformity
@@ -119,6 +125,19 @@ class TrainingConfig:
     recon_warmup_epochs: int = 20
     warmup_epochs: int = 10
     lr_schedule: str = "cosine_no_restart"
+    lr_min: float = 1e-6
+    # Kappa 渐进
+    kappa_start: float = 50.0
+    kappa_end: float = 500.0
+    kappa_warmup_epochs: int = 100
+    # 其他
+    vicreg_weight: float = 0.0
+    koleo_weight: float = 0.0
+    ct_reconstruction_weight: float = 0.0
+    dino_weight: float = 0.0
+    teacher_momentum: float = 0.996
+    save_every: int = 20
+    expander_dim: int = 0
     # 检查点
     save_best_balanced: bool = True
     best_balanced_uniform_min: float = -0.6
