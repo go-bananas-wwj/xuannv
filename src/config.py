@@ -126,6 +126,18 @@ class TrainingConfig:
     # Temporal Magnitude Loss (V5)
     temporal_magnitude_weight: float = 0.0
     temporal_max_gap_ms: int = 15552000000
+    # V6: Pixel-level temporal losses
+    temporal_cosine_pixel_weight: float = 0.0
+    temporal_cosine_pixel_temperature: float = 0.05
+    pixel_temporal_info_nce_weight: float = 0.0
+    pixel_temporal_info_nce_temperature: float = 0.1
+    pixel_temporal_info_nce_samples: int = 16
+    # V6: Spatial uniformity
+    spatial_uniformity_weight: float = 0.0
+    spatial_uniformity_samples: int = 256
+    # V6.5: Gap-aware temporal
+    gap_aware_temporal_weight: float = 0.0
+    gap_aware_temporal_temperature: float = 0.05
     # 预归一化 uniformity
     pre_norm_uniform_weight: float = 3.0
     encoder_uniform_weight: float = 2.0

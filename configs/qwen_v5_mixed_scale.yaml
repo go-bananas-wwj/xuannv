@@ -49,15 +49,15 @@ training:
   consistency_weight: 0.05
   
   # Temporal Magnitude Loss (CaCo 思想)
-  temporal_magnitude_weight: 0.5   # 初始权重, 可 warmup
-  temporal_max_gap_ms: 15552000000  # 6个月 (归一化分母)
-  temporal_margin: 0.1
+  temporal_magnitude_weight: 0.3   # 降低权重，减弱对 uniformity 的压制
+  temporal_max_gap_ms: 47347200000  # 18个月 (归一化分母，覆盖实际最大gap ~22月)
+  temporal_margin: 0.0               # 去掉margin，降低threshold
   
   # 分类监督
   classification_weight: 0.03
   
   # 反坍缩三件套
-  uniformity_weight: 1.0        # raw_uniformity_loss
+  uniformity_weight: 1.5        # raw_uniformity_loss (增强反坍缩)
   variance_weight: 0.25         # VICReg variance
   decorrelation_weight: 0.05     # Barlow Twins
   orthogonality_weight: 0.01    # bottleneck 权重正交

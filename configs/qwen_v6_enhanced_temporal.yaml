@@ -1,0 +1,91 @@
+# ============================================================
+# AEF_qwen V6 Enhanced Temporal — 增强时序区分性 + 改善 Uniformity
+# ============================================================
+# 核心变更 (vs V5):
+#   1. 增强 uniformity: weight 1.5→2.5, 梯度累积 8→12 (effective batch 48)
+#   2. 新增空间 uniformity: 从 pre_norm_map 采样 256 个空间位置计算
+#   3. 新增 pixel-level 时序对比损失 (temporal_cosine_pixel_loss)
+#      — 始终有梯度，强制不同时间窗口在像素级产生差异
+#   4. 新增 pixel-level InfoNCE (pixel_temporal_info_nce_loss)
+#      — Anti-diagonal，每个空间位置独立优化
+#   5. 降低 temporal_magnitude_loss 权重 (0.3→0.1)
+#      — 保留为安全约束，但主力改为始终有梯度的 pixel 损失
+#   6. 从 V5 best checkpoint 软重启
+# ============================================================
+
+_base_: qwen_v5_mixed_scale.yaml
+
+experiment:
+  name: aef_qwen_v6_enhanced_temporal
+  output_dir: /workspace/outputs/aef_qwen_v6_enhanced_temporal
+
+training:
+  epochs: 300
+  
+  # 梯度累积: batch=2 * 2GPU * accum=12 = effective batch=48
+  # 更大的 effective batch 提升 uniformity 估计质量
+  gradient_accumulation_steps: 12
+  
+  # --- 核心损失权重调整 ---
+  reconstruction_weight: 1.0
+  
+  # 教师-学生一致性
+  consistency_weight: 0.05
+  
+  # Temporal Magnitude Loss (保留但降权)
+  temporal_magnitude_weight: 0.1
+  temporal_max_gap_ms: 47347200000  # 18个月
+  temporal_margin: 0.0
+  
+  # ★ 新增: Pixel-level Cosine Temporal Loss (始终有梯度)
+  temporal_cosine_pixel_weight: 0.5
+  temporal_cosine_pixel_temperature: 0.05
+  
+  # ★ 新增: Pixel-level Anti-Diagonal InfoNCE
+  pixel_temporal_info_nce_weight: 0.2
+  pixel_temporal_info_nce_temperature: 0.1
+  pixel_temporal_info_nce_samples: 16
+  
+  # 分类监督
+  classification_weight: 0.03
+  
+  # ★ 增强反坍缩: uniformity weight 提升
+  uniformity_weight: 2.5        # raw_uniformity_loss (1.5→2.5)
+  variance_weight: 0.25         # VICReg variance
+  decorrelation_weight: 0.05     # Barlow Twins
+  orthogonality_weight: 0.01    # bottleneck 权重正交
+  
+  # ★ 新增: 空间 uniformity 采样数
+  spatial_uniformity_samples: 256
+  spatial_uniformity_weight: 0.5  # 空间 uniformity 辅助权重
+  
+  # --- 已移除的损失 ---
+  dino_weight: 0.0
+  vicreg_weight: 0.0
+  koleo_weight: 0.0
+  temporal_contrastive_weight: 0.0
+  l2_temporal_weight: 0.0
+  ct_reconstruction_weight: 0.0
+  
+  # --- Student 扰动参数 ---
+  student_frame_drop_rate: 0.4
+  student_source_drop_rate: 0.25
+  student_front_drop_prob: 0.15
+  student_back_drop_prob: 0.15
+  
+  # --- 渐进 VMF Kappa ---
+  kappa_start: 50.0
+  kappa_end: 500.0
+  kappa_warmup_epochs: 100
+  
+  # --- 学习率 ---
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 10
+  save_every: 20
+  grad_clip_norm: 1.0
+  weight_decay: 0.05
+
+model:
+  vmf_kappa: 50.0

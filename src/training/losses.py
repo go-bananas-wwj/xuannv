@@ -340,6 +340,38 @@ def pixel_temporal_info_nce_loss(
     return loss / max(N, 1)
 
 
+def gap_aware_temporal_cosine_loss(
+    pre_w1: torch.Tensor,
+    pre_w2: torch.Tensor,
+    time_gap_ms: torch.Tensor,
+    max_gap_ms: float = 6 * 30 * 24 * 3600 * 1000,
+    temperature: float = 0.05,
+) -> torch.Tensor:
+    """Gap-aware pixel-level temporal cosine loss.
+
+    核心改进 (vs temporal_cosine_pixel_loss):
+    - 根据时间 gap 大小设定不同的 target cos_sim
+    - gap=0 → target=1 (相似), gap=max → target=-1 (相反)
+    - 小间隔不过度推开, 大间隔允许充分差异
+    - 保留渐变变化检测能力
+    """
+    if pre_w1.shape[0] < 1:
+        return pre_w1.new_tensor(0.0)
+
+    B, D, H, W = pre_w1.shape
+    f1 = F.normalize(pre_w1, p=2, dim=1)
+    f2 = F.normalize(pre_w2, p=2, dim=1)
+    cos_map = (f1 * f2).sum(dim=1)  # [B, H, W]
+
+    # 每个 batch 的 target: [B] → [B, 1, 1]
+    time_gap_norm = torch.clamp(time_gap_ms / max_gap_ms, 0.0, 1.0)  # [B]
+    target = 1.0 - 2.0 * time_gap_norm  # gap=0→1, gap=max→-1
+    target_map = target.view(B, 1, 1).expand(B, H, W)
+
+    loss = ((cos_map - target_map).pow(2)).mean() / temperature
+    return loss
+
+
 def temporal_magnitude_loss(
     pre_w1: torch.Tensor,
     pre_w2: torch.Tensor,
@@ -380,8 +412,8 @@ def temporal_magnitude_loss(
     # Distance in [0, 1]: (1 - cos_sim) / 2
     dist = (1.0 - cos_sim) * 0.5  # [B]
 
-    # Normalized time gap: [0, 1]
-    time_gap_norm = (time_gap_ms / max_gap_ms).clamp(0.0, 1.0)  # [B]
+    # Normalized time gap — 不 clamp，让长间隔的 threshold 可以 > 1 (自然不触发)
+    time_gap_norm = time_gap_ms / max_gap_ms  # [B]
 
     # Hinge loss: 只惩罚 dist > time_gap_norm + margin 的部分
     loss = F.relu(dist - time_gap_norm - margin).mean()

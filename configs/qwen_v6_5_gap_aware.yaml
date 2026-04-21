@@ -1,0 +1,77 @@
+# ============================================================
+# AEF_qwen V6.5 Gap-Aware Temporal — 修复 V6 过强时序损失
+# ============================================================
+# 核心变更 (vs V6):
+#   1. 替换 temporal_cosine_pixel_loss 为 gap_aware_temporal_cosine_loss
+#      — 根据时间 gap 设定 target cos_sim: gap=0→1, gap=max→-1
+#   2. 降低 temporal 损失权重: tc_pixel 0.5→0.3, ptnce 0.2→0.1
+#   3. 增强 uniformity: weight 2.5→3.0, spatial 0.5→1.0
+#   4. 增强 variance: 0.25→0.5
+#   5. 从 V5 best checkpoint 软重启 (V6 epoch 8  uniformity 不足)
+# ============================================================
+
+_base_: qwen_v6_enhanced_temporal.yaml
+
+experiment:
+  name: aef_qwen_v6_5_gap_aware
+  output_dir: /workspace/outputs/aef_qwen_v6_5_gap_aware
+
+training:
+  epochs: 300
+  
+  # 梯度累积: batch=2 * 2GPU * accum=12 = effective batch=48
+  gradient_accumulation_steps: 12
+  
+  # --- 核心损失权重 ---
+  reconstruction_weight: 1.0
+  consistency_weight: 0.05
+  
+  # Temporal Magnitude Loss (保留但降权)
+  temporal_magnitude_weight: 0.05
+  temporal_max_gap_ms: 47347200000  # 18个月
+  temporal_margin: 0.0
+  
+  # ★ 新增: Gap-aware Cosine Temporal Loss (替代 V6 的 tc_pixel)
+  temporal_cosine_pixel_weight: 0.3
+  temporal_cosine_pixel_temperature: 0.05
+  
+  # ★ 降低: Pixel InfoNCE
+  pixel_temporal_info_nce_weight: 0.1
+  pixel_temporal_info_nce_temperature: 0.1
+  pixel_temporal_info_nce_samples: 16
+  
+  # 分类监督
+  classification_weight: 0.03
+  
+  # ★ 增强 uniformity
+  uniformity_weight: 3.0         # 2.5→3.0
+  variance_weight: 0.5           # 0.25→0.5
+  decorrelation_weight: 0.05
+  orthogonality_weight: 0.01
+  
+  # ★ 增强空间 uniformity
+  spatial_uniformity_samples: 256
+  spatial_uniformity_weight: 1.0  # 0.5→1.0
+  
+  # --- Student 扰动参数 ---
+  student_frame_drop_rate: 0.4
+  student_source_drop_rate: 0.25
+  student_front_drop_prob: 0.15
+  student_back_drop_prob: 0.15
+  
+  # --- 渐进 VMF Kappa ---
+  kappa_start: 50.0
+  kappa_end: 500.0
+  kappa_warmup_epochs: 100
+  
+  # --- 学习率 ---
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 10
+  save_every: 20
+  grad_clip_norm: 1.0
+  weight_decay: 0.05
+
+model:
+  vmf_kappa: 50.0

@@ -3,7 +3,6 @@
 > 生成时间：2026-04-15  
 > 模型：AEF_qwen_v4_official  
 > 最佳权重：epoch_best_epoch231.pt (uniformity = -3.04)  
-> 评估者：Kimi Code CLI
 
 ---
 
