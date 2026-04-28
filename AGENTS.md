@@ -292,6 +292,14 @@ Demo 依赖预计算的 embedding maps (`embedding_maps.npy` + `patch_ids.json`)
 - 单卡调试/测试可使用 `cuda:0`
 - 如需限制特定 GPU，手动设置 `CUDA_VISIBLE_DEVICES` 环境变量
 
+### 本机硬件配置
+
+- **GPU**: 8 × NVIDIA GeForce RTX 4090 (24GB 显存)
+- **CUDA**: 12.8 (驱动 570.211.01)
+- **PyTorch**: 2.11.0+cu126
+- **conda 环境**: `aef-qwen` (Python 3.11)
+- **激活方式**: `conda activate aef-qwen`
+
 ## 部署与运行时
 
 ### 训练任务管理
