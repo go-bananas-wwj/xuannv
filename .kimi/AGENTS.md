@@ -5,8 +5,6 @@
 这是 **AlphaEarth Foundations 改进版**，从零实现于 `/workspace/xuannv/`。
 核心使命：**解决嵌入坍缩 + 提升时间敏感性**，使模型能够执行变化检测。
 
-**原版代码位于 `/workspace/AEF/`，任何情况下不要修改。**
-
 ## 核心设计决策
 
 1. **输入严格对齐论文**: 只有 `S2`、`S1`、`Landsat` 三类时序图像作为输入。
@@ -31,4 +29,4 @@
 - 修改损失函数或训练逻辑时，确保 `gathered_pre_norm` 被正确使用。
 - 调试 AUC 低时，优先检查 temporal contrastive loss 是否生效、双窗口数据是否正确生成。
 - 所有文件操作限制在 `/workspace/xuannv/` 内。
-- **硬件资源约束：运行训练、推理或预计算任务时，只能使用 GPU 6 和 GPU 7（`CUDA_VISIBLE_DEVICES=6,7`）。严禁占用 GPU 0–5。**
+- **硬件资源约束：运行训练、推理或预计算任务前，请先检查 GPU 占用情况，选择空闲 GPU。必要时手动设置 `CUDA_VISIBLE_DEVICES`。**

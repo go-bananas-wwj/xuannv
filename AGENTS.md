@@ -5,7 +5,7 @@
 **xuannv_embdding** (包名 `aef-qwen`) 是 **AlphaEarth Foundations (AEF)** 的独立改进版，从零实现于 `/workspace/xuannv/`。
 
 - **核心使命**: 解决嵌入坍缩 (embedding collapse) 与提升时间敏感性 (temporal sensitivity)，使模型能够执行变化检测 (change detection)。
-- **与原版关系**: 原版代码位于 `/workspace/AEF/`，**任何情况下不要修改**。本项目完全独立实现，仅参考接口设计（数据加载协议、模型输入输出格式）。
+- **与原版关系**: 本项目完全独立实现，仅参考 AEF 接口设计（数据加载协议、模型输入输出格式）。
 - **语言与注释**: 项目内代码注释、文档、配置均以中文为主。
 
 ### 核心设计决策
@@ -130,14 +130,14 @@ cfg = load_config("configs/qwen_v1_scenes.yaml")
 启动示例 (V1):
 ```bash
 cd /workspace/xuannv
-CUDA_VISIBLE_DEVICES=6,7 torchrun --nproc_per_node=2 \
+torchrun --nproc_per_node=2 \
     scripts/train/train_ddp.py --config configs/qwen_v1_scenes.yaml \
     --save-every 50 --warmup-epochs 10
 ```
 
 启动示例 (V6.5, 从 checkpoint 软重启):
 ```bash
-CUDA_VISIBLE_DEVICES=6,7 torchrun --nproc_per_node=2 \
+torchrun --nproc_per_node=2 \
     scripts/train/train_ddp_v6_5.py --config configs/qwen_v6_5_gap_aware.yaml \
     --soft-restart /workspace/outputs/.../epoch_best_xxx.pt \
     --save-every 20
@@ -227,7 +227,7 @@ Gradio 可视化平台 (`demo_v2/app.py`)，提供以下 Tab:
 启动:
 ```bash
 cd /workspace/xuannv
-CUDA_VISIBLE_DEVICES=6,7 python demo_v2/app.py --port 7868
+python demo_v2/app.py --port 7868
 ```
 
 Demo 依赖预计算的 embedding maps (`embedding_maps.npy` + `patch_ids.json`)，由 `demo_v2/precompute_cd.py` 生成。
@@ -282,10 +282,15 @@ Demo 依赖预计算的 embedding maps (`embedding_maps.npy` + `patch_ids.json`)
 
 ## 硬件约束
 
-- **运行训练、推理或预计算任务时，只能使用 GPU 6 和 GPU 7 (`CUDA_VISIBLE_DEVICES=6,7`)**
-- **严禁占用 GPU 0–5**
-- DDP 训练使用 `torchrun --nproc_per_node=2` (双卡)
-- 单卡调试/测试可使用 `cuda:0` (在 `CUDA_VISIBLE_DEVICES=6,7` 环境下即物理 GPU 6)
+- 训练/推理前请先检查 GPU 占用情况，选择空闲 GPU：
+  ```bash
+  nvidia-smi
+  # 或
+  python -c "import torch; print(torch.cuda.device_count())"
+  ```
+- DDP 训练使用 `torchrun --nproc_per_node=N` (N 为可用卡数)
+- 单卡调试/测试可使用 `cuda:0`
+- 如需限制特定 GPU，手动设置 `CUDA_VISIBLE_DEVICES` 环境变量
 
 ## 部署与运行时
 
@@ -337,4 +342,4 @@ Demo 使用的预计算结果由 `demo_v2/precompute_cd.py` 生成，依赖 back
   3. `raw_unif` 是否在正常范围 (-4.0 ~ -1.0)
 - 所有文件操作限制在 `/workspace/xuannv/` 内。
 - 如需修改 demo 模型注册表，同步更新 `demo_v2/utils/constants.py` 中的 `MODEL_REGISTRY`。
-- 启动训练前务必确认 `CUDA_VISIBLE_DEVICES=6,7`。
+- 启动训练前请先检查 GPU 占用情况（`nvidia-smi`），选择空闲 GPU，必要时手动设置 `CUDA_VISIBLE_DEVICES`。
