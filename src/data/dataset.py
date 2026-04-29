@@ -86,7 +86,8 @@ class HarbinPatchDataset(Dataset):
 
         # ★ 内存预加载: 避免每个 epoch 重复从磁盘读取 GeoTIFF
         self._cache: dict[str, dict[str, tuple]] = {}
-        self._preload_all()
+        if getattr(d, "preload", True):
+            self._preload_all()
 
     def _discover_patches(self) -> list[str]:
         if self.data_root.suffix == ".json":
