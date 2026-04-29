@@ -167,7 +167,7 @@ class HarbinPatchDataset(Dataset):
         cache_key = hashlib.md5(
             (str(self.data_root) + ",".join(self.patches)).encode()
         ).hexdigest()[:16]
-        cache_file = Path("/workspace/outputs/aef_qwen_v4_cd_upgrade") / f"dataset_cache_{cache_key}.pt"
+        cache_file = Path(getattr(cfg.experiment, "output_dir", "/workspace/outputs")) / f"dataset_cache_{cache_key}.pt"
 
         # 尝试加载已有缓存
         if cache_file.exists():

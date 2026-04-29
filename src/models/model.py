@@ -141,8 +141,8 @@ class AEFModel(nn.Module):
             source_frames = source_frames[:, None, ...]
             source_timestamps_ms = source_timestamps_ms[:, None, ...]
             source_frame_mask = source_frame_mask[:, None, ...]
-            source_input_mask = source_input_mask[:, None] if source_input_mask.dim() == 1 else source_input_mask
-            source_type_ids = source_type_ids[:, None] if source_type_ids.dim() == 1 else source_type_ids
+            source_input_mask = source_input_mask[None, :] if source_input_mask.dim() == 1 else source_input_mask
+            source_type_ids = source_type_ids[None, :] if source_type_ids.dim() == 1 else source_type_ids
 
         # 传感器编码
         encoded = self.sensor_encoder_bank(source_frames, source_type_ids)
