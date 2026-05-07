@@ -25,6 +25,7 @@
 
 ## Agent 行为准则
 
+- **与用户交流时必须使用中文回复**。
 - 处理训练/模型相关任务前，先读取对应版本的 config YAML。
 - 修改损失函数或训练逻辑时，确保 `gathered_pre_norm` 被正确使用。
 - 调试 AUC 低时，优先检查 temporal contrastive loss 是否生效、双窗口数据是否正确生成。

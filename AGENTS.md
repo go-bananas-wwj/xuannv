@@ -35,6 +35,8 @@ cd /workspace/xuannv
 pip install -e .
 ```
 
+**注意**: 项目中没有任何 linting/formatting 配置文件（无 black、flake8、isort、pre-commit 等）。代码风格由开发者手动保持一致。
+
 ## 代码组织结构
 
 ```
@@ -218,16 +220,20 @@ python scripts/inference/extract_monthly_embeddings_all_patches.py \
 Gradio 可视化平台 (`demo_v2/app.py`)，提供以下 Tab:
 - Project Introduction
 - Data & Embedding Field (数据浏览)
+- Spatial Anomaly (空间异常)
 - Change Detection (变化检测)
 - Three-Type CD (建筑工地/房屋拆除/非农非粮)
 - Downstream Tasks (下游任务)
 - Model Performance Analysis
 - Model Comparison
+- AlphaEarth Official
 
 启动:
 ```bash
 cd /workspace/xuannv
 python demo_v2/app.py --port 7868
+# 或使用脚本:
+bash start_gradio.sh
 ```
 
 Demo 依赖预计算的 embedding maps (`embedding_maps.npy` + `patch_ids.json`)，由 `demo_v2/precompute_cd.py` 生成。
@@ -242,6 +248,8 @@ Demo 依赖预计算的 embedding maps (`embedding_maps.npy` + `patch_ids.json`)
 - 使用 `pathlib.Path` 处理路径
 - 设备选择统一走 `src.utils.device.get_device`
 - checkpoint 统一走 `src.utils.checkpoint.load_checkpoint / save_checkpoint`
+- 训练脚本顶部通常设置 `torch.set_num_threads(4)`
+- 训练脚本常通过 `sys.path.insert(0, "/workspace/xuannv")` 确保模块导入
 
 ### 数据规范
 
@@ -280,26 +288,6 @@ Demo 依赖预计算的 embedding maps (`embedding_maps.npy` + `patch_ids.json`)
 
 添加新 trainer 时，建议复制 `test_v6_launch.py` 模式写一个快速验证脚本。
 
-## 硬件约束
-
-- 训练/推理前请先检查 GPU 占用情况，选择空闲 GPU：
-  ```bash
-  nvidia-smi
-  # 或
-  python -c "import torch; print(torch.cuda.device_count())"
-  ```
-- DDP 训练使用 `torchrun --nproc_per_node=N` (N 为可用卡数)
-- 单卡调试/测试可使用 `cuda:0`
-- 如需限制特定 GPU，手动设置 `CUDA_VISIBLE_DEVICES` 环境变量
-
-### 本机硬件配置
-
-- **GPU**: 8 × NVIDIA GeForce RTX 4090 (24GB 显存)
-- **CUDA**: 12.8 (驱动 570.211.01)
-- **PyTorch**: 2.11.0+cu126
-- **conda 环境**: `aef-qwen` (Python 3.11)
-- **激活方式**: `conda activate aef-qwen`
-
 ## 部署与运行时
 
 ### 训练任务管理
@@ -310,7 +298,12 @@ tmux new -s v6_train
 # 在 session 中执行训练命令
 ```
 
-`monitor_training.py` 是一个独立的 watchdog 脚本，监控指定日志目录的 NaN/Inf 并自动重启 (项目中有多个类似脚本，按实验版本命名)。
+可用的启动脚本:
+- `start_train.sh`: V1 DDP 训练启动器 (GPU 5,6,7)
+- `start_v6_train.sh`: V6 训练启动器
+- `start_v6_5_train.sh`: V6.5 训练启动器
+- `watchdog.sh`: DDP v4 崩溃自动恢复看门狗 (自动 resume 最新 checkpoint，最大重试 10 次)
+- `monitor_training.py`: Python 版监控脚本，检测 NaN/Inf 并自动修复重启 (会修改 config 降低 risky weights)
 
 ### 输出目录约定
 
@@ -328,6 +321,23 @@ tmux new -s v6_train
 
 Demo 使用的预计算结果由 `demo_v2/precompute_cd.py` 生成，依赖 backbone checkpoint。修改模型后需要重新预计算。
 
+### 本机硬件配置
+
+- **GPU**: 8 × NVIDIA GeForce RTX 4090 (24GB 显存)
+- **CUDA**: 12.8 (驱动 570.211.01)
+- **PyTorch**: 2.11.0+cu126
+- **conda 环境**: `aef-qwen` (Python 3.11)
+- **激活方式**: `conda activate aef-qwen`
+
+## 安全与注意事项
+
+- **所有文件操作限制在 `/workspace/xuannv/` 内**，不要读写项目外的文件。
+- **checkpoint 文件较大** (数百 MB 到数 GB)，不要频繁复制或传输。
+- 训练脚本会修改 config YAML (如 `monitor_training.py` 自动降低 loss weights)，注意版本控制。
+- Demo 和评估脚本中使用了大量**硬编码绝对路径** (如 `/workspace/raw/harbin_scenes/`、`/workspace/index/harbin/grid/harbin_grid.geojson`)，修改路径时需同步更新所有引用位置。
+- `archive/` 目录为废弃代码，**只读参考**，不要修改或依赖其中的逻辑。
+- 没有 CI/CD 流程，所有测试和验证需在本地或开发机上手动执行。
+
 ## GitHub 仓库同步规则
 
 - **远程仓库**: `git@github.com:go-bananas-wwj/xuannv.git` (私密仓库)
@@ -342,6 +352,7 @@ Demo 使用的预计算结果由 `demo_v2/precompute_cd.py` 生成，依赖 back
 
 ## Agent 行为准则
 
+- **与用户交流时必须使用中文回复**。
 - 处理训练/模型相关任务前，先读取对应版本的 config YAML。
 - 修改损失函数或训练逻辑时，确保 `gathered_pre_norm` / `pre_norm_map` 被正确使用。
 - 调试 AUC 低时，优先检查:
@@ -350,4 +361,4 @@ Demo 使用的预计算结果由 `demo_v2/precompute_cd.py` 生成，依赖 back
   3. `raw_unif` 是否在正常范围 (-4.0 ~ -1.0)
 - 所有文件操作限制在 `/workspace/xuannv/` 内。
 - 如需修改 demo 模型注册表，同步更新 `demo_v2/utils/constants.py` 中的 `MODEL_REGISTRY`。
-- 启动训练前请先检查 GPU 占用情况（`nvidia-smi`），选择空闲 GPU，必要时手动设置 `CUDA_VISIBLE_DEVICES`。
+- 启动训练前请先检查 GPU 占用情况（`nvidia-smi`），选择空闲 GPU，必要时手动设置 `CUDA_VISIBLE_devices`。
