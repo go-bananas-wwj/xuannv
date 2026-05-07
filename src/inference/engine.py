@@ -1,7 +1,7 @@
 """统一推理引擎.
 
 封装 Backbone 加载、Embedding 提取、CD Head 加载等公共逻辑，
-供 scripts/ 和 demo_v2/ 复用，避免重复实现.
+供 scripts/ 复用，避免重复实现.
 """
 from __future__ import annotations
 

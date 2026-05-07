@@ -1,1 +1,1 @@
-"""AEF_qwen — AlphaEarth Foundations 改进版."""
+"""xuannv — AlphaEarth Foundations 改进版."""

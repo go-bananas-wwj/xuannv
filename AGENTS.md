@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-**xuannv_embdding** (包名 `aef-qwen`) 是 **AlphaEarth Foundations (AEF)** 的独立改进版，从零实现于 `/workspace/xuannv/`。
+**xuannv_embdding** (包名 `xuannv`) 是 **AlphaEarth Foundations (AEF)** 的独立改进版，从零实现于 `/workspace/xuannv/`。
 
 - **核心使命**: 解决嵌入坍缩 (embedding collapse) 与提升时间敏感性 (temporal sensitivity)，使模型能够执行变化检测 (change detection)。
 - **与原版关系**: 本项目完全独立实现，仅参考 AEF 接口设计（数据加载协议、模型输入输出格式）。
@@ -34,13 +34,12 @@
 | 数据 I/O | rasterio, geopandas, numpy |
 | 配置 | PyYAML |
 | 构建 | setuptools (`pyproject.toml`) |
-| Demo | Gradio + matplotlib + folium |
 | 推理加速 | torch.autocast (bf16), gradient checkpointing |
 | 分布式 | torchrun + DDP (hccl) |
 
 ### 关键配置文件
 
-- **`pyproject.toml`**: 包配置，定义包名 `aef-qwen`、版本 `0.1.0`、依赖 (`torch>=2.0`, `numpy`, `rasterio`, `geopandas`, `pyyaml`)，使用 `setuptools>=61.0` 构建。
+- **`pyproject.toml`**: 包配置，定义包名 `xuannv`、版本 `0.1.0`、依赖 (`torch>=2.0`, `numpy`, `rasterio`, `geopandas`, `pyyaml`)，使用 `setuptools>=61.0` 构建。
 - **`configs/qwen_v*.yaml`**: 训练配置，支持 `_base_` 继承机制。共 14 个配置文件，覆盖 V1~V6.5 各版本。
 - **`.gitignore`**: 排除 `__pycache__/`, `*.pt`, `*.pth`, `outputs/`, `*.npy`, `*.tif`, `.vscode/`, `.idea/` 等。
 
@@ -102,14 +101,6 @@ xuannv_embdding/
 │   ├── test_v6_launch.py       # 快速冒烟测试
 │   ├── test_v6_trainer.py      # 训练器链路测试
 │   └── train_v*_downstream_*.py  # 下游任务训练 (MLP/ConvHead)
-├── demo_v2/                    # Gradio 可视化 Demo
-│   ├── app.py                  # Demo 主入口
-│   ├── config.py               # 模型注册表查询
-│   ├── cache_manager.py        # 预计算结果缓存
-│   ├── precompute_cd.py        # 预计算 embedding maps
-│   ├── engines/                # 推理引擎封装 (6个模块)
-│   ├── components/             # 各 Tab UI 组件 (11个模块)
-│   └── utils/                  # 常量、可视化、地图工具
 ├── archive/                    # 废弃/实验代码 (只读参考)
 │   ├── demo_legacy/
 │   ├── demo_v2_legacy/
@@ -287,31 +278,6 @@ python scripts/inference/extract_monthly_embeddings_all_patches.py \
     --gpu_idx 0 --total_gpus 2
 ```
 
-## Demo 系统
-
-Gradio 可视化平台 (`demo_v2/app.py`)，提供以下 Tab:
-- Project Introduction
-- Data & Embedding Field (数据浏览)
-- Spatial Anomaly (空间异常)
-- Change Detection (变化检测)
-- Three-Type CD (建筑工地/房屋拆除/非农非粮)
-- Downstream Tasks (下游任务)
-- Model Performance Analysis
-- Model Comparison
-- AlphaEarth Official
-
-启动:
-```bash
-cd /workspace/xuannv
-python demo_v2/app.py --port 7868
-# 或使用脚本:
-bash start_gradio.sh
-```
-
-Demo 依赖预计算的 embedding maps (`embedding_maps.npy` + `patch_ids.json`)，由 `demo_v2/precompute_cd.py` 生成。修改模型后需要重新预计算。
-
-模型注册表位于 `demo_v2/utils/constants.py` 中的 `MODEL_REGISTRY`，如需注册新版本必须同步更新。
-
 ## 开发规范
 
 ### 代码风格
@@ -355,7 +321,6 @@ tmux new -s v6_train
 - `start_train.sh`: V1 DDP 训练启动器 (GPU 5,6,7)
 - `start_v6_train.sh`: V6 训练启动器
 - `start_v6_5_train.sh`: V6.5 训练启动器
-- `start_gradio.sh`: Gradio Demo 启动器 (端口 7868)
 - `watchdog.sh`: DDP v4 崩溃自动恢复看门狗 (自动 resume 最新 checkpoint，最大重试 10 次)
 - `monitor_training.py`: Python 版监控脚本，检测 NaN/Inf 并自动修复重启 (会修改 config 降低 risky weights)
 
@@ -373,7 +338,7 @@ tmux new -s v6_train
 
 ### 预计算缓存
 
-Demo 使用的预计算结果由 `demo_v2/precompute_cd.py` 生成，依赖 backbone checkpoint。修改模型后需要重新预计算。
+
 
 ## 安全与注意事项
 
@@ -406,7 +371,6 @@ Demo 使用的预计算结果由 `demo_v2/precompute_cd.py` 生成，依赖 back
   2. 双窗口数据是否正确生成
   3. `raw_unif` 是否在正常范围 (-4.0 ~ -1.0)
 - 所有文件操作限制在 `/workspace/xuannv/` 内。
-- 如需修改 demo 模型注册表，同步更新 `demo_v2/utils/constants.py` 中的 `MODEL_REGISTRY`。
 - 启动训练或推理前请先检查 NPU 占用情况（`npu-smi info`），选择空闲 NPU，必要时通过 `ASCEND_RT_VISIBLE_DEVICES` 或脚本参数指定设备。
 
 ---
