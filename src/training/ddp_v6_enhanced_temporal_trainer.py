@@ -150,7 +150,7 @@ class DDPv6EnhancedTemporalTrainer:
     def __init__(self, cfg: Config, local_rank: int = 0) -> None:
         self.cfg = cfg
         self.local_rank = local_rank
-        self.device = torch.device(f"cuda:{local_rank}")
+        self.device = torch.device(f"npu:{local_rank}")
         self.world_size = dist.get_world_size() if dist.is_initialized() else 1
         self.global_rank = dist.get_rank() if dist.is_initialized() else 0
 
@@ -172,7 +172,7 @@ class DDPv6EnhancedTemporalTrainer:
         self.scheduler = build_scheduler(self.optimizer, cfg)
 
         # GradScaler
-        self.scaler = torch.cuda.amp.GradScaler(init_scale=2**18)
+        self.scaler = torch_npu.npu.amp.GradScaler(init_scale=2**18)
 
         # 输出目录
         self.output_dir = Path(cfg.experiment.output_dir)
@@ -215,7 +215,7 @@ class DDPv6EnhancedTemporalTrainer:
             for pg in self.optimizer.param_groups:
                 pg["lr"] = lr
 
-            with torch.autocast(device_type="cuda", dtype=torch.bfloat16, enabled=True):
+            with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=True):
                 # Teacher forward: 完整输入
                 with torch.no_grad():
                     teacher_out = self.teacher(

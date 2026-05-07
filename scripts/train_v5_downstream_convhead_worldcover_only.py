@@ -138,7 +138,7 @@ def compute_class_weights(y_true, n_classes):
 
 
 def train_pixel_conv_head(task_name, ds, n_classes, is_binary=False, epochs=40, batch_size=4, lr=1e-3):
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("npu:0" if torch.npu.is_available() else "cpu")
     
     patch_size = len(ds.months)
     n_patches = len(ds.patch_ids)

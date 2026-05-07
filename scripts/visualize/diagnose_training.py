@@ -12,7 +12,7 @@ cfg = load_config("configs/qwen_v4_cd_upgrade.yaml")
 cfg.training.epochs = 1  # 不实际训练
 
 dataloader = build_dataloader(cfg, training=True, distributed=False, world_size=1, rank=0)
-trainer = SingleGPUTrainer(cfg, device_str="cuda:0")
+trainer = SingleGPUTrainer(cfg, device_str="npu:0")
 
 batch = next(iter(dataloader))
 print(f"Batch loaded: patch={batch['patch_id']}")
@@ -23,17 +23,17 @@ print(f"  spatial_mask: {batch.get('spatial_mask')}")
 # 前向传播
 print("\n--- Forward pass ---")
 student_out = trainer.model(
-    batch["source_frames"].cuda(0),
-    batch["source_timestamps_ms"].cuda(0),
-    batch["source_frame_mask"].cuda(0),
-    batch["source_input_mask"].cuda(0),
-    batch["source_type_ids"].cuda(0),
-    batch["valid_start_ms"].cuda(0),
-    batch["valid_end_ms"].cuda(0),
-    batch["target_relative_time"].cuda(0),
-    batch["target_metadata"].cuda(0),
-    batch["target_loss_type"].cuda(0),
-    batch["target_source_idx"].cuda(0),
+    batch["source_frames"].npu(0),
+    batch["source_timestamps_ms"].npu(0),
+    batch["source_frame_mask"].npu(0),
+    batch["source_input_mask"].npu(0),
+    batch["source_type_ids"].npu(0),
+    batch["valid_start_ms"].npu(0),
+    batch["valid_end_ms"].npu(0),
+    batch["target_relative_time"].npu(0),
+    batch["target_metadata"].npu(0),
+    batch["target_loss_type"].npu(0),
+    batch["target_source_idx"].npu(0),
 )
 print(f"  embedding: {student_out.embedding.shape}")
 print(f"  embedding min/max: {student_out.embedding.min().item():.3f} / {student_out.embedding.max().item():.3f}")
@@ -54,17 +54,17 @@ for t_idx, recon in enumerate(student_out.reconstructions):
 print("\n--- Teacher forward ---")
 with torch.no_grad():
     teacher_out = trainer.teacher(
-        batch["source_frames"].cuda(0),
-        batch["source_timestamps_ms"].cuda(0),
-        batch["source_frame_mask"].cuda(0),
-        batch["source_input_mask"].cuda(0),
-        batch["source_type_ids"].cuda(0),
-        batch["valid_start_ms"].cuda(0),
-        batch["valid_end_ms"].cuda(0),
-        batch["target_relative_time"].cuda(0),
-        batch["target_metadata"].cuda(0),
-        batch["target_loss_type"].cuda(0),
-        batch["target_source_idx"].cuda(0),
+        batch["source_frames"].npu(0),
+        batch["source_timestamps_ms"].npu(0),
+        batch["source_frame_mask"].npu(0),
+        batch["source_input_mask"].npu(0),
+        batch["source_type_ids"].npu(0),
+        batch["valid_start_ms"].npu(0),
+        batch["valid_end_ms"].npu(0),
+        batch["target_relative_time"].npu(0),
+        batch["target_metadata"].npu(0),
+        batch["target_loss_type"].npu(0),
+        batch["target_source_idx"].npu(0),
     )
 print(f"  teacher embedding NaN: {torch.isnan(teacher_out.embedding).any().item()}")
 

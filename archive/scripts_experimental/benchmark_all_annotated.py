@@ -29,7 +29,7 @@ from demo_v2.utils.harbin_annotations_v2 import (
 )
 
 VERSION = "v2"
-DEVICE = "cuda:0"
+DEVICE = "npu:0"
 OUTPUT_DIR = Path("/workspace/outputs/aef_qwen_v2_taskheads/benchmark_all")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 

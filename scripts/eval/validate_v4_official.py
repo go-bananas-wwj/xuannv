@@ -35,7 +35,7 @@ print("="*60)
 # ──────────────────────────────────────────
 from src.inference.engine import load_backbone, extract_embedding_map
 
-device = torch.device("cuda:0")
+device = torch.device("npu:0")
 model, dataset, cfg = load_backbone(CONFIG_PATH, CKPT_PATH, device=device)
 
 # ──────────────────────────────────────────

@@ -66,8 +66,8 @@ from src.data.dataset import HarbinPatchDataset
 
 def load_model(ckpt_path):
     cfg = load_config(CONFIG_PATH)
-    model = AEFModel(cfg).to("cuda:0")
-    ckpt = torch.load(ckpt_path, map_location="cuda:0", weights_only=False)
+    model = AEFModel(cfg).to("npu:0")
+    ckpt = torch.load(ckpt_path, map_location="npu:0", weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"])
     return model, cfg
 
@@ -79,7 +79,7 @@ def extract_embedding_for_patch(model, dataset, patch_idx, valid_start_ms, valid
     batch_dev = {}
     for k, v in batch.items():
         if isinstance(v, torch.Tensor):
-            batch_dev[k] = v.unsqueeze(0).to("cuda:0")
+            batch_dev[k] = v.unsqueeze(0).to("npu:0")
         else:
             batch_dev[k] = v
     with torch.no_grad():
@@ -219,7 +219,7 @@ def train_supervised_contrastive(emb_before, emb_after, labels,
     - 冻结 backbone
     - 训练 temporal contrastive head
     """
-    device = "cuda:0"
+    device = "npu:0"
     head = TemporalContrastiveHead(emb_before.shape[1]).to(device)
     optimizer = torch.optim.AdamW(head.parameters(), lr=lr, weight_decay=0.01)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
@@ -290,7 +290,7 @@ def train_supervised_contrastive(emb_before, emb_after, labels,
 
 def evaluate_with_head(emb_before, emb_after, labels, head_state, output_dir=None):
     """用训练好的 head 评估完整数据集 (与 V2 fewshot pipeline 对比)."""
-    device = "cuda:0"
+    device = "npu:0"
     D = emb_before.shape[1]
     head = TemporalContrastiveHead(D).to(device)
     head.load_state_dict(head_state)

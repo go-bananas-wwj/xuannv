@@ -34,7 +34,7 @@ NEEDED_MONTHS = {"2025-04", "2025-06", "2025-08", "2025-09", "2025-10"}
 
 
 def main():
-    device = get_device(device_str="cuda:0")
+    device = get_device(device_str="npu:0")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     model, dataset, cfg = load_backbone(CONFIG_PATH, CKPT_PATH, device=device)
 

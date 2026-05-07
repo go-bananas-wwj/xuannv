@@ -36,7 +36,7 @@ from src.models.model import AEFModel
 CONFIG_PATH = "/workspace/xuannv/configs/qwen_v1_scenes.yaml"
 CKPT_PATH = "/workspace/outputs/aef_qwen_v2/epoch_499.pt"
 OUTPUT_DIR = Path("/workspace/outputs/aef_qwen_v2/backbone_finetune")
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("npu:0" if torch.npu.is_available() else "cpu")
 
 PERIOD_TO_MONTHS = {
     "2025-04~2025-06": ("2025-04", "2025-06"),

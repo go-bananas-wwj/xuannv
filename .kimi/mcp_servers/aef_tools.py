@@ -95,8 +95,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         try:
             import torch
             lines.append(f"PyTorch: {torch.__version__}")
-            lines.append(f"CUDA available: {torch.cuda.is_available()}")
-            if torch.cuda.is_available():
+            lines.append(f"CUDA available: {torch.npu.is_available()}")
+            if torch.npu.is_available():
                 lines.append(f"CUDA version: {torch.version.cuda}")
                 lines.append(f"GPU count: {torch.cuda.device_count()}")
                 for i in range(torch.cuda.device_count()):

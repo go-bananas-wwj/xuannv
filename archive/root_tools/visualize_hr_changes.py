@@ -41,8 +41,8 @@ ADJACENT_PAIRS = [
 
 # Load model
 cfg = load_config(CONFIG)
-model = AEFModel(cfg).to("cuda:0")
-ckpt = torch.load(CKPT, map_location="cuda:0", weights_only=False)
+model = AEFModel(cfg).to("npu:0")
+ckpt = torch.load(CKPT, map_location="npu:0", weights_only=False)
 model.load_state_dict(ckpt["model_state_dict"])
 model.eval()
 
@@ -53,7 +53,7 @@ def extract_outputs(model, dataset, patch_idx, valid_start_ms, valid_end_ms):
     batch = dataset[patch_idx]
     batch["valid_start_ms"] = torch.tensor(valid_start_ms, dtype=torch.float64)
     batch["valid_end_ms"] = torch.tensor(valid_end_ms, dtype=torch.float64)
-    batch_dev = {k: (v.unsqueeze(0).to("cuda:0") if isinstance(v, torch.Tensor) else v) for k, v in batch.items()}
+    batch_dev = {k: (v.unsqueeze(0).to("npu:0") if isinstance(v, torch.Tensor) else v) for k, v in batch.items()}
     with torch.no_grad():
         out = model(
             source_frames=batch_dev["source_frames"],

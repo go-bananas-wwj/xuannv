@@ -39,7 +39,7 @@ BATCH_SIZE = 16
 LR = 1e-3
 EPOCHS = 300
 PATIENCE = 50
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("npu:0" if torch.npu.is_available() else "cpu")
 
 PERIOD_TO_MONTHS = {
     "2025-04~2025-06": ("2025-04", "2025-06"),

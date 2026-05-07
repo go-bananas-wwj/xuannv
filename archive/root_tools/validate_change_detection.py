@@ -47,7 +47,7 @@ from src.models.model import AEFModel
 from src.data.dataset import HarbinPatchDataset
 
 cfg = load_config(CONFIG_PATH)
-device = torch.device("cuda:0")
+device = torch.device("npu:0")
 model = AEFModel(cfg).to(device)
 ckpt = torch.load(CKPT_PATH, map_location=device, weights_only=False)
 model.load_state_dict(ckpt["model_state_dict"] if "model_state_dict" in ckpt else ckpt)

@@ -20,7 +20,7 @@ CONFIG_PATH = "/workspace/xuannv/configs/qwen_v5_mixed_scale.yaml"
 CKPT_V5 = "/workspace/outputs/aef_qwen_v5_mixed_scale/epoch_best_epoch161.pt"
 ANNOT_DIR = "/workspace/哈尔滨松北新区变化检测汇总文件/变化检测shp文件"
 GRID_PATH = "/workspace/index/harbin/grid/harbin_grid.geojson"
-DEVICE = "cuda:0"  # GPU 6
+DEVICE = "npu:0"  # GPU 6
 
 # 时间窗口
 BEFORE_WINDOW = (1688169600000.0, 1703980800000.0)  # 2023Q3-Q4

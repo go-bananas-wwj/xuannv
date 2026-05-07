@@ -43,3 +43,8 @@ Thumbs.db
 .env
 .venv/
 venv/
+
+# NPU adaptation temp files
+fusion_result.json
+*.log
+nohup.out

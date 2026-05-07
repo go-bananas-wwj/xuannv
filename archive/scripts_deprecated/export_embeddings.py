@@ -24,7 +24,7 @@ def main():
     parser.add_argument("--config", type=str, required=True)
     parser.add_argument("--checkpoint", type=str, required=True)
     parser.add_argument("--output-dir", type=str, default=None)
-    parser.add_argument("--device", type=str, default="cuda:0")
+    parser.add_argument("--device", type=str, default="npu:0")
     parser.add_argument("--batch-size", type=int, default=4)
     args = parser.parse_args()
 

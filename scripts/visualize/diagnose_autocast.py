@@ -10,12 +10,12 @@ from src.training.single_gpu_trainer import SingleGPUTrainer
 
 cfg = load_config("configs/qwen_v4_cd_upgrade.yaml")
 dataloader = build_dataloader(cfg, training=True, distributed=False, world_size=1, rank=0)
-trainer = SingleGPUTrainer(cfg, device_str="cuda:0")
+trainer = SingleGPUTrainer(cfg, device_str="npu:0")
 
 for i, batch in enumerate(dataloader):
-    batch = {k: v.cuda(0) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+    batch = {k: v.npu(0) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
     
-    with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True):
+    with torch.autocast(device_type="npu", dtype=torch.float16, enabled=True):
         student_out = trainer.model(
             source_frames=batch["source_frames"],
             source_timestamps_ms=batch["source_timestamps_ms"],
@@ -59,7 +59,7 @@ for i, batch in enumerate(dataloader):
         vicreg = vicreg_loss(z_s, z_t)
         koleo = koleo_loss(torch.cat([z_s, z_t], dim=0))
         
-        ct_recon = torch.tensor(0.0, device="cuda:0")
+        ct_recon = torch.tensor(0.0, device="npu:0")
         if getattr(cfg.training, "ct_reconstruction_weight", 0.0) > 0 and "spatial_mask" in batch:
             ct_recon = trainer._cross_temporal_masked_recon(batch, student_out)
         

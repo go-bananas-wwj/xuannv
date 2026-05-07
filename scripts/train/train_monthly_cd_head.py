@@ -31,6 +31,7 @@ sys.path.insert(0, "/workspace/xuannv")
 
 import numpy as np
 import torch
+import torch_npu
 torch.set_num_threads(4)
 import torch.nn as nn
 import torch.nn.functional as F
@@ -62,7 +63,7 @@ BATCH_SIZE = 16
 LR = 1e-3
 EPOCHS = 120
 PATIENCE = 30
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("npu:0" if torch.npu.is_available() else "cpu")
 
 # period -> (before_month, after_month)
 PERIOD_TO_MONTHS = {
@@ -394,7 +395,7 @@ def parse_args():
     parser.add_argument("--ohem_ratio", type=float, default=0.25)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output_name", type=str, default=None, help="输出文件名后缀")
-    parser.add_argument("--device", type=str, default=None, help="torch device, e.g. cuda:0")
+    parser.add_argument("--device", type=str, default=None, help="torch device, e.g. npu:0")
     return parser.parse_args()
 
 

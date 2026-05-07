@@ -33,7 +33,7 @@ from demo_v2.utils.harbin_annotations_v2 import (
 )
 
 # ── 配置 ──
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("npu:0" if torch.npu.is_available() else "cpu")
 VERSION = "v2"
 CFG_PATH = "/workspace/xuannv/configs/qwen_v2_temporal.yaml"
 CKPT_PATH = "/workspace/outputs/aef_qwen_v2/best.pt"

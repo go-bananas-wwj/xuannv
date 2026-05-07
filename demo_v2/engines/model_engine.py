@@ -15,9 +15,9 @@ from src.inference.engine import extract_embedding_map, load_backbone
 class ModelEngine:
     """按需加载模型，支持实时推理获取指定时间窗口的 embedding."""
 
-    def __init__(self, version: str, device: str = "cuda:0"):
+    def __init__(self, version: str, device: str = "npu:0"):
         self.version = version
-        self.device = torch.device(device if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(device if torch.npu.is_available() else "cpu")
         self._model: Optional[Any] = None
         self._dataset: Optional[Any] = None
         self._cfg: Optional[Any] = None

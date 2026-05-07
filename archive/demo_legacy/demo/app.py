@@ -135,7 +135,7 @@ def get_model():
     from src.models.model import AEFModel
     from src.data.dataset import HarbinPatchDataset
     cfg = load_config(CONFIG_PATH)
-    device = torch.device("cuda:0")
+    device = torch.device("npu:0")
     model = AEFModel(cfg).to(device)
     ckpt = torch.load(CKPT_PATH, map_location=device, weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"] if "model_state_dict" in ckpt else ckpt)
@@ -274,7 +274,7 @@ def _compute_change_intensity(before_window, after_window, max_patches=50):
         return None, f"❌ 无效时间窗口 (bs={bs}, ae={ae})"
 
     model, dataset, cfg = get_model()
-    device = torch.device("cuda:0")
+    device = torch.device("npu:0")
 
     # Get patch bounds from grid
     patch_bounds = {}
@@ -473,7 +473,7 @@ def _get_embedding_for_patch(pid):
     for ws, we in [(BEFORE_WINDOW[0], BEFORE_WINDOW[1]), (AFTER_WINDOW[0], AFTER_WINDOW[1])]:
         batch["valid_start_ms"] = torch.tensor(ws, dtype=torch.float64)
         batch["valid_end_ms"] = torch.tensor(we, dtype=torch.float64)
-        batch_dev = {k: v.unsqueeze(0).to("cuda:0") if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+        batch_dev = {k: v.unsqueeze(0).to("npu:0") if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
         with torch.no_grad():
             output = model(
                 source_frames=batch_dev["source_frames"],
@@ -797,7 +797,7 @@ with gr.Blocks(title="AEF_qwen Demo") as demo:
                 for ws, we in [bs, ae]:
                     batch["valid_start_ms"] = torch.tensor(ws, dtype=torch.float64)
                     batch["valid_end_ms"] = torch.tensor(we, dtype=torch.float64)
-                    batch_dev = {k: v.unsqueeze(0).to("cuda:0") if isinstance(v, torch.Tensor) else v
+                    batch_dev = {k: v.unsqueeze(0).to("npu:0") if isinstance(v, torch.Tensor) else v
                                  for k, v in batch.items()}
                     with torch.no_grad():
                         output = model(

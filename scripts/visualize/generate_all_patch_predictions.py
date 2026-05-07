@@ -41,7 +41,7 @@ def get_all_patch_ids() -> list[str]:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device", default=None, help="torch device string, e.g. cuda:0")
+    parser.add_argument("--device", default=None, help="torch device string, e.g. npu:0")
     parser.add_argument("--gpu_idx", type=int, default=0)
     parser.add_argument("--total_gpus", type=int, default=1)
     args = parser.parse_args()

@@ -280,7 +280,7 @@ def main():
     print("="*60)
     print("  正在加载模型...")
     try:
-        device = torch.device("cuda:5" if torch.cuda.is_available() else "cpu")
+        device = torch.device("npu:5" if torch.npu.is_available() else "cpu")
         from demo.embedding_engine import load_model
         model, dataset, cfg = load_model(
             "qwen_v1 (3-input, 7-target)", str(device))

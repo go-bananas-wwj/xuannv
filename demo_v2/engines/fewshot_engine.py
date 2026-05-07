@@ -23,7 +23,7 @@ from demo_v2.utils.constants import RAW_DIR
 class FewShotEngine:
     """哈尔滨新区 few-shot 变化检测引擎."""
 
-    def __init__(self, version: str = "v2", device: str = "cuda:0"):
+    def __init__(self, version: str = "v2", device: str = "npu:0"):
         self.version = version
         self.cd_engine = ChangeDetectionEngine(version, device)
         self._annotated_patches = get_annotated_patches()

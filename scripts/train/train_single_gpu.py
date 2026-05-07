@@ -28,6 +28,7 @@ sys.path.insert(0, "/workspace/xuannv")
 
 import numpy as np
 import torch
+import torch_npu
 
 torch.set_num_threads(4)
 
@@ -40,7 +41,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True, help="YAML 配置文件路径")
     parser.add_argument("--resume", type=str, default=None, help="恢复训练的检查点路径")
-    parser.add_argument("--device", type=str, default="cuda:6", help="训练设备")
+    parser.add_argument("--device", type=str, default="npu:0", help="训练设备")
     parser.add_argument("--epochs", type=int, default=None, help="覆盖配置中的训练轮数")
     parser.add_argument("--save-every", type=int, default=50, help="每隔多少 epoch 保存检查点")
     return parser.parse_args()
@@ -59,8 +60,8 @@ def main():
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
+    if torch.npu.is_available():
+        torch.npu.manual_seed_all(seed)
 
     print("=" * 70)
     print(f"  单 GPU 训练  [{args.device}]  —  {cfg.experiment.name}")

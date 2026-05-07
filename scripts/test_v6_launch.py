@@ -21,9 +21,9 @@ def main():
     if not dist.is_initialized():
         os.environ.setdefault("MASTER_ADDR", "localhost")
         os.environ.setdefault("MASTER_PORT", "29506")
-        dist.init_process_group(backend="nccl", rank=0, world_size=1)
+        dist.init_process_group(backend="hccl", rank=0, world_size=1)
     
-    torch.cuda.set_device(0)
+    torch.npu.set_device(0)
     
     cfg = load_config("configs/qwen_v6_enhanced_temporal.yaml")
     cfg.training.epochs = 1
@@ -45,7 +45,7 @@ def main():
                  for k, v in batch.items()}
         
         # 只测试 forward + loss computation
-        with torch.autocast(device_type="cuda", dtype=torch.bfloat16, enabled=True):
+        with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=True):
             student_out = trainer.model(
                 source_frames=batch["source_frames"],
                 source_timestamps_ms=batch["source_timestamps_ms"],

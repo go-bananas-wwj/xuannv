@@ -45,8 +45,8 @@ from src.models.model import AEFModel
 from src.data.dataset import HarbinPatchDataset
 
 cfg = load_config(CONFIG_PATH)
-model = AEFModel(cfg).to("cuda:0")
-ckpt = torch.load(CKPT_PATH, map_location="cuda:0", weights_only=False)
+model = AEFModel(cfg).to("npu:0")
+ckpt = torch.load(CKPT_PATH, map_location="npu:0", weights_only=False)
 model.load_state_dict(ckpt["model_state_dict"])
 model.eval()
 
@@ -110,7 +110,7 @@ def get_embedding_for_patch(pid, window_type="before"):
                           (AFTER_WINDOW[0], AFTER_WINDOW[1], after_maps)]:
         batch["valid_start_ms"] = torch.tensor(ws, dtype=torch.float64)
         batch["valid_end_ms"] = torch.tensor(we, dtype=torch.float64)
-        batch_dev = {k: v.unsqueeze(0).to("cuda:0") if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+        batch_dev = {k: v.unsqueeze(0).to("npu:0") if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
         with torch.no_grad():
             output = model(
                 source_frames=batch_dev["source_frames"],

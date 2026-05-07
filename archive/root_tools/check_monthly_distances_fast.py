@@ -29,8 +29,8 @@ MONTHS = {
 }
 
 cfg = load_config(CONFIG_PATH)
-model = AEFModel(cfg).to("cuda:0")
-ckpt = torch.load(CKPT_PATH, map_location="cuda:0", weights_only=False)
+model = AEFModel(cfg).to("npu:0")
+ckpt = torch.load(CKPT_PATH, map_location="npu:0", weights_only=False)
 model.load_state_dict(ckpt["model_state_dict"], strict=False)
 model.eval()
 
@@ -42,7 +42,7 @@ def get_emb(idx, w):
     batch = ds[idx]
     batch["valid_start_ms"] = torch.tensor(w[0], dtype=torch.float64)
     batch["valid_end_ms"] = torch.tensor(w[1], dtype=torch.float64)
-    dev = {k: (v.unsqueeze(0).to("cuda:0") if isinstance(v, torch.Tensor) else v) for k, v in batch.items()}
+    dev = {k: (v.unsqueeze(0).to("npu:0") if isinstance(v, torch.Tensor) else v) for k, v in batch.items()}
     with torch.no_grad():
         out = model(**{k:dev[k] for k in [
             "source_frames","source_timestamps_ms","source_frame_mask",

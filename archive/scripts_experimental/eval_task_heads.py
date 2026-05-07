@@ -16,7 +16,7 @@ sys.path.insert(0, "/workspace/xuannv")
 from src.models.heads import ChangeDetectionHead
 from scripts.train_task_heads import EmbeddingChangeDataset, CACHE_DIR
 
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("npu:0" if torch.npu.is_available() else "cpu")
 OUTPUT_DIR = Path("/workspace/outputs/aef_qwen_v2_taskheads")
 
 

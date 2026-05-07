@@ -20,6 +20,7 @@ sys.path.insert(0, "/workspace/xuannv")
 
 import numpy as np
 import torch
+import torch_npu
 torch.set_num_threads(4)
 import torch.nn as nn
 import torch.nn.functional as F
@@ -43,7 +44,7 @@ BATCH_SIZE = 16
 LR = 1e-3
 EPOCHS = 120
 PATIENCE = 30
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("npu:0" if torch.npu.is_available() else "cpu")
 
 # period -> before_months, after_months (列表，支持多月份融合)
 PERIOD_TO_MONTHS = {

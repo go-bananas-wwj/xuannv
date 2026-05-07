@@ -168,11 +168,11 @@ def train_pixel_conv_head(task_name, ds, n_classes, is_binary=False, epochs=30):
         _, lbl = ds[i]
         all_labels.extend(lbl[lbl >= 0].flatten().tolist())
     y_true = np.array(all_labels)
-    class_weights = compute_class_weights(y_true, n_classes).cuda()
+    class_weights = compute_class_weights(y_true, n_classes).npu()
     print(f"  Class weights: {class_weights.cpu().numpy()}")
     
     # Model
-    model = PixelConvHead(in_dim=ds.D * 3, hidden_dim=128, num_classes=n_classes, kernel_size=3, dropout=0.2).cuda()
+    model = PixelConvHead(in_dim=ds.D * 3, hidden_dim=128, num_classes=n_classes, kernel_size=3, dropout=0.2).npu()
     criterion = nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1, reduction="mean")
     optimizer = torch.optim.AdamW(model.parameters(), lr=5e-4, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
@@ -187,8 +187,8 @@ def train_pixel_conv_head(task_name, ds, n_classes, is_binary=False, epochs=30):
         train_loss = 0.0
         train_steps = 0
         for emb, lbl in train_loader:
-            emb = emb.cuda()
-            lbl = lbl.cuda()
+            emb = emb.npu()
+            lbl = lbl.npu()
             optimizer.zero_grad()
             logits = model(emb)
             loss = criterion(logits, lbl)
@@ -203,8 +203,8 @@ def train_pixel_conv_head(task_name, ds, n_classes, is_binary=False, epochs=30):
         all_targets = []
         with torch.no_grad():
             for emb, lbl in val_loader:
-                emb = emb.cuda()
-                lbl = lbl.cuda()
+                emb = emb.npu()
+                lbl = lbl.npu()
                 logits = model(emb)
                 preds = logits.argmax(dim=1).cpu().numpy().flatten()
                 targets = lbl.cpu().numpy().flatten()

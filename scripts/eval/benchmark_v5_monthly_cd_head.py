@@ -34,7 +34,7 @@ PERIOD_TO_MONTHS = {
     "2025-all": ("2025-04", "2025-10"),
 }
 
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("npu:0" if torch.npu.is_available() else "cpu")
 
 
 def load_head():

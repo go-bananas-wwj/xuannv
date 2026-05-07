@@ -32,6 +32,7 @@ def main():
     local_rank = int(os.environ.get("LOCAL_RANK", args.local_rank))
 
     import torch
+    import torch_npu
     import torch.distributed as dist
 
     from src.config import load_config
@@ -46,8 +47,8 @@ def main():
 
     # 设置随机种子
     torch.manual_seed(cfg.experiment.seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(cfg.experiment.seed)
+    if torch.npu.is_available():
+        torch.npu.manual_seed(cfg.experiment.seed)
 
     # DDP 训练 (process group initialized in train_worker)
     from src.training.trainer import train_worker

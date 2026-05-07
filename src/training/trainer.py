@@ -36,7 +36,7 @@ class DDPTrainer:
     def __init__(self, cfg: Config, local_rank: int = 0) -> None:
         self.cfg = cfg
         self.local_rank = local_rank
-        self.device = torch.device(f"cuda:{local_rank}")
+        self.device = torch.device(f"npu:{local_rank}")
         self.world_size = dist.get_world_size() if dist.is_initialized() else 1
         self.global_rank = dist.get_rank() if dist.is_initialized() else 0
 
@@ -80,7 +80,7 @@ class DDPTrainer:
                 pg["lr"] = lr
 
             # 前向传播
-            with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True):
+            with torch.autocast(device_type="npu", dtype=torch.float16, enabled=True):
                 teacher_out = self.model(
                     source_frames=batch["source_frames"],
                     source_timestamps_ms=batch["source_timestamps_ms"],
@@ -263,8 +263,8 @@ class DDPTrainer:
 def train_worker(local_rank: int, cfg: Config, resume_from: str | None = None) -> None:
     """Single worker training function."""
     if not dist.is_initialized():
-        dist.init_process_group(backend="nccl")
-    torch.cuda.set_device(local_rank)
+        dist.init_process_group(backend="hccl")
+    torch.npu.set_device(local_rank)
 
     trainer = DDPTrainer(cfg, local_rank)
 

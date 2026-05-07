@@ -54,6 +54,7 @@ class HarbinPatchDataset(Dataset):
         self.filter_2025_monthly = getattr(d, "filter_2025_monthly", False)
         self.source_channels = getattr(d, "source_channels", {})
         self.merge_hr_into_lr = getattr(d, "merge_hr_into_lr", False)
+        self.cfg = cfg
 
         self.temporal_window_augmentation = d.temporal_window_augmentation
         self.temporal_window_prob = d.temporal_window_prob
@@ -97,12 +98,9 @@ class HarbinPatchDataset(Dataset):
 
         patch_ids: set[str] = set()
         if self.data_root.is_dir():
-            for src_dir in self.data_root.iterdir():
-                if not src_dir.is_dir():
-                    continue
-                for patch_dir in src_dir.iterdir():
-                    if patch_dir.is_dir() and patch_dir.name.startswith("patch_"):
-                        patch_ids.add(patch_dir.name)
+            for patch_dir in self.data_root.rglob("patch_*"):
+                if patch_dir.is_dir():
+                    patch_ids.add(patch_dir.name)
         patches = sorted(patch_ids)
         if not patches:
             raise FileNotFoundError(f"No patches found in {self.data_root}")
@@ -168,7 +166,7 @@ class HarbinPatchDataset(Dataset):
         cache_key = hashlib.md5(
             (str(self.data_root) + ",".join(self.patches)).encode()
         ).hexdigest()[:16]
-        cache_file = Path(getattr(cfg.experiment, "output_dir", "/workspace/outputs")) / f"dataset_cache_{cache_key}.pt"
+        cache_file = Path(getattr(self.cfg.experiment, "output_dir", "/workspace/outputs")) / f"dataset_cache_{cache_key}.pt"
 
         # 尝试加载已有缓存
         if cache_file.exists():

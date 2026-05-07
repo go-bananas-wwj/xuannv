@@ -32,7 +32,7 @@ sys.path.insert(0, "/workspace/xuannv")
 # ──────────────────────────────────────────
 EMB_DIR = Path("/workspace/outputs/aef_qwen_v5_mixed_scale/monthly_embeddings_2025_prenorm")
 LABEL_DIR = Path("/workspace/outputs/aef_qwen_v5_mixed_scale/monthly_labels_2025")
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("npu:0" if torch.npu.is_available() else "cpu")
 MONTHS = ["2025-04", "2025-06", "2025-08", "2025-09", "2025-10"]
 
 # ──────────────────────────────────────────

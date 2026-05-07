@@ -45,8 +45,8 @@ RECORDS_BY_IMPROVEMENT = sorted(
 )
 RECORDS_BY_HEAD_AUC = sorted(RECORDS, key=lambda x: x["head"]["auc"], reverse=True)
 
-_CD_ENGINE = ChangeDetectionEngine("v2", "cuda:0")
-_FS_ENGINE = FewShotEngine("v2", "cuda:0")
+_CD_ENGINE = ChangeDetectionEngine("v2", "npu:0")
+_FS_ENGINE = FewShotEngine("v2", "npu:0")
 
 
 # ── 辅助函数 ──

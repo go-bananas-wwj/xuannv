@@ -67,8 +67,8 @@ from src.data.dataset import HarbinPatchDataset
 
 def load_model(ckpt_path):
     cfg = load_config(CONFIG_PATH)
-    model = AEFModel(cfg).to("cuda:0")
-    ckpt = torch.load(ckpt_path, map_location="cuda:0", weights_only=False)
+    model = AEFModel(cfg).to("npu:0")
+    ckpt = torch.load(ckpt_path, map_location="npu:0", weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"])
     return model, cfg
 
@@ -80,7 +80,7 @@ def extract_embedding_for_patch(model, dataset, patch_idx, valid_start_ms, valid
     batch_dev = {}
     for k, v in batch.items():
         if isinstance(v, torch.Tensor):
-            batch_dev[k] = v.unsqueeze(0).to("cuda:0")
+            batch_dev[k] = v.unsqueeze(0).to("npu:0")
         else:
             batch_dev[k] = v
     with torch.no_grad():
@@ -211,7 +211,7 @@ def train_with_partial_backbone(model, emb_before, emb_after, labels,
     - 解冻最后 2 个 STP block + bottleneck + classification_head
     - 训练 change detection head
     """
-    device = "cuda:0"
+    device = "npu:0"
 
     # 创建 head
     head = ChangeDetectionHead(emb_before.shape[1]).to(device)

@@ -42,7 +42,7 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 RNG = np.random.RandomState(42)
 MAX_SAMPLES_PER_PATCH = 300
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("npu:0" if torch.npu.is_available() else "cpu")
 
 # ── DW 月份→季度映射 (时间对齐) ──
 MONTH_TO_DW_QUARTER = {

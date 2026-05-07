@@ -40,7 +40,7 @@ from src.data.dataset import HarbinPatchDataset
 # ── 配置 ─────────────────────────────────────────────────────────
 CONFIG_PATH = "/workspace/xuannv/configs/qwen_v1_scenes.yaml"
 CKPT_PATH   = "/workspace/outputs/aef_qwen_v2/best.pt"
-DEVICE      = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE      = torch.device("npu:0" if torch.npu.is_available() else "cpu")
 
 SHP_DIR     = Path("/workspace/哈尔滨松北新区变化检测汇总文件/变化检测shp文件")
 GRID_PATH   = Path("/workspace/index/harbin/grid/harbin_grid.geojson")

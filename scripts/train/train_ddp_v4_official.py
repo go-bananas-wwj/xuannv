@@ -27,6 +27,7 @@ sys.path.insert(0, "/workspace/xuannv")
 
 import numpy as np
 import torch
+import torch_npu
 import torch.distributed as dist
 
 torch.set_num_threads(4)
@@ -73,9 +74,9 @@ def main():
 
     # DDP 初始化
     if not dist.is_initialized():
-        dist.init_process_group(backend="nccl")
+        dist.init_process_group(backend="hccl")
     local_rank = int(os.environ.get("LOCAL_RANK", args.local_rank))
-    torch.cuda.set_device(local_rank)
+    torch.npu.set_device(local_rank)
     global_rank = dist.get_rank()
     world_size = dist.get_world_size()
 
@@ -94,8 +95,8 @@ def main():
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
+    if torch.npu.is_available():
+        torch.npu.manual_seed_all(seed)
 
     if global_rank == 0:
         logger.Print("=" * 70)

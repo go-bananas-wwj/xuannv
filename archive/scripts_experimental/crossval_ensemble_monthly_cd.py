@@ -46,7 +46,7 @@ from src.models.heads import (
 
 EMBEDDING_DIR = Path("/workspace/outputs/aef_qwen_v2/monthly_embeddings_2025")
 OUTPUT_DIR = Path("/workspace/outputs/aef_qwen_v2/monthly_cd_head")
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("npu:0" if torch.npu.is_available() else "cpu")
 
 PERIOD_TO_MONTHS = {
     "2025-04~2025-06": ("2025-04", "2025-06"),

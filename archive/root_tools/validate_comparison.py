@@ -40,8 +40,8 @@ from src.data.dataset import HarbinPatchDataset
 
 def load_model(ckpt_path, config_path):
     cfg = load_config(config_path)
-    model = AEFModel(cfg).to("cuda:0")
-    ckpt = torch.load(ckpt_path, map_location="cuda:0", weights_only=False)
+    model = AEFModel(cfg).to("npu:0")
+    ckpt = torch.load(ckpt_path, map_location="npu:0", weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
     dataset = HarbinPatchDataset(cfg)
@@ -95,7 +95,7 @@ def extract_emb(model, dataset, patch_idx, valid_start_ms, valid_end_ms):
     batch_dev = {}
     for k, v in batch.items():
         if isinstance(v, torch.Tensor):
-            batch_dev[k] = v.unsqueeze(0).to("cuda:0")
+            batch_dev[k] = v.unsqueeze(0).to("npu:0")
         else:
             batch_dev[k] = v
     with torch.no_grad():

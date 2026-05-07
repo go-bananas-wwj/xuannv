@@ -63,8 +63,8 @@ from src.data.dataset import HarbinPatchDataset
 
 def load_model(ckpt_path):
     cfg = load_config(CONFIG_PATH)
-    model = AEFModel(cfg).to("cuda:0")
-    ckpt = torch.load(ckpt_path, map_location="cuda:0", weights_only=False)
+    model = AEFModel(cfg).to("npu:0")
+    ckpt = torch.load(ckpt_path, map_location="npu:0", weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"])
     return model, cfg
 
@@ -77,7 +77,7 @@ def extract_embeddings(model, dataset, patch_idx, training=False):
     for ws, we in [(BEFORE_WINDOW[0], BEFORE_WINDOW[1]), (AFTER_WINDOW[0], AFTER_WINDOW[1])]:
         batch["valid_start_ms"] = torch.tensor(ws, dtype=torch.float64)
         batch["valid_end_ms"] = torch.tensor(we, dtype=torch.float64)
-        batch_dev = {k: v.unsqueeze(0).to("cuda:0") if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+        batch_dev = {k: v.unsqueeze(0).to("npu:0") if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
         
         output = model(
                 source_frames=batch_dev["source_frames"],
@@ -109,7 +109,7 @@ def train_pixel_level(model, dataset, patch_to_changes, patch_bounds,
     - 微调最后几个 block
     - 用标注的像素级变化信息做对比学习
     """
-    device = "cuda:0"
+    device = "npu:0"
     
     # 冻结大部分 backbone
     for param in model.parameters():

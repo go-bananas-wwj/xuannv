@@ -148,7 +148,7 @@ def train_pixel_conv_head(task_name, ds, n_classes, is_binary=False, epochs=30):
     print(f"  Input dim: {ds.D * 3}, Classes: {n_classes}, Binary: {is_binary}")
     print(f"{'='*60}")
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("npu:0" if torch.npu.is_available() else "cpu")
 
     indices = list(range(len(ds)))
     train_idx, val_idx = train_test_split(indices, test_size=0.15, random_state=42)

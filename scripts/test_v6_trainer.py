@@ -20,9 +20,9 @@ def main():
     if not dist.is_initialized():
         os.environ.setdefault("MASTER_ADDR", "localhost")
         os.environ.setdefault("MASTER_PORT", "29507")
-        dist.init_process_group(backend="nccl", rank=0, world_size=1)
+        dist.init_process_group(backend="hccl", rank=0, world_size=1)
     
-    torch.cuda.set_device(0)
+    torch.npu.set_device(0)
     
     cfg = load_config("configs/qwen_v6_enhanced_temporal.yaml")
     cfg.training.epochs = 1

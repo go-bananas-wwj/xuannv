@@ -19,7 +19,7 @@ from src.data.dataset import HarbinPatchDataset
 
 CONFIG_PATH = "/workspace/xuannv/configs/qwen_v5_mixed_scale.yaml"
 CKPT_PATH = "/workspace/outputs/aef_qwen_v5_mixed_scale/epoch_best_epoch161.pt"
-DEVICE = "cuda:0"
+DEVICE = "npu:0"
 
 # 时间窗口
 BEFORE_WINDOW = (1672531200000.0, 1703980800000.0)  # 2023全年

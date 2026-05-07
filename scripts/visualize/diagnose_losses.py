@@ -11,10 +11,10 @@ from src.training.single_gpu_trainer import SingleGPUTrainer, vicreg_loss, koleo
 
 cfg = load_config("configs/qwen_v4_cd_upgrade.yaml")
 dataloader = build_dataloader(cfg, training=True, distributed=False, world_size=1, rank=0)
-trainer = SingleGPUTrainer(cfg, device_str="cuda:0")
+trainer = SingleGPUTrainer(cfg, device_str="npu:0")
 
 batch = next(iter(dataloader))
-batch = {k: v.cuda(0) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+batch = {k: v.npu(0) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
 
 print("=== Step 1: Forward ===")
 student_out = trainer.model(
@@ -75,7 +75,7 @@ koleo = koleo_loss(torch.cat([z_s, z_t], dim=0))
 print(f"  koleo: {koleo.item():.4f} NaN: {torch.isnan(koleo).item()}")
 
 print("\n=== Step 7: CT Recon ===")
-ct_recon = torch.tensor(0.0, device="cuda:0")
+ct_recon = torch.tensor(0.0, device="npu:0")
 if getattr(cfg.training, "ct_reconstruction_weight", 0.0) > 0 and "spatial_mask" in batch:
     spatial_mask = batch["spatial_mask"]
     if spatial_mask.dim() == 2:

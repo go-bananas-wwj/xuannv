@@ -66,7 +66,7 @@ def save_comparison(patch_id: str, before_window, after_window, gt_mask, engine:
 
 
 def main():
-    engine = ChangeDetectionEngine(VERSION, device="cuda:0")
+    engine = ChangeDetectionEngine(VERSION, device="npu:0")
     patches = get_annotated_patches()[:3]  # 测试前 3 个
 
     for pid in patches:

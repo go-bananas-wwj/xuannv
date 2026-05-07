@@ -21,13 +21,13 @@ class TaskHeadEngine:
     _loaded: bool = False
 
     @classmethod
-    def get_instance(cls, device: torch.device | str = "cuda:0") -> "TaskHeadEngine":
+    def get_instance(cls, device: torch.device | str = "npu:0") -> "TaskHeadEngine":
         if cls._instance is None:
             cls._instance = cls(device)
         return cls._instance
 
-    def __init__(self, device: torch.device | str = "cuda:0"):
-        self.device = torch.device(device if torch.cuda.is_available() else "cpu")
+    def __init__(self, device: torch.device | str = "npu:0"):
+        self.device = torch.device(device if torch.npu.is_available() else "cpu")
         self._load()
 
     def _load(self) -> None:

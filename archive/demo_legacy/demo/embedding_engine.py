@@ -18,7 +18,7 @@ from src.data.dataset import HarbinPatchDataset
 _model_cache = {}
 
 
-def load_model(model_name: str, device: str = "cuda:0") -> tuple[AEFModel, HarbinPatchDataset, dict]:
+def load_model(model_name: str, device: str = "npu:0") -> tuple[AEFModel, HarbinPatchDataset, dict]:
     """加载模型和数据集."""
     if model_name in _model_cache:
         return _model_cache[model_name]

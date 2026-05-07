@@ -59,8 +59,8 @@ from src.data.dataset import HarbinPatchDataset
 
 def load_model(ckpt_path):
     cfg = load_config(CONFIG_PATH)
-    model = AEFModel(cfg).to("cuda:0")
-    ckpt = torch.load(ckpt_path, map_location="cuda:0", weights_only=False)
+    model = AEFModel(cfg).to("npu:0")
+    ckpt = torch.load(ckpt_path, map_location="npu:0", weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"])
     return model, cfg
 
@@ -82,7 +82,7 @@ def extract_embeddings_for_patches(model, dataset, patch_ids):
         batch = dataset[pidx]
         batch["valid_start_ms"] = torch.tensor(BEFORE_WINDOW[0], dtype=torch.float64)
         batch["valid_end_ms"] = torch.tensor(BEFORE_WINDOW[1], dtype=torch.float64)
-        batch_dev = {k: v.unsqueeze(0).to("cuda:0") if isinstance(v, torch.Tensor) else v
+        batch_dev = {k: v.unsqueeze(0).to("npu:0") if isinstance(v, torch.Tensor) else v
                      for k, v in batch.items()}
         with torch.no_grad():
             out = model(
@@ -101,7 +101,7 @@ def extract_embeddings_for_patches(model, dataset, patch_ids):
         # After
         batch["valid_start_ms"] = torch.tensor(AFTER_WINDOW[0], dtype=torch.float64)
         batch["valid_end_ms"] = torch.tensor(AFTER_WINDOW[1], dtype=torch.float64)
-        batch_dev = {k: v.unsqueeze(0).to("cuda:0") if isinstance(v, torch.Tensor) else v
+        batch_dev = {k: v.unsqueeze(0).to("npu:0") if isinstance(v, torch.Tensor) else v
                      for k, v in batch.items()}
         with torch.no_grad():
             out = model(
@@ -229,7 +229,7 @@ def train_model(model, X_train, y_train, X_val, y_val, lr=1e-6, epochs=50, outpu
     - 冻结 backbone
     - 只训练 temporal head
     """
-    device = "cuda:0"
+    device = "npu:0"
     head = TemporalHead(X_train.shape[1]).to(device)
     optimizer = torch.optim.AdamW(head.parameters(), lr=lr, weight_decay=0.01)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)

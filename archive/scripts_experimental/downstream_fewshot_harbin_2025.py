@@ -52,8 +52,8 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def load_model():
     cfg = load_config(CONFIG_PATH)
-    model = AEFModel(cfg).to("cuda:0")
-    ckpt = torch.load(CKPT_PATH, map_location="cuda:0", weights_only=False)
+    model = AEFModel(cfg).to("npu:0")
+    ckpt = torch.load(CKPT_PATH, map_location="npu:0", weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
     dataset = HarbinPatchDataset(cfg)
@@ -69,7 +69,7 @@ def extract_embedding(model, dataset, patch_idx, window_start_ms, window_end_ms)
     batch_dev = {}
     for k, v in batch.items():
         if isinstance(v, torch.Tensor):
-            batch_dev[k] = v.unsqueeze(0).to("cuda:0")
+            batch_dev[k] = v.unsqueeze(0).to("npu:0")
         else:
             batch_dev[k] = v
     with torch.no_grad():

@@ -15,6 +15,7 @@ sys.path.insert(0, "/workspace/xuannv")
 
 import numpy as np
 import torch
+import torch_npu
 torch.set_num_threads(4)
 import torch.nn.functional as F
 from sklearn.metrics import roc_auc_score, balanced_accuracy_score, f1_score
@@ -39,7 +40,7 @@ from src.models.heads import (
 
 EMBEDDING_DIR = Path("/workspace/outputs/aef_qwen_v2/monthly_embeddings_2025")
 OUTPUT_DIR = Path("/workspace/outputs/aef_qwen_v2/monthly_cd_head")
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("npu:0" if torch.npu.is_available() else "cpu")
 
 PERIOD_TO_MONTHS = {
     "2025-04~2025-06": ("2025-04", "2025-06"),
@@ -368,7 +369,7 @@ def parse_args():
     parser.add_argument("--ohem", action="store_true")
     parser.add_argument("--ohem_ratio", type=float, default=0.25)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--device", type=str, default=None, help="torch device, e.g. cuda:0")
+    parser.add_argument("--device", type=str, default=None, help="torch device, e.g. npu:0")
     return parser.parse_args()
 
 

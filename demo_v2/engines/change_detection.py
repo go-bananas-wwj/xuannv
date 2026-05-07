@@ -17,7 +17,7 @@ _MODEL_ENGINE_CACHE: dict[str, ModelEngine] = {}
 class ChangeDetectionEngine:
     """变化检测引擎."""
 
-    def __init__(self, version: str, device: str = "cuda:0"):
+    def __init__(self, version: str, device: str = "npu:0"):
         self.version = version
         self._device = device
 

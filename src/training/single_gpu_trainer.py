@@ -131,7 +131,7 @@ class DINOLoss(nn.Module):
 class SingleGPUTrainer:
     """单 GPU 训练器 — GPU6 专用."""
 
-    def __init__(self, cfg: Config, device_str: str = "cuda:6") -> None:
+    def __init__(self, cfg: Config, device_str: str = "npu:0") -> None:
         self.cfg = cfg
         self.device = torch.device(device_str)
 
@@ -202,7 +202,7 @@ class SingleGPUTrainer:
                 pg["lr"] = lr
 
             # ── Student 前向 (完整输入) ──
-            with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True):
+            with torch.autocast(device_type="npu", dtype=torch.float16, enabled=True):
                 student_out = self.model(
                     source_frames=batch["source_frames"],
                     source_timestamps_ms=batch["source_timestamps_ms"],
