@@ -38,6 +38,7 @@ ckpt = torch.load(CKPT_PATH, map_location=DEVICE, weights_only=False)
 model.load_state_dict(ckpt["model_state_dict"])
 model.eval()
 
+cfg.data.preload = False
 dataset = HarbinPatchDataset(cfg)
 dataset.training = False
 dataset._spatial_augmentation = False

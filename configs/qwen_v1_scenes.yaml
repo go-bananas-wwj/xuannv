@@ -23,7 +23,7 @@ experiment:
 data:
   dataset_type: harbin_patches
   # 单景数据路径
-  manifest_path: /workspace/raw/harbin_scenes
+  manifest_path: /workspace/raw/harbin_scenes/harbin_scenes
   stats_dir: /workspace/statistics/harbin_scenes
   batch_size: 2
   num_workers: 4
@@ -44,6 +44,8 @@ data:
   temporal_window_max_frames: 24
   cloud_filter_threshold: 0.0
   variance_weighted: false
+  # 内存预加载: True=启动时全部加载到RAM(快但启动慢), False=按需从磁盘读取(启动快但训练慢)
+  preload: true
 
 model:
   input_dim: 6

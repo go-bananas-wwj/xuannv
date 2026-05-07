@@ -28,6 +28,152 @@ from src.data.transforms import (
 )
 
 
+# ---------------------------------------------------------------------------
+# 多进程预加载 worker
+# ---------------------------------------------------------------------------
+
+def _preload_patch_worker(args: tuple) -> tuple[str, dict, int]:
+    """多进程 worker：加载单个 patch 的所有数据.
+    
+    将实例方法的核心逻辑复制到模块级别，避免 pickle 实例方法的问题.
+    """
+    (
+        patch_id,
+        data_root_str,
+        input_sources,
+        target_sources,
+        image_size,
+        input_dim,
+        reconstruction_channels,
+        num_classes,
+        stats,
+        merge_hr_into_lr,
+        filter_2025_monthly,
+    ) = args
+
+    data_root = Path(data_root_str)
+    cache_entry: dict = {}
+    n_cached = 0
+
+    def _resolve(source_name: str, pid: str) -> Path | None:
+        source_dir = data_root / source_name / pid
+        if source_dir.exists():
+            return source_dir
+        for sub_dir in data_root.iterdir():
+            if not sub_dir.is_dir():
+                continue
+            candidate = sub_dir / source_name / pid
+            if candidate.exists():
+                return candidate
+        return None
+
+    def _pad_channels(data: np.ndarray, target_dim: int) -> np.ndarray:
+        current = data.shape[0]
+        if current >= target_dim:
+            return data[:target_dim]
+        padded = np.zeros((target_dim, data.shape[1], data.shape[2]), dtype=data.dtype)
+        padded[:current] = data
+        return padded
+
+    def _load_input_frames(pid: str, source_name: str) -> tuple[np.ndarray, np.ndarray]:
+        source_dir = _resolve(source_name, pid)
+        tif_files = sorted(source_dir.glob("*.tif")) if source_dir is not None else []
+
+        hr_name = None
+        if merge_hr_into_lr and source_name == "s2":
+            hr_name = "s2_hr"
+        elif merge_hr_into_lr and source_name == "s1":
+            hr_name = "s1_hr"
+
+        hr_files: dict[str, Path] = {}
+        if hr_name:
+            hr_dir = _resolve(hr_name, pid)
+            if hr_dir is not None:
+                for p in sorted(hr_dir.glob("*.tif")):
+                    hr_files[p.stem] = p
+
+        if not tif_files and not hr_files:
+            return (np.zeros((0, input_dim, image_size, image_size), dtype=np.float32),
+                    np.zeros(0, dtype=np.float64))
+
+        if filter_2025_monthly:
+            def _is_valid(path: Path) -> bool:
+                stem = path.stem
+                if "Q" in stem.upper():
+                    return False
+                if len(stem) == 8 and stem.isdigit() and stem.startswith("2025"):
+                    return 4 <= int(stem[4:6]) <= 10
+                return False
+            tif_files = [f for f in tif_files if _is_valid(f)]
+
+        frames_list: list[np.ndarray] = []
+        timestamps: list[float] = []
+
+        for tif_path in tif_files:
+            stem = tif_path.stem
+            data = read_tif(tif_path, image_size)
+            if data is None:
+                continue
+            data = normalize_data(data, source_name, stats, num_classes)
+
+            if hr_name and stem in hr_files:
+                hr_data = read_tif(hr_files[stem], image_size)
+                if hr_data is not None:
+                    hr_data = normalize_data(hr_data, hr_name, stats, num_classes)
+                    data = np.concatenate([data, hr_data], axis=0)
+
+            data = _pad_channels(data, input_dim)
+            frames_list.append(data)
+            timestamps.append(float(label_to_timestamp_ms(stem)))
+
+        if not frames_list:
+            return (np.zeros((0, input_dim, image_size, image_size), dtype=np.float32),
+                    np.zeros(0, dtype=np.float64))
+
+        return np.stack(frames_list), np.array(timestamps, dtype=np.float64)
+
+    # 加载输入源
+    for src_name in input_sources:
+        result = _load_input_frames(patch_id, src_name)
+        if len(result[0]) > 0:
+            cache_entry[src_name] = result
+            n_cached += 1
+
+    # 加载目标源
+    for tgt_name, loss_type, sensor_src in target_sources:
+        if tgt_name in cache_entry:
+            continue
+        if tgt_name in ("dem", "worldcover", "jrc_water"):
+            src_dir = _resolve(tgt_name, patch_id)
+            if src_dir is not None:
+                tif_files = sorted(src_dir.glob("*.tif"))
+                if tif_files:
+                    data = read_tif(tif_files[0], 0)
+                    if data is not None:
+                        data = normalize_data(data, tgt_name, stats, num_classes)
+                        data = _pad_channels(data, reconstruction_channels)
+                        cache_entry[tgt_name] = (data[np.newaxis, ...], np.array([0.0]))
+                        n_cached += 1
+        elif tgt_name == "dynamic_world":
+            src_dir = _resolve(tgt_name, patch_id)
+            if src_dir is not None:
+                tif_files = sorted(src_dir.glob("*.tif"))
+                frames_list = []
+                ts_list = []
+                for tf in tif_files:
+                    d = read_tif(tf, image_size)
+                    if d is not None:
+                        d = normalize_data(d, tgt_name, stats, num_classes)
+                        d = _pad_channels(d, reconstruction_channels)
+                        frames_list.append(d)
+                        ts_list.append(float(label_to_timestamp_ms(tf.stem)))
+                if frames_list:
+                    cache_entry[tgt_name] = (np.stack(frames_list), np.array(ts_list, dtype=np.float64))
+                    n_cached += 1
+
+    return patch_id, cache_entry, n_cached
+
+
 class HarbinPatchDataset(Dataset):
     """哈尔滨 Patch 数据集 — 3类输入, 7类目标."""
 
@@ -201,43 +347,72 @@ class HarbinPatchDataset(Dataset):
         # rank 0 (或非 DDP): 执行预加载并保存 (原子写入，防止 rank 1 读到不完整文件)
         start = time.time()
         n_cached = 0
-        for patch_id in self.patches:
-            self._cache[patch_id] = {}
-            for src_name in self.input_sources:
-                result = self._load_input_frames_impl(patch_id, src_name)
-                if len(result[0]) > 0:
-                    self._cache[patch_id][src_name] = result
-                    n_cached += 1
-            for tgt_name, loss_type, sensor_src in self.target_sources:
-                if tgt_name in self._cache[patch_id]:
-                    continue
-                if tgt_name in ("dem", "worldcover", "jrc_water"):
-                    src_dir = self.data_root / tgt_name / patch_id
-                    if src_dir.exists():
-                        tif_files = sorted(src_dir.glob("*.tif"))
-                        if tif_files:
-                            data = read_tif(tif_files[0], 0)
-                            if data is not None:
-                                data = self._normalize(data, tgt_name)
-                                data = self._pad_channels(data, self.reconstruction_channels)
-                                self._cache[patch_id][tgt_name] = (data[np.newaxis, ...], np.array([0.0]))
+
+        # ★ 多进程并行预加载 (非 DDP 环境下使用，避免与 DDP 进程冲突)
+        use_parallel = not is_ddp and len(self.patches) > 20
+        if use_parallel:
+            import os
+            from concurrent.futures import ProcessPoolExecutor
+            n_workers = min(16, os.cpu_count() or 1)
+            worker_args = []
+            for patch_id in self.patches:
+                worker_args.append((
+                    patch_id,
+                    str(self.data_root),
+                    self.input_sources,
+                    self.target_sources,
+                    self.image_size,
+                    self.input_dim,
+                    self.reconstruction_channels,
+                    self.num_classes,
+                    self.stats,
+                    self.merge_hr_into_lr,
+                    self.filter_2025_monthly,
+                ))
+            print(f"[Dataset] Parallel preloading with {n_workers} workers...")
+            with ProcessPoolExecutor(max_workers=n_workers) as executor:
+                for patch_id, cache_entry, patch_n_cached in executor.map(_preload_patch_worker, worker_args):
+                    self._cache[patch_id] = cache_entry
+                    n_cached += patch_n_cached
+        else:
+            # 串行回退 (DDP 环境或少量 patch)
+            for patch_id in self.patches:
+                self._cache[patch_id] = {}
+                for src_name in self.input_sources:
+                    result = self._load_input_frames_impl(patch_id, src_name)
+                    if len(result[0]) > 0:
+                        self._cache[patch_id][src_name] = result
+                        n_cached += 1
+                for tgt_name, loss_type, sensor_src in self.target_sources:
+                    if tgt_name in self._cache[patch_id]:
+                        continue
+                    if tgt_name in ("dem", "worldcover", "jrc_water"):
+                        src_dir = self._resolve_source_dir(tgt_name, patch_id)
+                        if src_dir is not None:
+                            tif_files = sorted(src_dir.glob("*.tif"))
+                            if tif_files:
+                                data = read_tif(tif_files[0], 0)
+                                if data is not None:
+                                    data = self._normalize(data, tgt_name)
+                                    data = self._pad_channels(data, self.reconstruction_channels)
+                                    self._cache[patch_id][tgt_name] = (data[np.newaxis, ...], np.array([0.0]))
+                                    n_cached += 1
+                    elif tgt_name == "dynamic_world":
+                        src_dir = self._resolve_source_dir(tgt_name, patch_id)
+                        if src_dir is not None:
+                            tif_files = sorted(src_dir.glob("*.tif"))
+                            frames_list = []
+                            ts_list = []
+                            for tf in tif_files:
+                                d = read_tif(tf, self.image_size)
+                                if d is not None:
+                                    d = self._normalize(d, tgt_name)
+                                    d = self._pad_channels(d, self.reconstruction_channels)
+                                    frames_list.append(d)
+                                    ts_list.append(float(label_to_timestamp_ms(tf.stem)))
+                            if frames_list:
+                                self._cache[patch_id][tgt_name] = (np.stack(frames_list), np.array(ts_list, dtype=np.float64))
                                 n_cached += 1
-                elif tgt_name == "dynamic_world":
-                    src_dir = self.data_root / tgt_name / patch_id
-                    if src_dir.exists():
-                        tif_files = sorted(src_dir.glob("*.tif"))
-                        frames_list = []
-                        ts_list = []
-                        for tf in tif_files:
-                            d = read_tif(tf, self.image_size)
-                            if d is not None:
-                                d = self._normalize(d, tgt_name)
-                                d = self._pad_channels(d, self.reconstruction_channels)
-                                frames_list.append(d)
-                                ts_list.append(float(label_to_timestamp_ms(tf.stem)))
-                        if frames_list:
-                            self._cache[patch_id][tgt_name] = (np.stack(frames_list), np.array(ts_list, dtype=np.float64))
-                            n_cached += 1
         elapsed = time.time() - start
         print(f"[Dataset] Pre-loaded {len(self.patches)} patches, {n_cached} sources in {elapsed:.1f}s ({elapsed/60:.1f}min)")
 
@@ -247,6 +422,24 @@ class HarbinPatchDataset(Dataset):
         tmp_file.rename(cache_file)  # 原子重命名
         print(f"[Dataset] Saved cache to {cache_file} ({cache_file.stat().st_size/1e9:.1f}GB) in {time.time()-save_start:.1f}s")
 
+    def _resolve_source_dir(self, source_name: str, patch_id: str) -> Path | None:
+        """解析数据源目录，支持 data_root 的直接子目录嵌套结构.
+        
+        优先查找 data_root / source_name / patch_id，
+        若不存在则在 data_root 的直接子目录中搜索.
+        """
+        source_dir = self.data_root / source_name / patch_id
+        if source_dir.exists():
+            return source_dir
+        # 在 data_root 的直接子目录中搜索（兼容 harbin_scenes/harbin/s2/patch_*）
+        for sub_dir in self.data_root.iterdir():
+            if not sub_dir.is_dir():
+                continue
+            candidate = sub_dir / source_name / patch_id
+            if candidate.exists():
+                return candidate
+        return None
+
     def _load_input_frames(self, patch_id: str, source_name: str) -> tuple[np.ndarray, np.ndarray]:
         """带缓存的输入帧加载."""
         if patch_id in self._cache and source_name in self._cache[patch_id]:
@@ -254,9 +447,9 @@ class HarbinPatchDataset(Dataset):
         return self._load_input_frames_impl(patch_id, source_name)
 
     def _load_input_frames_impl(self, patch_id: str, source_name: str) -> tuple[np.ndarray, np.ndarray]:
-        """从磁盘加载一个输入源的所有帧 (原始逻辑)."""
-        source_dir = self.data_root / source_name / patch_id
-        tif_files = sorted(source_dir.glob("*.tif")) if source_dir.exists() else []
+        """从磁盘加载一个输入源的所有帧."""
+        source_dir = self._resolve_source_dir(source_name, patch_id)
+        tif_files = sorted(source_dir.glob("*.tif")) if source_dir is not None else []
 
         hr_name = None
         if self.merge_hr_into_lr and source_name == "s2":
@@ -266,8 +459,8 @@ class HarbinPatchDataset(Dataset):
 
         hr_files = {}
         if hr_name:
-            hr_dir = self.data_root / hr_name / patch_id
-            if hr_dir.exists():
+            hr_dir = self._resolve_source_dir(hr_name, patch_id)
+            if hr_dir is not None:
                 for p in sorted(hr_dir.glob("*.tif")):
                     hr_files[p.stem] = p
 
@@ -314,8 +507,8 @@ class HarbinPatchDataset(Dataset):
 
     def _load_target_frame(self, patch_id: str, source_name: str):
         """加载单个目标帧."""
-        source_dir = self.data_root / source_name / patch_id
-        if not source_dir.exists():
+        source_dir = self._resolve_source_dir(source_name, patch_id)
+        if source_dir is None:
             return None
 
         tif_files = sorted(source_dir.glob("*.tif"))
@@ -333,8 +526,8 @@ class HarbinPatchDataset(Dataset):
     def _get_worldcover_label(self, patch_id: str) -> int:
         """从原始 WorldCover TIFF 提取 patch-level 众数类别标签."""
         try:
-            wc_dir = self.data_root / "worldcover" / patch_id
-            if wc_dir.exists():
+            wc_dir = self._resolve_source_dir("worldcover", patch_id)
+            if wc_dir is not None:
                 tif_files = list(wc_dir.glob("*.tif"))
                 if tif_files:
                     data = read_tif(tif_files[0], 0)

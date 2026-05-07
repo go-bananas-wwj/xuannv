@@ -5,7 +5,7 @@ experiment:
 
 data:
   dataset_type: harbin_patches
-  manifest_path: /workspace/raw/harbin_scenes
+  manifest_path: /workspace/raw/harbin_scenes/harbin_scenes
   stats_dir: /workspace/statistics/harbin_scenes
   batch_size: 4
   num_workers: 4
@@ -26,7 +26,7 @@ data:
   non_overlapping_windows: true
   cloud_filter_threshold: 0.0
   variance_weighted: false
-  filter_2025_monthly: true
+  filter_2025_monthly: false
   merge_hr_into_lr: false
   source_channels:
     s2_hr: 6
