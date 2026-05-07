@@ -1,0 +1,72 @@
+# ============================================================
+# AEF_qwen V7 Minimal — 极简验证
+# 只改损失: VICReg + KoLeo 替代反坍缩四件套
+# 不改架构、不改数据采样、不从 checkpoint 加载
+# ============================================================
+
+_base_: qwen_v1_scenes.yaml
+
+experiment:
+  name: aef_qwen_v7_minimal
+  output_dir: /workspace/outputs/aef_qwen_v7_minimal
+
+training:
+  epochs: 50
+  
+  # 梯度累积: batch=2 * 8GPU * accum=4 = effective batch=64
+  gradient_accumulation_steps: 4
+  
+  # --- VICReg + KoLeo (核心替换) ---
+  vicreg_weight: 1.0
+  vicreg_lambda_var: 1.0
+  vicreg_lambda_cov: 0.04   # 1/25
+  koleo_weight: 0.1
+  vicreg_temporal_dropout: 0.15  # Student 视图中随机丢弃帧的比例
+  
+  # --- 原有四件套权重置 0 ---
+  uniformity_weight: 0.0
+  variance_weight: 0.0
+  decorrelation_weight: 0.0
+  orthogonality_weight: 0.0
+  pre_norm_uniform_weight: 0.0
+  encoder_uniform_weight: 0.0
+  
+  # --- 保留原有损失 ---
+  reconstruction_weight: 1.0
+  consistency_weight: 0.05
+  classification_weight: 0.03
+  aux_classification_weight: 0.0
+  bottleneck_cls_weight: 0.0
+  
+  # --- 时序损失 (保留但权重可能为0) ---
+  temporal_magnitude_weight: 0.0
+  temporal_max_gap_ms: 47347200000
+  temporal_margin: 0.0
+  
+  temporal_cosine_pixel_weight: 0.0
+  pixel_temporal_info_nce_weight: 0.0
+  
+  # --- Student 扰动参数 ---
+  student_frame_drop_rate: 0.2
+  student_source_drop_rate: 0.15
+  student_front_drop_prob: 0.1
+  student_back_drop_prob: 0.1
+  
+  # --- 渐进 VMF Kappa ---
+  kappa_start: 50.0
+  kappa_end: 500.0
+  kappa_warmup_epochs: 100
+  
+  # --- 学习率 ---
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 10
+  lr_schedule: cosine_no_restart
+  
+  # --- 检查点 ---
+  save_every: 10
+  checkpoint_interval: 10
+  grad_clip_norm: 1.0
+  weight_decay: 0.05
+  early_stop_patience: 150

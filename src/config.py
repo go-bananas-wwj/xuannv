@@ -172,6 +172,9 @@ class TrainingConfig:
     # VICReg + KoLeo
     vicreg_weight: float = 0.0
     koleo_weight: float = 0.0
+    vicreg_lambda_var: float = 1.0
+    vicreg_lambda_cov: float = 0.04
+    vicreg_temporal_dropout: float = 0.15
     expander_dim: int = 0
     # 跨时相掩码重建
     ct_reconstruction_weight: float = 0.0
