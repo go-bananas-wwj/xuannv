@@ -24,7 +24,7 @@
 - **conda 环境**: `xuannv` (Python 3.11)，激活方式 `conda activate xuannv`
 - **注意**: 当前代码已全面适配 NPU (`torch.npu`, `hccl`, `torch_npu.amp.GradScaler`)。`src/utils/device.py` 默认优先返回 NPU 设备。少量遗留启动脚本中仍出现 `CUDA_VISIBLE_DEVICES`，实际训练代码已统一走 NPU 逻辑。
 
-## 技术栈
+## 技术栈与依赖
 
 | 层级 | 技术 |
 |------|------|
@@ -38,7 +38,14 @@
 | 推理加速 | torch.autocast (bf16), gradient checkpointing |
 | 分布式 | torchrun + DDP (hccl) |
 
-安装命令:
+### 关键配置文件
+
+- **`pyproject.toml`**: 包配置，定义包名 `aef-qwen`、版本 `0.1.0`、依赖 (`torch>=2.0`, `numpy`, `rasterio`, `geopandas`, `pyyaml`)，使用 `setuptools>=61.0` 构建。
+- **`configs/qwen_v*.yaml`**: 训练配置，支持 `_base_` 继承机制。共 14 个配置文件，覆盖 V1~V6.5 各版本。
+- **`.gitignore`**: 排除 `__pycache__/`, `*.pt`, `*.pth`, `outputs/`, `*.npy`, `*.tif`, `.vscode/`, `.idea/` 等。
+
+### 安装命令
+
 ```bash
 cd /workspace/xuannv
 pip install -e .
@@ -52,44 +59,46 @@ pip install -e .
 xuannv_embdding/
 ├── pyproject.toml              # 包配置 (setuptools)
 ├── configs/
-│   └── qwen_v*.yaml            # 训练配置 (支持 _base_ 继承)
-├── src/                        # 核心源码包
-│   ├── config.py               # YAML -> dataclass 配置系统
+│   └── qwen_v*.yaml            # 14个训练配置 (支持 _base_ 继承)
+├── src/                        # 核心源码包 (~6800行 Python)
+│   ├── config.py               # YAML -> dataclass 配置系统 (236行)
 │   ├── data/
-│   │   ├── dataset.py          # HarbinPatchDataset (3输入/7目标, 内存预加载)
-│   │   ├── transforms.py       # 归一化、TIFF读取、时间戳解析、源定义
-│   │   └── builder.py          # DataLoader 工厂 (DistributedSampler)
+│   │   ├── dataset.py          # HarbinPatchDataset (1000行, 3输入/7目标, 内存预加载)
+│   │   ├── transforms.py       # 归一化、TIFF读取、时间戳解析、源定义 (205行)
+│   │   └── builder.py          # DataLoader 工厂 (DistributedSampler) (53行)
 │   ├── models/
-│   │   ├── model.py            # AEFModel 主模型 (编码→瓶颈→解码)
-│   │   ├── bottleneck.py       # VMFBottleneck (训练skip L2, 推理L2+VMF)
-│   │   ├── blocks.py           # STPBlock (三路径: Time/Space/Precision)
-│   │   ├── sensor_encoders.py  # SensorEncoderBank (多源独立stem)
-│   │   ├── decoders.py         # ContinuousDecoder / CategoricalDecoder
-│   │   ├── heads.py            # ChangeDetectionHead V1/V2/V3
-│   │   ├── downstream_heads.py # PixelMLPHead / PixelConvHead
-│   │   └── time_encoding.py    # TimeCode / WindowCode / RelativeTimeCode
+│   │   ├── model.py            # AEFModel 主模型 (355行, 编码→瓶颈→解码)
+│   │   ├── bottleneck.py       # VMFBottleneck (90行, 训练skip L2, 推理L2+VMF)
+│   │   ├── blocks.py           # STPBlock (128行, 三路径: Time/Space/Precision)
+│   │   ├── sensor_encoders.py  # SensorEncoderBank (135行, 多源独立stem)
+│   │   ├── decoders.py         # ContinuousDecoder / CategoricalDecoder (124行)
+│   │   ├── heads.py            # ChangeDetectionHead V1/V2/V3 (396行)
+│   │   ├── downstream_heads.py # PixelMLPHead / PixelConvHead (174行)
+│   │   └── time_encoding.py    # TimeCode / WindowCode / RelativeTimeCode (77行)
 │   ├── training/
-│   │   ├── losses.py           # raw_uniformity + 时序对比损失全家桶
-│   │   ├── trainer.py          # V1 DDP 训练器
-│   │   ├── ddp_v4_trainer.py   # V4 DDP 训练器
-│   │   ├── ddp_v5_mixed_scale_trainer.py        # V5 混合尺度
-│   │   ├── ddp_v6_enhanced_temporal_trainer.py  # V6 增强时序
-│   │   ├── ddp_v6_5_gap_aware_trainer.py        # V6.5 gap-aware
-│   │   ├── single_gpu_trainer.py
-│   │   ├── optimizer.py        # AdamW + cosine warmup scheduler
-│   │   └── loops.py            # 重建损失计算辅助
+│   │   ├── losses.py           # raw_uniformity + 时序对比损失全家桶 (420行)
+│   │   ├── trainer.py          # V1 DDP 训练器 (351行)
+│   │   ├── ddp_v4_trainer.py   # V4 DDP 训练器 (402行)
+│   │   ├── ddp_v4_official_trainer.py  # V4 官方对齐 (502行)
+│   │   ├── ddp_v5_mixed_scale_trainer.py        # V5 混合尺度 (546行)
+│   │   ├── ddp_v6_enhanced_temporal_trainer.py  # V6 增强时序 (602行)
+│   │   ├── ddp_v6_5_gap_aware_trainer.py        # V6.5 gap-aware (571行)
+│   │   ├── single_gpu_trainer.py       # 单卡训练器 (397行)
+│   │   ├── optimizer.py        # AdamW + cosine warmup scheduler (54行)
+│   │   └── loops.py            # 重建损失计算辅助 (69行)
 │   ├── inference/
-│   │   └── engine.py           # 统一推理引擎 (load_backbone / load_cd_head)
+│   │   └── engine.py           # 统一推理引擎 (165行, load_backbone / load_cd_head)
 │   └── utils/
-│       ├── checkpoint.py       # load_checkpoint / save_checkpoint
-│       ├── device.py           # get_device (优先NPU)
-│       ├── io.py               # IO 辅助
-│       └── logging.py          # 日志工具
+│       ├── checkpoint.py       # load_checkpoint / save_checkpoint (84行)
+│       ├── device.py           # get_device (优先NPU) (29行)
+│       ├── io.py               # IO 辅助 (43行)
+│       └── logging.py          # 日志工具 (21行)
 ├── scripts/
 │   ├── train/                  # DDP 训练入口 (train_ddp.py / train_ddp_v*.py)
-│   ├── eval/                   # AUC 验证、benchmark、embedding 分析
+│   ├── eval/                   # AUC 验证、benchmark、embedding 分析 (12个脚本)
 │   ├── inference/              # 月度 embedding 提取
 │   ├── visualize/              # 训练诊断、结果可视化
+│   ├── preprocessing/          # 数据预处理 (云筛选、统计计算)
 │   ├── test_v6_launch.py       # 快速冒烟测试
 │   ├── test_v6_trainer.py      # 训练器链路测试
 │   └── train_v*_downstream_*.py  # 下游任务训练 (MLP/ConvHead)
@@ -98,10 +107,17 @@ xuannv_embdding/
 │   ├── config.py               # 模型注册表查询
 │   ├── cache_manager.py        # 预计算结果缓存
 │   ├── precompute_cd.py        # 预计算 embedding maps
-│   ├── engines/                # 推理引擎封装
-│   ├── components/             # 各 Tab UI 组件
+│   ├── engines/                # 推理引擎封装 (6个模块)
+│   ├── components/             # 各 Tab UI 组件 (11个模块)
 │   └── utils/                  # 常量、可视化、地图工具
-└── archive/                    # 废弃/实验代码 (只读参考)
+├── archive/                    # 废弃/实验代码 (只读参考)
+│   ├── demo_legacy/
+│   ├── demo_v2_legacy/
+│   ├── root_tools/
+│   ├── scripts_deprecated/
+│   ├── scripts_experimental/
+│   └── scripts_preprocessing/
+└── docs/                       # 项目文档 (8个markdown文件)
 ```
 
 ## 配置系统
@@ -122,9 +138,10 @@ cfg = load_config("configs/qwen_v1_scenes.yaml")
 
 关键配置段:
 - `experiment`: 名称、种子、输出目录 (`/workspace/outputs/{name}`)
-- `data`: batch_size, image_size, max_frames, 时序增强参数, 窗口模式
+- `data`: batch_size, image_size, max_frames, 时序增强参数, 窗口模式, preload
 - `model`: embedding_dim, num_blocks, vmf_kappa, skip_l2_norm_training
 - `training`: 学习率、损失权重、warmup、检查点保存频率
+- `evaluation`: knn_k, bootstrap_samples
 - `pretrained`: 预训练权重路径 (可选，由训练脚本 `--resume` 或 `--soft-restart` 覆盖)
 
 ## 模型架构
@@ -177,6 +194,7 @@ cfg = load_config("configs/qwen_v1_scenes.yaml")
 |------|----------|----------|----------|
 | V1 | `scripts/train/train_ddp.py` | `DDPTrainer` | 反坍缩基线 |
 | V4 | `scripts/train/train_ddp_v4.py` | `DDPv4Trainer` | 官方对齐 |
+| V4官方 | `scripts/train/train_ddp_v4_official.py` | `DDPv4OfficialTrainer` | 官方完整对齐 |
 | V5 | `scripts/train/train_ddp_v5.py` | `DDPv5MixedScaleTrainer` | 混合尺度双窗口 |
 | V6 | `scripts/train/train_ddp_v6.py` | `DDPv6EnhancedTemporalTrainer` | 像素级时序损失 |
 | V6.5 | `scripts/train/train_ddp_v6_5.py` | `DDPv6_5GapAwareTrainer` | gap-aware temporal |
@@ -318,6 +336,11 @@ Demo 依赖预计算的 embedding maps (`embedding_maps.npy` + `patch_ids.json`)
 
 添加新 trainer 时，建议复制 `test_v6_launch.py` 模式写一个快速验证脚本。
 
+### 数据预处理脚本
+
+- **`scripts/preprocessing/filter_cloudy_frames.py`**: S2 云筛选，按月保留最 clear 的帧
+- **`scripts/preprocessing/compute_statistics.py`**: 计算各源数据的 mean/std 统计量
+
 ## 部署与运行时
 
 ### 训练任务管理
@@ -332,6 +355,7 @@ tmux new -s v6_train
 - `start_train.sh`: V1 DDP 训练启动器 (GPU 5,6,7)
 - `start_v6_train.sh`: V6 训练启动器
 - `start_v6_5_train.sh`: V6.5 训练启动器
+- `start_gradio.sh`: Gradio Demo 启动器 (端口 7868)
 - `watchdog.sh`: DDP v4 崩溃自动恢复看门狗 (自动 resume 最新 checkpoint，最大重试 10 次)
 - `monitor_training.py`: Python 版监控脚本，检测 NaN/Inf 并自动修复重启 (会修改 config 降低 risky weights)
 
