@@ -5,8 +5,8 @@
 # 目标 (Target): 输入3类 + DEM + WorldCover + Dynamic World + JRC Water = 7类
 #
 # 数据: 单景影像 (YYYYMMDD)
-#   S2: ~180 景/patch, S1: ~96 景/patch, Landsat: ~38 景/patch
-#   时间范围: 2023-01 ~ 2026-03
+#   S2: ~22 景/patch (云筛选后), S1: ~42 景/patch, Landsat: ~47 景/patch
+#   时间范围: 2023-01 ~ 2025-10
 #
 # 启动:
 #   cd /workspace/xuannv
@@ -22,8 +22,8 @@ experiment:
 
 data:
   dataset_type: harbin_patches
-  # 单景数据路径
-  manifest_path: /workspace/raw/harbin_scenes/harbin_scenes
+  # 云筛选后数据路径 (S2 每月保留最 clear 的 2 帧)
+  manifest_path: /workspace/raw/harbin_scenes/harbin_scenes_cloud_filtered
   stats_dir: /workspace/statistics/harbin_scenes
   batch_size: 2
   num_workers: 4
