@@ -384,3 +384,200 @@ Demo 使用的预计算结果由 `demo_v2/precompute_cd.py` 生成，依赖 back
 - 所有文件操作限制在 `/workspace/xuannv/` 内。
 - 如需修改 demo 模型注册表，同步更新 `demo_v2/utils/constants.py` 中的 `MODEL_REGISTRY`。
 - 启动训练或推理前请先检查 NPU 占用情况（`npu-smi info`），选择空闲 NPU，必要时通过 `ASCEND_RT_VISIBLE_DEVICES` 或脚本参数指定设备。
+
+---
+
+# ★ 当前数据状态与训练准备（2026-05-08 更新）
+
+> **重要**: 以下内容是最近一次数据准备工作的完整记录。任何接手训练的 Agent **必须**先阅读本节，确保理解当前数据状态和训练要求。
+
+## 数据修复历史
+
+### 1. 路径修复（已完成）
+
+- **问题**: 5 个配置文件的 `manifest_path` 指向 `/workspace/raw/harbin_scenes`（季度数据父目录），但代码期望的是日度数据子目录。
+- **修复**: 将 `manifest_path` 从 `/workspace/raw/harbin_scenes` 改为 `/workspace/raw/harbin_scenes/harbin_scenes`。
+- **影响配置**: `qwen_v1_scenes.yaml`, `qwen_v2_hr_finetune.yaml`, `qwen_v2_hr_from_scratch.yaml`, `qwen_v2_hr_only_small.yaml`, `qwen_v3_continue.yaml`
+
+### 2. 代码路径解析增强（已完成）
+
+- **修改文件**: `src/data/dataset.py`
+- **新增方法**: `_resolve_source_dir(source_name, patch_id)` — 自动在 `data_root` 及其子目录中搜索数据源目录，兼容 `harbin_scenes/harbin/s2/patch_*` 的嵌套结构。
+- **影响范围**: `_load_input_frames_impl`, `_load_target_frame`, `_preload_all` 目标加载, `_get_worldcover_label`
+
+### 3. Symlink 修复（已完成）
+
+- **问题**: `dem`, `worldcover`, `jrc_water`, `dynamic_world`, `modis_lst`, `modis_ndvi` 的 symlink 断裂。
+- **修复**: 重新链接到 `/workspace/raw/harbin_scenes/harbin/` 下的正确目录。
+
+### 4. filter_2025_monthly 修复（已完成）
+
+- **问题**: `qwen_v2_hr_from_scratch.yaml` 和 `qwen_v2_hr_only_small.yaml` 中 `filter_2025_monthly: true`，导致只保留 2025 年 4-10 月数据，过滤掉了所有 2023-2024 训练数据。
+- **修复**: 改为 `filter_2025_monthly: false`。
+
+### 5. 统计数据生成（已完成）
+
+- **新增脚本**: `scripts/preprocessing/compute_statistics.py`
+- **输出**: `/workspace/statistics/harbin_scenes/{source}_stats.json`（7 个文件）
+- **已生成**: s2(6ch), s1(2ch), landsat(6ch), dem(1ch), worldcover(1ch), dynamic_world(1ch), jrc_water(1ch)
+
+### 6. 并行预加载优化（已完成）
+
+- **修改文件**: `src/data/dataset.py`
+- **优化**: 非 DDP 环境下使用 `ProcessPoolExecutor(16 workers)` 并行预加载
+- **性能**: 首次加载从 ~19 分钟 → 4.2 分钟 (4.6x 加速)，缓存加载 125 秒
+
+### 7. 验证脚本优化（已完成）
+
+- **修改**: 6 个验证脚本创建数据集前设置 `cfg.data.preload = False`
+- **效果**: 启动从 ~19 分钟 → 3 秒
+- **修改脚本**: `validate_v2.py`, `validate_v4_level1_bare.py`, `validate_v5_level1_bare.py`, `validate_v6_level1_bare.py`, `validate_v6_5_level1_bare.py`, `analyze_v5_embedding_space.py`
+
+### 8. Grid GeoJSON 重建（已完成）
+
+- **问题**: `/workspace/index/harbin/grid/harbin_grid.geojson` 缺失，导致验证脚本和标注解析无法运行。
+- **修复**: 从 xuannv_show 仓库的 `patches_meta.json` 验证，并从 TIFF 元数据重建，424 个 feature 完全匹配。
+- **输出**: `/workspace/index/harbin/grid/harbin_grid.geojson`
+
+### 9. S2 云筛选预处理（已完成）
+
+- **新增脚本**: `scripts/preprocessing/filter_cloudy_frames.py`
+- **策略**: 对每个 patch 的 S2 帧计算 cloud_score（亮度/10000 - NDVI），按月保留最 clear 的 2 帧；全 cloudy 月份 fallback 保留 1 帧。
+- **结果**:
+  - 原始: 29,707 帧 → 筛选后: 9,321 帧
+  - 平均每 patch: ~70 帧 → ~22 帧
+  - fallback 月份: 357 / 4839 = 7.4%（主要集中在哈尔滨冬季 1-2 月）
+- **新数据目录**: `/workspace/raw/harbin_scenes/harbin_scenes_cloud_filtered/`
+- **Symlink**: s1, s1_hr, s2_hr, landsat, dem, worldcover, dynamic_world, jrc_water, modis_lst, modis_ndvi 已链接
+- **配置文件更新**: 5 个配置文件的 `manifest_path` 已指向新目录
+- **统计数据更新**: S2 stats 已重新计算（mean=1466.11, std=1207.10）
+- **缓存更新**: 旧缓存已删除，新缓存 27.7GB 已生成
+
+## 当前数据目录结构
+
+```
+/workspace/raw/harbin_scenes/
+├── harbin/                          # 季度合成数据 (YYYYQN)，旧数据
+│   ├── s2/, s1/, landsat/, dem/, worldcover/, ...
+├── harbin_scenes/                   # 原始日度数据 (YYYYMMDD)
+│   ├── s2/ (180帧/patch)            ← 原始数据，未筛选
+│   ├── s1/ (96帧/patch)
+│   ├── s2_hr/ (5帧/patch)
+│   ├── s1_hr/ (4帧/patch)
+│   ├── landsat/ (76帧/patch)
+│   ├── dem -> ../harbin/dem
+│   ├── worldcover -> ../harbin/worldcover
+│   ├── dynamic_world -> ../harbin/dynamic_world
+│   ├── jrc_water -> ../harbin/jrc_water
+│   ├── modis_lst -> ../harbin/modis_lst
+│   └── modis_ndvi -> ../harbin/modis_ndvi
+└── harbin_scenes_cloud_filtered/    # ★ 当前训练使用的数据
+    ├── s2/ (~22帧/patch)            ← 云筛选后
+    ├── s1 -> ../harbin_scenes/s1
+    ├── s1_hr -> ../harbin_scenes/s1_hr
+    ├── s2_hr -> ../harbin_scenes/s2_hr
+    ├── landsat -> ../harbin_scenes/landsat
+    ├── dem -> ../harbin_scenes/dem
+    ├── worldcover -> ../harbin_scenes/worldcover
+    ├── dynamic_world -> ../harbin_scenes/dynamic_world
+    ├── jrc_water -> ../harbin_scenes/jrc_water
+    ├── modis_lst -> ../harbin_scenes/modis_lst
+    └── modis_ndvi -> ../harbin_scenes/modis_ndvi
+```
+
+## 当前各源帧数分布
+
+| 源 | Patch 数 | 最少帧 | 最多帧 | 均值 | 中位数 | 零帧数 |
+|----|---------|--------|--------|------|--------|--------|
+| S2 (云筛选后) | 424 | 2 | ~40 | 22.0 | ~22 | 0 |
+| S1 | 424 | 38 | 100 | 42.7 | 39 | 0 |
+| Landsat | 407 | 2 | 76 | 47.9 | 37 | 17 patch 缺失 |
+| S2_HR | 424 | 3 | 5 | 5.0 | 5 | 0 |
+| S1_HR | 424 | 3 | 4 | 4.0 | 4 | 0 |
+
+## 已知数据问题
+
+1. **Landsat 缺失 17 个 patch**: `patch_000324`~`patch_000327`, `patch_000409`~`patch_000414` 等。代码已优雅处理（`source_input_mask[s_idx]=False`），不会 crash。
+2. **S2 冬季 fallback**: 357 个月份（7.4%）全 cloudy，被迫保留最不清的一张。主要集中在 2025-01（272 个）、2024-01（24 个）、2024-02（15 个）。
+3. **不同源时间不对齐**: S2/S1/Landsat 的重访周期不同（5天/12天/16天），同一天重叠极少。模型通过时间编码处理，这是设计预期行为。
+
+## 训练启动要求
+
+### 环境检查（启动前必须做）
+
+```bash
+# 1. 激活环境
+conda activate xuannv
+
+# 2. 检查 NPU 占用（必须选择空闲 NPU）
+npu-smi info
+
+# 3. 确认当前分支和提交
+# 当前应为 main 分支，commit 72055b7 或更新
+```
+
+### Backbone 训练命令（V1 基线）
+
+```bash
+cd /workspace/xuannv
+# 使用前3个空闲 NPU，3卡 DDP
+torchrun --nproc_per_node=3 \
+    scripts/train/train_ddp.py --config configs/qwen_v1_scenes.yaml \
+    --save-every 50 --warmup-epochs 10
+```
+
+### 监控要求
+
+训练中**必须**实时监控以下指标：
+
+| 指标 | 正常范围 | 第1个 epoch 应达到 | 异常处理 |
+|------|----------|-------------------|---------|
+| `raw_unif` | -4.0 ~ -1.0 | < -0.5 | 如果 > -0.5 持续 5 个 epoch，立即报告 |
+| `pre_unif` | 接近 raw_unif | 差距 < 0.5 | 差距大说明 pre_norm 和 norm 空间不一致 |
+| `recon` | < 0.3 | < 1.0 (warmup期) | 如果 warmup 后仍 > 0.5，检查数据 |
+| `var_reg` | 接近 0 | < 0.5 | > 0.5 表示方差坍缩 |
+| `orth` | < 0.3 | < 0.5 | > 0.5 权重不正交 |
+| `decorr` | < 1.0 | < 2.0 | > 2.0 强相关 |
+
+**如果 raw_unif > -0.5 且持续不下降，说明 embedding 坍缩，训练失败。**
+
+### 训练中断恢复
+
+```bash
+# 从最新 checkpoint resume
+torchrun --nproc_per_node=3 \
+    scripts/train/train_ddp.py --config configs/qwen_v1_scenes.yaml \
+    --resume /workspace/outputs/aef_qwen_v1/epoch_best_xxx.pt
+```
+
+### 验证要求
+
+训练每 50 个 epoch 保存一次 checkpoint，应在保存后立即运行验证：
+
+```bash
+# V1 验证（需要约 5-10 分钟）
+python scripts/eval/validate_v2.py --checkpoint /workspace/outputs/aef_qwen_v1/epoch_50.pt
+```
+
+**AUC 目标**: 变化检测 AUC > 0.7 为及格，> 0.8 为良好，> 0.85 为优秀。
+
+## 对训练 Agent 的强制要求
+
+1. **启动前必须检查 NPU 占用**，不要抢占正在运行的训练任务。
+2. **不要修改 `filter_2025_monthly`**，当前所有配置均为 `false`。
+3. **不要修改 `manifest_path`**，当前所有配置已指向云筛选后的正确目录。
+4. **如果需要重新生成统计数据**，使用 `scripts/preprocessing/compute_statistics.py`，不要手写 JSON。
+5. **如果需要重新筛选云数据**，使用 `scripts/preprocessing/filter_cloudy_frames.py`，参数：
+   ```bash
+   python scripts/preprocessing/filter_cloudy_frames.py \
+       --max-per-month 2 --cloud-threshold 0.3 --workers 16
+   ```
+6. **每次修改后必须 git commit + push**。
+7. **如果训练出现 NaN/Inf**，先检查是否是 loss weight 过高，不要直接删除 checkpoint。
+8. **调试 AUC 低时**，优先检查：
+   - temporal contrastive loss 是否生效
+   - 双窗口数据是否正确生成
+   - `raw_unif` 是否在正常范围
+
+---
+*最后更新: 2026-05-08, commit 72055b7*
