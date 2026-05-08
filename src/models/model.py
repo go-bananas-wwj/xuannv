@@ -75,10 +75,16 @@ class AEFModel(nn.Module):
         self.window_encoder = WindowCodeEncoder(m.window_code_dim)
         self.relative_time_encoder = RelativeTimeCodeEncoder(m.relative_time_code_dim)
 
-        # STP blocks
+        # STP blocks (前 N 层禁用 Space)
+        n_space_disabled = getattr(m, 'num_blocks_disable_space', 0)
         self.stp_blocks = nn.ModuleList([
-            STPBlock(channels=m.precision_dim, num_heads=m.num_heads, time_code_dim=m.time_code_dim)
-            for _ in range(m.num_blocks)
+            STPBlock(
+                channels=m.precision_dim,
+                num_heads=m.num_heads,
+                time_code_dim=m.time_code_dim,
+                use_space=(i >= n_space_disabled),
+            )
+            for i in range(m.num_blocks)
         ])
         self.use_checkpoint = m.gradient_checkpointing
 
@@ -245,7 +251,7 @@ class AEFModel(nn.Module):
         # Flatten for encoder then reshape back
         flat_rel_time = target_relative_time.reshape(B * T_tgt, 1)
         relative_codes = self.relative_time_encoder(flat_rel_time)
-        expanded_map = embedding_map[:, None, ...].expand(-1, T_tgt, -1, -1, -1)
+        expanded_map = embedding_map[:, None, ...].repeat(1, T_tgt, 1, 1, 1)
         expanded_window = window_code[:, None, :].expand(-1, T_tgt, -1)
 
         flat_map = expanded_map.reshape(B * T_tgt, *embedding_map.shape[1:])

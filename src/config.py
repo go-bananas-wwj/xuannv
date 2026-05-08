@@ -73,6 +73,7 @@ class ModelConfig:
     window_code_dim: int = 64
     relative_time_code_dim: int = 16
     num_blocks: int = 8
+    num_blocks_disable_space: int = 0  # 前 N 层禁用 Space path
     num_heads: int = 8
     vmf_kappa: float = 2000.0
     bottleneck_noise_scale: float = 0.02

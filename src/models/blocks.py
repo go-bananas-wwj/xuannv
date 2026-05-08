@@ -21,10 +21,12 @@ class STPBlock(nn.Module):
         channels: int,
         num_heads: int,
         time_code_dim: int = 64,
+        use_space: bool = True,
     ) -> None:
         super().__init__()
         self.channels = channels
         self.num_heads = num_heads
+        self.use_space = use_space
 
         # Precision path: 高分辨率 3x3 卷积
         self.precision_conv = nn.Sequential(
@@ -62,8 +64,9 @@ class STPBlock(nn.Module):
         )
 
         # 跨路径融合: 将不同分辨率的特征对齐到 precision 分辨率
+        fusion_in = channels * 3 if use_space else channels * 2
         self.fusion = nn.Sequential(
-            nn.Conv2d(channels * 3, channels, kernel_size=1),
+            nn.Conv2d(fusion_in, channels, kernel_size=1),
             nn.GroupNorm(8, channels),
             nn.GELU(),
         )
@@ -108,19 +111,24 @@ class STPBlock(nn.Module):
         x_t_up = self.time_up(x_t_up)  # [B*T, C, H, W]
 
         # ── Space path (降采样 → 空间注意力 → 上采样) ──
-        x_s = self.space_down(x_flat)  # [B*T, C, H/4, W/4]
-        _, c_s, h_s, w_s = x_s.shape
-        # 空间自注意力: 将空间展平为序列
-        x_s_flat = x_s.reshape(B, T, c_s, h_s * w_s).permute(0, 1, 3, 2)  # [B, T, H/4*W/4, C]
-        x_s_flat = x_s_flat.reshape(B * T, h_s * w_s, c_s)
-        x_s_attn, _ = self.space_attn(x_s_flat, x_s_flat, x_s_flat)
-        x_s_attn = self.space_norm(x_s_attn)
-        x_s_attn = x_s_attn.reshape(B, T, h_s, w_s, c_s).permute(0, 1, 4, 2, 3)  # [B, T, C, H/4, W/4]
-        x_s_up = x_s_attn.reshape(B * T, c_s, h_s, w_s)
-        x_s_up = self.space_up(x_s_up)  # [B*T, C, H, W]
+        if self.use_space:
+            x_s = self.space_down(x_flat)  # [B*T, C, H/4, W/4]
+            _, c_s, h_s, w_s = x_s.shape
+            # 空间自注意力: 将空间展平为序列
+            x_s_flat = x_s.reshape(B, T, c_s, h_s * w_s).permute(0, 1, 3, 2)  # [B, T, H/4*W/4, C]
+            x_s_flat = x_s_flat.reshape(B * T, h_s * w_s, c_s)
+            x_s_attn, _ = self.space_attn(x_s_flat, x_s_flat, x_s_flat)
+            x_s_attn = self.space_norm(x_s_attn)
+            x_s_attn = x_s_attn.reshape(B, T, h_s, w_s, c_s).permute(0, 1, 4, 2, 3)  # [B, T, C, H/4, W/4]
+            x_s_up = x_s_attn.reshape(B * T, c_s, h_s, w_s)
+            x_s_up = self.space_up(x_s_up)  # [B*T, C, H, W]
 
         # ── 融合 ──
-        fused = self.fusion(torch.cat([x_prec, x_t_up, x_s_up], dim=1))  # [B*T, C, H, W]
+        if self.use_space:
+            fused = self.fusion(torch.cat([x_prec, x_t_up, x_s_up], dim=1))  # [B*T, C, H, W]
+        else:
+            # 仅 Precision + Time 两路融合
+            fused = self.fusion(torch.cat([x_prec, x_t_up], dim=1))  # [B*T, 2*C, H, W]
 
         # ── 残差 ──
         residual = self.residual_norm(x_flat)

@@ -311,13 +311,47 @@ python scripts/inference/extract_monthly_embeddings_all_patches.py \
 
 ### 训练任务管理
 
-训练通常在 tmux session 中后台运行，例如:
+**必须使用 tmux 运行训练，禁止使用 nohup。**
+
+> ⚠️ **教训**: nohup 在会话断开时会发送 SIGHUP 信号，导致 torchrun DDP 进程被终止。2025-05-08 的 V7 Phase1 v2 训练因此中断（Epoch 50）。tmux 是唯一的可靠方案。
+
+#### 启动新训练
+
 ```bash
-tmux new -s v6_train
-# 在 session 中执行训练命令
+# 创建 tmux session
+tmux new-session -d -s v7_train -c /workspace/xuannv
+
+# 在 session 中发送训练命令
+tmux send-keys -t v7_train 'export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3' Enter
+tmux send-keys -t v7_train 'conda activate xuannv' Enter
+tmux send-keys -t v7_train 'torchrun --nproc_per_node=4 scripts/train/train_ddp_v7.py --config configs/xuannv_v7.yaml --save-every 20' Enter
+
+# detach，训练在后台继续
+tmux detach -t v7_train
 ```
 
-可用的启动脚本:
+#### 从 checkpoint 恢复训练
+
+```bash
+# 创建新 session 恢复
+tmux new-session -d -s v7_train -c /workspace/xuannv
+tmux send-keys -t v7_train 'export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3' Enter
+tmux send-keys -t v7_train 'conda activate xuannv' Enter
+tmux send-keys -t v7_train 'torchrun --nproc_per_node=4 scripts/train/train_ddp_v7.py --config configs/xuannv_v7.yaml --resume /workspace/outputs/xuannv_backbone_v7_phase1_v2/epoch_best_39.pt --save-every 20' Enter
+```
+
+#### 常用 tmux 操作
+
+| 操作 | 命令 |
+|------|------|
+| 查看所有 session | `tmux list-sessions` |
+| attach 到 session | `tmux attach -t v7_train` |
+| detach（保持后台运行） | 按 `Ctrl+B` 然后按 `D` |
+| 查看日志 | `tmux capture-pane -t v7_train -p \| tail -20` |
+| 终止 session | `tmux kill-session -t v7_train` |
+
+#### 可用的启动脚本
+
 - `start_train.sh`: V1 DDP 训练启动器 (GPU 5,6,7)
 - `start_v6_train.sh`: V6 训练启动器
 - `start_v6_5_train.sh`: V6.5 训练启动器

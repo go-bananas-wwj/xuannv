@@ -47,9 +47,13 @@ def compute_recon_loss(
                 is_categorical = True
 
         if is_categorical:
-            tgt_cls = tgt[batch_mask, 0].long()  # [N_valid, H, W]
+            # 从 one-hot 编码恢复类别索引
+            tgt_onehot = tgt[batch_mask]  # [N_valid, C, H, W]
+            tgt_cls = tgt_onehot.argmax(dim=1).long()  # [N_valid, H, W]
+            # 排除 no-data（所有通道和接近 0）
+            has_data = tgt_onehot.sum(dim=1) > 0.5
+            valid_pixels = has_data & (tgt_cls >= 0) & (tgt_cls < num_classes)
             p_valid = p[batch_mask]  # [N_valid, C, H, W]
-            valid_pixels = (tgt_cls >= 0) & (tgt_cls < num_classes)
             if valid_pixels.sum() > 0:
                 if p_valid.shape[-2:] != tgt_cls.shape[-2:]:
                     p_aligned = F.interpolate(p_valid, size=tgt_cls.shape[-2:], mode="bilinear", align_corners=False)

@@ -150,6 +150,9 @@ def _preload_patch_worker(args: tuple) -> tuple[str, dict, int]:
                 if tif_files:
                     data = read_tif(tif_files[0], 0)
                     if data is not None:
+                        if tgt_name == "jrc_water":
+                            data = data.astype(np.float32)
+                            data[data == -128] = np.nan
                         data = normalize_data(data, tgt_name, stats, num_classes)
                         data = _pad_channels(data, reconstruction_channels)
                         cache_entry[tgt_name] = (data[np.newaxis, ...], np.array([0.0]))
@@ -393,6 +396,9 @@ class HarbinPatchDataset(Dataset):
                             if tif_files:
                                 data = read_tif(tif_files[0], 0)
                                 if data is not None:
+                                    if tgt_name == "jrc_water":
+                                        data = data.astype(np.float32)
+                                        data[data == -128] = np.nan
                                     data = self._normalize(data, tgt_name)
                                     data = self._pad_channels(data, self.reconstruction_channels)
                                     self._cache[patch_id][tgt_name] = (data[np.newaxis, ...], np.array([0.0]))
@@ -741,13 +747,14 @@ class HarbinPatchDataset(Dataset):
 
         return w1_start, w1_end, w2_start, w2_end
 
-    def _resize_to_target(self, data: np.ndarray, target_res: int, is_categorical: bool = False) -> np.ndarray:
+    def _resize_to_target(self, data: np.ndarray, target_res: int, is_categorical: bool = False, has_nan: bool = False) -> np.ndarray:
         """将数据 resize 到 target_res.
 
         Args:
             data: (C, H, W) numpy array.
             target_res: 目标分辨率.
             is_categorical: 是否为分类数据（最近邻）.
+            has_nan: 是否包含 NaN（如 JRC Water 的 no-data），使用 nearest 避免扩散.
         Returns:
             (C, target_res, target_res) numpy array.
         """
@@ -757,7 +764,7 @@ class HarbinPatchDataset(Dataset):
         import torch.nn.functional as F
         import torch
         t = torch.from_numpy(data).unsqueeze(0)  # (1, C, H, W)
-        if is_categorical:
+        if is_categorical or has_nan:
             mode = "nearest"
             align = None
         elif H < target_res:
@@ -885,7 +892,8 @@ class HarbinPatchDataset(Dataset):
             if tgt_name in ("dem", "worldcover", "jrc_water"):
                 if tgt_name in self._cache.get(patch_id, {}):
                     data = self._cache[patch_id][tgt_name][0][0]
-                    data = self._resize_to_target(data, target_res, is_categorical=is_categorical)
+                    has_nan = (tgt_name == "jrc_water")
+                    data = self._resize_to_target(data, target_res, is_categorical=is_categorical, has_nan=has_nan)
                     target_images[t_idx, :data.shape[0]] = data
                     target_mask[t_idx] = True
                     target_loss_type[t_idx] = loss_type
@@ -898,8 +906,11 @@ class HarbinPatchDataset(Dataset):
                         if tif_files:
                             data = read_tif(tif_files[0], 0)
                             if data is not None:
+                                if tgt_name == "jrc_water":
+                                    data = data.astype(np.float32)
+                                    data[data == -128] = np.nan
                                 data = self._normalize(data, tgt_name)
-                                data = self._resize_to_target(data, target_res, is_categorical=is_categorical)
+                                data = self._resize_to_target(data, target_res, is_categorical=is_categorical, has_nan=(tgt_name == "jrc_water"))
                                 target_images[t_idx, :data.shape[0]] = data
                                 target_mask[t_idx] = True
                                 target_loss_type[t_idx] = loss_type
