@@ -1,0 +1,13 @@
+# V7 消融 — 16-dim (极限压缩)
+_base_: ../xuannv_v7.yaml
+
+experiment:
+  name: v7_ablation_dim16
+  output_dir: /workspace/outputs/v7_ablation_dim16
+
+model:
+  embedding_dim: 16
+
+training:
+  vicreg_lambda_cov: 0.005
+  koleo_weight: 0.3

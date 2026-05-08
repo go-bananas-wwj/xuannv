@@ -1,0 +1,13 @@
+# V7 消融 — 64-dim (论文标准)
+_base_: ../xuannv_v7.yaml
+
+experiment:
+  name: v7_ablation_dim64
+  output_dir: /workspace/outputs/v7_ablation_dim64
+
+model:
+  embedding_dim: 64
+
+training:
+  vicreg_lambda_cov: 0.02
+  koleo_weight: 0.5

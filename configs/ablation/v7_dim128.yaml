@@ -1,0 +1,13 @@
+# V7 基线 — 128-dim (对照组)
+_base_: ../xuannv_v7.yaml
+
+experiment:
+  name: v7_ablation_dim128
+  output_dir: /workspace/outputs/v7_ablation_dim128
+
+model:
+  embedding_dim: 128
+
+training:
+  vicreg_lambda_cov: 0.04
+  koleo_weight: 0.5

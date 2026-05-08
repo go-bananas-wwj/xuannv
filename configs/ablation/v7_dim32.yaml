@@ -1,0 +1,13 @@
+# V7 消融 — 32-dim
+_base_: ../xuannv_v7.yaml
+
+experiment:
+  name: v7_ablation_dim32
+  output_dir: /workspace/outputs/v7_ablation_dim32
+
+model:
+  embedding_dim: 32
+
+training:
+  vicreg_lambda_cov: 0.01
+  koleo_weight: 0.5

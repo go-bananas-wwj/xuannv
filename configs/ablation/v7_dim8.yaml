@@ -1,0 +1,13 @@
+# V7 消融 — 8-dim (信息瓶颈测试)
+_base_: ../xuannv_v7.yaml
+
+experiment:
+  name: v7_ablation_dim8
+  output_dir: /workspace/outputs/v7_ablation_dim8
+
+model:
+  embedding_dim: 8
+
+training:
+  vicreg_lambda_cov: 0.003
+  koleo_weight: 0.2
