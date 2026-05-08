@@ -256,13 +256,15 @@ class DDPv7MinimalTrainer:
 
     def _cleanup_old_epochs(self, keep_latest: int = 2) -> None:
         """删除旧的 epoch 文件，只保留最新的 N 个."""
+        import re
+        # 只匹配 epoch_{number}.pt，排除 epoch_best_*.pt
+        all_files = glob.glob(str(self.output_dir / "epoch_*.pt"))
+        epoch_files = [p for p in all_files if re.match(r"epoch_\d+\.pt$", Path(p).name)]
         epoch_files = sorted(
-            glob.glob(str(self.output_dir / "epoch_*.pt")),
+            epoch_files,
             key=lambda p: int(Path(p).stem.split("_")[1]),
             reverse=True,
         )
-        # 排除 best 文件（如果命名包含 best）
-        epoch_files = [p for p in epoch_files if "best" not in Path(p).stem]
         for old_path in epoch_files[keep_latest:]:
             try:
                 os.remove(old_path)
