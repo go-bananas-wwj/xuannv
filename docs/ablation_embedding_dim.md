@@ -256,5 +256,111 @@ done
 
 ---
 
+---
+
+## 参考：外部博客的关键发现
+
+### Robinson & Corley (2026) — Compressing Earth Embeddings
+
+[Compressing Earth Embeddings](https://geospatialml.com/posts/compressing-earth-embeddings/) 和 [TerraBit](https://geospatialml.com/posts/terrabit/) 两篇博客系统研究了地球观测嵌入向量的冗余性，核心发现如下：
+
+#### 1. int8 量化 = 统计无损
+
+| 模型 | float32 | int8 | 损失 |
+|------|---------|------|------|
+| AEF (64d) | 94.5% | 94.6% | **+0.1%** |
+| OlmoEarth (128d) | 94.8% | 94.8% | **0%** |
+| DINOv3 (1024d) | 94.5% | 94.5% | **0%** |
+
+McNemar 检验 p > 0.12，int8 与 float32 统计上无法区分。**存储时完全不需要 float32**。
+
+#### 2. PCA 降维效果惊人（后处理）
+
+对**已有嵌入向量**做 PCA 降维：
+
+| 模型 | 原始维度 | PCA(64)+int8 | PCA(32)+int8 | PCA(16)+int4 |
+|------|---------|-------------|-------------|-------------|
+| DINOv3 (1024d) | 94.5% | **93.1%** (-1.4%) | **92.4%** (-2.1%) | 89.3% (-5.2%) |
+
+**方差累积分析**：
+- AEF (64d)：32维解释 **97%** 方差
+- OlmoEarth (128d)：32维解释 **98%** 方差
+- Tessera (512d)：8维解释 **98%** 方差
+- DINOv3 (1024d)：256维解释 **97%** 方差
+
+#### 3. 内在维度 (Intrinsic Dimension) ≈ 13-17
+
+Clay v1.5 (1024-dim) 的实际分析：
+
+| 估计方法 | ID |
+|---------|-----|
+| MLE | 17.0 |
+| TwoNN | 12.6 |
+| Local PCA | 17.0 |
+
+**结论**：1024 维空间中，实际只用了 **13-17 个自由度**。
+
+#### 4. 重要局限
+
+博客作者明确警告：
+> "We have not tested: semantic segmentation, pixel regression, object detection, **change detection**, or retrieval — ranking quality over large databases may be more sensitive to distance distortion than top-1 classification."
+
+所有实验基于 **EuroSAT patch classification**（10类），对变化检测的参考价值有限。
+
+---
+
+### 博客结论对本次消融实验的启示
+
+#### ✅ 乐观信号
+
+1. **32-dim 和 64-dim 很可能可行**
+   - OlmoEarth (128d) 的 PCA(32) 保留 98% 方差
+   - AEF (64d) 的 PCA(32) 保留 97% 方差
+   - 如果高维模型的信息集中在 32-64 维，原生 32-64 维模型应该也能学到
+
+2. **量化不影响下游任务**
+   - 所有 checkpoint 可以安全地 int8 量化存储，节省 4× 空间
+
+#### ⚠️ 关键区别：后处理降维 ≠ 原生低维训练
+
+| 操作 | 本质 | 效果 |
+|------|------|------|
+| **后处理 PCA 降维** | 已有高维嵌入 → 去掉冗余维度 | ✅ 几乎无损（信息已学完） |
+| **原生训练低维模型** | 训练时就用信息瓶颈 | ⚠️ 可能学不到某些模式 |
+
+博客中的实验是**后处理压缩**——先训练 1024-dim 模型，再 PCA 到 64-dim。此时高维模型已学完所有信息，PCA 只是去掉噪声维度。
+
+本次消融实验是**原生训练低维模型**——模型在训练过程中就只有 8/16/32/64 个自由度，有些复杂模式可能根本学不到。
+
+#### ⚠️ 悲观信号
+
+1. **8-dim 和 16-dim 可能真的不行**
+   - AEF (64d) → PCA(8)+binary：Highway 类 F1 **暴跌 0.486**
+   - 16-dim 只解释 AEF 91% 方差，丢失的 9% 可能是关键判别信息
+
+2. **变化检测可能比分类更吃维度**
+   - 博客只验证了 patch classification
+   - change detection 需要编码**时序差异**，对距离度量的敏感度可能更高
+
+---
+
+### 修正后的预期假设
+
+| 维度 | 修正预期 | 理由 |
+|------|---------|------|
+| 128 | 基线 AUC ~0.78 | 当前训练 |
+| 64 | AUC ~0.75-0.77 | 博客支持，AEF 原生 64d 表现很好 |
+| 32 | AUC ~0.70-0.75 | **拐点**，可能开始丢失变化检测细节 |
+| 16 | AUC ~0.60-0.70 | 信息瓶颈显现，CD 比分类更敏感 |
+| 8 | AUC < 0.60 | 大概率断崖，13-17 内在维度是几何事实而非训练结果 |
+
+**关键问题**：
+1. 32-dim 是否是**性价比拐点**？（模型小 4×，AUC 损失 < 0.05）
+2. 64-dim 是否是**无损压缩点**？（与 128-dim AUC 差异 < 0.02）
+3. 8-dim/16-dim 的失败模式是什么？哪些地物/变化类型最先丢失？
+
+---
+
 *创建时间: 2026-05-08*
 *关联: V7 Phase1 训练、V4 评估报告、AlphaEarth 论文*
+*参考: Robinson & Corley (2026), "Compressing Earth Embeddings" / "TerraBit"*
