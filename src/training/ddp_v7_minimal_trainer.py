@@ -237,6 +237,9 @@ class DDPv7MinimalTrainer:
         if self.global_rank != 0:
             return
 
+        # 保存前清零残留梯度，避免恢复时引入 stale gradients
+        self.optimizer.zero_grad()
+
         checkpoint = {
             "epoch": epoch,
             "model_state_dict": self.model.module.state_dict(),
@@ -311,6 +314,8 @@ class DDPv7MinimalTrainer:
         checkpoint = torch.load(path, map_location=self.device)
         self.model.module.load_state_dict(checkpoint["model_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        # 恢复后清零可能存在的残留梯度
+        self.optimizer.zero_grad()
         return checkpoint.get("epoch", 0)
 
 
