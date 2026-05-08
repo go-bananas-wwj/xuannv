@@ -43,8 +43,8 @@ model:
   time_code_dim: 64
   window_code_dim: 64
   relative_time_code_dim: 16
-  num_blocks: 10
-  num_blocks_disable_space: 2
+  num_blocks: 6
+  num_blocks_disable_space: 1
   num_heads: 8
   vmf_kappa: 2000.0
   bottleneck_noise_scale: 0.02
