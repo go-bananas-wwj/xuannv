@@ -54,8 +54,8 @@ class DDPv7Trainer:
         self.model = AEFModel(cfg).to(self.device)
         self.model = DistributedDataParallel(self.model, device_ids=[local_rank], find_unused_parameters=True)
 
-        # EMA Teacher
-        self.teacher = copy.deepcopy(self.model).eval()
+        # EMA Teacher (复制原始 module，避免 DDP wrapper 问题)
+        self.teacher = copy.deepcopy(self.model.module).eval()
         for p in self.teacher.parameters():
             p.requires_grad = False
 
@@ -178,8 +178,32 @@ class DDPv7Trainer:
                 pre_unif = pre_norm_uniformity_loss(gathered_pre_norm)
                 enc_unif = directional_uniformity_loss(gathered_pre_norm)
 
+                # Teacher forward (无梯度)
+                with torch.no_grad():
+                    teacher_out = self.teacher(
+                        source_frames=batch["source_frames"],
+                        source_timestamps_ms=batch["source_timestamps_ms"],
+                        source_frame_mask=batch["source_frame_mask"],
+                        source_input_mask=batch["source_input_mask"],
+                        source_type_ids=batch["source_type_ids"],
+                        valid_start_ms=batch["valid_start_ms"],
+                        valid_end_ms=batch["valid_end_ms"],
+                        target_relative_time=batch["target_relative_time"],
+                        target_metadata=batch["target_metadata"],
+                        target_loss_type=batch.get("target_loss_type"),
+                        target_source_idx=batch.get("target_source_idx"),
+                    )
+                    teacher_emb = teacher_out.embedding
+                
+                # 跨 GPU 聚合 teacher embedding
+                if dist.is_initialized() and self.world_size > 1:
+                    all_t = [torch.zeros_like(teacher_emb) for _ in range(self.world_size)]
+                    dist.all_gather(all_t, teacher_emb)
+                    all_t[self.local_rank] = teacher_emb
+                    teacher_emb = torch.cat(all_t, dim=0)
+                
                 # 其他损失
-                consist = consistency_loss(gathered.detach(), gathered)
+                consist = consistency_loss(teacher_emb, gathered)
                 cls = classification_loss(out.logits, batch["label"])
                 aux_cls = classification_loss(out.aux_logits, batch["label"]) if out.aux_logits is not None else torch.tensor(0.0, device=self.device)
                 bn_cls = classification_loss(out.bottleneck_logits, batch["label"]) if out.bottleneck_logits is not None else torch.tensor(0.0, device=self.device)
@@ -406,11 +430,21 @@ class DDPv7Trainer:
                 if self.global_rank == 0:
                     print(f"  [Load] Scheduler reinitialized: {e}")
         
-        # 加载 EMA teacher 状态
+        # 加载 EMA teacher 状态（兼容旧 checkpoint 的 module. 前缀）
         if "teacher_state_dict" in checkpoint:
-            self.teacher.load_state_dict(checkpoint["teacher_state_dict"])
-            if self.global_rank == 0:
-                print("  [Load] Teacher state restored")
+            t_state = checkpoint["teacher_state_dict"]
+            # 去掉可能的 module. 前缀（旧版 teacher 是 DDP wrapper）
+            cleaned = {}
+            for k, v in t_state.items():
+                new_k = k[7:] if k.startswith("module.") else k
+                cleaned[new_k] = v
+            try:
+                self.teacher.load_state_dict(cleaned, strict=False)
+                if self.global_rank == 0:
+                    print("  [Load] Teacher state restored")
+            except Exception as e:
+                if self.global_rank == 0:
+                    print(f"  [Load] Teacher reinitialized: {e}")
         
         # 恢复后清零残留梯度
         self.optimizer.zero_grad()

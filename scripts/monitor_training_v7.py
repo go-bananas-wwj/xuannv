@@ -41,16 +41,25 @@ def log(msg: str) -> None:
         f.write(line + "\n")
 
 
-def get_tmux_output(n_lines: int = 50) -> str:
+def get_latest_log_text(n_lines: int = 50) -> str:
+    """从日志文件读取最新输出（避免 tmux 换行截断问题）."""
     try:
-        result = subprocess.run(
-            ["tmux", "capture-pane", "-t", TMUX_SESSION, "-p"],
-            capture_output=True, text=True, timeout=10
-        )
-        lines = result.stdout.splitlines()
-        return "\n".join(lines[-n_lines:])
+        log_dir = Path("/workspace/outputs/xuannv_backbone_v7_phase1_v2")
+        log_files = sorted(log_dir.glob("train_*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if not log_files:
+            # fallback to tmux
+            result = subprocess.run(
+                ["tmux", "capture-pane", "-t", TMUX_SESSION, "-p"],
+                capture_output=True, text=True, timeout=10
+            )
+            return "\n".join(result.stdout.splitlines()[-n_lines:])
+        
+        with open(log_files[0], "r", encoding="utf-8", errors="replace") as f:
+            text = f.read()
+        # 处理 tmux 日志中可能的换行截断：先把所有内容合并，再用正则匹配
+        return text
     except Exception as e:
-        return f"[ERROR] Failed to capture tmux: {e}"
+        return f"[ERROR] Failed to read log: {e}"
 
 
 def check_process_alive() -> tuple[bool, str]:
@@ -66,10 +75,14 @@ def check_process_alive() -> tuple[bool, str]:
 
 
 def parse_latest_epoch(log_text: str) -> dict | None:
-    """从 tmux 输出解析最新的 epoch 指标."""
+    """从日志文本解析最新的 epoch 指标（支持 tmux 换行截断）."""
+    # 先把可能的换行截断合并（tmux 窄窗口会在数字中间换行）
+    # 策略：删除数字和字母之间的换行，保留 Epoch 之间的完整行
+    merged = log_text.replace('\n', ' ')
+    
     # 匹配格式: Epoch N/M | Loss: x.xxxx | Recon: x.xxxx | VICReg: x.xxxx ...
     pattern = re.compile(
-        r"Epoch\s+(\d+)/(\d+)\s+\|\s+"
+        r"Epoch\s+(\d+)/\d+\s+\|\s+"
         r"Loss:\s+([\d.e+-]+)\s+\|\s+"
         r"Recon:\s+([\d.e+-]+)\s+\|\s+"
         r"VICReg:\s+([\d.e+-]+)\s+\(var=([\d.e+-]+)\s+cov=([\d.e+-]+)\)\s+\|\s+"
@@ -82,26 +95,25 @@ def parse_latest_epoch(log_text: str) -> dict | None:
         r"LR:\s+([\d.e+-]+)\s+\|"
     )
     
-    matches = list(pattern.finditer(log_text))
+    matches = list(pattern.finditer(merged))
     if not matches:
         return None
     
     m = matches[-1]  # 取最新的
     return {
         "epoch": int(m.group(1)),
-        "total_epochs": int(m.group(2)),
-        "total_loss": float(m.group(3)),
-        "recon": float(m.group(4)),
-        "vicreg": float(m.group(5)),
-        "vicreg_var": float(m.group(6)),
-        "vicreg_cov": float(m.group(7)),
-        "koleo": float(m.group(8)),
-        "pre_unif": float(m.group(9)),
-        "enc_unif": float(m.group(10)),
-        "consist": float(m.group(11)),
-        "cls": float(m.group(12)),
-        "temporal": float(m.group(13)),
-        "lr": float(m.group(14)),
+        "total_loss": float(m.group(2)),
+        "recon": float(m.group(3)),
+        "vicreg": float(m.group(4)),
+        "vicreg_var": float(m.group(5)),
+        "vicreg_cov": float(m.group(6)),
+        "koleo": float(m.group(7)),
+        "pre_unif": float(m.group(8)),
+        "enc_unif": float(m.group(9)),
+        "consist": float(m.group(10)),
+        "cls": float(m.group(11)),
+        "temporal": float(m.group(12)),
+        "lr": float(m.group(13)),
     }
 
 
@@ -190,7 +202,7 @@ def main():
             continue
         
         # 2. 获取最新输出
-        output = get_tmux_output(n_lines=50)
+        output = get_latest_log_text(n_lines=50)
         
         # 3. 解析指标
         metrics = parse_latest_epoch(output)

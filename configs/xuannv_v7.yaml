@@ -39,7 +39,7 @@ model:
   precision_dim: 256
   time_dim: 256
   space_dim: 256
-  embedding_dim: 128
+  embedding_dim: 64
   time_code_dim: 64
   window_code_dim: 64
   relative_time_code_dim: 16
@@ -72,7 +72,7 @@ training:
   # VICReg + KoLeo
   vicreg_weight: 2.0
   vicreg_lambda_var: 1.0
-  vicreg_lambda_cov: 0.04
+  vicreg_lambda_cov: 0.02
   koleo_weight: 0.5
   vicreg_temporal_dropout: 0.15
   vicreg_gamma: 1.0
