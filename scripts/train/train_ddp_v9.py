@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""DDP V4 Official 训练入口 — GPU 6/7 双卡并行.
+"""DDP V9 Temporal 训练入口 — 8卡 NPU 并行.
 
 用法:
     cd /workspace/xuannv
-    CUDA_VISIBLE_DEVICES=6,7 torchrun --nproc_per_node=2 \
-        scripts/train/train_ddp_v4_official.py --config configs/qwen_v4_official.yaml \
-        --soft-restart /workspace/outputs/aef_qwen_v4_cd_upgrade/epoch_best_epoch113.pt
+    torchrun --nproc_per_node=8 \
+        scripts/train/train_ddp_v9.py --config configs/xuannv_v9_temporal.yaml \
+        --soft-restart /workspace/outputs/xuannv_backbone_v8_clean/epoch_best_epoch223.pt \
+        --epochs 200
 
 支持:
   - 软重启 (保留 encoder, 重置 bottleneck/decoder/head)
-  - 教师-学生一致性 + Student 输入扰动
-  - Raw Uniformity + Variance + Decorrelation 反坍缩
-  - Classification 监督
-  - 渐进 VMF Kappa
+  - V8 所有机制 + 轻量 gap-aware temporal loss
   - resume 断点续训
 """
 from __future__ import annotations
@@ -34,7 +32,7 @@ torch.set_num_threads(4)
 
 from src.config import load_config
 from src.data.builder import build_dataloader
-from src.training.ddp_v4_official_trainer import DDPv4OfficialTrainer
+from src.training.ddp_v9_temporal_trainer import DDPv9TemporalTrainer
 
 
 def parse_args():
@@ -44,7 +42,7 @@ def parse_args():
     parser.add_argument("--soft-restart", type=str, default=None, help="软重启: 从旧 checkpoint 加载 encoder，重置其余")
     parser.add_argument("--epochs", type=int, default=None, help="覆盖配置中的训练轮数")
     parser.add_argument("--save-every", type=int, default=None, help="每隔多少 epoch 保存检查点")
-    parser.add_argument("--local_rank", type=int, default=0)
+    parser.add_argument("--local-rank", type=int, default=0)
     return parser.parse_args()
 
 
@@ -100,7 +98,7 @@ def main():
 
     if global_rank == 0:
         logger.Print("=" * 70)
-        logger.Print(f"  DDP V4 Official 训练  [GPU 6,7]  —  {cfg.experiment.name}")
+        logger.Print(f"  DDP V9 Temporal 训练  [8×NPU]  —  {cfg.experiment.name}")
         logger.Print(f"  World size: {world_size}  |  Rank: {global_rank}")
         logger.Print("=" * 70)
         logger.Print(f"  Config: {args.config}")
@@ -108,11 +106,14 @@ def main():
         logger.Print(f"  Batch per GPU: {cfg.data.batch_size}")
         logger.Print(f"  Grad accum: {getattr(cfg.training, 'gradient_accumulation_steps', 8)}")
         logger.Print(f"  Effective batch: {cfg.data.batch_size * world_size * getattr(cfg.training, 'gradient_accumulation_steps', 8)}")
+        logger.Print(f"  Recon weight: {getattr(cfg.training, 'reconstruction_weight', 1.0)}")
         logger.Print(f"  Consistency weight: {getattr(cfg.training, 'consistency_weight', 0.0)}")
         logger.Print(f"  Classification weight: {getattr(cfg.training, 'classification_weight', 0.0)}")
         logger.Print(f"  Uniformity weight: {getattr(cfg.training, 'uniformity_weight', 0.0)}")
         logger.Print(f"  Variance weight: {getattr(cfg.training, 'variance_weight', 0.0)}")
         logger.Print(f"  Decorrelation weight: {getattr(cfg.training, 'decorrelation_weight', 0.0)}")
+        logger.Print(f"  Temporal gap-aware weight: {getattr(cfg.training, 'temporal_gap_aware_weight', 0.0)}")
+        logger.Print(f"  Temporal warmup epochs: {getattr(cfg.training, 'temporal_gap_aware_warmup_epochs', 30)}")
         logger.Print(f"  Kappa: {getattr(cfg.training, 'kappa_start', 50.0)} → {getattr(cfg.training, 'kappa_end', 500.0)}")
         logger.Print("=" * 70)
 
@@ -126,7 +127,7 @@ def main():
     )
 
     # Trainer
-    trainer = DDPv4OfficialTrainer(cfg, local_rank=local_rank)
+    trainer = DDPv9TemporalTrainer(cfg, local_rank=local_rank)
 
     start_epoch = 0
     if args.soft_restart:
@@ -151,20 +152,20 @@ def main():
         losses = trainer.train_epoch(epoch, dataloader)
 
         if global_rank == 0:
+            temporal_str = f"temporal={losses['temporal']:.4f}"
             logger.Print(
                 f"Epoch {epoch + 1:03d}/{cfg.training.epochs} | "
                 f"total={losses['total']:.4f} recon={losses['recon']:.4f} "
                 f"consist={losses['consist']:.4f} cls={losses['cls']:.4f} "
                 f"uniform={losses['uniform']:.4f} var={losses['var']:.4f} "
                 f"decorr={losses['decorr']:.4f} orth={losses['orth']:.4f} "
-                f"lr={losses['lr']:.6f}"
+                f"{temporal_str} lr={losses['lr']:.6f}"
             )
 
         if (epoch + 1) % save_every == 0:
             trainer.save_checkpoint(epoch + 1, losses)
 
-        # ★ 基于 reconstruction loss 选 best（核心目标），而非 total loss
-        # total loss 包含负值的 uniform，会导致 E01 永远最低
+        # 基于 reconstruction loss 选 best
         if losses["recon"] < best_recon:
             best_recon = losses["recon"]
             trainer.save_checkpoint(f"best_epoch{epoch + 1}", losses)

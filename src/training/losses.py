@@ -418,3 +418,67 @@ def temporal_magnitude_loss(
     # Hinge loss: 只惩罚 dist > time_gap_norm + margin 的部分
     loss = F.relu(dist - time_gap_norm - margin).mean()
     return loss
+
+
+# ────────────────────────────────────────────
+# 6. Pixel Change Supervision Loss (V9.5)
+# ────────────────────────────────────────────
+
+def pixel_change_supervision_loss(
+    pre_w1: torch.Tensor,
+    pre_w2: torch.Tensor,
+    img_w1: torch.Tensor,
+    img_w2: torch.Tensor,
+    threshold: float = 0.1,
+) -> torch.Tensor:
+    """像素级变化监督 — 利用两期图像差异指导 embedding 差异.
+
+    核心思想:
+    - 两期图像差异大的区域 → embedding 差异也应大
+    - 两期图像差异小的区域 → embedding 差异也应小
+    - 不需要人工标注，直接用 S2 图像的像素差异作为弱监督信号
+
+    Args:
+        pre_w1: [B, D, H, W] pre-norm embedding map (window 1)
+        pre_w2: [B, D, H, W] pre-norm embedding map (window 2)
+        img_w1: [B, C_img, H, W] 窗口1的代表图像 (已归一化)
+        img_w2: [B, C_img, H, W] 窗口2的代表图像 (已归一化)
+        threshold: 图像差异阈值，低于此值视为"无变化"
+
+    Returns:
+        scalar loss
+    """
+    if pre_w1.shape[0] < 1 or img_w1 is None or img_w2 is None:
+        return pre_w1.new_tensor(0.0)
+
+    B, D, H, W = pre_w1.shape
+
+    # 1. 计算 embedding 差异 (cosine distance → [0, 1])
+    f1 = F.normalize(pre_w1, p=2, dim=1)
+    f2 = F.normalize(pre_w2, p=2, dim=1)
+    emb_cos = (f1 * f2).sum(dim=1)  # [B, H, W], range [-1, 1]
+    emb_diff = (1.0 - emb_cos) * 0.5  # [B, H, W], range [0, 1]
+
+    # 2. 计算图像差异 (逐像素绝对差)
+    # img: [B, C, H, W] → 在通道维度求平均
+    img_diff = torch.abs(img_w1.mean(dim=1) - img_w2.mean(dim=1))  # [B, H, W]
+
+    # 3. 归一化到 [0, 1] (per-batch)
+    img_diff_max = img_diff.amax(dim=(1, 2), keepdim=True).clamp(min=1e-6)
+    img_diff_norm = img_diff / img_diff_max  # [B, H, W]
+
+    # 4. 构建变化掩码: 只监督"确实有图像变化"的区域
+    # 同时排除完全无变化的区域（避免强迫无变化区域产生虚假差异）
+    change_mask = (img_diff_norm > threshold).float()
+
+    # 如果整个 batch 都无显著变化，跳过
+    if change_mask.sum() < 1.0:
+        return pre_w1.new_tensor(0.0)
+
+    # 5. 加权 MSE: 图像变化大的区域权重更高
+    # weight = 1 + img_diff_norm → 变化区域权重 1~2x
+    weights = 1.0 + img_diff_norm
+
+    loss = (weights * change_mask * (emb_diff - img_diff_norm).pow(2)).sum()
+    loss = loss / change_mask.sum().clamp(min=1.0)
+    return loss

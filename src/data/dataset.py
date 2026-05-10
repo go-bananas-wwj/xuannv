@@ -342,6 +342,11 @@ class HarbinPatchDataset(Dataset):
                 time.sleep(2)
                 if time.time() - wait_start > 600:
                     raise RuntimeError("Timeout waiting for dataset cache")
+            # ★ 错开读取大缓存文件，避免所有 rank 同时 I/O 竞争
+            stagger = rank * 3  # 每 rank 间隔 3 秒
+            if stagger > 0:
+                print(f"[Dataset] Rank {rank} staggering cache load by {stagger}s...")
+                time.sleep(stagger)
             ckpt = torch.load(cache_file, weights_only=False)
             self._cache = ckpt["cache"]
             print(f"[Dataset] Rank {rank} loaded cache in {time.time()-wait_start:.1f}s")

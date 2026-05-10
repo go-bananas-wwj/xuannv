@@ -5,9 +5,9 @@
 # ============================================================
 
 experiment:
-  name: xuannv_backbone_v7_phase1_v2
+  name: xuannv_backbone_v7_temporal
   seed: 42
-  output_dir: /workspace/outputs/xuannv_backbone_v7_phase1_v2
+  output_dir: /workspace/outputs/xuannv_backbone_v7_temporal
 
 data:
   dataset_type: harbin_patches
@@ -91,14 +91,14 @@ training:
   
   # 保留损失
   reconstruction_weight: 1.0
-  consistency_weight: 0.03
+  consistency_weight: 0.01   # 降低 consistency，避免压制时间差异
   classification_weight: 0.03
   aux_classification_weight: 0.0
   bottleneck_cls_weight: 0.0
   text_contrastive_weight: 0.0
   
   # 时序损失
-  temporal_magnitude_weight: 0.0
+  temporal_magnitude_weight: 0.3   # 启用 pixel-level temporal cosine loss
   temporal_max_gap_ms: 47347200000
   temporal_margin: 0.0
   temporal_cosine_pixel_weight: 0.0

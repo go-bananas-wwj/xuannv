@@ -139,6 +139,16 @@ class TrainingConfig:
     # V6.5: Gap-aware temporal
     gap_aware_temporal_weight: float = 0.0
     gap_aware_temporal_temperature: float = 0.05
+    # V9: Gap-aware temporal cosine (轻量)
+    temporal_gap_aware_weight: float = 0.0
+    temporal_gap_aware_weight_end: float = 0.02
+    temporal_gap_aware_weight_ramp_epochs: int = 50
+    temporal_gap_aware_warmup_epochs: int = 30
+    temporal_gap_max_months: int = 12
+    # V9.5: Pixel change supervision
+    pixel_change_supervision_weight: float = 0.0
+    pixel_change_supervision_warmup_epochs: int = 40
+    pixel_change_threshold: float = 0.1
     # 预归一化 uniformity
     pre_norm_uniform_weight: float = 3.0
     encoder_uniform_weight: float = 2.0

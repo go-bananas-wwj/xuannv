@@ -1,12 +1,11 @@
-"""DDP V4 Official 训练器 — 参考官方设置.
+"""DDP V9 Temporal 训练器 — V8 + 轻量 Gap-aware Temporal Loss.
 
-核心机制:
-- Teacher: 完整输入 → embedding
-- Student: 扰动输入 (丢帧/丢源/截断) → embedding
-- Consistency Loss: 强制 teacher/student embedding 一致
-- Classification Loss: WorldCover 众数类别监督
-- Raw Uniformity + Variance + Decorrelation: 反坍缩三件套
-- 渐进 VMF Kappa: 50→500
+核心设计:
+- 从 V8 checkpoint soft restart (保留 encoder, 重置 bottleneck/decoder/head)
+- 30 epoch warmup 后启用 gap-aware temporal cosine loss
+- weight=0.02 (极轻量, 不主导训练)
+- 提升 classification_weight=0.08 (增强语义信号)
+- 保持 V8 所有反坍缩和重建设置
 """
 from __future__ import annotations
 
@@ -32,6 +31,7 @@ from src.training.losses import (
     bottleneck_orthogonality_loss,
     consistency_loss,
     classification_loss,
+    gap_aware_temporal_cosine_loss,
 )
 from src.training.optimizer import build_optimizer, build_scheduler, get_cosine_lr
 
@@ -62,7 +62,6 @@ def _build_student_view(
         source_keep = (torch.rand(input_mask.shape, device=input_mask.device) > source_drop_rate)
         input_mask = input_mask & source_keep
         stats["source_drop_ratio"] = float((~source_keep).float().mean().item())
-        # 至少保留一个源
         for batch_index in range(input_mask.shape[0]):
             if not input_mask[batch_index].any():
                 input_mask[batch_index, 0] = True
@@ -86,7 +85,6 @@ def _build_student_view(
                 if len(valid_ts) <= 1:
                     continue
                 
-                # 按真实时间戳排序后截断
                 ts_sorted = sorted(valid_ts, key=lambda t: source_timestamps_ms[b, s, t].item())
                 
                 front_cut = 0
@@ -121,8 +119,8 @@ def _get_kappa(epoch: int, cfg) -> float:
     return kappa_start + (kappa_end - kappa_start) * progress
 
 
-class DDPv4OfficialTrainer:
-    """DDP V4 Official 训练器 — 双卡 GPU 6/7."""
+class DDPv9TemporalTrainer:
+    """DDP V9 Temporal 训练器 — V8 + 轻量 Gap-aware Temporal Loss."""
 
     def __init__(self, cfg: Config, local_rank: int = 0) -> None:
         self.cfg = cfg
@@ -148,13 +146,17 @@ class DDPv4OfficialTrainer:
         self.optimizer = build_optimizer(self.model.module, cfg)
         self.scheduler = build_scheduler(self.optimizer, cfg)
 
-        # GradScaler — 更高初始 scale 防止 fp16 梯度溢出
+        # GradScaler
         self.scaler = torch_npu.npu.amp.GradScaler(init_scale=2**18)
 
         # 输出目录
         self.output_dir = Path(cfg.experiment.output_dir)
         if self.global_rank == 0:
             self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        # temporal loss 熔断机制
+        self.temporal_weight_current = getattr(cfg.training, 'temporal_gap_aware_weight', 0.02)
+        self.recon_history: list[float] = []
 
     @torch.no_grad()
     def update_teacher(self) -> None:
@@ -183,6 +185,10 @@ class DDPv4OfficialTrainer:
         kappa = _get_kappa(epoch, self.cfg)
         self.model.module.bottleneck.kappa = kappa
         self.teacher.bottleneck.kappa = kappa
+
+        # Temporal loss warmup
+        temporal_warmup_epochs = getattr(t, 'temporal_gap_aware_warmup_epochs', 30)
+        temporal_enabled = epoch >= temporal_warmup_epochs
 
         for step, batch in enumerate(dataloader):
             batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v
@@ -247,19 +253,18 @@ class DDPv4OfficialTrainer:
             else:
                 gathered_pre_norm = pre_norm
 
-            # 1. Consistency Loss (论文核心) — fp32 for numerical stability
+            # 1. Consistency Loss (论文核心)
             consist_w = getattr(t, 'consistency_weight', 0.0)
             consist = torch.tensor(0.0, device=self.device)
             if consist_w > 0:
                 consist = consistency_loss(teacher_out.embedding.detach().float(), student_out.embedding.float())
 
-            # 2. Classification Loss (语义监督) — fp32 for softmax stability
+            # 2. Classification Loss (语义监督)
             cls_w = getattr(t, 'classification_weight', 0.0)
             cls = torch.tensor(0.0, device=self.device)
             dummy_cls = torch.tensor(0.0, device=self.device)
             if cls_w > 0 and "label" in batch:
                 labels = batch["label"]
-                # 跳过全 0 标签 (未初始化)
                 if labels.unique().numel() > 1 or labels[0].item() != 0:
                     cls = classification_loss(student_out.logits.float(), labels)
                     if student_out.aux_logits is not None:
@@ -267,7 +272,6 @@ class DDPv4OfficialTrainer:
                     if student_out.bottleneck_logits is not None:
                         cls = cls + 0.3 * classification_loss(student_out.bottleneck_logits.float(), labels)
                 else:
-                    # Dummy loss 确保 DDP 所有参数参与梯度
                     if student_out.logits is not None:
                         dummy_cls = dummy_cls + student_out.logits.sum() * 0.0
                     if student_out.aux_logits is not None:
@@ -275,7 +279,7 @@ class DDPv4OfficialTrainer:
                     if student_out.bottleneck_logits is not None:
                         dummy_cls = dummy_cls + student_out.bottleneck_logits.sum() * 0.0
 
-            # 3. Raw Uniformity Loss — fp32 for numerical stability
+            # 3. Raw Uniformity Loss
             uniform_w = getattr(t, 'uniformity_weight', 0.0)
             uniform = torch.tensor(0.0, device=self.device)
             if uniform_w > 0 and gathered_pre_norm.shape[0] >= 2:
@@ -287,7 +291,7 @@ class DDPv4OfficialTrainer:
             if var_w > 0 and gathered_pre_norm.shape[0] >= 2:
                 var = variance_regularizer(gathered_pre_norm.float(), min_std=1.0)
 
-            # 5. Decorrelation Loss (Barlow Twins) — fp32 for numerical stability
+            # 5. Decorrelation Loss (Barlow Twins)
             decorr_w = getattr(t, 'decorrelation_weight', 0.0)
             decorr = torch.tensor(0.0, device=self.device)
             if decorr_w > 0 and gathered_pre_norm.shape[0] >= 2:
@@ -299,6 +303,44 @@ class DDPv4OfficialTrainer:
             if orth_w > 0:
                 bnw = self.model.module.bottleneck.to_embedding.weight
                 orth = bottleneck_orthogonality_loss(bnw)
+
+            # 7. ★ V9: Gap-aware Temporal Loss (轻量)
+            temporal = torch.tensor(0.0, device=self.device)
+            if temporal_enabled and self.temporal_weight_current > 0:
+                dual_keys = ['valid_start_w1', 'valid_end_w1', 'valid_start_w2', 'valid_end_w2']
+                if all(k in batch for k in dual_keys):
+                    try:
+                        with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=True):
+                            # 使用 student 的扰动输入计算 dual window
+                            # 注意: encode_dual_window 会调用完整 forward (含 decoder)
+                            # 但 bfloat16 + batch_size=2，额外开销可接受
+                            _, _, pre_w1, pre_w2 = self.model.module.encode_dual_window(
+                                source_frames=student_frames,
+                                source_timestamps_ms=batch["source_timestamps_ms"],
+                                source_frame_mask=student_frame_mask,
+                                source_input_mask=student_input_mask,
+                                source_type_ids=batch["source_type_ids"],
+                                valid_start_w1=batch["valid_start_w1"].float(),
+                                valid_end_w1=batch["valid_end_w1"].float(),
+                                valid_start_w2=batch["valid_start_w2"].float(),
+                                valid_end_w2=batch["valid_end_w2"].float(),
+                            )
+
+                        # 计算时间 gap: 两窗口中心点之差的绝对值
+                        w1_center = (batch["valid_start_w1"].float() + batch["valid_end_w1"].float()) / 2.0
+                        w2_center = (batch["valid_start_w2"].float() + batch["valid_end_w2"].float()) / 2.0
+                        time_gap_ms = torch.abs(w1_center - w2_center).to(self.device)
+
+                        max_gap_ms = getattr(t, 'temporal_gap_max_months', 12) * 30 * 24 * 3600 * 1000
+
+                        temporal = gap_aware_temporal_cosine_loss(
+                            pre_w1, pre_w2, time_gap_ms,
+                            max_gap_ms=max_gap_ms,
+                            temperature=0.1,
+                        )
+                    except Exception as e:
+                        if self.global_rank == 0:
+                            print(f"  [Temporal] Error at step {step}: {e}")
 
             # Recon warmup
             recon_warmup = min(1.0, (epoch + 1) / max(getattr(t, 'recon_warmup_epochs', 10), 1))
@@ -312,6 +354,7 @@ class DDPv4OfficialTrainer:
                 + var_w * var
                 + decorr_w * decorr
                 + orth_w * orth
+                + self.temporal_weight_current * temporal
                 + dummy_cls
             )
             
@@ -321,7 +364,8 @@ class DDPv4OfficialTrainer:
                     print(f"  [WARNING] NaN/Inf total at step {step}, skipping. "
                           f"recon={recon.item():.3f} consist={consist.item():.3f} "
                           f"cls={cls.item():.3f} uniform={uniform.item():.3f} "
-                          f"var={var.item():.3f} decorr={decorr.item():.3f}")
+                          f"var={var.item():.3f} decorr={decorr.item():.3f} "
+                          f"temporal={temporal.item():.3f}")
                 self.optimizer.zero_grad()
                 continue
             
@@ -335,7 +379,7 @@ class DDPv4OfficialTrainer:
                     self.model.parameters(),
                     getattr(t, "grad_clip_norm", 1.0)
                 )
-                # 检查梯度是否 NaN，如果是则跳过更新
+                # 检查梯度是否 NaN
                 has_nan_grad = False
                 for p in self.model.parameters():
                     if p.grad is not None and (torch.isnan(p.grad).any() or torch.isinf(p.grad).any()):
@@ -360,6 +404,7 @@ class DDPv4OfficialTrainer:
                 "var": var.item(),
                 "decorr": decorr.item(),
                 "orth": orth.item(),
+                "temporal": temporal.item(),
                 "lr": lr,
             }.items():
                 loss_accum[k] = loss_accum.get(k, 0.0) + v
@@ -367,16 +412,31 @@ class DDPv4OfficialTrainer:
 
             # 打印扰动统计
             if self.global_rank == 0 and step % 20 == 0:
-                print(f"  [Perturb] frame_drop={perturb_stats['frame_drop_ratio']:.2f} "
-                      f"source_drop={perturb_stats['source_drop_ratio']:.2f} "
-                      f"front={perturb_stats['front_cut_ratio']:.2f} "
-                      f"back={perturb_stats['back_cut_ratio']:.2f} "
+                temporal_status = f"temporal={temporal.item():.4f}" if temporal_enabled else "temporal=warmup"
+                print(f"  [Step {step}] recon={recon.item():.3f} {temporal_status} "
+                      f"perturb=[fd={perturb_stats['frame_drop_ratio']:.2f} "
+                      f"sd={perturb_stats['source_drop_ratio']:.2f} "
+                      f"fc={perturb_stats['front_cut_ratio']:.2f} "
+                      f"bc={perturb_stats['back_cut_ratio']:.2f}] "
                       f"kappa={kappa:.1f}")
 
         # 平均并跨卡同步
         loss_accum = {k: v / n_steps for k, v in loss_accum.items()}
         loss_accum = self._reduce_loss_dict(loss_accum)
         loss_accum["lr"] = lr
+
+        # 熔断机制: 如果 recon 连续上升，降低 temporal weight
+        self.recon_history.append(loss_accum["recon"])
+        if len(self.recon_history) >= 6:
+            recent = self.recon_history[-5:]
+            if all(recent[i] <= recent[i+1] for i in range(4)):
+                old_w = self.temporal_weight_current
+                self.temporal_weight_current *= 0.5
+                if self.global_rank == 0:
+                    print(f"  [FUSE] Recon rising for 5 epochs: {recent[0]:.4f} → {recent[-1]:.4f}. "
+                          f"Reducing temporal weight: {old_w:.4f} → {self.temporal_weight_current:.4f}")
+                self.recon_history.clear()
+
         return loss_accum
 
     def _compute_recon_loss(self, predictions, batch):
@@ -397,7 +457,7 @@ class DDPv4OfficialTrainer:
             "scaler_state_dict": self.scaler.state_dict(),
             "losses": losses,
         }, path)
-        print(f"[ddp_v4_official] Saved checkpoint to {path}")
+        print(f"[ddp_v9_temporal] Saved checkpoint to {path}")
         
         # 自动清理：只保留最新的 3 个数字 epoch checkpoint
         ckpts = sorted(
@@ -406,7 +466,7 @@ class DDPv4OfficialTrainer:
         )
         for old_ckpt in ckpts[:-3]:
             old_ckpt.unlink()
-            print(f"[ddp_v4_official] Removed old checkpoint: {old_ckpt}")
+            print(f"[ddp_v9_temporal] Removed old checkpoint: {old_ckpt}")
 
         best_ckpts = sorted(
             [p for p in self.output_dir.glob("epoch_best_*.pt")],
@@ -414,7 +474,7 @@ class DDPv4OfficialTrainer:
         )
         for old_ckpt in best_ckpts[:-2]:
             old_ckpt.unlink()
-            print(f"[ddp_v4_official] Removed old best checkpoint: {old_ckpt}")
+            print(f"[ddp_v9_temporal] Removed old best checkpoint: {old_ckpt}")
 
     def load_checkpoint(self, path: str) -> int:
         ckpt = torch.load(path, map_location=self.device, weights_only=False)
@@ -493,7 +553,7 @@ class DDPv4OfficialTrainer:
         for p in self.teacher.parameters():
             p.requires_grad = False
         
-        # 6. 重新初始化优化器 (丢弃旧的 momentum/state)
+        # 6. 重新初始化优化器
         self.optimizer = build_optimizer(self.model.module, self.cfg)
         self.scheduler = build_scheduler(self.optimizer, self.cfg)
         if self.global_rank == 0:

@@ -138,12 +138,12 @@ for i, (pid, changes) in enumerate(test_patches):
         change_mask = np.zeros((H, W), dtype=np.float32)
         for ch_info in changes:
             geom = ch_info["geometry"]
-            for px in range(H):
-                for py in range(W):
-                    wx = bounds[0] + (px + 0.5) * resolution
-                    wy = bounds[3] - (py + 0.5) * resolution
+            for row in range(H):
+                for col in range(W):
+                    wx = bounds[0] + (col + 0.5) * resolution
+                    wy = bounds[3] - (row + 0.5) * resolution
                     if geom.contains(Point(wx, wy)):
-                        change_mask[px, py] = 1.0
+                        change_mask[row, col] = 1.0
 
         all_embeddings_before.append(eb)
         all_embeddings_after.append(ea)

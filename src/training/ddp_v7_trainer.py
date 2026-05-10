@@ -33,7 +33,7 @@ from src.models.model import AEFModel
 from src.training.losses import (
     reconstruction_loss, consistency_loss,
     classification_loss, pre_norm_uniformity_loss, directional_uniformity_loss,
-    temporal_contrastive_loss, pixel_temporal_info_nce_loss,
+    temporal_contrastive_loss, temporal_cosine_pixel_loss, pixel_temporal_info_nce_loss,
 )
 from src.training.vicreg_loss import koleo_loss
 from src.training.loops import compute_recon_loss
@@ -224,7 +224,8 @@ class DDPv7Trainer:
                             valid_start_w2=batch["valid_start_w2"],
                             valid_end_w2=batch["valid_end_w2"],
                         )
-                        temporal = temporal_contrastive_loss(emb_w1, emb_w2, temperature=getattr(t, 'temporal_magnitude_temperature', 0.1))
+                        # 使用 pixel-level cosine loss（无 hinge，持续有梯度）
+                        temporal = temporal_cosine_pixel_loss(emb_w1, emb_w2, temperature=getattr(t, 'temporal_magnitude_temperature', 0.1))
                     except Exception as e:
                         if dist.get_rank() == 0:
                             print(f"  [Temporal] Error: {e}")

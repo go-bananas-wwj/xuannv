@@ -169,12 +169,12 @@ for i, (pid, changes) in enumerate(test_patches):
         
         for ch_info in changes:
             geom = ch_info["geometry"]
-            for px in range(H):
-                for py in range(W):
-                    wx = bounds[0] + (px + 0.5) * resolution
-                    wy = bounds[3] - (py + 0.5) * resolution
+            for row in range(H):
+                for col in range(W):
+                    wx = bounds[0] + (col + 0.5) * resolution
+                    wy = bounds[3] - (row + 0.5) * resolution
                     if geom.contains(Point(wx, wy)):
-                        change_mask[px, py] = 1.0
+                        change_mask[row, col] = 1.0
         
         # AUC
         flat_v4 = cd_v4.flatten()
