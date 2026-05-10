@@ -56,6 +56,53 @@ def raw_uniformity_loss(embeddings: torch.Tensor) -> torch.Tensor:
 
 
 # ────────────────────────────────────────────
+# 1b. Batch Uniformity Loss — L2-normalized (AEF 原文公式4)
+# ────────────────────────────────────────────
+
+def batch_uniformity_loss_l2(embeddings: torch.Tensor) -> torch.Tensor:
+    """AEF 原文 Batch Uniformity Loss — 在 L2 归一化后的球面 S^63 上计算.
+
+    公式 (AEF Supplemental S2.2.4, Equation 4):
+        BatchUniformity = Σᵢ |uᵢ · u'ᵢ|
+
+    其中 uᵢ 和 u'ᵢ 都是 L2 归一化后的向量。
+    u'ᵢ 通过对 batch 做 roll/shift 生成（batch-rotated embeddings）。
+
+    返回值:
+        - 理想均匀分布: → 0 (随机向量在球面上近似正交)
+        - 完全坍缩: → 1 (所有向量方向相同)
+
+    Args:
+        embeddings: [B, D] 或 [B, D, H, W] 或 [B, T, H, W, D]
+                   已经 L2 归一化，或在函数内部归一化
+
+    Returns:
+        scalar loss, 越小越好
+    """
+    if embeddings.shape[0] < 2:
+        return embeddings.new_tensor(0.0)
+
+    # 展平所有空间/时间维度 → [N, D]
+    x = embeddings
+    while x.dim() > 2:
+        # 将额外维度合并到 batch: e.g. [B, D, H, W] -> [B*H*W, D]
+        B = x.shape[0]
+        D = x.shape[-1]
+        x = x.reshape(-1, D)
+
+    # L2 归一化（确保在球面上）
+    x = F.normalize(x, p=2, dim=-1)
+
+    # Batch rotate: u' = roll(u, 1) — AEF 原文的 batch-rotated embeddings
+    x_prime = torch.roll(x, shifts=1, dims=0)
+
+    # |u · u'|
+    dots = (x * x_prime).sum(dim=-1).abs()
+
+    return dots.mean()
+
+
+# ────────────────────────────────────────────
 # 2. Decorrelation Loss (Barlow Twins)
 # ────────────────────────────────────────────
 

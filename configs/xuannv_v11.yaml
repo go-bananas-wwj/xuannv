@@ -1,12 +1,14 @@
 # ============================================================
-# xuannv Backbone V11 — 数据扩展 + 架构优化
+# xuannv Backbone V11 — 对齐 AEF 原文修复版
 # ============================================================
-# 基于 V10 的改进:
-#   1. 源特定重建权重: 动态=1.0, DEM=0.3, 静态=0.5
-#   2. 移除 decorrelation + orthogonality (冗余)
-#   3. 强化教师-学生一致性: 0.05 → 0.2 (AEF 核心)
-#   4. 静态目标时间编码弱化
-#   5. 课程学习: Phase1(哈尔滨) → Phase2(全省混合)
+# 核心修复 (基于 AEF 论文原文 arxiv.org/abs/2507.22291):
+#   1. Uniformity 在 L2-norm 后计算 (原 pre-norm 计算导致推理坍缩)
+#   2. Uniformity weight: 1.0 → 0.05 (AEF 原文公式4)
+#   3. Consistency weight: 0.2 → 0.02 (AEF 原文公式5)
+#   4. 移除 skip_l2_norm_training (AEF 训练/推理统一 L2)
+#   5. 移除 variance/decorrelation/orthogonality (AEF 原文无此设计)
+#   6. S2 保护规则: Stage 1 永不 drop (AEF S2.2.5)
+#   7. Batch size 增大: 2 → 4 (NPU HBM 64GB 远未跑满)
 # ============================================================
 
 experiment:
@@ -18,7 +20,7 @@ data:
   dataset_type: harbin_patches
   manifest_path: /workspace/raw/harbin_scenes/harbin_scenes_cloud_filtered
   stats_dir: /workspace/statistics/harbin_scenes
-  batch_size: 2
+  batch_size: 4
   num_workers: 4
   image_size: 128
   max_frames: 32
@@ -66,7 +68,7 @@ model:
   gradient_checkpointing: true
   per_source_decoders: false
   decoder_hidden_mult: 1
-  skip_l2_norm_training: true
+  skip_l2_norm_training: false  # V11: 对齐 AEF，训练/推理统一 L2
   spatial_dropout_rate: 0.0
 
 training:
@@ -80,15 +82,15 @@ training:
   # --- 核心损失: 重建 ---
   reconstruction_weight: 1.0
 
-  # --- 教师-学生一致性 (V11: 强化) ---
-  consistency_weight: 0.2
+  # --- 教师-学生一致性 (V11: 对齐 AEF 原文 c=0.02) ---
+  consistency_weight: 0.02
 
   # --- 分类监督 ---
   classification_weight: 0.08
 
-  # --- 反坍缩: 只保留 uniformity + variance ---
-  uniformity_weight: 1.0
-  variance_weight: 0.25
+  # --- Batch Uniformity (V11: 对齐 AEF 原文 b=0.05, L2-norm 后计算) ---
+  uniformity_weight: 0.05
+  variance_weight: 0.0  # V11: 移除 (AEF 原文无此设计)
 
   # --- 源特定重建权重 (V11 新增) ---
   # TARGET_SOURCES 顺序: s2, s1, landsat, dem, worldcover, dynamic_world, jrc_water
@@ -111,7 +113,11 @@ training:
   change_consistency_warmup_epochs: 40
   change_consistency_threshold: 0.1
 
-  # --- Student 扰动参数 ---
+  # --- Student 扰动参数 (对齐 AEF S2.2.5) ---
+  # AEF 策略:
+  #   Stage 1 (源级别): S2 永不 drop, S1 30%, Landsat 30%
+  #   Stage 2 (帧级别): S2 50%, S1 30%, Landsat 30%  或 前/后半年截断
+  # 代码中硬编码了 AEF 比率，以下参数仅用于兼容性
   student_frame_drop_rate: 0.4
   student_source_drop_rate: 0.25
   student_front_drop_prob: 0.15
@@ -131,8 +137,8 @@ training:
   # --- 保存频率 ---
   save_every: 20
   save_best_balanced: true
-  best_balanced_uniform_min: -4.0
-  best_balanced_uniform_max: -1.0
+  best_balanced_uniform_min: 0.0   # V11: uniformity_l2 值域 [0, 1]，越小越好
+  best_balanced_uniform_max: 0.3   # >0.3 视为坍缩
   early_stop_patience: 200
 
   # --- 已移除/置0的损失 ---

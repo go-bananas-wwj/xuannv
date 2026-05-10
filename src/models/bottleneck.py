@@ -1,11 +1,13 @@
-"""VMF Bottleneck — V10: 加入 Difference Module.
+"""VMF Bottleneck — V11: 对齐 AEF 原文，训练/推理统一 L2 归一化.
 
-核心设计:
-- 训练时: Conv1x1 → 原始幅度空间 → uniformity/decorrelation/variance 在此空间计算
-- 推理时: Conv1x1 → L2 Norm → VMF noise → 球面 embedding
-- V10 新增: forward_dual_window — 显式编码双窗口差分
+核心设计 (对齐 AEF 论文 Supplemental S2.2):
+- 训练时: Conv1x1 → L2 Norm → VMF noise → 球面 embedding
+- 推理时: Conv1x1 → L2 Norm → VMF sample → 球面 embedding
+- 所有损失 (uniformity/consistency/reconstruction) 都在同一 L2-norm 空间计算
+- 这是 AEF 原文的精确实现，区别于 V10 的 skip_l2_training 设计
 
-这彻底消除了 L2 Normalization 的 Jacobian 梯度屏障问题。
+Difference Module (V10 保留):
+- forward_dual_window: 显式编码双窗口差分 + change_gate
 """
 from __future__ import annotations
 
@@ -28,31 +30,29 @@ def sample_vmf(mean_direction: torch.Tensor, kappa: float) -> torch.Tensor:
 
 
 class VMFBottleneck(nn.Module):
-    """改进版 VMF 瓶颈 — V10 加入 Difference Module."""
+    """V11 VMF 瓶颈 — 对齐 AEF 原文，训练/推理统一 L2 归一化."""
 
     def __init__(
         self,
         channels: int,
         embedding_dim: int,
         kappa: float = 2000.0,
-        skip_l2_training: bool = True,
+        skip_l2_training: bool = False,  # V11: 忽略此参数，始终 L2 归一化
     ) -> None:
         super().__init__()
         self.to_embedding = nn.Conv2d(channels, embedding_dim, kernel_size=1)
         self.embedding_dim = embedding_dim
         self.kappa = kappa
-        self.skip_l2_training = skip_l2_training
+        # V11: skip_l2_training 不再使用，保留参数仅为兼容旧 checkpoint
+        self.skip_l2_training = False
 
-        # ── V10: Difference Module ──
-        # 差分编码: 将两个窗口的 pre-norm embedding 拼接后编码差分特征
+        # ── V10: Difference Module (保留) ──
         self.diff_encoder = nn.Sequential(
             nn.Conv2d(embedding_dim * 2, embedding_dim // 2, kernel_size=1),
             nn.GroupNorm(8, embedding_dim // 2),
             nn.GELU(),
         )
-        # 变化门控: 预测每个像素位置的变化概率
         self.change_gate = nn.Conv2d(embedding_dim // 2, 1, kernel_size=1)
-        # 融合: 将原始 embedding 与差分特征融合回 embedding_dim
         self.fusion = nn.Sequential(
             nn.Conv2d(embedding_dim + embedding_dim // 2, embedding_dim, kernel_size=1),
             nn.GroupNorm(8, embedding_dim),
@@ -66,18 +66,17 @@ class VMFBottleneck(nn.Module):
             features: [B, C, H, W]  summary_map from STP encoder
 
         Returns:
-            embedding_map: [B, D, H, W]
-            embedding_vector: [B, D]
-            pre_norm_embedding: [B, D]
-            pre_norm_map: [B, D, H, W]
+            embedding_map: [B, D, H, W]  L2-normalized
+            embedding_vector: [B, D]  L2-normalized (global mean)
+            pre_norm_embedding: [B, D]  与 embedding_vector 相同 (兼容旧接口)
+            pre_norm_map: [B, D, H, W]  与 embedding_map 相同 (兼容旧接口)
         """
         pre_norm_map = self.to_embedding(features)  # [B, D, H, W]
         embedding_map = self._apply_norm(pre_norm_map)
-        pre_norm_vector = pre_norm_map.mean(dim=(-2, -1))
         embedding_vector = embedding_map.mean(dim=(-2, -1))
-        if not (self.training and self.skip_l2_training):
-            embedding_vector = F.normalize(embedding_vector, p=2, dim=1)
-        return embedding_map, embedding_vector, pre_norm_vector, pre_norm_map
+        embedding_vector = F.normalize(embedding_vector, p=2, dim=1)
+        # V11: pre_norm 字段与 L2-norm 后的 embedding 相同（兼容旧接口）
+        return embedding_map, embedding_vector, embedding_vector, embedding_map
 
     def forward_dual_window(
         self,
@@ -91,12 +90,12 @@ class VMFBottleneck(nn.Module):
             feat_w2: [B, C, H, W] summary_map (window 2)
 
         Returns:
-            emb_w1: [B, D, H, W] 窗口1 embedding (L2 normalized if inference)
-            emb_w2: [B, D, H, W] 窗口2 embedding
-            pre_w1: [B, D, H, W] 窗口1 pre-norm
-            pre_w2: [B, D, H, W] 窗口2 pre-norm
+            emb_w1: [B, D, H, W] L2-normalized (window 1)
+            emb_w2: [B, D, H, W] L2-normalized (window 2)
+            pre_w1: [B, D, H, W] 与 emb_w1 相同 (兼容旧接口)
+            pre_w2: [B, D, H, W] 与 emb_w2 相同 (兼容旧接口)
             change_score: [B, 1, H, W] 变化概率图 (0~1)
-            diff_feat: [B, D/2, H, W] 差分特征 (可用于辅助监督)
+            diff_feat: [B, D/2, H, W] 差分特征
         """
         # 1. 各自 embedding (pre-norm)
         pre_w1 = self.to_embedding(feat_w1)  # [B, D, H, W]
@@ -113,21 +112,26 @@ class VMFBottleneck(nn.Module):
         fused_w1 = self.fusion(enhanced_w1)  # [B, D, H, W]
         fused_w2 = self.fusion(enhanced_w2)
 
-        # 4. 应用 L2/VMF (同标准 forward 逻辑)
+        # 4. 应用 L2/VMF (训练/推理统一)
         emb_w1 = self._apply_norm(fused_w1)
         emb_w2 = self._apply_norm(fused_w2)
 
-        return emb_w1, emb_w2, pre_w1, pre_w2, change_score, diff_feat
+        # V11: pre_w 与 emb 相同（兼容旧接口，不再区分 pre-norm 和 L2-norm）
+        return emb_w1, emb_w2, emb_w1, emb_w2, change_score, diff_feat
 
     def _apply_norm(self, pre_norm_map: torch.Tensor) -> torch.Tensor:
-        """对 pre-norm map 应用 L2/VMF (训练/推理区分)."""
-        if self.training and self.skip_l2_training:
-            if self.kappa > 0:
-                noise = torch.randn_like(pre_norm_map) * math.sqrt(1.0 / self.kappa)
-                return pre_norm_map + noise
-            return pre_norm_map
-        else:
-            direction = F.normalize(pre_norm_map, p=2, dim=1)
-            if self.kappa > 0:
-                return sample_vmf(direction, self.kappa)
-            return direction
+        """对 pre-norm map 应用 L2 Norm + VMF 噪声.
+
+        V11 变更: 训练/推理统一处理，始终 L2 归一化。
+        VMF 噪声在训练时加在方向向量上（AEF 原文方式）。
+        """
+        direction = F.normalize(pre_norm_map, p=2, dim=1)
+        if self.training and self.kappa > 0:
+            # VMF 噪声加在方向向量上（AEF 原文: mean direction + noise on S^63）
+            noise = torch.randn_like(direction) * math.sqrt(1.0 / self.kappa)
+            noisy = direction + noise
+            # 重新归一化保持单位长度
+            return F.normalize(noisy, p=2, dim=1)
+        elif self.kappa > 0:
+            return sample_vmf(direction, self.kappa)
+        return direction

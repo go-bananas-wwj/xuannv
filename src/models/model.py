@@ -403,14 +403,10 @@ class AEFModel(nn.Module):
             source_input_mask, source_type_ids, valid_start_w2, valid_end_w2,
         )
 
-        # V10: bottleneck 显式差分
+        # V10: bottleneck 显式差分 (V11: 始终 L2-normalized)
         emb_w1, emb_w2, pre_w1, pre_w2, change_score, diff_feat = self.bottleneck.forward_dual_window(
             summary_w1, summary_w2
         )
 
-        # 推理时额外 L2 normalize
-        if not (self.training and self.bottleneck.skip_l2_training):
-            emb_w1 = F.normalize(emb_w1, p=2, dim=1)
-            emb_w2 = F.normalize(emb_w2, p=2, dim=1)
-
+        # V11: bottleneck 始终返回 L2-normalized embedding，无需额外处理
         return emb_w1, emb_w2, pre_w1, pre_w2, change_score, diff_feat

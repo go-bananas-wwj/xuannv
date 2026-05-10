@@ -25,8 +25,7 @@ from src.config import Config
 from src.models.model import AEFModel
 from src.training.losses import (
     reconstruction_loss,
-    raw_uniformity_loss,
-    variance_regularizer,
+    batch_uniformity_loss_l2,
     consistency_loss,
     classification_loss,
     gap_aware_temporal_cosine_loss,
@@ -53,7 +52,17 @@ def _build_student_view(
     front_drop_prob: float,
     back_drop_prob: float,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, dict[str, float]]:
-    """构建 Student 的扰动输入视图."""
+    """构建 Student 的扰动输入视图 — V11: 对齐 AEF 原文 S2.2.5.
+
+    AEF 原文策略:
+    - Stage 1 (源级别 drop): S2 永不 drop, S1 30%, Landsat 30%
+    - Stage 2 (帧级别 drop): S2 50%, S1 30%, Landsat 30%
+    - 或前后半年截断 (forecasting/backcasting)
+
+    我们的实现:
+    - source_type_ids: 0=S2, 1=S1, 2=Landsat
+    - S2 (source_type=0): Stage 1 永不 drop
+    """
     frames = source_frames.clone()
     frame_mask = source_frame_mask.clone()
     input_mask = source_input_mask.clone()
@@ -64,20 +73,66 @@ def _build_student_view(
         "back_cut_ratio": 0.0,
     }
 
-    # 1. 随机丢源
-    if source_drop_rate > 0:
-        source_keep = (torch.rand(input_mask.shape, device=input_mask.device) > source_drop_rate)
-        input_mask = input_mask & source_keep
-        stats["source_drop_ratio"] = float((~source_keep).float().mean().item())
-        for batch_index in range(input_mask.shape[0]):
-            if not input_mask[batch_index].any():
-                input_mask[batch_index, 0] = True
+    B, S, T = frame_mask.shape[:3]
+    device = input_mask.device
 
-    # 2. 随机丢帧
-    if drop_rate > 0:
-        keep = (torch.rand(frame_mask.shape, device=frame_mask.device) > drop_rate) & frame_mask
-        frame_mask = keep
-        stats["frame_drop_ratio"] = float((~keep).float().mean().item())
+    # === Stage 1: 源级别 drop (AEF: S2 永不 drop, S1/Landsat 30%) ===
+    if source_drop_rate > 0:
+        # S2 (source_type=0) 永不 drop; 其他源按 source_drop_rate drop
+        # input_mask: [B, S], source_type_ids 与 source 顺序对应
+        # 假设 source 0=S2, 1=S1, 2=Landsat
+        for s_idx in range(S):
+            if s_idx == 0:  # S2 — 永不 drop
+                continue
+            drop = torch.rand(B, device=device) < source_drop_rate
+            input_mask[drop, s_idx] = False
+
+        stats["source_drop_ratio"] = float((~input_mask).float().mean().item())
+        for batch_index in range(B):
+            if not input_mask[batch_index].any():
+                input_mask[batch_index, 0] = True  # 至少保留 S2
+
+    # === Stage 2: 三种策略选一种 (AEF S2.2.5) ===
+    # 0: 随机帧 drop, 1: 后半年 drop, 2: 前半年 drop
+    strat = torch.randint(0, 3, (1,)).item()
+
+    if strat == 0:
+        # 随机帧 drop — AEF: S2 50%, S1 30%, Landsat 30%
+        for s_idx in range(S):
+            frac = 0.5 if s_idx == 0 else 0.3  # S2=50%, others=30%
+            for b in range(B):
+                if not input_mask[b, s_idx]:
+                    continue
+                drops = torch.rand(T, device=device) < frac
+                frame_mask[b, s_idx, drops] = False
+        stats["frame_drop_ratio"] = float((~frame_mask & source_frame_mask).float().mean().item())
+
+    elif strat in (1, 2):
+        # 前/后半年截断
+        for b in range(B):
+            for s_idx in range(S):
+                if not input_mask[b, s_idx]:
+                    continue
+                valid_ts = [t for t in range(T) if source_frame_mask[b, s_idx, t]]
+                if len(valid_ts) <= 1:
+                    continue
+                # 按时间排序
+                ts_vals = [source_timestamps_ms[b, s_idx, t].item() for t in valid_ts]
+                sorted_pairs = sorted(zip(ts_vals, valid_ts))
+                mid_idx = len(sorted_pairs) // 2
+                if strat == 1:
+                    # 后半年 drop: 保留前半
+                    keep_ts = set(t for _, t in sorted_pairs[:mid_idx])
+                else:
+                    # 前半年 drop: 保留后半
+                    keep_ts = set(t for _, t in sorted_pairs[mid_idx:])
+                for t in range(T):
+                    if t not in keep_ts:
+                        frame_mask[b, s_idx, t] = False
+        if strat == 1:
+            stats["back_cut_ratio"] = 0.25
+        else:
+            stats["front_cut_ratio"] = 0.25
 
     # 3. 截断前后段
     if front_drop_prob > 0 or back_drop_prob > 0:
@@ -329,16 +384,16 @@ class DDPv11Trainer:
                 # Reconstruction (只从 student 计算, 带源特定权重)
                 recon = self._compute_recon_loss(student_out.reconstructions, batch)
 
-            # Gather pre_norm embeddings across GPUs for uniformity
-            pre_norm = student_out.pre_norm_embedding
+            # Gather L2-normalized embeddings across GPUs for uniformity
+            embedding = student_out.embedding
             if dist.is_initialized() and self.world_size > 1:
-                gathered_pre_norm = [torch.zeros_like(pre_norm) for _ in range(self.world_size)]
-                dist.all_gather(gathered_pre_norm, pre_norm)
-                gathered_pre_norm = torch.cat(gathered_pre_norm, dim=0)
+                gathered_emb = [torch.zeros_like(embedding) for _ in range(self.world_size)]
+                dist.all_gather(gathered_emb, embedding)
+                gathered_emb = torch.cat(gathered_emb, dim=0)
             else:
-                gathered_pre_norm = pre_norm
+                gathered_emb = embedding
 
-            # 1. Consistency Loss (V11: 强化到 0.2)
+            # 1. Consistency Loss (V11: 对齐 AEF 原文 weight=0.02)
             consist_w = getattr(t, 'consistency_weight', 0.0)
             consist = torch.tensor(0.0, device=self.device)
             if consist_w > 0:
@@ -367,19 +422,21 @@ class DDPv11Trainer:
                     if student_out.bottleneck_logits is not None:
                         dummy_cls = dummy_cls + student_out.bottleneck_logits.sum() * 0.0
 
-            # 3. Raw Uniformity Loss
+            # 3. Batch Uniformity Loss — L2-normalized (AEF 原文公式4)
             uniform_w = getattr(t, 'uniformity_weight', 0.0)
             uniform = torch.tensor(0.0, device=self.device)
-            if uniform_w > 0 and gathered_pre_norm.shape[0] >= 2:
-                uniform = raw_uniformity_loss(gathered_pre_norm.float())
+            if uniform_w > 0 and gathered_emb.shape[0] >= 2:
+                # 使用 embedding_map (空间 dense) 计算 uniformity，比全局 mean 更丰富
+                emb_map = student_out.embedding_map  # [B, D, H, W]
+                if dist.is_initialized() and self.world_size > 1:
+                    gathered_map = [torch.zeros_like(emb_map) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_map, emb_map)
+                    gathered_map = torch.cat(gathered_map, dim=0)
+                else:
+                    gathered_map = emb_map
+                uniform = batch_uniformity_loss_l2(gathered_map.float())
 
-            # 4. Variance Regularizer (VICReg)
-            var_w = getattr(t, 'variance_weight', 0.0)
-            var = torch.tensor(0.0, device=self.device)
-            if var_w > 0 and gathered_pre_norm.shape[0] >= 2:
-                var = variance_regularizer(gathered_pre_norm.float(), min_std=1.0)
-
-            # V11: 移除 decorrelation 和 orthogonality (已验证冗余)
+            # V11: 移除 variance/decorrelation/orthogonality (AEF 原文无此设计)
 
             # 5. Gap-aware Temporal Loss + Difference Module
             temporal = torch.tensor(0.0, device=self.device)
@@ -488,7 +545,6 @@ class DDPv11Trainer:
                 + consist_w * consist
                 + cls_w * cls
                 + uniform_w * uniform
-                + var_w * var
                 + self.temporal_weight_current * temporal
                 + pixel_change_w * pixel_change
                 + change_w * change_consist
@@ -501,7 +557,7 @@ class DDPv11Trainer:
                     print(f"  [WARNING] NaN/Inf total at step {step}, skipping. "
                           f"recon={recon.item():.3f} consist={consist.item():.3f} "
                           f"cls={cls.item():.3f} uniform={uniform.item():.3f} "
-                          f"var={var.item():.3f} temporal={temporal.item():.3f}")
+                          f"temporal={temporal.item():.3f}")
                 self.optimizer.zero_grad()
                 continue
             
@@ -536,7 +592,6 @@ class DDPv11Trainer:
                 "consist": consist.item(),
                 "cls": cls.item(),
                 "uniform": uniform.item(),
-                "var": var.item(),
                 "temporal": temporal.item(),
                 "pixel_change": pixel_change.item(),
                 "change_consist": change_consist.item(),
