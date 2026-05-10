@@ -166,7 +166,7 @@ def main():
                 f"Epoch {epoch + 1:03d}/{cfg.training.epochs} | "
                 f"total={losses['total']:.4f} recon={losses['recon']:.4f} "
                 f"consist={losses['consist']:.4f} cls={losses['cls']:.4f} "
-                f"uniform={losses['uniform']:.4f} var={losses['var']:.4f} "
+                f"uniform={losses['uniform']:.4f} "
                 f"{temporal_str}{pixel_str}{change_str} lr={losses['lr']:.6f}"
             )
 
