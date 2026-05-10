@@ -56,25 +56,26 @@ def raw_uniformity_loss(embeddings: torch.Tensor) -> torch.Tensor:
 
 
 # ────────────────────────────────────────────
-# 1b. Batch Uniformity Loss — L2-normalized (AEF 原文公式4)
+# 1b. Batch Uniformity Loss — L2-normalized (V11 改进版)
 # ────────────────────────────────────────────
 
-def batch_uniformity_loss_l2(embeddings: torch.Tensor) -> torch.Tensor:
-    """AEF 原文 Batch Uniformity Loss — 在 L2 归一化后的球面 S^63 上计算.
+def batch_uniformity_loss_l2(embeddings: torch.Tensor, dim_dropout: float = 0.1,
+                                 max_samples: int = 512) -> torch.Tensor:
+    """改进版 Batch Uniformity Loss — All-Pairs + 空间采样 + 维度 Dropout.
 
-    公式 (AEF Supplemental S2.2.4, Equation 4):
-        BatchUniformity = Σᵢ |uᵢ · u'ᵢ|
-
-    其中 uᵢ 和 u'ᵢ 都是 L2 归一化后的向量。
-    u'ᵢ 通过对 batch 做 roll/shift 生成（batch-rotated embeddings）。
-
-    返回值:
-        - 理想均匀分布: → 0 (随机向量在球面上近似正交)
-        - 完全坍缩: → 1 (所有向量方向相同)
+    V11 改进 (vs AEF 原文 torch.roll):
+    1. All-Pairs: 每个样本与 batch 中**所有其他样本**计算 |u_i · u_j|，
+       效果强 N 倍（N=batch_size）。
+    2. 空间采样: 对 embedding_map [B,D,H,W] 随机采样最多 max_samples 个空间位置，
+       避免 OOM（全图 H*W=4096 时 all-pairs 矩阵达 16GB+）。
+    3. 维度 Dropout: 随机 mask 10% 维度后计算 dot product，增加鲁棒性。
+    4. 值域 [0, 1]: 0=均匀分布, 1=完全坍缩。
 
     Args:
-        embeddings: [B, D] 或 [B, D, H, W] 或 [B, T, H, W, D]
+        embeddings: [B, D] 或 [B, D, H, W]
                    已经 L2 归一化，或在函数内部归一化
+        dim_dropout: 维度 dropout 比率 (默认 0.1)
+        max_samples: 最大采样空间位置数 (默认 512)
 
     Returns:
         scalar loss, 越小越好
@@ -82,24 +83,65 @@ def batch_uniformity_loss_l2(embeddings: torch.Tensor) -> torch.Tensor:
     if embeddings.shape[0] < 2:
         return embeddings.new_tensor(0.0)
 
-    # 展平所有空间/时间维度 → [N, D]
     x = embeddings
-    while x.dim() > 2:
-        # 将额外维度合并到 batch: e.g. [B, D, H, W] -> [B*H*W, D]
-        B = x.shape[0]
-        D = x.shape[-1]
-        x = x.reshape(-1, D)
+
+    # 处理 spatial embedding map [B, D, H, W]
+    if x.dim() == 4:
+        B, D, H, W = x.shape
+        # 展平空间: [B, D, H*W]
+        x = x.reshape(B, D, H * W)
+        # 随机采样空间位置（避免 OOM）
+        n_spatial = H * W
+        if n_spatial > max_samples:
+            indices = torch.randperm(n_spatial, device=x.device)[:max_samples]
+            x = x[:, :, indices]
+        # 转置为 [B, H*W, D] → 展平为 [B*H*W, D]
+        x = x.permute(0, 2, 1).reshape(-1, D)
+    elif x.dim() > 2:
+        # 其他高维情况，展平所有非 batch 维度
+        while x.dim() > 2:
+            B = x.shape[0]
+            D = x.shape[-1]
+            x = x.reshape(-1, D)
+
+    N, D = x.shape
+    if N < 2:
+        return x.new_tensor(0.0)
 
     # L2 归一化（确保在球面上）
     x = F.normalize(x, p=2, dim=-1)
 
-    # Batch rotate: u' = roll(u, 1) — AEF 原文的 batch-rotated embeddings
-    x_prime = torch.roll(x, shifts=1, dims=0)
+    # 维度 Dropout: 随机 mask 部分维度，增加配对多样性
+    if dim_dropout > 0 and x.requires_grad:
+        mask = torch.empty_like(x).bernoulli_(1 - dim_dropout)
+        if mask.sum() > 0:
+            x_dropped = x * mask
+            x_dropped = F.normalize(x_dropped, p=2, dim=-1)
+        else:
+            x_dropped = x
+    else:
+        x_dropped = x
 
-    # |u · u'|
-    dots = (x * x_prime).sum(dim=-1).abs()
+    # All-Pairs: 计算所有 i≠j 的 |u_i · u_j|
+    # 使用 chunk 分批计算，进一步降低峰值内存
+    chunk_size = min(1024, N)
+    total_loss = 0.0
+    n_pairs = 0
 
-    return dots.mean()
+    for i_start in range(0, N, chunk_size):
+        i_end = min(i_start + chunk_size, N)
+        chunk_i = x_dropped[i_start:i_end]  # [chunk, D]
+        # chunk_i 与所有样本的相似度
+        sim = chunk_i @ x_dropped.T  # [chunk, N]
+        # 排除对角线和自身 chunk 内的对角线
+        for local_i in range(i_end - i_start):
+            global_i = i_start + local_i
+            sim[local_i, global_i] = 0.0
+        # 累加绝对值
+        total_loss += sim.abs().sum().item()
+        n_pairs += (i_end - i_start) * N - (i_end - i_start)  # 排除自身
+
+    return torch.tensor(total_loss / max(n_pairs, 1), device=x.device, dtype=x.dtype)
 
 
 # ────────────────────────────────────────────

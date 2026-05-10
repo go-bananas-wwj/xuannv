@@ -88,8 +88,9 @@ training:
   # --- 分类监督 ---
   classification_weight: 0.08
 
-  # --- Batch Uniformity (V11: 对齐 AEF 原文 b=0.05, L2-norm 后计算) ---
-  uniformity_weight: 0.05
+  # --- Batch Uniformity (V11.1: 改进 all-pairs + 维度 dropout, weight 增大)
+  # AEF 原文 b=0.05 基于 3B 帧数据; 我们的数据少, 需要更大权重
+  uniformity_weight: 0.3
   variance_weight: 0.0  # V11: 移除 (AEF 原文无此设计)
 
   # --- 源特定重建权重 (V11 新增) ---
