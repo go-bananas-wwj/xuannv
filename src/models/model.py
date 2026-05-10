@@ -359,3 +359,47 @@ class AEFModel(nn.Module):
         pre_w2 = out2.pre_norm_map if out2.pre_norm_map is not None else out2.embedding_map
 
         return emb_w1, emb_w2, pre_w1, pre_w2
+
+    def encode_dual_window_v10(
+        self,
+        source_frames: torch.Tensor,
+        source_timestamps_ms: torch.Tensor,
+        source_frame_mask: torch.Tensor,
+        source_input_mask: torch.Tensor,
+        source_type_ids: torch.Tensor,
+        valid_start_w1: torch.Tensor,
+        valid_end_w1: torch.Tensor,
+        valid_start_w2: torch.Tensor,
+        valid_end_w2: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """V10: 双窗口编码 — 显式 Difference Module.
+
+        Returns:
+            emb_w1: [B, D, H, W] L2-normalized (window 1)
+            emb_w2: [B, D, H, W] L2-normalized (window 2)
+            pre_w1: [B, D, H, W] pre-norm (window 1)
+            pre_w2: [B, D, H, W] pre-norm (window 2)
+            change_score: [B, 1, H, W] 变化概率图 (0~1)
+            diff_feat: [B, D/2, H, W] 差分特征
+        """
+        # 编码两个窗口到 summary_map (共用 encoder，避免重复计算)
+        summary_w1, _, _ = self.encode_frames(
+            source_frames, source_timestamps_ms, source_frame_mask,
+            source_input_mask, source_type_ids, valid_start_w1, valid_end_w1,
+        )
+        summary_w2, _, _ = self.encode_frames(
+            source_frames, source_timestamps_ms, source_frame_mask,
+            source_input_mask, source_type_ids, valid_start_w2, valid_end_w2,
+        )
+
+        # V10: bottleneck 显式差分
+        emb_w1, emb_w2, pre_w1, pre_w2, change_score, diff_feat = self.bottleneck.forward_dual_window(
+            summary_w1, summary_w2
+        )
+
+        # 推理时额外 L2 normalize
+        if not (self.training and self.bottleneck.skip_l2_training):
+            emb_w1 = F.normalize(emb_w1, p=2, dim=1)
+            emb_w2 = F.normalize(emb_w2, p=2, dim=1)
+
+        return emb_w1, emb_w2, pre_w1, pre_w2, change_score, diff_feat

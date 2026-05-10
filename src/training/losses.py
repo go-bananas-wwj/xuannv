@@ -421,6 +421,54 @@ def temporal_magnitude_loss(
 
 
 # ────────────────────────────────────────────
+# 7. Change Consistency Loss (V10)
+# ────────────────────────────────────────────
+
+def change_consistency_loss(
+    change_score: torch.Tensor,
+    img_w1: torch.Tensor,
+    img_w2: torch.Tensor,
+    threshold: float = 0.1,
+) -> torch.Tensor:
+    """变化一致性损失 — 让 bottleneck 预测的 change_score 与图像差异对齐.
+
+    V10 核心: bottleneck 产生的 change_score [B, 1, H, W] 应该反映真实的图像变化。
+    不需要标注，直接用 S2 图像的像素差异作为弱监督。
+
+    Args:
+        change_score: [B, 1, H, W] bottleneck 预测的变化概率 (sigmoid 后 0~1)
+        img_w1: [B, C, H, W] 窗口1的代表图像
+        img_w2: [B, C, H, W] 窗口2的代表图像
+        threshold: 图像差异阈值，低于此值视为无变化
+
+    Returns:
+        scalar loss
+    """
+    if change_score is None or change_score.shape[0] < 1:
+        return img_w1.new_tensor(0.0) if img_w1 is not None else torch.tensor(0.0)
+
+    # 图像差异 (通道平均)
+    img_diff = torch.abs(img_w1.mean(dim=1) - img_w2.mean(dim=1))  # [B, H, W]
+
+    # 归一化到 [0, 1] (per-batch)
+    img_diff_max = img_diff.amax(dim=(1, 2), keepdim=True).clamp(min=1e-6)
+    img_diff_norm = img_diff / img_diff_max  # [B, H, W]
+
+    # 构建变化掩码: 只监督"确实有图像变化"的区域
+    change_mask = (img_diff_norm > threshold).float()
+    if change_mask.sum() < 1.0:
+        return change_score.new_tensor(0.0)
+
+    # BCE Loss: change_score 应该预测图像差异
+    # 用 img_diff_norm 作为 target (软标签，不是二值)
+    loss = F.binary_cross_entropy(
+        change_score.squeeze(1), img_diff_norm, reduction='none'
+    )
+    loss = (loss * change_mask).sum() / change_mask.sum().clamp(min=1.0)
+    return loss
+
+
+# ────────────────────────────────────────────
 # 6. Pixel Change Supervision Loss (V9.5)
 # ────────────────────────────────────────────
 

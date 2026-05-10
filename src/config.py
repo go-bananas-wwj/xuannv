@@ -149,6 +149,10 @@ class TrainingConfig:
     pixel_change_supervision_weight: float = 0.0
     pixel_change_supervision_warmup_epochs: int = 40
     pixel_change_threshold: float = 0.1
+    # V10: Change consistency supervision
+    change_consistency_weight: float = 0.0
+    change_consistency_warmup_epochs: int = 40
+    change_consistency_threshold: float = 0.1
     # 预归一化 uniformity
     pre_norm_uniform_weight: float = 3.0
     encoder_uniform_weight: float = 2.0
