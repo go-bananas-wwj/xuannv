@@ -143,7 +143,7 @@ for i, (pid, changes) in enumerate(test_patches):
                     wx = bounds[0] + (px + 0.5) * resolution
                     wy = bounds[3] - (py + 0.5) * resolution
                     if geom.contains(Point(wx, wy)):
-                        change_mask[px, py] = 1.0
+                        change_mask[py, px] = 1.0  # FIXED: py=row(y), px=col(x)
 
         all_embeddings_before.append(eb)
         all_embeddings_after.append(ea)
