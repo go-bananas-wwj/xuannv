@@ -422,11 +422,12 @@ class DDPv11Trainer:
                     if student_out.bottleneck_logits is not None:
                         dummy_cls = dummy_cls + student_out.bottleneck_logits.sum() * 0.0
 
-            # 3. Batch Uniformity Loss — L2-normalized (AEF 原文公式4)
+            # 3. Batch Uniformity Loss — L2-normalized (V11.2 改进)
+            # Cross-batch spatial pairs: 在 spatial embedding map 上计算 uniformity，
+            # 但只配对不同 batch 元素之间的空间位置。避免同一 patch 内像素互相排斥。
             uniform_w = getattr(t, 'uniformity_weight', 0.0)
             uniform = torch.tensor(0.0, device=self.device)
-            if uniform_w > 0 and gathered_emb.shape[0] >= 2:
-                # 使用 embedding_map (空间 dense) 计算 uniformity，比全局 mean 更丰富
+            if uniform_w > 0:
                 emb_map = student_out.embedding_map  # [B, D, H, W]
                 if dist.is_initialized() and self.world_size > 1:
                     gathered_map = [torch.zeros_like(emb_map) for _ in range(self.world_size)]
