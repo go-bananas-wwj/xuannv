@@ -1,0 +1,157 @@
+# ============================================================
+# xuannv Backbone V11 — 数据扩展 + 架构优化
+# ============================================================
+# 基于 V10 的改进:
+#   1. 源特定重建权重: 动态=1.0, DEM=0.3, 静态=0.5
+#   2. 移除 decorrelation + orthogonality (冗余)
+#   3. 强化教师-学生一致性: 0.05 → 0.2 (AEF 核心)
+#   4. 静态目标时间编码弱化
+#   5. 课程学习: Phase1(哈尔滨) → Phase2(全省混合)
+# ============================================================
+
+experiment:
+  name: xuannv_backbone_v11
+  seed: 42
+  output_dir: /workspace/outputs/xuannv_backbone_v11
+
+data:
+  dataset_type: harbin_patches
+  manifest_path: /workspace/raw/harbin_scenes/harbin_scenes_cloud_filtered
+  stats_dir: /workspace/statistics/harbin_scenes
+  batch_size: 2
+  num_workers: 4
+  image_size: 128
+  max_frames: 32
+  num_samples: 424
+  num_classes: 11
+  input_dim: 6
+  metadata_dim: 4
+  num_input_sources: 3
+  num_target_sources: 7
+  random_target_frame: true
+  spatial_augmentation: true
+  temporal_window_augmentation: true
+  temporal_window_prob: 0.5
+  temporal_window_min_frames: 4
+  temporal_window_max_frames: 24
+  cloud_filter_threshold: 0.0
+  variance_weighted: false
+  preload: true
+
+  # Mixed-scale 窗口采样
+  window_mode: "mixed_scale"
+  mixed_scale_long_prob: 0.5
+  mixed_scale_short_prob: 0.5
+  mixed_scale_short_max_gap_ms: 7776000000
+  mixed_scale_long_min_gap_ms: 15552000000
+
+model:
+  input_dim: 6
+  stem_dim: 128
+  precision_dim: 256
+  time_dim: 256
+  space_dim: 256
+  embedding_dim: 64
+  time_code_dim: 64
+  window_code_dim: 64
+  relative_time_code_dim: 16
+  num_blocks: 6
+  num_blocks_disable_space: 1
+  num_heads: 8
+  vmf_kappa: 2000.0
+  bottleneck_noise_scale: 0.02
+  reconstruction_channels: 6
+  metadata_dim: 4
+  num_sensor_types: 16
+  gradient_checkpointing: true
+  per_source_decoders: false
+  decoder_hidden_mult: 1
+  skip_l2_norm_training: true
+  spatial_dropout_rate: 0.0
+
+training:
+  epochs: 200
+  gradient_accumulation_steps: 8
+  lr: 0.0001
+  weight_decay: 0.05
+  grad_clip_norm: 1.0
+  teacher_momentum: 0.996
+
+  # --- 核心损失: 重建 ---
+  reconstruction_weight: 1.0
+
+  # --- 教师-学生一致性 (V11: 强化) ---
+  consistency_weight: 0.2
+
+  # --- 分类监督 ---
+  classification_weight: 0.08
+
+  # --- 反坍缩: 只保留 uniformity + variance ---
+  uniformity_weight: 1.0
+  variance_weight: 0.25
+
+  # --- 源特定重建权重 (V11 新增) ---
+  # TARGET_SOURCES 顺序: s2, s1, landsat, dem, worldcover, dynamic_world, jrc_water
+  source_recon_weights: [1.0, 1.0, 1.0, 0.3, 0.5, 1.0, 0.5]
+
+  # --- 动态 Temporal Weight 调度 ---
+  temporal_gap_aware_weight: 0.02
+  temporal_gap_aware_weight_end: 0.08
+  temporal_gap_aware_weight_ramp_epochs: 50
+  temporal_gap_aware_warmup_epochs: 30
+  temporal_gap_max_months: 12
+
+  # --- 像素级变化监督 ---
+  pixel_change_supervision_weight: 0.05
+  pixel_change_supervision_warmup_epochs: 40
+  pixel_change_threshold: 0.1
+
+  # --- 变化一致性监督 ---
+  change_consistency_weight: 0.05
+  change_consistency_warmup_epochs: 40
+  change_consistency_threshold: 0.1
+
+  # --- Student 扰动参数 ---
+  student_frame_drop_rate: 0.4
+  student_source_drop_rate: 0.25
+  student_front_drop_prob: 0.15
+  student_back_drop_prob: 0.15
+
+  # --- 渐进 VMF Kappa ---
+  kappa_start: 50.0
+  kappa_end: 500.0
+  kappa_warmup_epochs: 100
+
+  # --- 学习率调度 ---
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 10
+  lr_schedule: cosine_no_restart
+
+  # --- 保存频率 ---
+  save_every: 20
+  save_best_balanced: true
+  best_balanced_uniform_min: -4.0
+  best_balanced_uniform_max: -1.0
+  early_stop_patience: 200
+
+  # --- 已移除/置0的损失 ---
+  decorrelation_weight: 0.0
+  orthogonality_weight: 0.0
+  vicreg_weight: 0.0
+  koleo_weight: 0.0
+  temporal_magnitude_weight: 0.0
+  temporal_cosine_pixel_weight: 0.0
+  pixel_temporal_info_nce_weight: 0.0
+  text_contrastive_weight: 0.0
+  dino_weight: 0.0
+  l2_temporal_weight: 0.0
+  ct_reconstruction_weight: 0.0
+  aux_classification_weight: 0.0
+  bottleneck_cls_weight: 0.0
+  pre_norm_uniform_weight: 0.0
+  encoder_uniform_weight: 0.0
+
+evaluation:
+  knn_k: 5
+  bootstrap_samples: 100
