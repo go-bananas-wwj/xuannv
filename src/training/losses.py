@@ -61,23 +61,21 @@ def raw_uniformity_loss(embeddings: torch.Tensor) -> torch.Tensor:
 
 def batch_uniformity_loss_l2(embeddings: torch.Tensor, dim_dropout: float = 0.1,
                                  max_samples: int = 512) -> torch.Tensor:
-    """改进版 Batch Uniformity Loss — Cross-Batch Pairs + 空间采样 + 维度 Dropout.
+    """改进版 Batch Uniformity Loss — All-Pairs + 空间采样 + 维度 Dropout.
 
-    V11.2 改进 (关键洞察):
-    - AEF batch uniformity 应在**不同 batch 元素**之间计算
-    - 同一 patch 内的不同空间像素本来就相似，强迫它们正交不合理
-    - 本实现只对**不同 batch 元素之间的空间位置**配对
-
-    具体做法:
-    1. 对 embedding_map [B,D,H,W] 每个 batch 元素采样 max_samples_per_batch 个空间位置
-    2. 构建 [B, N_samples, D] 的张量
-    3. 只计算不同 batch 元素 (b_i ≠ b_j) 之间的 |u · v|
-    4. 维度 Dropout 增加鲁棒性
+    V11.1 实现 (当前最佳):
+    1. All-Pairs: 每个样本与 batch 中**所有其他样本**计算 |u_i · u_j|
+    2. 空间采样: 对 embedding_map [B,D,H,W] 随机采样最多 max_samples 个空间位置，
+       避免 OOM（全图 H*W=4096 时 all-pairs 矩阵达 16GB+）
+    3. chunk 分批: 进一步降低峰值内存
+    4. 维度 Dropout: 随机 mask 10% 维度后计算 dot product，增加鲁棒性
+    5. 值域 [0, 1]: 0=均匀分布, 1=完全坍缩
 
     Args:
-        embeddings: [B, D, H, W]  spatial embedding map (L2-normalized)
+        embeddings: [B, D] 或 [B, D, H, W]
+                   已经 L2 归一化，或在函数内部归一化
         dim_dropout: 维度 dropout 比率 (默认 0.1)
-        max_samples: 每个 batch 元素最大采样空间位置数 (默认 512)
+        max_samples: 最大采样空间位置数 (默认 512)
 
     Returns:
         scalar loss, 越小越好
@@ -86,59 +84,59 @@ def batch_uniformity_loss_l2(embeddings: torch.Tensor, dim_dropout: float = 0.1,
         return embeddings.new_tensor(0.0)
 
     x = embeddings
-    if x.dim() != 4:
-        # 非 spatial map，回退到简单的 all-pairs
+
+    # 处理 spatial embedding map [B, D, H, W]
+    if x.dim() == 4:
+        B, D, H, W = x.shape
+        # 展平空间: [B, D, H*W]
+        x = x.reshape(B, D, H * W)
+        # 随机采样空间位置（避免 OOM）
+        n_spatial = H * W
+        if n_spatial > max_samples:
+            indices = torch.randperm(n_spatial, device=x.device)[:max_samples]
+            x = x[:, :, indices]
+        # 转置为 [B, H*W, D] → 展平为 [B*H*W, D]
+        x = x.permute(0, 2, 1).reshape(-1, D)
+    elif x.dim() > 2:
+        # 其他高维情况，展平所有非 batch 维度
         while x.dim() > 2:
             B = x.shape[0]
             D = x.shape[-1]
             x = x.reshape(-1, D)
-        x = F.normalize(x, p=2, dim=-1)
-        sim = x @ x.T
-        N = sim.shape[0]
-        sim = sim.masked_fill(torch.eye(N, device=x.device, dtype=torch.bool), 0.0)
-        return sim.abs().sum() / (N * (N - 1))
 
-    B, D, H, W = x.shape
-    n_spatial = H * W
-    n_samples = min(n_spatial, max_samples)
+    N, D = x.shape
+    if N < 2:
+        return x.new_tensor(0.0)
 
-    # L2 归一化（channel 维度）
-    x = F.normalize(x, p=2, dim=1)  # [B, D, H, W]
+    # L2 归一化（确保在球面上）
+    x = F.normalize(x, p=2, dim=-1)
 
-    # 每个 batch 元素随机采样空间位置
-    if n_samples < n_spatial:
-        indices = torch.randperm(n_spatial, device=x.device)[:n_samples]
-    else:
-        indices = torch.arange(n_spatial, device=x.device)
-
-    # [B, D, H*W] → [B, D, n_samples] → [B, n_samples, D]
-    x_flat = x.reshape(B, D, n_spatial)
-    x_sampled = x_flat[:, :, indices].permute(0, 2, 1)  # [B, n_samples, D]
-
-    # 维度 Dropout
-    if dim_dropout > 0 and x_sampled.requires_grad:
-        mask = torch.empty_like(x_sampled).bernoulli_(1 - dim_dropout)
+    # 维度 Dropout: 随机 mask 部分维度，增加配对多样性
+    if dim_dropout > 0 and x.requires_grad:
+        mask = torch.empty_like(x).bernoulli_(1 - dim_dropout)
         if mask.sum() > 0:
-            x_sampled = x_sampled * mask
-            x_sampled = F.normalize(x_sampled, p=2, dim=-1)
+            x_dropped = x * mask
+            x_dropped = F.normalize(x_dropped, p=2, dim=-1)
+        else:
+            x_dropped = x
+    else:
+        x_dropped = x
 
-    # Cross-batch pairs: 只计算不同 batch 元素之间的 dot product
-    # 方法: 对每个 batch 元素 b_i，计算其所有采样点与所有其他 batch 元素 b_j (j≠i) 的采样点的 dot product
+    # All-Pairs: 使用 chunk 分批计算所有 i≠j 的 |u_i · u_j|
+    chunk_size = min(1024, N)
     total_loss = 0.0
     n_pairs = 0
 
-    for i in range(B):
-        # batch i 的所有采样点: [n_samples, D]
-        points_i = x_sampled[i]  # [n_samples, D]
-        # 其他 batch 的所有采样点: [(B-1)*n_samples, D]
-        other_mask = torch.ones(B, dtype=torch.bool, device=x.device)
-        other_mask[i] = False
-        points_other = x_sampled[other_mask].reshape(-1, D)  # [(B-1)*n_samples, D]
-
-        # sim: [n_samples, (B-1)*n_samples]
-        sim = points_i @ points_other.T
+    for i_start in range(0, N, chunk_size):
+        i_end = min(i_start + chunk_size, N)
+        chunk_i = x_dropped[i_start:i_end]  # [chunk, D]
+        sim = chunk_i @ x_dropped.T  # [chunk, N]
+        # 排除对角线
+        for local_i in range(i_end - i_start):
+            global_i = i_start + local_i
+            sim[local_i, global_i] = 0.0
         total_loss += sim.abs().sum().item()
-        n_pairs += n_samples * points_other.shape[0]
+        n_pairs += (i_end - i_start) * N - (i_end - i_start)
 
     return torch.tensor(total_loss / max(n_pairs, 1), device=x.device, dtype=x.dtype)
 
