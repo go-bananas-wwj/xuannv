@@ -76,6 +76,13 @@ class VMFBottleneck(nn.Module):
         embedding_vector = embedding_map.mean(dim=(-2, -1))
         embedding_vector = F.normalize(embedding_vector, p=2, dim=1)
         # V11: pre_norm 字段与 L2-norm 后的 embedding 相同（兼容旧接口）
+        # Dummy: diff_encoder / change_gate / fusion 仅在 dual_window 中使用，
+        # 添加 dummy 确保单窗口 forward 时这些参数也有梯度（避免 DDP unused param 错误）
+        dummy = torch.tensor(0.0, device=features.device)
+        for m in [self.diff_encoder, self.change_gate, self.fusion]:
+            for p in m.parameters():
+                dummy = dummy + p.sum() * 0.0
+        embedding_map = embedding_map + dummy
         return embedding_map, embedding_vector, embedding_vector, embedding_map
 
     def forward_dual_window(
