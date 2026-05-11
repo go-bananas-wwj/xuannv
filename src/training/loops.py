@@ -65,9 +65,16 @@ def compute_recon_loss(
         else:
             p_valid = p[batch_mask]
             tgt_valid = tgt[batch_mask]
-            valid = ~torch.isnan(tgt_valid)
+            # V12 fix: pred 和 target 的通道数可能不同 (per-source decoder)
+            # 只取两者共同的通道数进行计算
+            p_ch = p_valid.shape[1]
+            tgt_ch = tgt_valid.shape[1]
+            ch = min(p_ch, tgt_ch)
+            p_valid_c = p_valid[:, :ch]
+            tgt_valid_c = tgt_valid[:, :ch]
+            valid = ~torch.isnan(tgt_valid_c)
             if valid.sum() > 0:
-                total_loss = total_loss + torch.abs(p_valid[valid] - tgt_valid[valid]).mean()
+                total_loss = total_loss + torch.abs(p_valid_c[valid] - tgt_valid_c[valid]).mean()
                 count += 1
 
     return total_loss / max(count, 1)
