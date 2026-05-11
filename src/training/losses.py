@@ -547,8 +547,9 @@ def change_consistency_loss(
 
     # BCE Loss: change_score 应该预测图像差异
     # 用 img_diff_norm 作为 target (软标签，不是二值)
+    # ★ NPU bf16 不支持 BCE，fallback 到 fp32
     loss = F.binary_cross_entropy(
-        change_score.squeeze(1), img_diff_norm, reduction='none'
+        change_score.squeeze(1).float(), img_diff_norm.float(), reduction='none'
     )
     loss = (loss * change_mask).sum() / change_mask.sum().clamp(min=1.0)
     return loss

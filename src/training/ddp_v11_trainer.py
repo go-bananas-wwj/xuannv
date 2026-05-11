@@ -339,7 +339,8 @@ class DDPv11Trainer:
                 pg["lr"] = lr
 
             with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=True):
-                # Teacher forward: 完整输入
+                # Teacher forward: 完整输入 (使用 w1 作为默认窗口，与 student 对齐)
+                has_dual = all(k in batch for k in ['valid_start_w1', 'valid_end_w1', 'valid_start_w2', 'valid_end_w2'])
                 with torch.no_grad():
                     teacher_out = self.teacher(
                         source_frames=batch["source_frames"],
@@ -347,8 +348,8 @@ class DDPv11Trainer:
                         source_frame_mask=batch["source_frame_mask"],
                         source_input_mask=batch["source_input_mask"],
                         source_type_ids=batch["source_type_ids"],
-                        valid_start_ms=batch["valid_start_ms"],
-                        valid_end_ms=batch["valid_end_ms"],
+                        valid_start_ms=batch["valid_start_w1"] if has_dual else batch["valid_start_ms"],
+                        valid_end_ms=batch["valid_end_w1"] if has_dual else batch["valid_end_ms"],
                         target_relative_time=batch["target_relative_time"],
                         target_metadata=batch["target_metadata"],
                         target_loss_type=batch.get("target_loss_type"),
@@ -367,18 +368,26 @@ class DDPv11Trainer:
                     back_drop_prob=getattr(t, 'student_back_drop_prob', 0.15),
                 )
 
+                # V11 fix: 使用 w1 作为默认窗口，同时内联 dual_window 编码 w2。
+                # 这样只需要一次 forward + 一次 backward，避免 DDP 二次 forward 的
+                # "mark ready only once" 和 inplace operation 错误。
+                dual_keys = ['valid_start_w1', 'valid_end_w1', 'valid_start_w2', 'valid_end_w2']
+                has_dual = all(k in batch for k in dual_keys)
                 student_out = self.model(
                     source_frames=student_frames,
                     source_timestamps_ms=batch["source_timestamps_ms"],
                     source_frame_mask=student_frame_mask,
                     source_input_mask=student_input_mask,
                     source_type_ids=batch["source_type_ids"],
-                    valid_start_ms=batch["valid_start_ms"],
-                    valid_end_ms=batch["valid_end_ms"],
+                    valid_start_ms=batch["valid_start_w1"] if has_dual else batch["valid_start_ms"],
+                    valid_end_ms=batch["valid_end_w1"] if has_dual else batch["valid_end_ms"],
                     target_relative_time=batch["target_relative_time"],
                     target_metadata=batch["target_metadata"],
                     target_loss_type=batch.get("target_loss_type"),
                     target_source_idx=batch.get("target_source_idx"),
+                    dual_window=has_dual,
+                    valid_start_w2=batch.get("valid_start_w2"),
+                    valid_end_w2=batch.get("valid_end_w2"),
                 )
 
                 # Reconstruction (只从 student 计算, 带源特定权重)
@@ -439,108 +448,71 @@ class DDPv11Trainer:
 
             # V11: 移除 variance/decorrelation/orthogonality (AEF 原文无此设计)
 
-            # 5. Gap-aware Temporal Loss + Difference Module
+            # 5. Gap-aware Temporal Loss
+            # V11 fix: dual window 编码已内联到 model.forward 中 (dual_window=True)。
+            # student_out.pre_norm_map 是 w1 的 embedding，student_out.dual_pre_w2 是 w2 的 embedding。
+            # 这样只需要一次 forward + 一次 backward，避免 DDP 的 "mark ready only once" 和
+            # inplace operation 错误。
             temporal = torch.tensor(0.0, device=self.device)
-            change_consist = torch.tensor(0.0, device=self.device)
-            change_score = None
-            if temporal_enabled and self.temporal_weight_current > 0:
-                dual_keys = ['valid_start_w1', 'valid_end_w1', 'valid_start_w2', 'valid_end_w2']
-                if all(k in batch for k in dual_keys):
-                    try:
-                        with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=True):
-                            emb_w1, emb_w2, pre_w1, pre_w2, change_score, diff_feat = self.model.module.encode_dual_window_v10(
-                                source_frames=student_frames,
-                                source_timestamps_ms=batch["source_timestamps_ms"],
-                                source_frame_mask=student_frame_mask,
-                                source_input_mask=student_input_mask,
-                                source_type_ids=batch["source_type_ids"],
-                                valid_start_w1=batch["valid_start_w1"].float(),
-                                valid_end_w1=batch["valid_end_w1"].float(),
-                                valid_start_w2=batch["valid_start_w2"].float(),
-                                valid_end_w2=batch["valid_end_w2"].float(),
-                            )
+            dual_pre_w2 = getattr(student_out, 'dual_pre_w2', None)
+            if temporal_enabled and self.temporal_weight_current > 0 and dual_pre_w2 is not None:
+                w1_center = (batch["valid_start_w1"].float() + batch["valid_end_w1"].float()) / 2.0
+                w2_center = (batch["valid_start_w2"].float() + batch["valid_end_w2"].float()) / 2.0
+                time_gap_ms = torch.abs(w1_center - w2_center).to(self.device)
+                max_gap_ms = getattr(t, 'temporal_gap_max_months', 12) * 30 * 24 * 3600 * 1000
 
-                        w1_center = (batch["valid_start_w1"].float() + batch["valid_end_w1"].float()) / 2.0
-                        w2_center = (batch["valid_start_w2"].float() + batch["valid_end_w2"].float()) / 2.0
-                        time_gap_ms = torch.abs(w1_center - w2_center).to(self.device)
-                        max_gap_ms = getattr(t, 'temporal_gap_max_months', 12) * 30 * 24 * 3600 * 1000
-
-                        temporal = gap_aware_temporal_cosine_loss(
-                            pre_w1, pre_w2, time_gap_ms,
-                            max_gap_ms=max_gap_ms,
-                            temperature=0.1,
-                        )
-
-                        change_w = getattr(t, 'change_consistency_weight', 0.0)
-                        change_warmup = getattr(t, 'change_consistency_warmup_epochs', 40)
-                        if change_w > 0 and epoch >= change_warmup and change_score is not None:
-                            with torch.no_grad():
-                                img_w1 = _extract_window_images(
-                                    student_frames,
-                                    batch["source_timestamps_ms"],
-                                    student_frame_mask,
-                                    student_input_mask,
-                                    batch["valid_start_w1"].float(),
-                                    batch["valid_end_w1"].float(),
-                                )
-                                img_w2 = _extract_window_images(
-                                    student_frames,
-                                    batch["source_timestamps_ms"],
-                                    student_frame_mask,
-                                    student_input_mask,
-                                    batch["valid_start_w2"].float(),
-                                    batch["valid_end_w2"].float(),
-                                )
-                            if img_w1 is not None and img_w2 is not None:
-                                threshold = getattr(t, 'change_consistency_threshold', 0.1)
-                                change_consist = change_consistency_loss(
-                                    change_score, img_w1, img_w2, threshold=threshold
-                                )
-                    except Exception as e:
-                        if self.global_rank == 0:
-                            print(f"  [Temporal/V10] Error at step {step}: {e}")
+                temporal = gap_aware_temporal_cosine_loss(
+                    student_out.pre_norm_map, dual_pre_w2, time_gap_ms,
+                    max_gap_ms=max_gap_ms,
+                    temperature=0.1,
+                )
 
             # 6. Pixel Change Supervision
             pixel_change = torch.tensor(0.0, device=self.device)
             pixel_change_w = getattr(t, 'pixel_change_supervision_weight', 0.0)
             pixel_change_warmup = getattr(t, 'pixel_change_supervision_warmup_epochs', 40)
-            if pixel_change_w > 0 and epoch >= pixel_change_warmup and temporal_enabled:
-                dual_keys = ['valid_start_w1', 'valid_end_w1', 'valid_start_w2', 'valid_end_w2']
-                if all(k in batch for k in dual_keys):
-                    try:
-                        with torch.no_grad():
-                            img_w1 = _extract_window_images(
-                                student_frames,
-                                batch["source_timestamps_ms"],
-                                student_frame_mask,
-                                student_input_mask,
-                                batch["valid_start_w1"].float(),
-                                batch["valid_end_w1"].float(),
-                            )
-                            img_w2 = _extract_window_images(
-                                student_frames,
-                                batch["source_timestamps_ms"],
-                                student_frame_mask,
-                                student_input_mask,
-                                batch["valid_start_w2"].float(),
-                                batch["valid_end_w2"].float(),
-                            )
-                        
-                        if img_w1 is not None and img_w2 is not None:
-                            threshold = getattr(t, 'pixel_change_threshold', 0.1)
-                            pixel_change = pixel_change_supervision_loss(
-                                pre_w1, pre_w2, img_w1, img_w2,
-                                threshold=threshold,
-                            )
-                    except Exception as e:
-                        if self.global_rank == 0:
-                            print(f"  [PixelChange] Error at step {step}: {e}")
+            if pixel_change_w > 0 and epoch >= pixel_change_warmup and dual_pre_w2 is not None:
+                try:
+                    with torch.no_grad():
+                        img_w1 = _extract_window_images(
+                            student_frames,
+                            batch["source_timestamps_ms"],
+                            student_frame_mask,
+                            student_input_mask,
+                            batch["valid_start_w1"].float(),
+                            batch["valid_end_w1"].float(),
+                        )
+                        img_w2 = _extract_window_images(
+                            student_frames,
+                            batch["source_timestamps_ms"],
+                            student_frame_mask,
+                            student_input_mask,
+                            batch["valid_start_w2"].float(),
+                            batch["valid_end_w2"].float(),
+                        )
+                    
+                    if img_w1 is not None and img_w2 is not None:
+                        pre_w1 = student_out.pre_norm_map
+                        pre_w2 = dual_pre_w2
+                        _, _, h_img, w_img = img_w1.shape
+                        if pre_w1.shape[-2:] != (h_img, w_img):
+                            pre_w1_up = F.interpolate(pre_w1, size=(h_img, w_img), mode='bilinear', align_corners=False)
+                            pre_w2_up = F.interpolate(pre_w2, size=(h_img, w_img), mode='bilinear', align_corners=False)
+                        else:
+                            pre_w1_up, pre_w2_up = pre_w1, pre_w2
+                        threshold = getattr(t, 'pixel_change_threshold', 0.1)
+                        pixel_change = pixel_change_supervision_loss(
+                            pre_w1_up, pre_w2_up, img_w1, img_w2,
+                            threshold=threshold,
+                        )
+                except Exception as e:
+                    if self.global_rank == 0:
+                        print(f"  [PixelChange] Error at step {step}: {e}")
 
             # Recon warmup
             recon_warmup = min(1.0, (epoch + 1) / max(getattr(t, 'recon_warmup_epochs', 10), 1))
             recon_weight = t.reconstruction_weight * recon_warmup
 
-            change_w = getattr(t, 'change_consistency_weight', 0.0)
             total = (
                 recon_weight * recon
                 + consist_w * consist
@@ -548,7 +520,6 @@ class DDPv11Trainer:
                 + uniform_w * uniform
                 + self.temporal_weight_current * temporal
                 + pixel_change_w * pixel_change
-                + change_w * change_consist
                 + dummy_cls
             )
             
@@ -595,7 +566,6 @@ class DDPv11Trainer:
                 "uniform": uniform.item(),
                 "temporal": temporal.item(),
                 "pixel_change": pixel_change.item(),
-                "change_consist": change_consist.item(),
                 "lr": lr,
             }.items():
                 loss_accum[k] = loss_accum.get(k, 0.0) + v
@@ -604,8 +574,7 @@ class DDPv11Trainer:
             if self.global_rank == 0 and step % 20 == 0:
                 temporal_status = f"temporal={temporal.item():.4f}" if temporal_enabled else "temporal=warmup"
                 pixel_status = f" pc={pixel_change.item():.3f}" if pixel_change_w > 0 and epoch >= pixel_change_warmup else ""
-                change_status = f" chg={change_consist.item():.3f}" if change_w > 0 and epoch >= getattr(t, 'change_consistency_warmup_epochs', 40) else ""
-                print(f"  [Step {step}] recon={recon.item():.3f} {temporal_status}{pixel_status}{change_status} "
+                print(f"  [Step {step}] recon={recon.item():.3f} {temporal_status}{pixel_status} "
                       f"perturb=[fd={perturb_stats['frame_drop_ratio']:.2f} "
                       f"sd={perturb_stats['source_drop_ratio']:.2f} "
                       f"fc={perturb_stats['front_cut_ratio']:.2f} "
