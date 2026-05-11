@@ -29,6 +29,7 @@ class DataConfig:
     metadata_dim: int = 4
     num_input_sources: int = 7
     num_target_sources: int = 7
+    preload: bool = True
     random_target_frame: bool = True
     spatial_augmentation: bool = True
     # 时序窗口增强

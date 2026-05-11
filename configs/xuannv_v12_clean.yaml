@@ -30,7 +30,7 @@ data:
   temporal_window_prob: 0.5
   temporal_window_min_frames: 4
   temporal_window_max_frames: 24
-  preload: true
+  preload: false
 
   # 每个源的实际通道数（输入编码用）
   source_channels:
