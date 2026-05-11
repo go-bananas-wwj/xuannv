@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 PC 下载进度监控脚本
-每 5 分钟统计一次各城市各源的文件数量，计算速率和 ETA
+每 5 分钟统计一次各城市各源的文件数量，按帧数计算速率和 ETA
 
 用法:
     python monitor_pc_download.py
@@ -25,16 +25,20 @@ CITIES = {
         "name": "齐齐哈尔",
         "sources": ["s2", "s1", "landsat", "dem", "worldcover"],
         "total_patches": 400,
+        # 预估每 patch 帧数（用于 ETA 计算，会从实际数据中动态修正）
+        "frames_per_patch": {"s2": 22, "s1": 6, "landsat": 78, "dem": 1, "worldcover": 1},
     },
     "daqing": {
         "name": "大庆",
         "sources": ["s2", "s1", "landsat", "dem", "worldcover"],
         "total_patches": 400,
+        "frames_per_patch": {"s2": 155, "s1": 83, "landsat": 78, "dem": 1, "worldcover": 1},
     },
     "haidian": {
         "name": "海淀",
         "sources": ["s2", "s1", "landsat", "dem", "worldcover"],
         "total_patches": 400,
+        "frames_per_patch": {"s2": 100, "s1": 99, "landsat": 78, "dem": 1, "worldcover": 1},
     },
 }
 
@@ -71,12 +75,28 @@ def get_snapshot() -> dict:
     return snapshot
 
 
+def estimate_total_frames(cfg: dict, source: str, current_patches: int, current_frames: int) -> int:
+    """估算目标总帧数"""
+    total_patches = cfg["total_patches"]
+    default_fps = cfg["frames_per_patch"].get(source, 1)
+    
+    # 如果有已完成的 patches，用实际平均帧数修正预估
+    if current_patches > 0:
+        avg_fps = current_frames / current_patches
+        # 用实际平均值和预估值的加权平均（实际值权重更高）
+        fps = (avg_fps * 0.7 + default_fps * 0.3)
+    else:
+        fps = default_fps
+    
+    return int(total_patches * fps)
+
+
 def format_report(current: dict, previous: dict | None, elapsed_min: float) -> str:
     """格式化报告"""
     lines = []
-    lines.append("=" * 80)
+    lines.append("=" * 90)
     lines.append(f"PC 下载进度报告 | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    lines.append("=" * 80)
+    lines.append("=" * 90)
     
     # 检查 tmux session
     import subprocess
@@ -99,7 +119,11 @@ def format_report(current: dict, previous: dict | None, elapsed_min: float) -> s
             n_patches = curr["patches"]
             n_frames = curr["frames"]
             
-            # 计算速率和 ETA
+            # 估算总帧数
+            total_frames_est = estimate_total_frames(cfg, source, n_patches, n_frames)
+            remaining_frames = max(0, total_frames_est - n_frames)
+            
+            # 计算帧速率和 ETA
             if previous is not None and elapsed_min > 0:
                 prev = previous[city_key][source]
                 patch_delta = n_patches - prev["patches"]
@@ -107,20 +131,22 @@ def format_report(current: dict, previous: dict | None, elapsed_min: float) -> s
                 patch_rate = patch_delta / (elapsed_min / 60)  # patches/hour
                 frame_rate = frame_delta / (elapsed_min / 60)  # frames/hour
                 
-                remaining = total_patches - n_patches
-                if patch_rate > 0 and remaining > 0:
-                    eta_hours = remaining / patch_rate
+                if frame_rate > 0 and remaining_frames > 0:
+                    eta_hours = remaining_frames / frame_rate
                     eta_str = f"ETA={eta_hours:.1f}h"
+                elif remaining_frames <= 0:
+                    eta_str = "ETA=done"
                 else:
-                    eta_str = "ETA=∞"
+                    eta_str = "ETA=stalled"
                 
-                rate_str = f"+{patch_delta}p/{frame_delta}f ({patch_rate:.1f}p/h, {frame_rate:.0f}f/h)"
+                rate_str = f"+{patch_delta}p +{frame_delta}f ({frame_rate:.0f}f/h)"
             else:
                 rate_str = "baseline"
                 eta_str = "ETA=--"
             
-            status = "✅" if n_patches >= total_patches else "🔄"
-            lines.append(f"  {status} {source:12s}: {n_patches:3d}/{total_patches} patches, {n_frames:5d} frames | {rate_str} | {eta_str}")
+            progress_pct = min(100, n_frames / total_frames_est * 100) if total_frames_est > 0 else 0
+            status = "✅" if n_patches >= total_patches and remaining_frames <= 0 else "🔄"
+            lines.append(f"  {status} {source:12s}: {n_patches:3d}/{total_patches}p, {n_frames:5d}/{total_frames_est}f ({progress_pct:5.1f}%) | {rate_str} | {eta_str}")
         
         lines.append("")
     
