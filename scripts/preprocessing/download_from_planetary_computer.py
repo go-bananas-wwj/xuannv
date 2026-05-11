@@ -136,9 +136,7 @@ def search_items(catalog, source: str, bbox: list[float], date_start: str, date_
         kwargs["datetime"] = f"{date_start}/{date_end}"
     if source in ("s2", "landsat"):
         kwargs["query"] = {"eo:cloud_cover": {"lt": 20}}
-    if source == "landsat":
-        # 排除 Landsat 7（缺少 lwir11 band，只有 5 bands）
-        kwargs["query"]["platform"] = {"in": ["landsat-8", "landsat-9"]}
+
 
     try:
         search = catalog.search(**kwargs)
@@ -271,6 +269,12 @@ def download_patch(args) -> dict:
 
         items = search_items(catalog, source, bbox, date_start, date_end)
         n_items = len(items)
+        
+        # 手动过滤 Landsat 7（PC STAC API 不支持 platform query 过滤）
+        if source == "landsat":
+            items = [item for item in items if item.properties.get("platform") in ("landsat-8", "landsat-9")]
+            n_items = len(items)
+        
         downloaded = 0
         skipped = 0
         failed_items = 0
