@@ -356,8 +356,8 @@ class HarbinPatchDataset(Dataset):
         start = time.time()
         n_cached = 0
 
-        # ★ 多进程并行预加载 (非 DDP 环境下使用，避免与 DDP 进程冲突)
-        use_parallel = not is_ddp and len(self.patches) > 20
+        # ★ 多进程并行预加载 (DDP rank 0 也启用，其他 rank 只等待缓存，无冲突)
+        use_parallel = len(self.patches) > 20
         if use_parallel:
             import os
             from concurrent.futures import ProcessPoolExecutor
