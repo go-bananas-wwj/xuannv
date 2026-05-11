@@ -26,6 +26,7 @@ from src.training.losses import (
     batch_uniformity_loss_l2,
     consistency_loss,
 )
+from src.training.memory_bank import EmbeddingMemoryBank
 from src.training.optimizer import build_optimizer, build_scheduler, get_cosine_lr
 
 
@@ -179,6 +180,10 @@ class DDPv12Trainer:
             device=self.device,
         )
 
+        # Memory Bank — 扩大 uniformity 的有效 batch
+        emb_dim = getattr(cfg.model, 'embedding_dim', 128)
+        self.memory_bank = EmbeddingMemoryBank(K=512, dim=emb_dim, device=self.device)
+
     @torch.no_grad()
     def update_teacher(self) -> None:
         m = self.teacher_momentum
@@ -270,7 +275,7 @@ class DDPv12Trainer:
                 # Consistency (teacher vs student embedding)
                 consist = consistency_loss(teacher_out.embedding, student_out.embedding)
 
-            # Batch Uniformity
+            # Batch Uniformity (with Memory Bank)
             embedding = student_out.embedding
             if dist.is_initialized() and self.world_size > 1:
                 gathered_emb = [torch.zeros_like(embedding) for _ in range(self.world_size)]
@@ -279,7 +284,17 @@ class DDPv12Trainer:
             else:
                 gathered_emb = embedding
 
-            uniform = batch_uniformity_loss_l2(gathered_emb)
+            # Enqueue 当前 batch 的 embedding
+            self.memory_bank.enqueue(gathered_emb.detach())
+
+            # 合并当前 batch + memory bank
+            bank_emb = self.memory_bank.get_all()
+            if bank_emb.shape[0] > 0:
+                all_emb = torch.cat([gathered_emb, bank_emb], dim=0)
+            else:
+                all_emb = gathered_emb
+
+            uniform = batch_uniformity_loss_l2(all_emb)
 
             # Dummy loss for unused heads (avoid DDP unused parameter error)
             dummy = 0.0

@@ -14,7 +14,7 @@ data:
   dataset_type: harbin_patches
   manifest_path: /workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered
   stats_dir: /workspace/statistics/harbin_scenes
-  batch_size: 2
+  batch_size: 3
   num_workers: 4
   image_size: 128
   max_frames: 32
@@ -82,8 +82,8 @@ training:
   grad_clip_norm: 1.0
 
   # ★ 核心三损失（对齐AEF原文）
-  reconstruction_weight: 1.0
-  batch_uniformity_weight: 0.1
+  reconstruction_weight: 0.5
+  batch_uniformity_weight: 0.3
   consistency_weight: 0.2
 
   # ★ 源特定重建权重
