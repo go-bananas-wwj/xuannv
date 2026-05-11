@@ -183,6 +183,10 @@ def download_source_stackstac(
         data_np = data_np.astype(np.float32) / 10000.0
     elif source == "s2":
         data_np = data_np.astype(np.uint16)
+    elif source == "landsat":
+        # Landsat C2 L2 SR: DN * 0.0000275 + (-0.2) -> reflectance [0, 1]
+        data_np = data_np.astype(np.float32) * 0.0000275 - 0.2
+        data_np = np.clip(data_np, 0.0, 1.0)
 
     return data_np
 
@@ -331,8 +335,8 @@ def main():
     parser.add_argument("--workers", type=int, default=4, help="并行 worker 数")
     parser.add_argument("--date-start", default=DATE_START, help="起始日期")
     parser.add_argument("--date-end", default=DATE_END, help="结束日期")
-    parser.add_argument("--divide-10000", action="store_true",
-                        help="S2 数据除以 10000（保持与现有 GEE 数据格式一致）")
+    parser.add_argument("--no-divide-10000", action="store_true",
+                        help="S2 数据不除以 10000（默认除以 10000 保持与 GEE 格式一致）")
     parser.add_argument("--limit", type=int, default=0, help="限制下载 patch 数量（0=全部）")
     parser.add_argument("--offset", type=int, default=0, help="跳过前 N 个 patch")
     args = parser.parse_args()
@@ -353,13 +357,13 @@ def main():
     print(f"总 patch 数: {total}, 本次处理: {len(patches)} (offset={args.offset}, limit={args.limit})")
     print(f"数据源: {args.sources}")
     print(f"时间范围: {args.date_start} ~ {args.date_end}")
-    print(f"S2 divide(10000): {args.divide_10000}")
+    print(f"S2 divide(10000): {not args.no_divide_10000}")
     print(f"并行 workers: {args.workers}")
     print("=" * 60)
 
     # 并行下载
     task_args = [
-        (p, city_name, args.output, args.sources, args.date_start, args.date_end, args.divide_10000)
+        (p, city_name, args.output, args.sources, args.date_start, args.date_end, not args.no_divide_10000)
         for p in patches
     ]
 
