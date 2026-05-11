@@ -259,7 +259,7 @@ class AEFModel(nn.Module):
         for encoder in self.sensor_encoder_bank.encoders.values():
             for p in encoder.parameters():
                 dummy_sensor = dummy_sensor + p.sum() * 0.0
-        summary_map = summary_map + dummy_sensor
+        embedding_map = embedding_map + dummy_sensor
 
         # 解码 (可选跳过，用于 dual-window forward 节省计算)
         B = summary_map.shape[0]
