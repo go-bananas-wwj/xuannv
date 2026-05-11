@@ -105,6 +105,7 @@ class TrainingConfig:
     # 损失权重
     reconstruction_weight: float = 1.0
     uniformity_weight: float = 0.3
+    batch_uniformity_weight: float = 0.0
     uniformity_adaptive: bool = True
     consistency_weight: float = 0.15
     classification_weight: float = 0.05
