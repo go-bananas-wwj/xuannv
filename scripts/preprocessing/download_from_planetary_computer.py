@@ -160,6 +160,10 @@ def download_source_stackstac(
     assets = ASSET_MAP[source]
     resolution = RESOLUTION_MAP[source]
 
+    # ★ 强制重新签名，获取新鲜 SAS token（覆盖 search 时返回的过期 token）
+    import planetary_computer as pc
+    item = pc.sign(item)
+
     # 统一用 float64 读取（避免 fill_value 与 uint16 冲突），保存时再转 dtype
     stack = stackstac.stack(
         [item],
@@ -206,6 +210,10 @@ def download_source_odcstac(
 
     assets = ASSET_MAP[source]
     resolution = RESOLUTION_MAP[source]
+
+    # ★ 强制重新签名，获取新鲜 SAS token
+    import planetary_computer as pc
+    item = pc.sign(item)
 
     ds = odc.stac.load(
         [item],
