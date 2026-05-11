@@ -134,6 +134,9 @@ def search_items(catalog, source: str, bbox: list[float], date_start: str, date_
         kwargs["datetime"] = f"{date_start}/{date_end}"
     if source in ("s2", "landsat"):
         kwargs["query"] = {"eo:cloud_cover": {"lt": 20}}
+    if source == "landsat":
+        # 排除 Landsat 7（缺少 lwir11 band，只有 5 bands）
+        kwargs["query"]["platform"] = {"in": ["landsat-8", "landsat-9"]}
 
     try:
         search = catalog.search(**kwargs)
