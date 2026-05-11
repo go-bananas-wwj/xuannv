@@ -28,6 +28,18 @@ Planetary Computer 批量下载脚本（备用方案）
 """
 from __future__ import annotations
 
+# 限制底层库线程数，避免 ThreadPoolExecutor + Dask 嵌套导致死锁
+import os
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+
+# 设置 Dask 同步调度器，避免额外线程池
+import dask
+dask.config.set(scheduler="synchronous")
+
 import argparse
 import json
 import time
@@ -256,9 +268,10 @@ def download_patch(args) -> dict:
         n_items = len(items)
         downloaded = 0
         skipped = 0
+        failed_items = 0
 
-        try:
-            for item in items:
+        for item in items:
+            try:
                 # 日期命名
                 dt = item.datetime
                 if dt is None:
@@ -280,20 +293,21 @@ def download_patch(args) -> dict:
 
                 save_geotiff(out_path, data_np, bbox, epsg)
                 downloaded += 1
+            except Exception as e:
+                failed_items += 1
+                # 打印到 stderr 以便调试
+                print(f"    [WARN] patch_{patch_id:06d} {source} item {item.id if hasattr(item, 'id') else 'unknown'} failed: {e}", file=sys.stderr)
+                continue
 
-            results["sources"][source] = {
-                "status": "ok",
-                "n_items": n_items,
-                "downloaded": downloaded,
-                "skipped": skipped,
-                "time_s": round(time.time() - t0, 1),
-            }
-        except Exception as e:
-            results["sources"][source] = {
-                "status": "error",
-                "error": str(e),
-                "time_s": round(time.time() - t0, 1),
-            }
+        status = "ok" if downloaded > 0 else ("failed" if n_items > 0 else "no_data")
+        results["sources"][source] = {
+            "status": status,
+            "n_items": n_items,
+            "downloaded": downloaded,
+            "skipped": skipped,
+            "failed_items": failed_items,
+            "time_s": round(time.time() - t0, 1),
+        }
 
     return results
 
