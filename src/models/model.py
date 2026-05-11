@@ -111,6 +111,10 @@ class AEFModel(nn.Module):
         self.per_source_decoders = nn.ModuleList()
         self._per_source_out_channels: list[int] = []
         for t_idx, (tgt_name, loss_type, sensor_src) in enumerate(tgt_list):
+            # V12: 从 target_sources 配置中读取 out_channels，支持 per-source
+            out_ch = m.reconstruction_channels
+            if target_sources is not None and t_idx < len(target_sources):
+                out_ch = target_sources[t_idx].get("out_channels", m.reconstruction_channels)
             if loss_type == 1:
                 # 分类目标
                 dec = CategoricalDecoder(
@@ -122,9 +126,9 @@ class AEFModel(nn.Module):
                 # 连续目标
                 dec = ContinuousDecoder(
                     m.embedding_dim, m.window_code_dim, m.relative_time_code_dim,
-                    m.metadata_dim, out_channels=m.reconstruction_channels,
+                    m.metadata_dim, out_channels=out_ch,
                 )
-                self._per_source_out_channels.append(m.reconstruction_channels)
+                self._per_source_out_channels.append(out_ch)
             self.per_source_decoders.append(dec)
 
         # 分类头
