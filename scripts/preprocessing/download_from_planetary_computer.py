@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+import sys; sys.stdout.reconfigure(line_buffering=True)
 """
 Planetary Computer 批量下载脚本（备用方案）
 支持 S2 / S1 / Landsat / DEM / WorldCover
@@ -26,7 +28,7 @@ Planetary Computer 批量下载脚本（备用方案）
         --output /workspace/raw/heilongjiang_new/daqing \
         --sources s1 landsat --workers 4
 """
-from __future__ import annotations
+import sys; sys.stdout.reconfigure(line_buffering=True)
 
 # 限制底层库线程数，避免 ThreadPoolExecutor + Dask 嵌套导致死锁
 import os
