@@ -83,7 +83,7 @@ training:
 
   # ★ 核心三损失（对齐AEF原文）
   reconstruction_weight: 0.5
-  batch_uniformity_weight: 0.3
+  batch_uniformity_weight: 0.1
   consistency_weight: 0.2
 
   # ★ 源特定重建权重
