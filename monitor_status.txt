@@ -1,12 +1,10 @@
-=== Tue May 12 00:36:41 CST 2026 ===
+=== Tue May 12 00:46:41 CST 2026 ===
 
 训练进程数: 19
-  [Best] New best recon=0.8059 at epoch 4
-Epoch 005/200 | total=0.4655 recon=0.6373 consist=0.0732 uniform=0.9717 lr=0.000025
-  [Best] New best recon=0.6373 at epoch 5
-Epoch 006/200 | total=0.4556 recon=0.4912 consist=0.0590 uniform=0.9882 lr=0.000030
-  [Best] New best recon=0.4912 at epoch 6
+  Source recon weights: [1.0, 1.0, 1.0]
+  Embedding dim: 128
+  VMF kappa: 2000.0
+======================================================================
+[train] Resumed from /workspace/outputs/xuannv_v12_clean/epoch_best_epoch6.pt, starting at epoch 7
 
-  [Step 0] recon=0.523 consist=0.053 uniform=0.983 perturb=[fd=0.00 sd=0.44] lr=
-Epoch 006/200 | total=0.4556 recon=0.4912 consist=0.0590 uniform=0.9882 lr=0.000
-  [Step 0] recon=0.408 consist=0.040 uniform=0.991 perturb=[fd=0.33 sd=0.11] lr=
+.....  [Step 0] recon=0.429 consist=0.000 uniform=0.998 perturb=[fd=0.33 sd=0.11

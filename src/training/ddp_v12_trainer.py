@@ -25,6 +25,7 @@ from src.training.losses import (
     reconstruction_loss,
     batch_uniformity_loss_l2,
     consistency_loss,
+    variance_regularizer,
 )
 from src.training.memory_bank import EmbeddingMemoryBank
 from src.training.optimizer import build_optimizer, build_scheduler, get_cosine_lr
@@ -275,7 +276,7 @@ class DDPv12Trainer:
                 # Consistency (teacher vs student embedding)
                 consist = consistency_loss(teacher_out.embedding, student_out.embedding)
 
-            # Batch Uniformity (with Memory Bank)
+            # VICReg Variance Loss (with Memory Bank)
             embedding = student_out.embedding
             if dist.is_initialized() and self.world_size > 1:
                 gathered_emb = [torch.zeros_like(embedding) for _ in range(self.world_size)]
@@ -294,7 +295,16 @@ class DDPv12Trainer:
             else:
                 all_emb = gathered_emb
 
-            uniform = batch_uniformity_loss_l2(all_emb)
+            # 计算每个维度的标准差（用于日志诊断）
+            std_per_dim = torch.sqrt(all_emb.var(dim=0) + 1e-4)
+            std_min = std_per_dim.min().item()
+            std_mean = std_per_dim.mean().item()
+            std_max = std_per_dim.max().item()
+            n_collapse_dims = (std_per_dim < 0.05).sum().item()  # 标准差<0.05视为坍缩
+
+            # VICReg Variance Loss: 逐维检查，低于阈值的维度单独惩罚
+            # L2-normalized embedding 的理想 std ≈ 1/sqrt(128) ≈ 0.088
+            uniform = variance_regularizer(all_emb, min_std=0.05)
 
             # Dummy loss for unused heads (avoid DDP unused parameter error)
             dummy = 0.0
@@ -354,6 +364,9 @@ class DDPv12Trainer:
             if self.global_rank == 0 and step % 20 == 0:
                 print(f"  [Step {step}] recon={recon.item():.3f} "
                       f"consist={consist.item():.3f} uniform={uniform.item():.3f} "
+                      f"bank={self.memory_bank.size}/{self.memory_bank.K} "
+                      f"std=[{std_min:.3f}/{std_mean:.3f}/{std_max:.3f}] "
+                      f"collapse_dims={n_collapse_dims}/128 "
                       f"perturb=[fd={perturb_stats['frame_drop_ratio']:.2f} "
                       f"sd={perturb_stats['source_drop_ratio']:.2f}] "
                       f"lr={lr:.6f}")
