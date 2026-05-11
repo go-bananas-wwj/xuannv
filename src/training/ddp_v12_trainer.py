@@ -150,7 +150,7 @@ class DDPv12Trainer:
         # Student 模型
         self.model = AEFModel(cfg).to(self.device)
         self.model = DistributedDataParallel(
-            self.model, device_ids=[local_rank], find_unused_parameters=True
+            self.model, device_ids=[local_rank], find_unused_parameters=False
         )
 
         # EMA Teacher
@@ -250,23 +250,18 @@ class DDPv12Trainer:
                     back_drop_prob=getattr(t, 'student_back_drop_prob', 0.15),
                 )
 
-                dual_keys = ['valid_start_w1', 'valid_end_w1', 'valid_start_w2', 'valid_end_w2']
-                has_dual = all(k in batch for k in dual_keys)
                 student_out = self.model(
                     source_frames=student_frames,
                     source_timestamps_ms=batch["source_timestamps_ms"],
                     source_frame_mask=student_frame_mask,
                     source_input_mask=student_input_mask,
                     source_type_ids=batch["source_type_ids"],
-                    valid_start_ms=batch["valid_start_w1"] if has_dual else batch["valid_start_ms"],
-                    valid_end_ms=batch["valid_end_w1"] if has_dual else batch["valid_end_ms"],
+                    valid_start_ms=batch["valid_start_ms"],
+                    valid_end_ms=batch["valid_end_ms"],
                     target_relative_time=batch["target_relative_time"],
                     target_metadata=batch["target_metadata"],
                     target_loss_type=batch.get("target_loss_type"),
                     target_source_idx=batch.get("target_source_idx"),
-                    dual_window=has_dual,
-                    valid_start_w2=batch.get("valid_start_w2"),
-                    valid_end_w2=batch.get("valid_end_w2"),
                 )
 
                 # Reconstruction
