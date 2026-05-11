@@ -159,6 +159,11 @@ def download_source_stackstac(
     data = stack.compute()  # [time=1, band, y, x]
     data_np = np.asarray(data[0])  # [band, y, x]
 
+    # 检查 band 数量（Landsat 偶发某个 band 缺失）
+    expected_bands = len(assets)
+    if data_np.shape[0] != expected_bands:
+        raise ValueError(f"Band mismatch: expected {expected_bands}, got {data_np.shape[0]} for item {item.id}")
+
     if divide_10000 and source == "s2":
         data_np = data_np.astype(np.float32) / 10000.0
     elif source == "s2":
@@ -191,9 +196,15 @@ def download_source_odcstac(
     # odc-stac 返回 Dataset，按 band 名提取
     bands_list = []
     for band in assets:
+        if band not in data.data_vars:
+            raise ValueError(f"Band '{band}' missing in item {item.id}")
         band_data = np.asarray(data[band][0])  # [y, x]
         bands_list.append(band_data)
     data_np = np.stack(bands_list, axis=0)  # [band, y, x]
+
+    expected_bands = len(assets)
+    if data_np.shape[0] != expected_bands:
+        raise ValueError(f"Band mismatch: expected {expected_bands}, got {data_np.shape[0]} for item {item.id}")
 
     return data_np
 
