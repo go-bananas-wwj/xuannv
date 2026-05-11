@@ -379,7 +379,7 @@ tmux send-keys -t v7_train 'torchrun --nproc_per_node=4 scripts/train/train_ddp_
 - **所有文件操作限制在 `/workspace/xuannv/` 内**，不要读写项目外的文件。
 - **checkpoint 文件较大** (数百 MB 到数 GB)，不要频繁复制或传输。
 - 训练脚本会修改 config YAML (如 `monitor_training.py` 自动降低 loss weights)，注意版本控制。
-- Demo 和评估脚本中使用了大量**硬编码绝对路径** (如 `/workspace/raw/harbin_scenes/`、`/workspace/index/harbin/grid/harbin_grid.geojson`)，修改路径时需同步更新所有引用位置。
+- Demo 和评估脚本中使用了大量**硬编码绝对路径** (如 `/workspace/raw/phase1_harbin/`、`/workspace/index/harbin/grid/harbin_grid.geojson`)，修改路径时需同步更新所有引用位置。
 - `archive/` 目录为废弃代码，**只读参考**，不要修改或依赖其中的逻辑。
 - 没有 CI/CD 流程，所有测试和验证需在本地或开发机上手动执行。
 
@@ -417,8 +417,8 @@ tmux send-keys -t v7_train 'torchrun --nproc_per_node=4 scripts/train/train_ddp_
 
 ### 1. 路径修复（已完成）
 
-- **问题**: 5 个配置文件的 `manifest_path` 指向 `/workspace/raw/harbin_scenes`（季度数据父目录），但代码期望的是日度数据子目录。
-- **修复**: 将 `manifest_path` 从 `/workspace/raw/harbin_scenes` 改为 `/workspace/raw/harbin_scenes/harbin_scenes`。
+- **问题**: 5 个配置文件的 `manifest_path` 指向 `/workspace/raw/phase1_harbin`（季度数据父目录），但代码期望的是日度数据子目录。
+- **修复**: 将 `manifest_path` 从 `/workspace/raw/phase1_harbin` 改为 `/workspace/raw/phase1_harbin/harbin_scenes`。
 - **影响配置**: `qwen_v1_scenes.yaml`, `qwen_v2_hr_finetune.yaml`, `qwen_v2_hr_from_scratch.yaml`, `qwen_v2_hr_only_small.yaml`, `qwen_v3_continue.yaml`
 
 ### 2. 代码路径解析增强（已完成）
@@ -430,7 +430,7 @@ tmux send-keys -t v7_train 'torchrun --nproc_per_node=4 scripts/train/train_ddp_
 ### 3. Symlink 修复（已完成）
 
 - **问题**: `dem`, `worldcover`, `jrc_water`, `dynamic_world`, `modis_lst`, `modis_ndvi` 的 symlink 断裂。
-- **修复**: 重新链接到 `/workspace/raw/harbin_scenes/harbin/` 下的正确目录。
+- **修复**: 重新链接到 `/workspace/raw/phase1_harbin/harbin/` 下的正确目录。
 
 ### 4. filter_2025_monthly 修复（已完成）
 
@@ -469,7 +469,7 @@ tmux send-keys -t v7_train 'torchrun --nproc_per_node=4 scripts/train/train_ddp_
   - 原始: 29,707 帧 → 筛选后: 9,321 帧
   - 平均每 patch: ~70 帧 → ~22 帧
   - fallback 月份: 357 / 4839 = 7.4%（主要集中在哈尔滨冬季 1-2 月）
-- **新数据目录**: `/workspace/raw/harbin_scenes/harbin_scenes_cloud_filtered/`
+- **新数据目录**: `/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered/`
 - **Symlink**: s1, s1_hr, s2_hr, landsat, dem, worldcover, dynamic_world, jrc_water, modis_lst, modis_ndvi 已链接
 - **配置文件更新**: 5 个配置文件的 `manifest_path` 已指向新目录
 - **统计数据更新**: S2 stats 已重新计算（mean=1466.11, std=1207.10）
@@ -478,7 +478,7 @@ tmux send-keys -t v7_train 'torchrun --nproc_per_node=4 scripts/train/train_ddp_
 ## 当前数据目录结构
 
 ```
-/workspace/raw/harbin_scenes/
+/workspace/raw/phase1_harbin/
 ├── harbin/                          # 季度合成数据 (YYYYQN)，旧数据
 │   ├── s2/, s1/, landsat/, dem/, worldcover/, ...
 ├── harbin_scenes/                   # 原始日度数据 (YYYYMMDD)

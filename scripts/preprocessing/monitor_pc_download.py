@@ -42,7 +42,7 @@ CITIES = {
     },
 }
 
-DATA_ROOT = Path("/workspace/raw/heilongjiang_new")
+DATA_ROOT = Path("/workspace/raw/phase2_heilongjiang")
 LOG_FILE = Path("/workspace/outputs/pc_download_monitor.log")
 CHECK_INTERVAL = 300  # 5 分钟
 

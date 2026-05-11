@@ -18,14 +18,14 @@ Planetary Computer 批量下载脚本（备用方案）
 用法:
     # 下载齐齐哈尔全部 patch 的 S2
     python download_from_planetary_computer.py \
-        --patches /workspace/raw/heilongjiang_new/qiqihar/patches_meta.json \
-        --output /workspace/raw/heilongjiang_new/qiqihar \
+        --patches /workspace/raw/phase2_heilongjiang/qiqihar/patches_meta.json \
+        --output /workspace/raw/phase2_heilongjiang \
         --sources s2 --workers 4
 
     # 下载大庆全部 patch 的 S1 + Landsat
     python download_from_planetary_computer.py \
-        --patches /workspace/raw/heilongjiang_new/daqing/patches_meta.json \
-        --output /workspace/raw/heilongjiang_new/daqing \
+        --patches /workspace/raw/phase2_heilongjiang/daqing/patches_meta.json \
+        --output /workspace/raw/phase2_heilongjiang \
         --sources s1 landsat --workers 4
 """
 import sys; sys.stdout.reconfigure(line_buffering=True)

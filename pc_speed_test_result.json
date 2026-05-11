@@ -1,0 +1,60 @@
+{
+  "timestamp": "2026-05-11T16:48:44.714654",
+  "patch_id": 100,
+  "center": [
+    123.52314329946638,
+    47.45485741372449
+  ],
+  "bbox": [
+    123.51461621576571,
+    47.449091647958724,
+    123.53167038316705,
+    47.460623179490256
+  ],
+  "datetime_range": "2023-06-01/2023-08-31",
+  "results": [
+    {
+      "source": "S2",
+      "collection": "sentinel-2-l2a",
+      "n_items": 5,
+      "n_items_used": 3,
+      "search_time_s": 2.11,
+      "build_time_s": 0.02,
+      "download_time_s": 3.14,
+      "data_mb": 1.95,
+      "speed_mbps": 0.62,
+      "data_shape": [
+        3,
+        5,
+        130,
+        131
+      ],
+      "dtype": "float64"
+    },
+    {
+      "source": "S1",
+      "collection": "sentinel-1-grd",
+      "n_items": 7,
+      "search_time_s": 1.69,
+      "error": "download_failed: 'NoneType' object has no attribute 'to_epsg'"
+    },
+    {
+      "source": "Landsat",
+      "collection": "landsat-c2-l2",
+      "n_items": 8,
+      "n_items_used": 3,
+      "search_time_s": 1.02,
+      "build_time_s": 0.01,
+      "download_time_s": 3.12,
+      "data_mb": 0.27,
+      "speed_mbps": 0.09,
+      "data_shape": [
+        3,
+        6,
+        44,
+        44
+      ],
+      "dtype": "float64"
+    }
+  ]
+}

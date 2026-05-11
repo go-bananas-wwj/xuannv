@@ -5,7 +5,7 @@ experiment:
 
 data:
   dataset_type: harbin_patches
-  manifest_path: /workspace/raw/harbin_scenes/harbin_scenes_cloud_filtered
+  manifest_path: /workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered
   stats_dir: /workspace/statistics/harbin_scenes
   batch_size: 4
   num_workers: 4
