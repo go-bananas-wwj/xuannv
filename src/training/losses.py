@@ -124,7 +124,7 @@ def batch_uniformity_loss_l2(embeddings: torch.Tensor, dim_dropout: float = 0.1,
 
     # All-Pairs: 使用 chunk 分批计算所有 i≠j 的 |u_i · u_j|
     chunk_size = min(1024, N)
-    total_loss = 0.0
+    total_loss = x.new_tensor(0.0)
     n_pairs = 0
 
     for i_start in range(0, N, chunk_size):
@@ -135,10 +135,10 @@ def batch_uniformity_loss_l2(embeddings: torch.Tensor, dim_dropout: float = 0.1,
         for local_i in range(i_end - i_start):
             global_i = i_start + local_i
             sim[local_i, global_i] = 0.0
-        total_loss += sim.abs().sum().item()
+        total_loss = total_loss + sim.abs().sum()
         n_pairs += (i_end - i_start) * N - (i_end - i_start)
 
-    return torch.tensor(total_loss / max(n_pairs, 1), device=x.device, dtype=x.dtype)
+    return total_loss / max(n_pairs, 1)
 
 
 # ────────────────────────────────────────────
