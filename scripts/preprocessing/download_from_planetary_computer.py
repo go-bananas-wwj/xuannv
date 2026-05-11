@@ -188,6 +188,10 @@ def download_source_stackstac(
         data_np = data_np.astype(np.float32) * 0.0000275 - 0.2
         data_np = np.clip(data_np, 0.0, 1.0)
 
+    # 检测全0数据（stackstac 偶发返回全0数组，通常因为数据不可用或云覆盖100%）
+    if source in ("s2", "landsat", "s1") and np.all(data_np == 0):
+        raise ValueError(f"All-zero data for {source} item {item.id}")
+
     return data_np
 
 
@@ -301,12 +305,20 @@ def download_patch(args) -> dict:
                             dtype = src.dtypes[0]
                             data = src.read(1)
                             maxv = data.max()
+                            # 检测旧格式
                             if source == "landsat" and maxv > 2:
                                 out_path.unlink()
                                 print(f"      [FIX] 删除旧格式 Landsat: {out_path.name}")
                             elif source == "s2" and dtype == "uint16":
                                 out_path.unlink()
                                 print(f"      [FIX] 删除旧格式 S2: {out_path.name}")
+                            # 检测全0或极小文件（无效数据）
+                            elif out_path.stat().st_size < 2048:
+                                out_path.unlink()
+                                print(f"      [FIX] 删除损坏/空文件 ({out_path.stat().st_size}b): {out_path.name}")
+                            elif maxv == 0 and source in ("s2", "landsat", "s1"):
+                                out_path.unlink()
+                                print(f"      [FIX] 删除全0数据文件: {out_path.name}")
                             else:
                                 skipped += 1
                                 continue
