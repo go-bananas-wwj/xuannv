@@ -1,0 +1,12 @@
+=== Tue May 12 00:26:41 CST 2026 ===
+
+训练进程数: 20
+  [Best] New best recon=1.1640 at epoch 1
+Epoch 002/200 | total=0.3377 recon=1.1344 consist=0.1504 uniform=0.6471 lr=0.000010
+  [Best] New best recon=1.1344 at epoch 2
+Epoch 003/200 | total=0.4133 recon=0.9982 consist=0.0698 uniform=0.8321 lr=0.000015
+  [Best] New best recon=0.9982 at epoch 3
+
+  [Step 0] recon=1.046 consist=0.062 uniform=0.740 perturb=[fd=0.31 sd=0.11] lr=
+Epoch 003/200 | total=0.4133 recon=0.9982 consist=0.0698 uniform=0.8321 lr=0.000
+  [Step 0] recon=0.870 consist=0.066 uniform=0.909 perturb=[fd=0.00 sd=0.22] lr=
