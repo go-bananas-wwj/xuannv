@@ -295,8 +295,24 @@ def download_patch(args) -> dict:
 
                 out_path = patch_dir / f"{date_str}.tif"
                 if out_path.exists():
-                    skipped += 1
-                    continue
+                    # 检查格式是否正确，不正确则删除重新下载
+                    try:
+                        with rasterio.open(out_path) as src:
+                            dtype = src.dtypes[0]
+                            data = src.read(1)
+                            maxv = data.max()
+                            if source == "landsat" and maxv > 2:
+                                out_path.unlink()
+                                print(f"      [FIX] 删除旧格式 Landsat: {out_path.name}")
+                            elif source == "s2" and dtype == "uint16":
+                                out_path.unlink()
+                                print(f"      [FIX] 删除旧格式 S2: {out_path.name}")
+                            else:
+                                skipped += 1
+                                continue
+                    except Exception:
+                        skipped += 1
+                        continue
 
                 # 下载
                 if source == "s1":
