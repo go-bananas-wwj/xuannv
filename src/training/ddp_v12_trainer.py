@@ -390,6 +390,7 @@ class DDPv12Trainer:
         }, path)
         print(f"[ddp_v12] Saved checkpoint to {path}")
 
+        # 清理普通 checkpoint，只保留最近 3 个
         ckpts = sorted(
             [p for p in self.output_dir.glob("epoch_*.pt") if not p.name.startswith("epoch_best")],
             key=lambda p: p.stat().st_mtime
@@ -397,6 +398,15 @@ class DDPv12Trainer:
         for old_ckpt in ckpts[:-3]:
             old_ckpt.unlink()
             print(f"[ddp_v12] Removed old checkpoint: {old_ckpt}")
+
+        # 清理 best checkpoint，只保留最近 3 个
+        best_ckpts = sorted(
+            [p for p in self.output_dir.glob("epoch_best_*.pt")],
+            key=lambda p: p.stat().st_mtime
+        )
+        for old_ckpt in best_ckpts[:-3]:
+            old_ckpt.unlink()
+            print(f"[ddp_v12] Removed old best checkpoint: {old_ckpt}")
 
     def load_checkpoint(self, path: str) -> int:
         ckpt = torch.load(path, map_location=self.device, weights_only=False)
