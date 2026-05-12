@@ -295,6 +295,7 @@ class DDPv12Trainer:
 
             # === VICReg Variance + Covariance (Pre-norm 空间) + Memory Bank ===
             pre_norm = student_out.pre_norm_embedding  # [B, D] — 真正的 pre-norm
+            pre_norm_map = student_out.pre_norm_map      # [B, D, H, W] — spatial pre-norm
             
             # V13: skip NaN/Inf check (fixed in model.encode_frames fallback)
             
@@ -317,17 +318,39 @@ class DDPv12Trainer:
             var_w = getattr(t, 'variance_weight', 0.3)
             cov_w = getattr(t, 'covariance_weight', 0.1)
             vicreg_min_std = getattr(t, 'vicreg_min_std', 1.0)
-            var = variance_regularizer(all_pre.float(), min_std=vicreg_min_std) if var_w > 0 else torch.tensor(0.0, device=self.device)
-            cov = covariance_loss(all_pre.float()) if cov_w > 0 else torch.tensor(0.0, device=self.device)
+            
+            # V13-explore: Spatial VICReg — 在 [B*H*W, D] 上计算，绕过 GMP
+            use_spatial_vicreg = getattr(t, 'use_spatial_vicreg', False)
+            if use_spatial_vicreg and pre_norm_map is not None:
+                # [B, D, H, W] → [B*H*W, D]
+                spatial_flat = pre_norm_map.permute(0, 2, 3, 1).reshape(-1, pre_norm_map.shape[1])
+                var = variance_regularizer(spatial_flat.float(), min_std=vicreg_min_std) if var_w > 0 else torch.tensor(0.0, device=self.device)
+                cov = covariance_loss(spatial_flat.float()) if cov_w > 0 else torch.tensor(0.0, device=self.device)
+            else:
+                var = variance_regularizer(all_pre.float(), min_std=vicreg_min_std) if var_w > 0 else torch.tensor(0.0, device=self.device)
+                cov = covariance_loss(all_pre.float()) if cov_w > 0 else torch.tensor(0.0, device=self.device)
 
             # === Uniformity Loss（实验变体支持）===
             use_spatial_unif = getattr(t, 'use_spatial_uniformity', False)
             use_pre_norm_unif = getattr(t, 'use_pre_norm_uniform', False)
+            use_spatial_raw_unif = getattr(t, 'use_spatial_raw_uniformity', False)
             l2_uniform_w = getattr(t, 'batch_uniformity_weight', 0.05)
             pre_norm_uniform_w = getattr(t, 'pre_norm_uniform_weight', 0.0)
 
-            if use_pre_norm_unif and pre_norm_uniform_w > 0:
-                # Exp5: Pre-norm raw uniformity（欧氏空间，无 L2 Jacobian 屏障）
+            if use_spatial_raw_unif and pre_norm_uniform_w > 0:
+                # V13-explore: Spatial raw uniformity on pre_norm_map [B, D, H, W] — 完全绕过 GMP + L2
+                if dist.is_initialized() and self.world_size > 1:
+                    gathered_map_unif = [torch.zeros_like(pre_norm_map) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_map_unif, pre_norm_map)
+                    gathered_map_unif = torch.cat(gathered_map_unif, dim=0)
+                else:
+                    gathered_map_unif = pre_norm_map
+                # [B, D, H, W] → [B*H*W, D]
+                spatial_flat_unif = gathered_map_unif.permute(0, 2, 3, 1).reshape(-1, gathered_map_unif.shape[1])
+                l2_uniform = raw_uniformity_loss(spatial_flat_unif.float())
+                l2_uniform_w = pre_norm_uniform_w
+            elif use_pre_norm_unif and pre_norm_uniform_w > 0:
+                # Pre-norm raw uniformity（欧氏空间，无 L2 Jacobian 屏障）
                 if dist.is_initialized() and self.world_size > 1:
                     gathered_pre_unif = [torch.zeros_like(pre_norm) for _ in range(self.world_size)]
                     dist.all_gather(gathered_pre_unif, pre_norm)
@@ -335,9 +358,9 @@ class DDPv12Trainer:
                 else:
                     gathered_pre_unif = pre_norm
                 l2_uniform = raw_uniformity_loss(gathered_pre_unif.float())
-                l2_uniform_w = pre_norm_uniform_w  # 使用 pre_norm_uniform_weight
+                l2_uniform_w = pre_norm_uniform_w
             elif use_spatial_unif and l2_uniform_w > 0:
-                # Exp1/Exp4: Spatial uniformity on embedding_map [B, D, H, W]
+                # Spatial uniformity on embedding_map [B, D, H, W]
                 emb_map = student_out.embedding_map  # [B, D, H, W]
                 if dist.is_initialized() and self.world_size > 1:
                     gathered_map = [torch.zeros_like(emb_map) for _ in range(self.world_size)]
@@ -347,7 +370,7 @@ class DDPv12Trainer:
                     gathered_map = emb_map
                 l2_uniform = batch_uniformity_loss_l2(gathered_map.float())
             else:
-                # Baseline/Exp2/Exp3: Standard L2 uniformity on embedding vector
+                # Standard L2 uniformity on embedding vector
                 embedding = student_out.embedding  # [B, D]
                 if dist.is_initialized() and self.world_size > 1:
                     gathered_l2 = [torch.zeros_like(embedding) for _ in range(self.world_size)]
