@@ -160,6 +160,10 @@ class TrainingConfig:
     # 预归一化 uniformity
     pre_norm_uniform_weight: float = 3.0
     encoder_uniform_weight: float = 2.0
+    # V13 实验变体开关
+    use_spatial_uniformity: bool = False
+    use_pre_norm_uniform: bool = False
+    vicreg_min_std: float = 1.0
     # Warmup
     recon_warmup_epochs: int = 20
     warmup_epochs: int = 10

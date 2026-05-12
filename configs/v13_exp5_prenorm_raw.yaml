@@ -1,20 +1,20 @@
 # ============================================================
-# xuannv V13 — 月度采样 + 无时间条件Decoder
-# 核心: 按月采样，Decoder不偷看时间，Embedding被迫编码时间信息
-# 目标: S2+S1+Landsat+DEM
+# V13 Exp5: Pre-norm Raw Uniformity
+# 修改: 在 pre_norm 欧氏空间计算 raw_uniformity_loss，替代 L2 uniformity
+# 理论优势: 无 L2 Jacobian 梯度屏障
 # ============================================================
 
 experiment:
-  name: xuannv_v13_monthly
+  name: v13_exp5_prenorm_raw
   seed: 42
-  output_dir: /workspace/outputs/xuannv_v13_monthly
+  output_dir: /workspace/outputs/v13_exp5_prenorm_raw
 
 data:
   dataset_type: harbin_patches
   manifest_path: /workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered
   stats_dir: /workspace/statistics/harbin_scenes
   batch_size: 6
-  num_workers: 0  # V13: 避免多进程问题
+  num_workers: 0
   image_size: 128
   max_frames: 32
   num_samples: 424
@@ -31,16 +31,14 @@ data:
   temporal_window_max_frames: 24
   preload: true
 
-  # 每个源的实际通道数（输入编码用）
   source_channels:
     s2: 6
     s1: 2
     landsat: 6
 
-  # ★ 目标源配置：S2+S1+Landsat+DEM
   target_sources:
     - name: s2
-      loss_type: 0        # 0=continuous (L1)
+      loss_type: 0
       sensor_src: s2
       out_channels: 6
     - name: s1
@@ -78,24 +76,27 @@ model:
   skip_l2_norm_training: false
 
 training:
-  epochs: 200
-  gradient_accumulation_steps: 1  # V13: 排查NaN
-  lr: 0.000001  # V13: 降低学习率排查NaN
+  epochs: 10
+  gradient_accumulation_steps: 1
+  lr: 0.000001
   weight_decay: 0.01
   grad_clip_norm: 1.0
 
-  # ★ 方案A: 以重建为核心，降低 uniformity/consistency
-  reconstruction_weight: 0.5       # 主任务，保持不变
-  consistency_weight: 0.0    # V13-fix: 禁用 — 当前设计下 consistency 加速坍缩
+  reconstruction_weight: 0.5
+  consistency_weight: 0.2
   variance_weight: 0.3
   covariance_weight: 0.1
-  batch_uniformity_weight: 0.05
+  batch_uniformity_weight: 0.0     # ★ 禁用 L2 uniformity
   memory_bank_size: 512
 
-  # ★ 源特定重建权重
-  source_recon_weights: [1.0, 1.0, 1.0, 0.05]  # S2, S1, Landsat, DEM
+  # ★ Exp5 核心开关
+  use_spatial_uniformity: false
+  vicreg_min_std: 1.0
+  use_pre_norm_uniform: true       # 启用 pre-norm uniformity
+  pre_norm_uniform_weight: 0.3     # pre-norm uniformity 权重
 
-  # ★ 全部置0：移除所有复杂损失
+  source_recon_weights: [1.0, 1.0, 1.0, 0.05]
+
   temporal_gap_aware_weight: 0.0
   temporal_gap_aware_weight_end: 0.0
   temporal_gap_aware_weight_ramp_epochs: 0
@@ -118,10 +119,8 @@ training:
   ct_reconstruction_weight: 0.0
   aux_classification_weight: 0.0
   bottleneck_cls_weight: 0.0
-  pre_norm_uniform_weight: 0.0
   encoder_uniform_weight: 0.0
 
-  # Teacher-Student（AEF核心机制）
   teacher_momentum: 0.996
   teacher_dropout_rate: 0.1
   student_frame_drop_rate: 0.5
@@ -129,22 +128,18 @@ training:
   student_front_drop_prob: 0.15
   student_back_drop_prob: 0.15
 
-  # Kappa
   kappa_start: 2000.0
   kappa_end: 2000.0
   kappa_warmup_epochs: 0
 
-  # 学习率调度
   lr_min: 0.000001
   warmup_epochs: 10
   recon_warmup_epochs: 10
   lr_schedule: cosine_no_restart
 
-  # 每 epoch 最大步数（抽样训练，加速迭代）
   max_steps_per_epoch: 100
 
-  # 保存
-  save_every: 20
+  save_every: 5
   save_best_balanced: true
   best_balanced_uniform_min: 0.0
   best_balanced_uniform_max: 0.3

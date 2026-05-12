@@ -24,6 +24,7 @@ from src.models.model import AEFModel
 from src.training.losses import (
     reconstruction_loss,
     batch_uniformity_loss_l2,
+    raw_uniformity_loss,
     consistency_loss,
     consistency_loss_spatial,
     variance_regularizer,
@@ -314,19 +315,46 @@ class DDPv12Trainer:
             # Pre-norm VICReg: variance + covariance
             var_w = getattr(t, 'variance_weight', 0.3)
             cov_w = getattr(t, 'covariance_weight', 0.1)
-            var = variance_regularizer(all_pre.float(), min_std=1.0) if var_w > 0 else torch.tensor(0.0, device=self.device)
+            vicreg_min_std = getattr(t, 'vicreg_min_std', 1.0)
+            var = variance_regularizer(all_pre.float(), min_std=vicreg_min_std) if var_w > 0 else torch.tensor(0.0, device=self.device)
             cov = covariance_loss(all_pre.float()) if cov_w > 0 else torch.tensor(0.0, device=self.device)
 
-            # L2 空间轻量监督（防止 pre-norm → L2 传递失效）
+            # === Uniformity Loss（实验变体支持）===
+            use_spatial_unif = getattr(t, 'use_spatial_uniformity', False)
+            use_pre_norm_unif = getattr(t, 'use_pre_norm_uniform', False)
             l2_uniform_w = getattr(t, 'batch_uniformity_weight', 0.05)
-            embedding = student_out.embedding  # [B, D]
-            if dist.is_initialized() and self.world_size > 1:
-                gathered_l2 = [torch.zeros_like(embedding) for _ in range(self.world_size)]
-                dist.all_gather(gathered_l2, embedding)
-                gathered_l2 = torch.cat(gathered_l2, dim=0)
+            pre_norm_uniform_w = getattr(t, 'pre_norm_uniform_weight', 0.0)
+
+            if use_pre_norm_unif and pre_norm_uniform_w > 0:
+                # Exp5: Pre-norm raw uniformity（欧氏空间，无 L2 Jacobian 屏障）
+                if dist.is_initialized() and self.world_size > 1:
+                    gathered_pre_unif = [torch.zeros_like(pre_norm) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_pre_unif, pre_norm)
+                    gathered_pre_unif = torch.cat(gathered_pre_unif, dim=0)
+                else:
+                    gathered_pre_unif = pre_norm
+                l2_uniform = raw_uniformity_loss(gathered_pre_unif.float())
+                l2_uniform_w = pre_norm_uniform_w  # 使用 pre_norm_uniform_weight
+            elif use_spatial_unif and l2_uniform_w > 0:
+                # Exp1/Exp4: Spatial uniformity on embedding_map [B, D, H, W]
+                emb_map = student_out.embedding_map  # [B, D, H, W]
+                if dist.is_initialized() and self.world_size > 1:
+                    gathered_map = [torch.zeros_like(emb_map) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_map, emb_map)
+                    gathered_map = torch.cat(gathered_map, dim=0)
+                else:
+                    gathered_map = emb_map
+                l2_uniform = batch_uniformity_loss_l2(gathered_map.float())
             else:
-                gathered_l2 = embedding
-            l2_uniform = batch_uniformity_loss_l2(gathered_l2.float()) if l2_uniform_w > 0 else torch.tensor(0.0, device=self.device)
+                # Baseline/Exp2/Exp3: Standard L2 uniformity on embedding vector
+                embedding = student_out.embedding  # [B, D]
+                if dist.is_initialized() and self.world_size > 1:
+                    gathered_l2 = [torch.zeros_like(embedding) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_l2, embedding)
+                    gathered_l2 = torch.cat(gathered_l2, dim=0)
+                else:
+                    gathered_l2 = embedding
+                l2_uniform = batch_uniformity_loss_l2(gathered_l2.float()) if l2_uniform_w > 0 else torch.tensor(0.0, device=self.device)
 
             # Per-dim 诊断（日志用）
             with torch.no_grad():

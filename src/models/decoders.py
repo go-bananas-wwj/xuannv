@@ -59,9 +59,11 @@ class ContinuousDecoder(nn.Module):
             nn.Conv2d(embedding_dim, hidden, kernel_size=3, padding=1),
             nn.GroupNorm(8, hidden),
             nn.GELU(),
+            nn.Dropout2d(0.3),  # V13-fix: 削弱 decoder 容量，迫使 encoder 编码更多信息
             nn.Conv2d(hidden, hidden, kernel_size=3, padding=1),
             nn.GroupNorm(8, hidden),
             nn.GELU(),
+            nn.Dropout2d(0.3),  # V13-fix: 削弱 decoder 容量
             nn.Conv2d(hidden, out_channels, kernel_size=3, padding=1),
         )
 
@@ -97,9 +99,11 @@ class CategoricalDecoder(nn.Module):
             nn.Conv2d(embedding_dim, hidden, kernel_size=3, padding=1),
             nn.GroupNorm(8, hidden),
             nn.GELU(),
+            nn.Dropout2d(0.3),  # V13-fix: 削弱 decoder 容量，迫使 encoder 编码更多信息
             nn.Conv2d(hidden, hidden, kernel_size=3, padding=1),
             nn.GroupNorm(8, hidden),
             nn.GELU(),
+            nn.Dropout2d(0.3),  # V13-fix: 削弱 decoder 容量
             nn.Conv2d(hidden, out_channels, kernel_size=3, padding=1),
         )
 

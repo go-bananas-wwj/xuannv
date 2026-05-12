@@ -888,12 +888,14 @@ class HarbinPatchDataset(Dataset):
                 source_input_mask[s_idx] = False
                 continue
 
-            # 随机选1帧
-            rand_idx = random.randint(0, n_avail - 1)
-            source_frames[s_idx, 0] = frames[rand_idx]
-            source_ts[s_idx, 0] = ts[rand_idx]
-            source_mask[s_idx, 0] = True
-            all_monthly_ts.append(float(ts[rand_idx]))
+            # V13-fix: 加载当月所有可用帧（而非只选1帧），让 frame drop / valid_period 真正生效
+            n_use = min(n_avail, self.max_frames)
+            use_indices = list(range(n_avail))
+            for i, idx in enumerate(use_indices[:n_use]):
+                source_frames[s_idx, i] = frames[idx]
+                source_ts[s_idx, i] = ts[idx]
+                source_mask[s_idx, i] = True
+                all_monthly_ts.append(float(ts[idx]))
             source_type_ids[s_idx] = SOURCE_TYPE_MAP.get(src_name, 0)
 
         # 2. valid_period = 当月范围
