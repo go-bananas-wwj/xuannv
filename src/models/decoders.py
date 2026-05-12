@@ -6,7 +6,10 @@ from torch import nn
 
 
 class ConditionInjector(nn.Module):
-    """将条件变量 (window_code, relative_time, metadata) 注入到 embedding."""
+    """V13: 禁用条件注入 — 直接返回 embedding.
+    
+    保留类结构以兼容旧 checkpoint，但不做任何修改.
+    """
 
     def __init__(
         self,
@@ -16,31 +19,18 @@ class ConditionInjector(nn.Module):
         metadata_dim: int,
     ) -> None:
         super().__init__()
-        total_cond = window_code_dim + relative_time_code_dim + metadata_dim
-        self.cond_proj = nn.Sequential(
-            nn.Linear(total_cond, embedding_dim),
-            nn.GELU(),
-            nn.Linear(embedding_dim, embedding_dim * 2),
-        )
-        self.gate = nn.Sequential(
-            nn.Linear(embedding_dim * 2, embedding_dim),
-            nn.Sigmoid(),
-        )
+        # 保留参数但不再使用
+        self.embedding_dim = embedding_dim
 
     def forward(
         self,
         embedding: torch.Tensor,
-        window_code: torch.Tensor,
-        relative_time: torch.Tensor,
-        metadata: torch.Tensor,
+        window_code: torch.Tensor | None = None,
+        relative_time: torch.Tensor | None = None,
+        metadata: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        # embedding: [B, C, H, W]
-        # conditions: [B, cond_dim]
-        cond = torch.cat([window_code, relative_time, metadata], dim=-1)
-        cond_features = self.cond_proj(cond)  # [B, C*2]
-        gate = self.gate(cond_features)  # [B, C]
-        gated = embedding.mean(dim=(-2, -1)) * gate  # [B, C]
-        return embedding + gated[:, :, None, None]
+        # V13: 直接返回 embedding，不做任何条件注入
+        return embedding
 
 
 class ContinuousDecoder(nn.Module):
@@ -78,11 +68,11 @@ class ContinuousDecoder(nn.Module):
     def forward(
         self,
         embedding_map: torch.Tensor,
-        window_code: torch.Tensor,
-        relative_time: torch.Tensor,
-        metadata: torch.Tensor,
+        window_code: torch.Tensor | None = None,
+        relative_time: torch.Tensor | None = None,
+        metadata: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        x = self.injector(embedding_map, window_code, relative_time, metadata)
+        x = self.injector(embedding_map)  # V13: 不传递任何条件
         return self.head(x)
 
 

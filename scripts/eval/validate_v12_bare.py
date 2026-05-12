@@ -7,6 +7,10 @@ sys.path.insert(0, "/workspace/xuannv")
 import numpy as np
 import torch
 import torch.nn.functional as F
+try:
+    import torch_npu
+except ImportError:
+    pass
 import geopandas as gpd
 from shapely.geometry import box
 from sklearn.metrics import roc_auc_score

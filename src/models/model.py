@@ -180,6 +180,10 @@ class AEFModel(nn.Module):
         if mask_all_false.any():
             fallback_mask = (source_frame_mask & source_input_mask[:, :, None]).reshape(B, S * T)
             mask = torch.where(mask_all_false[:, None], fallback_mask, mask)
+        # 终极回退: 如果仍然全 False（所有 source 都被 drop），至少保留第一帧
+        mask_all_false = ~mask.any(dim=1)
+        if mask_all_false.any():
+            mask[mask_all_false, 0] = True
 
         # 时间编码
         time_codes = self.time_encoder(timestamps)
@@ -292,59 +296,38 @@ class AEFModel(nn.Module):
             target_metadata = target_metadata[:, None, :]
 
         T_tgt = target_relative_time.shape[1]
-        # Flatten for encoder then reshape back
-        flat_rel_time = target_relative_time.reshape(B * T_tgt, 1)
-        relative_codes = self.relative_time_encoder(flat_rel_time)
+        # V13: 简化 decode — 不传递任何时间条件
         expanded_map = embedding_map[:, None, ...].repeat(1, T_tgt, 1, 1, 1)
-        expanded_window = window_code[:, None, :].expand(-1, T_tgt, -1)
-
         flat_map = expanded_map.reshape(B * T_tgt, *embedding_map.shape[1:])
-        flat_window = expanded_window.reshape(B * T_tgt, window_code.shape[-1])
-        flat_relative = relative_codes  # already [B*T_tgt, code_dim]
-        flat_metadata = target_metadata.reshape(B * T_tgt, target_metadata.shape[-1])
 
-        # 7 类目标分别解码
-        # V11: 静态目标 (dem=3, worldcover=4, jrc_water=6) 弱化时间编码
-        STATIC_SOURCE_IDS = {3, 4, 6}
-        flat_relative_modified = flat_relative.clone()
-        if target_source_idx is not None:
-            flat_src_idx = target_source_idx.reshape(B * T_tgt)
-            static_mask = torch.zeros(B * T_tgt, dtype=torch.bool, device=flat_map.device)
-            for sid in STATIC_SOURCE_IDS:
-                static_mask |= (flat_src_idx == sid)
-            if static_mask.any():
-                flat_relative_modified[static_mask] = flat_relative_modified[static_mask] * 0.1
-
-        max_ch = max(self._per_source_out_channels)
+        max_ch = max(max(self._per_source_out_channels), self.cfg.data.num_classes)
         flat_recon = torch.zeros(B * T_tgt, max_ch, *flat_map.shape[2:], device=flat_map.device, dtype=flat_map.dtype)
 
-        dummy_dec = torch.tensor(0.0, device=flat_map.device)
         if target_source_idx is not None:
             flat_src_idx = target_source_idx.reshape(B * T_tgt)
             for src_id, dec in enumerate(self.per_source_decoders):
                 mask = (flat_src_idx == src_id)
                 if mask.any():
-                    out = dec(flat_map[mask], flat_window[mask], flat_relative_modified[mask], flat_metadata[mask])
+                    out = dec(flat_map[mask])  # V13: 不传递时间条件
                     out_ch = self._per_source_out_channels[src_id]
                     flat_recon[mask, :out_ch] = out.to(flat_recon.dtype)
-                # dummy loss to ensure decoder params always have gradients
-                for p in dec.parameters():
-                    dummy_dec = dummy_dec + p.sum() * 0.0
         else:
             # 默认: 全部用第一个 decoder
-            out = self.per_source_decoders[0](flat_map, flat_window, flat_relative_modified, flat_metadata)
+            out = self.per_source_decoders[0](flat_map)  # V13: 不传递时间条件
             flat_recon[:, :self._per_source_out_channels[0]] = out.to(flat_recon.dtype)
-            for p in self.per_source_decoders[0].parameters():
-                dummy_dec = dummy_dec + p.sum() * 0.0
 
-        flat_recon = flat_recon + dummy_dec
         reconstructions = flat_recon.reshape(B, T_tgt, *flat_recon.shape[1:])
 
-        # 分类头
+        # 分类头 (V13: 不使用，但保留参数以兼容旧 checkpoint)
         logits = self.classification_head(embedding)
         summary_pooled = summary_map.mean(dim=(-2, -1))
         aux_logits = self.aux_cls_head(summary_pooled)
         bottleneck_logits = self.bottleneck_cls_head(pre_norm)
+
+        # Dummy 梯度流：确保 classification head 参数参与 backward
+        # 加到 reconstructions 上（recon loss 一定会 backward）
+        dummy_cls = (logits.sum() + aux_logits.sum() + bottleneck_logits.sum()) * 0.0
+        reconstructions = reconstructions + dummy_cls.view(1, 1, 1, 1, 1)
 
         return AEFOutput(
             embedding_map=embedding_map,

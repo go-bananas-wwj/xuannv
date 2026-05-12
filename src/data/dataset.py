@@ -238,7 +238,41 @@ class HarbinPatchDataset(Dataset):
         self._cache: dict[str, dict[str, tuple]] = {}
         if getattr(d, "preload", True):
             self._preload_all()
+        
+        # ★ V13: 构建月度样本索引
+        self.monthly_samples = self._build_monthly_samples()
+        print(f"[Dataset] 月度样本数: {len(self.monthly_samples)} (来自 {len(self.patches)} patches)")
 
+    def _build_monthly_samples(self) -> list[tuple[str, int, int]]:
+        """构建月度样本索引: [(patch_id, year, month), ...].
+        
+        每个 patch 每个月只要有任意输入源有数据，就生成一个样本。
+        """
+        from datetime import datetime
+        from collections import defaultdict
+        
+        samples = []
+        for patch_id in self.patches:
+            # 收集该 patch 所有输入源的时间戳
+            month_groups = defaultdict(list)
+            
+            for src_name in self.input_sources:
+                src_dir = self._resolve_source_dir(src_name, patch_id)
+                if src_dir is None or not src_dir.exists():
+                    continue
+                tif_files = sorted(src_dir.glob("*.tif"))
+                for tf in tif_files:
+                    ts = label_to_timestamp_ms(tf.stem)
+                    if ts > 0:
+                        dt = datetime.fromtimestamp(ts / 1000)
+                        month_groups[(dt.year, dt.month)].append(ts)
+            
+            # 每个月一个样本（只要有数据）
+            for (year, month), ts_list in sorted(month_groups.items()):
+                samples.append((patch_id, year, month))
+        
+        return samples
+    
     def _discover_patches(self) -> list[str]:
         if self.data_root.suffix == ".json":
             with self.data_root.open("r") as f:
@@ -804,13 +838,31 @@ class HarbinPatchDataset(Dataset):
         return mask
 
     def __len__(self) -> int:
-        return len(self.patches)
+        return len(self.monthly_samples)
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         return self._get_item(idx)
 
+    def _load_monthly_frames(self, patch_id: str, source_name: str, year: int, month: int) -> tuple[np.ndarray, np.ndarray]:
+        """只加载指定自然月内的帧."""
+        from datetime import datetime
+        import calendar
+        
+        start_ms = datetime(year, month, 1).timestamp() * 1000
+        last_day = calendar.monthrange(year, month)[1]
+        end_ms = datetime(year, month, last_day, 23, 59, 59).timestamp() * 1000
+        
+        frames, ts = self._load_input_frames_impl(patch_id, source_name)
+        if len(frames) == 0:
+            return frames, ts
+        
+        # 过滤当月
+        mask = (ts >= start_ms) & (ts <= end_ms)
+        return frames[mask], ts[mask]
+    
     def _get_item(self, idx: int) -> dict[str, torch.Tensor]:
-        patch_id = self.patches[idx]
+        """V13: 月度采样 — 每个样本 = (patch, month), 输入/目标都是当月1帧."""
+        patch_id, year, month = self.monthly_samples[idx]
         S_inp = self.num_input_sources
         T = self.max_frames
         C = self.input_dim
@@ -818,66 +870,43 @@ class HarbinPatchDataset(Dataset):
         S_tgt = self.num_target_sources
         M = self.metadata_dim
 
-        # 1. 加载输入
-        all_timestamps: list[float] = []
+        # 1. 加载输入 — 当月每源随机1帧
         source_frames = np.zeros((S_inp, T, C, H, W), dtype=np.float32)
         source_ts = np.zeros((S_inp, T), dtype=np.float64)
         source_mask = np.zeros((S_inp, T), dtype=bool)
         source_input_mask = np.ones(S_inp, dtype=bool)
         source_type_ids = np.zeros(S_inp, dtype=np.int64)
+        
+        # 记录当月所有时间戳（用于 valid_period）
+        all_monthly_ts: list[float] = []
 
         for s_idx, src_name in enumerate(self.input_sources):
-            frames, ts = self._load_input_frames(patch_id, src_name)
+            frames, ts = self._load_monthly_frames(patch_id, src_name, year, month)
             n_avail = len(frames)
 
             if n_avail == 0:
                 source_input_mask[s_idx] = False
                 continue
 
-            frames, ts = self._subsample_frames(list(frames), list(ts))
-            n_use = len(frames)
-            source_frames[s_idx, :n_use] = frames
-            source_ts[s_idx, :n_use] = ts
-            source_mask[s_idx, :n_use] = True
-            all_timestamps.extend(ts)
+            # 随机选1帧
+            rand_idx = random.randint(0, n_avail - 1)
+            source_frames[s_idx, 0] = frames[rand_idx]
+            source_ts[s_idx, 0] = ts[rand_idx]
+            source_mask[s_idx, 0] = True
+            all_monthly_ts.append(float(ts[rand_idx]))
             source_type_ids[s_idx] = SOURCE_TYPE_MAP.get(src_name, 0)
 
-        # 2. 确定 valid_period
-        ts_sorted = sorted(set(int(t) for t in all_timestamps if t > 0))
-        if len(ts_sorted) >= 2:
-            duration = ts_sorted[-1] - ts_sorted[0]
-            valid_start = float(ts_sorted[0] + int(0.1 * duration))
-            valid_end = float(ts_sorted[-1] - int(0.1 * duration))
-        elif len(ts_sorted) == 1:
-            valid_start = valid_end = float(ts_sorted[0])
+        # 2. valid_period = 当月范围
+        if all_monthly_ts:
+            valid_start = float(min(all_monthly_ts))
+            valid_end = float(max(all_monthly_ts))
         else:
-            valid_start = valid_end = 1672531200000.0
+            from datetime import datetime
+            valid_start = datetime(year, month, 1).timestamp() * 1000
+            import calendar
+            valid_end = datetime(year, month, calendar.monthrange(year, month)[1], 23, 59, 59).timestamp() * 1000
 
-        # 3. 时序窗口增强
-        if (self.training and self.temporal_window_augmentation
-                and random.random() < self.temporal_window_prob and len(ts_sorted) >= 2):
-            min_f = max(2, self.temporal_window_min_frames)
-            max_f = min(self.temporal_window_max_frames, len(ts_sorted) - 1)
-            if min_f <= max_f:
-                n_sel = random.randint(min_f, max_f)
-                max_start = max(0, len(ts_sorted) - n_sel)
-                if max_start >= 0:
-                    si = random.randint(0, max_start)
-                    ei = min(si + n_sel, len(ts_sorted) - 1)
-                    valid_start = float(ts_sorted[si])
-                    valid_end = float(ts_sorted[ei])
-
-        # 4. 选择目标帧
-        valid_ts_set = set(int(t) for t in all_timestamps if t > 0)
-        valid_in_range = [t for t in valid_ts_set if valid_start <= t <= valid_end]
-        if valid_in_range and self.training:
-            target_ts = float(random.choice(valid_in_range))
-        elif valid_in_range:
-            target_ts = float(valid_in_range[len(valid_in_range) // 2])
-        else:
-            target_ts = valid_start
-
-        # 5. 构建目标
+        # 3. 构建目标 — 与输入同一帧（自编码器）
         target_res = H // 2
         tgt_ch = max(self.reconstruction_channels, self.num_classes)
         target_images = np.zeros((S_tgt, tgt_ch, target_res, target_res), dtype=np.float32)
@@ -887,18 +916,15 @@ class HarbinPatchDataset(Dataset):
         target_loss_type = np.zeros(S_tgt, dtype=np.int64)
         target_source_idx = np.zeros(S_tgt, dtype=np.int64)
         
-        # 从原始 WorldCover 文件提取 patch-level label (避开 cache 中的 one-hot 数据)
         patch_label = self._get_worldcover_label(patch_id)
-
-        support_duration = max(ts_sorted[-1] - ts_sorted[0], 1) if len(ts_sorted) >= 2 else 1
 
         for t_idx, (tgt_name, loss_type, sensor_src) in enumerate(self.target_sources):
             is_categorical = loss_type == 1
-            if tgt_name in ("dem", "worldcover", "jrc_water"):
+            if tgt_name == "dem":
+                # 静态目标
                 if tgt_name in self._cache.get(patch_id, {}):
                     data = self._cache[patch_id][tgt_name][0][0]
-                    has_nan = (tgt_name == "jrc_water")
-                    data = self._resize_to_target(data, target_res, is_categorical=is_categorical, has_nan=has_nan)
+                    data = self._resize_to_target(data, target_res, is_categorical=is_categorical)
                     target_images[t_idx, :data.shape[0]] = data
                     target_mask[t_idx] = True
                     target_loss_type[t_idx] = loss_type
@@ -911,73 +937,28 @@ class HarbinPatchDataset(Dataset):
                         if tif_files:
                             data = read_tif(tif_files[0], 0)
                             if data is not None:
-                                if tgt_name == "jrc_water":
-                                    data = data.astype(np.float32)
-                                    data[data == -128] = np.nan
                                 data = self._normalize(data, tgt_name)
-                                data = self._resize_to_target(data, target_res, is_categorical=is_categorical, has_nan=(tgt_name == "jrc_water"))
+                                data = self._resize_to_target(data, target_res, is_categorical=is_categorical)
                                 target_images[t_idx, :data.shape[0]] = data
                                 target_mask[t_idx] = True
                                 target_loss_type[t_idx] = loss_type
                                 target_source_idx[t_idx] = t_idx
                                 target_relative_time[t_idx] = 0.5
-            elif tgt_name == "dynamic_world":
-                if tgt_name in self._cache.get(patch_id, {}):
-                    frames_arr, ts_arr = self._cache[patch_id][tgt_name]
-                    closest_idx = int(np.argmin(np.abs(ts_arr - target_ts)))
-                    data = frames_arr[closest_idx]
-                    data = self._resize_to_target(data, target_res, is_categorical=is_categorical)
-                    target_images[t_idx, :data.shape[0]] = data
-                    target_mask[t_idx] = True
-                    target_loss_type[t_idx] = loss_type
-                    target_source_idx[t_idx] = t_idx
-                    rel_t = (ts_arr[closest_idx] - ts_sorted[0]) / support_duration if len(ts_sorted) >= 2 else 0.5
-                    target_relative_time[t_idx] = float(np.clip(rel_t, 0.0, 1.0))
-                else:
-                    src_dir = self.data_root / tgt_name / patch_id
-                    if src_dir.exists():
-                        tif_files = sorted(src_dir.glob("*.tif"))
-                        if tif_files:
-                            frames_list = []
-                            ts_list = []
-                            for tf in tif_files:
-                                d = read_tif(tf, H)
-                                if d is not None:
-                                    d = self._normalize(d, tgt_name)
-                                    d = self._resize_to_target(d, target_res, is_categorical=is_categorical)
-                                    frames_list.append(d)
-                                    ts_list.append(float(label_to_timestamp_ms(tf.stem)))
-                            if frames_list:
-                                frames_arr = np.stack(frames_list)
-                                ts_arr = np.array(ts_list, dtype=np.float64)
-                                closest_idx = int(np.argmin(np.abs(ts_arr - target_ts)))
-                                target_images[t_idx, :frames_arr.shape[1]] = frames_arr[closest_idx]
-                                target_mask[t_idx] = True
-                                target_loss_type[t_idx] = loss_type
-                                target_source_idx[t_idx] = t_idx
-                                rel_t = (ts_arr[closest_idx] - ts_sorted[0]) / support_duration if len(ts_sorted) >= 2 else 0.5
-                                target_relative_time[t_idx] = float(np.clip(rel_t, 0.0, 1.0))
-            else:
-                # s2/s1/landsat 作为目标: 复用已缓存的输入帧, 避免重复磁盘 IO
-                frames, ts = self._load_input_frames(patch_id, tgt_name)
-                if len(frames) > 0:
-                    closest_idx = int(np.argmin(np.abs(ts - target_ts)))
-                    data = frames[closest_idx]
+            elif tgt_name in ("s2", "s1", "landsat"):
+                # 动态目标: 复用输入帧（同一帧）
+                s_idx = self.input_sources.index(tgt_name)
+                if source_mask[s_idx, 0]:
+                    data = source_frames[s_idx, 0].copy()
                     data = self._pad_channels(data, self.reconstruction_channels)
                     data = self._resize_to_target(data, target_res, is_categorical=is_categorical)
                     target_images[t_idx, :data.shape[0]] = data
                     target_mask[t_idx] = True
                     target_loss_type[t_idx] = loss_type
                     target_source_idx[t_idx] = t_idx
-                    rel_t = (ts[closest_idx] - ts_sorted[0]) / support_duration if len(ts_sorted) >= 2 else 0.5
-                    target_relative_time[t_idx] = float(np.clip(rel_t, 0.0, 1.0))
+                    target_relative_time[t_idx] = 0.5
+            # else: worldcover/dynamic_world/jrc_water 已去掉
 
-            window_pos = (target_ts - valid_start) / max(valid_end - valid_start, 1)
-            window_width = (valid_end - valid_start) / support_duration if support_duration > 0 else 0
-            target_metadata[t_idx, 0] = float(np.clip(window_pos, 0, 1))
-            target_metadata[t_idx, 1] = float(np.clip(window_width, 0, 1))
-
-        # 6. 空间增强
+        # 4. 空间增强
         if self.training:
             if random.random() < 0.5:
                 source_frames = source_frames[..., ::-1, :].copy()
@@ -986,14 +967,16 @@ class HarbinPatchDataset(Dataset):
                 source_frames = source_frames[..., ::-1].copy()
                 target_images = target_images[..., ::-1].copy()
 
-        # 7. 双时间窗口生成
+        # 5. 双时间窗口（简化：用同一月的前后两半）
+        ts_sorted = sorted(int(t) for t in all_monthly_ts if t > 0)
         w1_start, w1_end, w2_start, w2_end = self._sample_dual_windows(ts_sorted)
 
-        # 8. 跨时相空间掩码（用于掩码重建任务）
+        # 6. 跨时相空间掩码
         spatial_mask = self._generate_spatial_mask() if self.training else None
 
         return {
             "patch_id": patch_id,
+            "year_month": (year, month),
             "source_frames": torch.from_numpy(source_frames),
             "source_timestamps_ms": torch.from_numpy(source_ts),
             "source_frame_mask": torch.from_numpy(source_mask),

@@ -105,6 +105,7 @@ class TrainingConfig:
     student_back_drop_prob: float = 0.2
     # 损失权重
     reconstruction_weight: float = 1.0
+    source_recon_weights: list = None  # 源特定重建权重
     uniformity_weight: float = 0.3
     batch_uniformity_weight: float = 0.0
     uniformity_adaptive: bool = True
@@ -114,6 +115,7 @@ class TrainingConfig:
     # 反坍缩四件套
     orthogonality_weight: float = 1.0
     variance_weight: float = 1.0
+    covariance_weight: float = 0.1
     decorrelation_weight: float = 0.01
     spatial_dropout_rate: float = 0.5
     bottleneck_cls_weight: float = 0.2
@@ -174,6 +176,7 @@ class TrainingConfig:
     dino_weight: float = 0.0
     teacher_momentum: float = 0.996
     save_every: int = 20
+    max_steps_per_epoch: int = 0  # 0 = 不限制，使用全部数据
     expander_dim: int = 0
     # 检查点
     save_best_balanced: bool = True

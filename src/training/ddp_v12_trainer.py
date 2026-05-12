@@ -25,7 +25,9 @@ from src.training.losses import (
     reconstruction_loss,
     batch_uniformity_loss_l2,
     consistency_loss,
+    consistency_loss_spatial,
     variance_regularizer,
+    covariance_loss,
 )
 from src.training.memory_bank import EmbeddingMemoryBank
 from src.training.optimizer import build_optimizer, build_scheduler, get_cosine_lr
@@ -34,7 +36,7 @@ from src.training.optimizer import build_optimizer, build_scheduler, get_cosine_
 # ---------------------------------------------------------------------------
 # 源 → 重建权重映射
 # ---------------------------------------------------------------------------
-DEFAULT_SOURCE_RECON_WEIGHTS = [1.0, 1.0, 1.0]
+DEFAULT_SOURCE_RECON_WEIGHTS = [1.0, 1.0, 1.0, 0.05]  # S2, S1, Landsat, DEM
 
 
 def _build_student_view(
@@ -167,7 +169,8 @@ class DDPv12Trainer:
         self.scheduler = build_scheduler(self.optimizer, cfg)
 
         # GradScaler
-        self.scaler = torch_npu.npu.amp.GradScaler(init_scale=2**18)
+        # V13: 禁用 scaler，fp32 训练不需要
+        self.scaler = None
 
         # 输出目录
         self.output_dir = Path(cfg.experiment.output_dir)
@@ -181,7 +184,7 @@ class DDPv12Trainer:
             device=self.device,
         )
 
-        # Memory Bank — 扩大 uniformity 的有效 batch
+        # Memory Bank — 扩大 pre-norm 有效 batch
         emb_dim = getattr(cfg.model, 'embedding_dim', 128)
         self.memory_bank = EmbeddingMemoryBank(K=512, dim=emb_dim, device=self.device)
 
@@ -218,7 +221,10 @@ class DDPv12Trainer:
         uniform_w = t.batch_uniformity_weight
         recon_warmup = min(1.0, (epoch + 1) / max(getattr(t, 'recon_warmup_epochs', 10), 1))
 
-        for step, batch in enumerate(dataloader):
+        import itertools
+        max_steps = getattr(t, 'max_steps_per_epoch', None)
+        iterator = itertools.islice(dataloader, max_steps) if max_steps else dataloader
+        for step, batch in enumerate(iterator):
             batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v
                      for k, v in batch.items()}
 
@@ -226,9 +232,12 @@ class DDPv12Trainer:
             for pg in self.optimizer.param_groups:
                 pg["lr"] = lr
 
-            with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=True):
+            with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=False):
                 # Teacher forward
                 has_dual = all(k in batch for k in ['valid_start_w1', 'valid_end_w1', 'valid_start_w2', 'valid_end_w2'])
+                # V13: empty cache before teacher forward to avoid OOM
+                if hasattr(torch.npu, 'empty_cache'):
+                    torch.npu.empty_cache()
                 with torch.no_grad():
                     teacher_out = self.teacher(
                         source_frames=batch["source_frames"],
@@ -273,65 +282,86 @@ class DDPv12Trainer:
                 # Reconstruction
                 recon = self._compute_recon_loss(student_out.reconstructions, batch)
 
-                # Consistency (teacher vs student embedding)
-                consist = consistency_loss(teacher_out.embedding, student_out.embedding)
+                # V13: Consistency (teacher vs student spatial map)
+                if consist_w > 0:
+                    consist = consistency_loss_spatial(
+                        teacher_out.embedding_map.detach(),
+                        student_out.embedding_map,
+                    )
+                else:
+                    consist = torch.tensor(0.0, device=self.device)
 
-            # VICReg Variance Loss (with Memory Bank)
-            embedding = student_out.embedding
+            # === VICReg Variance + Covariance (Pre-norm 空间) + Memory Bank ===
+            pre_norm = student_out.pre_norm_embedding  # [B, D] — 真正的 pre-norm
+            
+            # V13: skip NaN/Inf check (fixed in model.encode_frames fallback)
+            
             if dist.is_initialized() and self.world_size > 1:
-                gathered_emb = [torch.zeros_like(embedding) for _ in range(self.world_size)]
-                dist.all_gather(gathered_emb, embedding)
-                gathered_emb = torch.cat(gathered_emb, dim=0)
+                gathered_pre = [torch.zeros_like(pre_norm) for _ in range(self.world_size)]
+                dist.all_gather(gathered_pre, pre_norm)
+                gathered_pre = torch.cat(gathered_pre, dim=0)
             else:
-                gathered_emb = embedding
+                gathered_pre = pre_norm
 
-            # Enqueue 当前 batch 的 embedding
-            self.memory_bank.enqueue(gathered_emb.detach())
-
-            # 合并当前 batch + memory bank
+            # Memory Bank: 扩大 pre-norm 有效 batch
+            self.memory_bank.enqueue(gathered_pre.detach())
             bank_emb = self.memory_bank.get_all()
             if bank_emb.shape[0] > 0:
-                all_emb = torch.cat([gathered_emb, bank_emb], dim=0)
+                all_pre = torch.cat([gathered_pre, bank_emb], dim=0)
             else:
-                all_emb = gathered_emb
+                all_pre = gathered_pre
 
-            # 计算每个维度的标准差（用于日志诊断）
-            std_per_dim = torch.sqrt(all_emb.var(dim=0) + 1e-4)
-            std_min = std_per_dim.min().item()
-            std_mean = std_per_dim.mean().item()
-            std_max = std_per_dim.max().item()
-            n_collapse_dims = (std_per_dim < 0.05).sum().item()  # 标准差<0.05视为坍缩
+            # Pre-norm VICReg: variance + covariance
+            var_w = getattr(t, 'variance_weight', 0.3)
+            cov_w = getattr(t, 'covariance_weight', 0.1)
+            var = variance_regularizer(all_pre.float(), min_std=1.0) if var_w > 0 else torch.tensor(0.0, device=self.device)
+            cov = covariance_loss(all_pre.float()) if cov_w > 0 else torch.tensor(0.0, device=self.device)
 
-            # VICReg Variance Loss: 逐维检查，低于阈值的维度单独惩罚
-            # L2-normalized embedding 的理想 std ≈ 1/sqrt(128) ≈ 0.088
-            uniform = variance_regularizer(all_emb, min_std=0.05)
+            # L2 空间轻量监督（防止 pre-norm → L2 传递失效）
+            l2_uniform_w = getattr(t, 'batch_uniformity_weight', 0.05)
+            embedding = student_out.embedding  # [B, D]
+            if dist.is_initialized() and self.world_size > 1:
+                gathered_l2 = [torch.zeros_like(embedding) for _ in range(self.world_size)]
+                dist.all_gather(gathered_l2, embedding)
+                gathered_l2 = torch.cat(gathered_l2, dim=0)
+            else:
+                gathered_l2 = embedding
+            l2_uniform = batch_uniformity_loss_l2(gathered_l2.float()) if l2_uniform_w > 0 else torch.tensor(0.0, device=self.device)
 
-            # Dummy loss for unused heads (avoid DDP unused parameter error)
-            dummy = 0.0
-            for head in [self.model.module.classification_head,
-                         self.model.module.aux_cls_head,
-                         self.model.module.bottleneck_cls_head]:
-                for p in head.parameters():
-                    dummy = dummy + p.sum() * 0.0
+            # Per-dim 诊断（日志用）
+            with torch.no_grad():
+                std_per_dim = torch.sqrt(all_pre.var(dim=0, unbiased=False) + 1e-6)
+                std_min = std_per_dim.min().item()
+                std_mean = std_per_dim.mean().item()
+                std_max = std_per_dim.max().item()
+                active_dims = (std_per_dim > 0.05).sum().item()
+                cov_offdiag = cov.item() if cov_w > 0 else 0.0
 
             total = (
                 recon_w * recon_warmup * recon
                 + consist_w * consist
-                + uniform_w * uniform
-                + dummy
+                + var_w * var
+                + cov_w * cov
+                + l2_uniform_w * l2_uniform
             )
 
             if torch.isnan(total) or torch.isinf(total):
                 if self.global_rank == 0 and step % 10 == 0:
                     print(f"  [WARNING] NaN/Inf total at step {step}, skipping.")
+                    print(f"    recon={recon.item():.4f} consist={consist.item():.4f} "
+                          f"var={var.item():.4f} cov={cov.item():.4f} l2unif={l2_uniform.item():.4f}")
                 self.optimizer.zero_grad()
                 continue
 
             total = total / accum_steps
-            self.scaler.scale(total).backward()
+            if self.scaler is not None:
+                self.scaler.scale(total).backward()
+            else:
+                total.backward()
 
             if (step + 1) % accum_steps == 0 or (step + 1) == len(dataloader):
-                self.scaler.unscale_(self.optimizer)
+                if self.scaler is not None:
+                    self.scaler.unscale_(self.optimizer)
                 torch.nn.utils.clip_grad_norm_(
                     self.model.parameters(),
                     getattr(t, "grad_clip_norm", 1.0)
@@ -346,27 +376,39 @@ class DDPv12Trainer:
                         print(f"  [WARNING] NaN/Inf gradient detected, skipping optimizer step.")
                     self.optimizer.zero_grad()
                 else:
-                    self.scaler.step(self.optimizer)
-                    self.scaler.update()
+                    if self.scaler is not None:
+                        self.scaler.step(self.optimizer)
+                        self.scaler.update()
+                    else:
+                        self.optimizer.step()
                     self.optimizer.zero_grad()
                 self.update_teacher()
+                
+                # V13: weight health check (silent)
+                # for name, p in self.model.named_parameters():
+                #     if p is not None and (torch.isnan(p).any() or torch.isinf(p).any()):
+                #         print(f"  [DEBUG] NaN/Inf weight after step: {name}")
 
             for k, v in {
                 "total": total.item() * accum_steps,
                 "recon": recon.item(),
                 "consist": consist.item(),
-                "uniform": uniform.item(),
+                "var": var.item(),
+                "cov": cov.item(),
+                "l2unif": l2_uniform.item(),
                 "lr": lr,
             }.items():
                 loss_accum[k] = loss_accum.get(k, 0.0) + v
             n_steps += 1
 
             if self.global_rank == 0 and step % 20 == 0:
-                print(f"  [Step {step}] recon={recon.item():.3f} "
-                      f"consist={consist.item():.3f} uniform={uniform.item():.3f} "
-                      f"bank={self.memory_bank.size}/{self.memory_bank.K} "
-                      f"std=[{std_min:.3f}/{std_mean:.3f}/{std_max:.3f}] "
-                      f"collapse_dims={n_collapse_dims}/128 "
+                bank_size = self.memory_bank.size
+                print(f"  [Step {step}] recon={recon.item():.4f} "
+                      f"consist={consist.item():.4f} var={var.item():.4f} "
+                      f"cov={cov.item():.4f} l2unif={l2_uniform.item():.4f} "
+                      f"bank={bank_size}/{self.memory_bank.K} "
+                      f"std=[{std_min:.4f}/{std_mean:.4f}/{std_max:.4f}] "
+                      f"active_dims={active_dims}/128 "
                       f"perturb=[fd={perturb_stats['frame_drop_ratio']:.2f} "
                       f"sd={perturb_stats['source_drop_ratio']:.2f}] "
                       f"lr={lr:.6f}")
@@ -374,6 +416,14 @@ class DDPv12Trainer:
         loss_accum = {k: v / n_steps for k, v in loss_accum.items()}
         loss_accum = self._reduce_loss_dict(loss_accum)
         loss_accum["lr"] = lr
+        # 添加 epoch 级别诊断指标
+        with torch.no_grad():
+            bank_emb = self.memory_bank.get_all()
+            all_pre = bank_emb if bank_emb.shape[0] > 0 else torch.zeros(1, self.memory_bank.dim, device=self.device)
+            std_per_dim = torch.sqrt(all_pre.var(dim=0, unbiased=False) + 1e-6)
+            loss_accum["bank"] = float(self.memory_bank.size)
+            loss_accum["active_dims"] = float((std_per_dim > 0.05).sum().item())
+            loss_accum["std_mean"] = float(std_per_dim.mean().item())
         return loss_accum
 
     def _compute_recon_loss(self, predictions, batch):
@@ -398,7 +448,7 @@ class DDPv12Trainer:
             "epoch": epoch,
             "model_state_dict": self.model.module.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
-            "scaler_state_dict": self.scaler.state_dict(),
+            "scaler_state_dict": self.scaler.state_dict() if self.scaler is not None else {},
             "losses": losses,
         }, path)
         print(f"[ddp_v12] Saved checkpoint to {path}")
@@ -439,7 +489,8 @@ class DDPv12Trainer:
                 if self.global_rank == 0:
                     print(f"[load_checkpoint] Optimizer mismatch: {e}")
         if "scaler_state_dict" in ckpt:
-            self.scaler.load_state_dict(ckpt["scaler_state_dict"])
+            if self.scaler is not None and "scaler_state_dict" in ckpt:
+                self.scaler.load_state_dict(ckpt["scaler_state_dict"])
         epoch = ckpt.get("epoch", 0)
         if not isinstance(epoch, int):
             import re

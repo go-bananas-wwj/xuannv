@@ -176,12 +176,28 @@ def decorrelation_loss(embeddings: torch.Tensor) -> torch.Tensor:
 def variance_regularizer(embeddings: torch.Tensor, min_std: float = 1.0) -> torch.Tensor:
     """VICReg 风格方差正则: 约束每个维度的标准差不低于 min_std.
 
+    使用 biased variance (unbiased=False)，与 VICReg 官方实现一致。
     当某维度方差坍缩（std < min_std）时产生惩罚，否则为 0。
     """
     if embeddings.shape[0] < 2:
         return embeddings.new_tensor(0.0)
-    std = torch.sqrt(embeddings.var(dim=0) + 1e-4)
+    std = torch.sqrt(embeddings.var(dim=0, unbiased=False) + 1e-4)
     return F.relu(min_std - std).mean()
+
+
+def covariance_loss(embeddings: torch.Tensor) -> torch.Tensor:
+    """VICReg covariance loss — 惩罚维度之间的相关性.
+
+    计算 embedding 的协方差矩阵，惩罚非对角元素。
+    与 L2 归一化完全兼容。
+    """
+    if embeddings.shape[0] < 2:
+        return embeddings.new_tensor(0.0)
+    N = embeddings.shape[0]
+    emb_centered = embeddings - embeddings.mean(dim=0, keepdim=True)
+    cov = (emb_centered.T @ emb_centered) / (N - 1)
+    off_diag = cov - torch.diag(torch.diag(cov))
+    return (off_diag ** 2).mean()
 
 
 # ────────────────────────────────────────────
@@ -230,6 +246,24 @@ def consistency_loss(teacher: torch.Tensor, student: torch.Tensor) -> torch.Tens
     teacher = F.normalize(teacher, dim=-1)
     student = F.normalize(student, dim=-1)
     return 0.5 * (1.0 - torch.sum(teacher * student, dim=-1)).mean()
+
+
+def consistency_loss_spatial(teacher_map: torch.Tensor, student_map: torch.Tensor) -> torch.Tensor:
+    """V13: 教师-学生 Spatial Map 一致性损失.
+    
+    Args:
+        teacher_map: [B, D, H, W]
+        student_map: [B, D, H, W]
+    """
+    # L2 normalize 每个空间位置
+    teacher = F.normalize(teacher_map, dim=1)  # [B, D, H, W]
+    student = F.normalize(student_map, dim=1)  # [B, D, H, W]
+    
+    # 逐像素 cosine similarity
+    sim = torch.sum(teacher * student, dim=1)  # [B, H, W]
+    
+    # 1 - similarity = distance
+    return 0.5 * (1.0 - sim).mean()
 
 
 def classification_loss(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:

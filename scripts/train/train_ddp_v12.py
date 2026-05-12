@@ -27,6 +27,7 @@ import numpy as np
 import torch
 import torch_npu
 import torch.distributed as dist
+import time
 
 torch.set_num_threads(4)
 
@@ -142,19 +143,37 @@ def main():
     total_epochs = cfg.training.epochs
     best_recon = float("inf")
     save_every = args.save_every if args.save_every is not None else getattr(cfg.training, "save_every", 20)
+    epoch_start_time = time.time()
+    bank_size = 0
 
     for epoch in range(start_epoch, total_epochs):
         if hasattr(dataloader.sampler, "set_epoch"):
             dataloader.sampler.set_epoch(epoch)
 
+        epoch_t0 = time.time()
         losses = trainer.train_epoch(epoch, dataloader)
+        epoch_dt = time.time() - epoch_t0
+        elapsed = time.time() - epoch_start_time
+        remain_epochs = total_epochs - (epoch + 1)
+        eta_sec = epoch_dt * remain_epochs if remain_epochs > 0 else 0
+        eta_str = f"{int(eta_sec // 3600)}h{int((eta_sec % 3600) // 60)}m"
+
+        # 获取 Memory Bank 大小
+        if hasattr(trainer, 'memory_bank'):
+            bank_size = trainer.memory_bank.size
 
         if global_rank == 0:
+            bank_size = int(losses.get('bank', 0))
+            active_dims = int(losses.get('active_dims', 0))
+            std_mean = losses.get('std_mean', 0.0)
             logger.Print(
-                f"Epoch {epoch + 1:03d}/{cfg.training.epochs} | "
+                f"[{time.strftime('%H:%M:%S')}] Epoch {epoch + 1:03d}/{cfg.training.epochs} | "
                 f"total={losses['total']:.4f} recon={losses['recon']:.4f} "
-                f"consist={losses['consist']:.4f} uniform={losses['uniform']:.4f} "
-                f"lr={losses['lr']:.6f}"
+                f"consist={losses['consist']:.4f} var={losses['var']:.4f} "
+                f"cov={losses['cov']:.4f} l2unif={losses['l2unif']:.4f} "
+                f"bank={bank_size}/512 active={active_dims}/128 std_mean={std_mean:.4f} "
+                f"lr={losses['lr']:.6f} | "
+                f"time={epoch_dt:.1f}s elapsed={int(elapsed//60)}m ETA={eta_str}"
             )
 
         if (epoch + 1) % save_every == 0:
