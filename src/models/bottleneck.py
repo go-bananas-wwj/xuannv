@@ -43,8 +43,8 @@ class VMFBottleneck(nn.Module):
         self.to_embedding = nn.Conv2d(channels, embedding_dim, kernel_size=1)
         self.embedding_dim = embedding_dim
         self.kappa = kappa
-        # V11: skip_l2_training 不再使用，保留参数仅为兼容旧 checkpoint
-        self.skip_l2_training = False
+        # V13: skip_l2_training 真正生效 — 训练时跳过 L2 Norm，避免梯度屏障
+        self.skip_l2_training = skip_l2_training
 
         # ── V10: Difference Module (保留) ──
         self.diff_encoder = nn.Sequential(
@@ -72,9 +72,14 @@ class VMFBottleneck(nn.Module):
             pre_norm_map: [B, D, H, W]  与 embedding_map 相同 (兼容旧接口)
         """
         pre_norm_map = self.to_embedding(features)  # [B, D, H, W]
-        embedding_map = self._apply_norm(pre_norm_map)
-        embedding_vector = embedding_map.mean(dim=(-2, -1))
-        embedding_vector = F.normalize(embedding_vector, p=2, dim=1)
+        # V13: 训练时支持跳过 L2 Norm，避免 (I-uu^T)/||x|| Jacobian 梯度屏障
+        if self.training and self.skip_l2_training:
+            embedding_map = pre_norm_map
+            embedding_vector = embedding_map.mean(dim=(-2, -1))
+        else:
+            embedding_map = self._apply_norm(pre_norm_map)
+            embedding_vector = embedding_map.mean(dim=(-2, -1))
+            embedding_vector = F.normalize(embedding_vector, p=2, dim=1)
         # V12.1: 返回真正的 pre-norm（用于 VICReg variance/covariance）
         pre_norm_vector = pre_norm_map.mean(dim=(-2, -1))
         # Dummy: diff_encoder / change_gate / fusion 仅在 dual_window 中使用，

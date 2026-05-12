@@ -60,6 +60,8 @@ class DataConfig:
     # 跨时相掩码重建
     ct_mask_ratio: float = 0.0
     ct_mask_patch_size: int = 8
+    # 快速验证: 随机采样部分 patch
+    max_patches: int | None = None
 
 
 @dataclass

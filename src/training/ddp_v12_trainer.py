@@ -29,6 +29,7 @@ from src.training.losses import (
     consistency_loss_spatial,
     variance_regularizer,
     covariance_loss,
+    bottleneck_orthogonality_loss,
 )
 from src.training.memory_bank import EmbeddingMemoryBank
 from src.training.optimizer import build_optimizer, build_scheduler, get_cosine_lr
@@ -365,12 +366,19 @@ class DDPv12Trainer:
                 active_dims = (std_per_dim > 0.05).sum().item()
                 cov_offdiag = cov.item() if cov_w > 0 else 0.0
 
+            # V13: Bottleneck Orthogonality Loss
+            orth_w = getattr(t, 'orthogonality_weight', 0.0)
+            orth = torch.tensor(0.0, device=self.device)
+            if orth_w > 0:
+                orth = bottleneck_orthogonality_loss(self.model.module.bottleneck.to_embedding.weight)
+
             total = (
                 recon_w * recon_warmup * recon
                 + consist_w * consist
                 + var_w * var
                 + cov_w * cov
                 + l2_uniform_w * l2_uniform
+                + orth_w * orth
             )
 
             if torch.isnan(total) or torch.isinf(total):
