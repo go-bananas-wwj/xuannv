@@ -227,6 +227,13 @@ class HarbinPatchDataset(Dataset):
         self.ct_mask_patch_size = getattr(d, "ct_mask_patch_size", 8)  # 掩码 patch 尺寸
 
         self.patches = self._discover_patches()
+        # V13-fix: 支持随机采样部分 patch 用于快速验证
+        max_patches = getattr(d, 'max_patches', None)
+        if max_patches and isinstance(max_patches, int) and max_patches > 0:
+            if len(self.patches) > max_patches:
+                rng = random.Random(getattr(cfg.experiment, 'seed', 42) + 12345)
+                self.patches = rng.sample(self.patches, max_patches)
+                print(f"[Dataset] Randomly sampled {max_patches} patches for fast validation")
         stats_dir = Path(d.stats_dir) if d.stats_dir else None
         self.stats = self._load_stats(stats_dir)
 
