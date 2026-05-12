@@ -11,6 +11,7 @@ def compute_recon_loss(
     mask: torch.Tensor,
     loss_type: torch.Tensor | None,
     num_classes: int,
+    recon_mask: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """计算重建损失: L1 (连续源) / CE (分类源).
 
@@ -20,6 +21,7 @@ def compute_recon_loss(
         mask: [B, T_tgt] bool — 只计算 mask=True 的目标.
         loss_type: [B, T_tgt] or [B*T_tgt] int — 0=continuous, 1=categorical.
         num_classes: 分类目标的总类别数.
+        recon_mask: [H, W] 或 [B, H, W] — MAE风格，只对mask=1的区域计算loss.
 
     Returns:
         标量损失值.
@@ -53,6 +55,12 @@ def compute_recon_loss(
             # 排除 no-data（所有通道和接近 0）
             has_data = tgt_onehot.sum(dim=1) > 0.5
             valid_pixels = has_data & (tgt_cls >= 0) & (tgt_cls < num_classes)
+            # V13-MAE: 应用重建掩码
+            if recon_mask is not None:
+                if recon_mask.dim() == 2:
+                    valid_pixels = valid_pixels & (recon_mask[None, :, :] > 0.5)
+                elif recon_mask.dim() == 3:
+                    valid_pixels = valid_pixels & (recon_mask[batch_mask] > 0.5)
             p_valid = p[batch_mask]  # [N_valid, C, H, W]
             if valid_pixels.sum() > 0:
                 if p_valid.shape[-2:] != tgt_cls.shape[-2:]:
@@ -73,6 +81,12 @@ def compute_recon_loss(
             p_valid_c = p_valid[:, :ch]
             tgt_valid_c = tgt_valid[:, :ch]
             valid = ~torch.isnan(tgt_valid_c)
+            # V13-MAE: 应用重建掩码
+            if recon_mask is not None:
+                if recon_mask.dim() == 2:
+                    valid = valid & (recon_mask[None, None, :, :] > 0.5)
+                elif recon_mask.dim() == 3:
+                    valid = valid & (recon_mask[batch_mask][:, None, :, :] > 0.5)
             if valid.sum() > 0:
                 total_loss = total_loss + torch.abs(p_valid_c[valid] - tgt_valid_c[valid]).mean()
                 count += 1

@@ -468,6 +468,7 @@ class DDPv12Trainer:
         base_loss = compute_recon_loss(
             predictions, batch["target_images"], batch["target_mask"],
             batch.get("target_loss_type"), self.cfg.data.num_classes,
+            recon_mask=batch.get("recon_mask"),
         )
         target_source_idx = batch.get("target_source_idx")
         if target_source_idx is not None:

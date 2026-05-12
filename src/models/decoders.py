@@ -55,15 +55,12 @@ class ContinuousDecoder(nn.Module):
         )
         hidden = embedding_dim * hidden_mult
         # 不升采样, 输出和 embedding 相同分辨率
+        # V13: 1层decoder — 大幅削弱容量，迫使encoder编码更多信息
         self.head = nn.Sequential(
             nn.Conv2d(embedding_dim, hidden, kernel_size=3, padding=1),
             nn.GroupNorm(8, hidden),
             nn.GELU(),
-            nn.Dropout2d(0.3),  # V13-fix: 削弱 decoder 容量，迫使 encoder 编码更多信息
-            nn.Conv2d(hidden, hidden, kernel_size=3, padding=1),
-            nn.GroupNorm(8, hidden),
-            nn.GELU(),
-            nn.Dropout2d(0.3),  # V13-fix: 削弱 decoder 容量
+            nn.Dropout2d(0.3),
             nn.Conv2d(hidden, out_channels, kernel_size=3, padding=1),
         )
 
@@ -95,15 +92,12 @@ class CategoricalDecoder(nn.Module):
             embedding_dim, window_code_dim, relative_time_code_dim, metadata_dim,
         )
         hidden = embedding_dim * hidden_mult
+        # V13: 1层decoder — 大幅削弱容量
         self.head = nn.Sequential(
             nn.Conv2d(embedding_dim, hidden, kernel_size=3, padding=1),
             nn.GroupNorm(8, hidden),
             nn.GELU(),
-            nn.Dropout2d(0.3),  # V13-fix: 削弱 decoder 容量，迫使 encoder 编码更多信息
-            nn.Conv2d(hidden, hidden, kernel_size=3, padding=1),
-            nn.GroupNorm(8, hidden),
-            nn.GELU(),
-            nn.Dropout2d(0.3),  # V13-fix: 削弱 decoder 容量
+            nn.Dropout2d(0.3),
             nn.Conv2d(hidden, out_channels, kernel_size=3, padding=1),
         )
 

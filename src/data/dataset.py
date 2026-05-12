@@ -844,6 +844,25 @@ class HarbinPatchDataset(Dataset):
             mask[gh * p:(gh + 1) * p, gw * p:(gw + 1) * p] = 0.0
         return mask
 
+    def _generate_recon_mask(self) -> np.ndarray:
+        """V13-MAE: 生成重建掩码 [target_res, target_res].
+        
+        随机 mask 50% 的空间像素。返回 1.0 表示 visible（计算loss），
+        0.0 表示 masked（不计算loss）。
+        这样 decoder 必须依赖 embedding 才能重建被 mask 的区域，
+        常数 embedding 无法完成重建 → 结构免疫坍缩。
+        """
+        target_res = self.image_size // 2
+        total_pixels = target_res * target_res
+        n_visible = max(1, int(total_pixels * 0.5))  # 50% 可见
+        mask = np.zeros((target_res, target_res), dtype=np.float32)
+        indices = random.sample(range(total_pixels), n_visible)
+        for idx in indices:
+            h = idx // target_res
+            w = idx % target_res
+            mask[h, w] = 1.0
+        return mask
+
     def __len__(self) -> int:
         return len(self.monthly_samples)
 
@@ -982,6 +1001,9 @@ class HarbinPatchDataset(Dataset):
 
         # 6. 跨时相空间掩码
         spatial_mask = self._generate_spatial_mask() if self.training else None
+        
+        # V13-MAE: 生成重建掩码（随机mask 50%空间区域）
+        recon_mask = self._generate_recon_mask() if self.training else None
 
         return {
             "patch_id": patch_id,
@@ -998,6 +1020,7 @@ class HarbinPatchDataset(Dataset):
             "valid_start_w2": torch.tensor(w2_start, dtype=torch.float64),
             "valid_end_w2": torch.tensor(w2_end, dtype=torch.float64),
             "spatial_mask": torch.from_numpy(spatial_mask) if spatial_mask is not None else torch.ones((self.image_size, self.image_size), dtype=torch.float32),
+            "recon_mask": torch.from_numpy(recon_mask) if recon_mask is not None else torch.ones((target_res, target_res), dtype=torch.float32),
             "target_images": torch.from_numpy(target_images),
             "target_relative_time": torch.from_numpy(target_relative_time),
             "target_metadata": torch.from_numpy(target_metadata),

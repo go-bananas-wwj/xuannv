@@ -228,14 +228,29 @@ def reconstruction_loss(
     target: torch.Tensor,
     target_mask: torch.Tensor,
     target_loss_type: torch.Tensor | None = None,
+    recon_mask: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    """掩码重建损失: L1 (连续) / CE (类别)."""
+    """掩码重建损失: L1 (连续) / CE (类别).
+    
+    Args:
+        recon_mask: [H, W] 或 [B, H, W] — MAE风格，只对mask=1的区域计算loss
+    """
     if target_mask.dim() == 1:
         target_mask = target_mask[:, None]
 
     # 简单的 L1 重建 (兼容原版)
     pixel_valid_mask = (~torch.isnan(target)).float()
     mask = target_mask[:, :, None, None, None].float() * pixel_valid_mask
+    
+    # V13-MAE: 应用重建掩码
+    if recon_mask is not None:
+        if recon_mask.dim() == 2:
+            # [H, W] → [1, 1, 1, H, W]
+            mask = mask * recon_mask[None, None, None, :, :]
+        elif recon_mask.dim() == 3:
+            # [B, H, W] → [B, 1, 1, H, W]
+            mask = mask * recon_mask[:, None, None, :, :]
+    
     diff = torch.abs(prediction - target) * mask
     denom = torch.clamp(mask.sum(), min=1.0)
     return diff.sum() / denom
