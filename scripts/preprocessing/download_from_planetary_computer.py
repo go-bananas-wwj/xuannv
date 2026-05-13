@@ -123,17 +123,14 @@ def determine_utm_epsg(center_lon: float, center_lat: float) -> int:
         return 32700 + zone
 
 
-def search_items(catalog, source: str, bbox: list[float], date_start: str, date_end: str):
-    """STAC 搜索（带自动重试）"""
+def _search_single_window(catalog, source, bbox, window_start, window_end):
+    """对单个时间窗口执行 STAC 搜索（带重试）"""
     collection = COLLECTION_MAP[source]
-    assets = ASSET_MAP[source]
-
-    kwargs: dict[str, Any] = {
+    kwargs = {
         "collections": [collection],
         "bbox": bbox,
+        "datetime": f"{window_start}/{window_end}",
     }
-    if source not in STATIC_SOURCES:
-        kwargs["datetime"] = f"{date_start}/{date_end}"
     if source in ("s2", "landsat"):
         kwargs["query"] = {"eo:cloud_cover": {"lt": 20}}
 
@@ -141,16 +138,58 @@ def search_items(catalog, source: str, bbox: list[float], date_start: str, date_
         try:
             search = catalog.search(**kwargs)
             items = search.item_collection()
-            return items
+            return list(items)
         except Exception as e:
             if attempt < 2:
                 wait = 5 + attempt * 5
-                print(f"    [WARN] STAC 搜索失败 {source} (尝试 {attempt+1}/3): {e}，{wait}s 后重试...")
+                print(f"    [WARN] STAC 窗口搜索失败 {source} {window_start[:10]}~{window_end[:10]} (尝试 {attempt+1}/3): {e}，{wait}s 后重试...")
                 time.sleep(wait)
             else:
-                print(f"    [WARN] STAC 搜索失败 {source} (3次均失败): {e}")
+                print(f"    [WARN] STAC 窗口搜索失败 {source} {window_start[:10]}~{window_end[:10]} (3次均失败): {e}")
                 return []
     return []
+
+
+def search_items(catalog, source: str, bbox: list[float], date_start: str, date_end: str):
+    """STAC 搜索（带自动重试）——长日期范围拆分为按月窗口，避免服务器超时"""
+    if source in STATIC_SOURCES:
+        # 静态数据无需时间拆分
+        kwargs = {"collections": [COLLECTION_MAP[source]], "bbox": bbox}
+        for attempt in range(3):
+            try:
+                search = catalog.search(**kwargs)
+                items = search.item_collection()
+                return items
+            except Exception as e:
+                if attempt < 2:
+                    wait = 5 + attempt * 5
+                    print(f"    [WARN] STAC 搜索失败 {source} (尝试 {attempt+1}/3): {e}，{wait}s 后重试...")
+                    time.sleep(wait)
+                else:
+                    print(f"    [WARN] STAC 搜索失败 {source} (3次均失败): {e}")
+                    return []
+        return []
+
+    # 动态数据：拆分为按月窗口
+    from datetime import datetime, timedelta
+    start_dt = datetime.strptime(date_start, "%Y-%m-%d")
+    end_dt = datetime.strptime(date_end, "%Y-%m-%d")
+
+    all_items = []
+    seen_ids = set()
+    current = start_dt
+    while current < end_dt:
+        window_end = min(current + timedelta(days=31), end_dt)
+        ws = current.strftime("%Y-%m-%dT%H:%M:%SZ")
+        we = window_end.strftime("%Y-%m-%dT%H:%M:%SZ")
+        items = _search_single_window(catalog, source, bbox, ws, we)
+        for item in items:
+            if item.id not in seen_ids:
+                seen_ids.add(item.id)
+                all_items.append(item)
+        current = window_end
+
+    return all_items
 
 
 def _download_item_with_retry(download_fn, item, source, bbox, epsg, divide_10000=False):
