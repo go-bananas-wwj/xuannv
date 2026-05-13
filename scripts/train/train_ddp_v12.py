@@ -166,11 +166,13 @@ def main():
             bank_size = int(losses.get('bank', 0))
             active_dims = int(losses.get('active_dims', 0))
             std_mean = losses.get('std_mean', 0.0)
+            inter_var = losses.get('inter_var', 0.0)
             logger.Print(
                 f"[{time.strftime('%H:%M:%S')}] Epoch {epoch + 1:03d}/{cfg.training.epochs} | "
                 f"total={losses['total']:.4f} recon={losses['recon']:.4f} "
                 f"consist={losses['consist']:.4f} var={losses['var']:.4f} "
                 f"cov={losses['cov']:.4f} l2unif={losses['l2unif']:.4f} "
+                f"inter_var={inter_var:.4f} "
                 f"bank={bank_size}/512 active={active_dims}/128 std_mean={std_mean:.4f} "
                 f"lr={losses['lr']:.6f} | "
                 f"time={epoch_dt:.1f}s elapsed={int(elapsed//60)}m ETA={eta_str}"

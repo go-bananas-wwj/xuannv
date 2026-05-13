@@ -358,6 +358,17 @@ class DDPv12Trainer:
             else:
                 var = variance_regularizer(all_pre.float(), min_std=vicreg_min_std) if var_w > 0 else torch.tensor(0.0, device=self.device)
                 cov = covariance_loss(all_pre.float()) if cov_w > 0 else torch.tensor(0.0, device=self.device)
+            
+            # ★ 新增：样本间 VICReg variance（在 gathered_pre 上计算）
+            inter_var_w = getattr(t, 'inter_variance_weight', 0.0)
+            inter_min_std = getattr(t, 'inter_variance_min_std', 0.3)
+            inter_var = torch.tensor(0.0, device=self.device)
+            inter_cov = torch.tensor(0.0, device=self.device)
+            if inter_var_w > 0 and gathered_pre is not None and gathered_pre.shape[0] >= 2:
+                inter_var = variance_regularizer(gathered_pre.float(), min_std=inter_min_std)
+                inter_cov = covariance_loss(gathered_pre.float())
+                var = var + inter_var_w * inter_var
+                cov = cov + inter_var_w * inter_cov
 
             # === Uniformity Loss（实验变体支持）===
             use_spatial_unif = getattr(t, 'use_spatial_uniformity', False)
@@ -422,6 +433,11 @@ class DDPv12Trainer:
                 std_max = std_per_dim.max().item()
                 active_dims = (std_per_dim > 0.05).sum().item()
                 cov_offdiag = cov.item() if cov_w > 0 else 0.0
+                
+                # ★ 新增：样本间多样性诊断
+                inter_std = torch.sqrt(gathered_pre.var(dim=0, unbiased=False) + 1e-6)
+                inter_active = (inter_std > 0.05).sum().item()
+                inter_std_mean = inter_std.mean().item()
 
             # Decorrelation Loss (Barlow Twins)
             decorr_w = getattr(t, 'decorrelation_weight', 0.0)
@@ -445,6 +461,7 @@ class DDPv12Trainer:
                 + decorr_w * decorr
                 + orth_w * orth
                 + dummy_cls
+                + inter_var_w * inter_var
             )
 
             if torch.isnan(total) or torch.isinf(total):
@@ -503,20 +520,22 @@ class DDPv12Trainer:
                 "decorr": decorr.item(),
                 "orth": orth.item(),
                 "lr": lr,
+                "inter_var": inter_var.item() if inter_var_w > 0 else 0.0,
             }.items():
                 loss_accum[k] = loss_accum.get(k, 0.0) + v
             n_steps += 1
 
-            if self.global_rank == 0 and step % 20 == 0:
+            if self.global_rank == 0:
                 bank_size = self.memory_bank.size
                 print(f"  [Step {step}] recon={recon.item():.4f} "
                       f"consist={consist.item():.4f} cls={cls.item():.4f} "
                       f"var={var.item():.4f} cov={cov.item():.4f} "
                       f"decorr={decorr.item():.4f} orth={orth.item():.4f} "
                       f"l2unif={l2_uniform.item():.4f} "
+                      f"inter_var={inter_var.item():.4f} "
                       f"bank={bank_size}/{self.memory_bank.K} "
-                      f"std=[{std_min:.4f}/{std_mean:.4f}/{std_max:.4f}] "
-                      f"active_dims={active_dims}/{pre_norm_map.shape[1] if pre_norm_map is not None else pre_norm.shape[1]} "
+                      f"spatial=[{active_dims}/{pre_norm_map.shape[1] if pre_norm_map is not None else pre_norm.shape[1]}:{std_mean:.4f}] "
+                      f"inter=[{inter_active}/{pre_norm.shape[1]}:{inter_std_mean:.4f}] "
                       f"perturb=[fd={perturb_stats['frame_drop_ratio']:.2f} "
                       f"sd={perturb_stats['source_drop_ratio']:.2f}] "
                       f"lr={lr:.6f}")
