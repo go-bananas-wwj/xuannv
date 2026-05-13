@@ -356,7 +356,10 @@ class HarbinPatchDataset(Dataset):
         cache_key = hashlib.md5(
             (str(self.data_root) + ",".join(self.patches)).encode()
         ).hexdigest()[:16]
-        cache_file = Path(getattr(self.cfg.experiment, "output_dir", "/workspace/outputs")) / f"dataset_cache_{cache_key}.pt"
+        # ★ 共享缓存目录：所有实验共用同一缓存（节省磁盘空间）
+        shared_cache_dir = Path("/workspace/outputs/.cache_shared")
+        shared_cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = shared_cache_dir / f"dataset_cache_{cache_key}.pt"
 
         # 尝试加载已有缓存
         if cache_file.exists():

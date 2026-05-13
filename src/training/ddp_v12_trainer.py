@@ -191,6 +191,11 @@ class DDPv12Trainer:
         # Memory Bank — 扩大 pre-norm 有效 batch
         emb_dim = getattr(cfg.model, 'embedding_dim', 128)
         self.memory_bank = EmbeddingMemoryBank(K=512, dim=emb_dim, device=self.device)
+        
+        # 日志文件句柄（用于 step 日志同时写入文件）
+        self.log_file = None
+        if self.global_rank == 0:
+            self.log_file = open(self.output_dir / "train.log", "a", buffering=1, encoding="utf-8")
 
     @torch.no_grad()
     def update_teacher(self) -> None:
@@ -521,13 +526,15 @@ class DDPv12Trainer:
                 "orth": orth.item(),
                 "lr": lr,
                 "inter_var": inter_var.item() if inter_var_w > 0 else 0.0,
+                "active_dims": float(active_dims),
+                "std_mean": float(std_mean),
             }.items():
                 loss_accum[k] = loss_accum.get(k, 0.0) + v
             n_steps += 1
 
             if self.global_rank == 0:
                 bank_size = self.memory_bank.size
-                print(f"  [Step {step}] recon={recon.item():.4f} "
+                step_msg = (f"  [Step {step}] recon={recon.item():.4f} "
                       f"consist={consist.item():.4f} cls={cls.item():.4f} "
                       f"var={var.item():.4f} cov={cov.item():.4f} "
                       f"decorr={decorr.item():.4f} orth={orth.item():.4f} "
@@ -539,6 +546,10 @@ class DDPv12Trainer:
                       f"perturb=[fd={perturb_stats['frame_drop_ratio']:.2f} "
                       f"sd={perturb_stats['source_drop_ratio']:.2f}] "
                       f"lr={lr:.6f}")
+                print(step_msg)
+                if self.log_file:
+                    self.log_file.write(step_msg + "\n")
+                    self.log_file.flush()
 
         loss_accum = {k: v / n_steps for k, v in loss_accum.items()}
         loss_accum = self._reduce_loss_dict(loss_accum)
