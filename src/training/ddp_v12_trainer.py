@@ -343,10 +343,16 @@ class DDPv12Trainer:
             vicreg_min_std = getattr(t, 'vicreg_min_std', 1.0)
             
             # V13-explore: Spatial VICReg — 在 [B*H*W, D] 上计算，绕过 GMP
+            # ★ FIX: DDP 下必须 all_gather 所有卡的 pre_norm_map，否则 effective batch 不一致
             use_spatial_vicreg = getattr(t, 'use_spatial_vicreg', False)
+            gathered_spatial_map = pre_norm_map
             if use_spatial_vicreg and pre_norm_map is not None:
-                # [B, D, H, W] → [B*H*W, D]
-                spatial_flat = pre_norm_map.permute(0, 2, 3, 1).reshape(-1, pre_norm_map.shape[1])
+                if dist.is_initialized() and self.world_size > 1:
+                    gathered_maps = [torch.zeros_like(pre_norm_map) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_maps, pre_norm_map)
+                    gathered_spatial_map = torch.cat(gathered_maps, dim=0)
+                # [B_total, D, H, W] → [B_total*H*W, D]
+                spatial_flat = gathered_spatial_map.permute(0, 2, 3, 1).reshape(-1, gathered_spatial_map.shape[1])
                 var = variance_regularizer(spatial_flat.float(), min_std=vicreg_min_std) if var_w > 0 else torch.tensor(0.0, device=self.device)
                 cov = covariance_loss(spatial_flat.float()) if cov_w > 0 else torch.tensor(0.0, device=self.device)
             else:
@@ -404,8 +410,13 @@ class DDPv12Trainer:
                 l2_uniform = batch_uniformity_loss_l2(gathered_l2.float()) if l2_uniform_w > 0 else torch.tensor(0.0, device=self.device)
 
             # Per-dim 诊断（日志用）
+            # ★ FIX: 使用 gathered_spatial_map 计算 active，与 spatial_vicreg 一致
             with torch.no_grad():
-                std_per_dim = torch.sqrt(all_pre.var(dim=0, unbiased=False) + 1e-6)
+                if use_spatial_vicreg and gathered_spatial_map is not None:
+                    spatial_flat_diag = gathered_spatial_map.permute(0, 2, 3, 1).reshape(-1, gathered_spatial_map.shape[1])
+                    std_per_dim = torch.sqrt(spatial_flat_diag.var(dim=0, unbiased=False) + 1e-6)
+                else:
+                    std_per_dim = torch.sqrt(all_pre.var(dim=0, unbiased=False) + 1e-6)
                 std_min = std_per_dim.min().item()
                 std_mean = std_per_dim.mean().item()
                 std_max = std_per_dim.max().item()
