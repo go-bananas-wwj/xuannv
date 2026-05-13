@@ -274,6 +274,7 @@ def download_source_odcstac(
     source: str,
     bbox: list[float],
     epsg: int,
+    divide_10000: bool = False,
 ):
     """使用 odc-stac 下载并裁剪（适用于 S1，stackstac 对 S1 CRS 支持不完整）"""
     import odc.stac
