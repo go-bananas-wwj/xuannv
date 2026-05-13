@@ -165,7 +165,12 @@ class TrainingConfig:
     # V13 实验变体开关
     use_spatial_uniformity: bool = False
     use_pre_norm_uniform: bool = False
+    use_spatial_vicreg: bool = False
+    use_spatial_raw_uniformity: bool = False
     vicreg_min_std: float = 1.0
+    # V12 样本间方差
+    inter_variance_weight: float = 0.0
+    inter_variance_min_std: float = 0.3
     # Warmup
     recon_warmup_epochs: int = 20
     warmup_epochs: int = 10

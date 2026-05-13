@@ -237,7 +237,9 @@ class DDPv12Trainer:
             batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v
                      for k, v in batch.items()}
 
-            lr = get_cosine_lr(epoch, step, len(dataloader), self.cfg)
+            max_steps = getattr(t, 'max_steps_per_epoch', None)
+            effective_steps = min(len(dataloader), max_steps) if max_steps else len(dataloader)
+            lr = get_cosine_lr(epoch, step, effective_steps, self.cfg)
             for pg in self.optimizer.param_groups:
                 pg["lr"] = lr
 
