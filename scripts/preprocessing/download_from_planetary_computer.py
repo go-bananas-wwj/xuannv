@@ -124,7 +124,7 @@ def determine_utm_epsg(center_lon: float, center_lat: float) -> int:
 
 
 def search_items(catalog, source: str, bbox: list[float], date_start: str, date_end: str):
-    """STAC 搜索"""
+    """STAC 搜索（带自动重试）"""
     collection = COLLECTION_MAP[source]
     assets = ASSET_MAP[source]
 
@@ -137,14 +137,45 @@ def search_items(catalog, source: str, bbox: list[float], date_start: str, date_
     if source in ("s2", "landsat"):
         kwargs["query"] = {"eo:cloud_cover": {"lt": 20}}
 
+    for attempt in range(3):
+        try:
+            search = catalog.search(**kwargs)
+            items = search.item_collection()
+            return items
+        except Exception as e:
+            if attempt < 2:
+                wait = 5 + attempt * 5
+                print(f"    [WARN] STAC 搜索失败 {source} (尝试 {attempt+1}/3): {e}，{wait}s 后重试...")
+                time.sleep(wait)
+            else:
+                print(f"    [WARN] STAC 搜索失败 {source} (3次均失败): {e}")
+                return []
+    return []
 
-    try:
-        search = catalog.search(**kwargs)
-        items = search.item_collection()
-        return items
-    except Exception as e:
-        print(f"    [WARN] STAC 搜索失败 {source}: {e}")
-        return []
+
+def _download_item_with_retry(download_fn, item, source, bbox, epsg, divide_10000=False):
+    """下载单个 item，自动处理 token 过期并重新签名重试"""
+    import planetary_computer as pc
+
+    for attempt in range(3):
+        try:
+            # 每次重试前都重新签名，获取新鲜 token
+            item = pc.sign(item)
+            return download_fn(item, source, bbox, epsg, divide_10000)
+        except Exception as e:
+            err_str = str(e).lower()
+            # 判断是否为 token 过期或 403 相关错误
+            is_token_error = any(x in err_str for x in [
+                "not recognized as being in a supported file format",
+                "http response code: 403",
+                "read failed",
+            ])
+            if is_token_error and attempt < 2:
+                wait = 2 + attempt * 3
+                print(f"      [RETRY] token 过期/403，{wait}s 后重新签名重试 (尝试 {attempt+1}/3): {item.id}")
+                time.sleep(wait)
+                continue
+            raise
 
 
 def download_source_stackstac(
@@ -334,11 +365,11 @@ def download_patch(args) -> dict:
                         skipped += 1
                         continue
 
-                # 下载
+                # 下载（带自动重试和重新签名）
                 if source == "s1":
-                    data_np = download_source_odcstac(item, source, bbox, epsg)
+                    data_np = _download_item_with_retry(download_source_odcstac, item, source, bbox, epsg, divide_10000)
                 else:
-                    data_np = download_source_stackstac(item, source, bbox, epsg, divide_10000)
+                    data_np = _download_item_with_retry(download_source_stackstac, item, source, bbox, epsg, divide_10000)
 
                 save_geotiff(out_path, data_np, bbox, epsg)
                 downloaded += 1
@@ -368,7 +399,7 @@ def main():
     parser.add_argument("--sources", nargs="+", default=["s2"],
                         choices=["s2", "s1", "landsat", "dem", "worldcover"],
                         help="要下载的数据源")
-    parser.add_argument("--workers", type=int, default=4, help="并行 worker 数")
+    parser.add_argument("--workers", type=int, default=2, help="并行 worker 数")
     parser.add_argument("--date-start", default=DATE_START, help="起始日期")
     parser.add_argument("--date-end", default=DATE_END, help="结束日期")
     parser.add_argument("--no-divide-10000", action="store_true",

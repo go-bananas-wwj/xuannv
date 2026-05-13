@@ -1,29 +1,73 @@
 #!/usr/bin/env python3
 """
-Planetary Computer 下载看门狗
+Planetary Computer 下载看门狗 V2
 - 检测 tmux 下载 session 是否健康
+- session 不存在时自动创建并启动
+- 文件数量停滞检测（30分钟0增长则重启）
 - 发现 SAS token 过期（大量 RasterioIOError）时自动重启
-- 监控全0数据检测是否正常工作
-- 每 30 分钟运行一次（建议用 cron 或 while sleep 循环）
+- 每 15 分钟运行一次
 
 用法:
     python scripts/preprocessing/pc_download_watchdog.py
     # 或后台循环运行:
-    nohup bash -c 'while true; do python scripts/preprocessing/pc_download_watchdog.py; sleep 1800; done' > /workspace/outputs/pc_watchdog.log 2>&1 &
+    nohup bash -c 'while true; do python scripts/preprocessing/pc_download_watchdog.py; sleep 900; done' > /workspace/outputs/pc_watchdog.log 2>&1 &
 """
 
 import subprocess
 import sys
 import time
+import json
 from datetime import datetime
 from pathlib import Path
 
+# ---------------------------------------------------------------------------
 # 配置
-TMUX_SESSIONS = ["pc_qiqihar_all", "pc_daqing", "pc_haidian"]
-ERROR_WINDOW_LINES = 50      # 检查最近 N 行输出
-ERROR_THRESHOLD = 5          # 最近 N 行中出现 >= 此数量的 token 过期错误则判定过期
-RESTART_WAIT_S = 10          # 停止后等待秒数
+# ---------------------------------------------------------------------------
+
 LOG_FILE = Path("/workspace/outputs/pc_download_watchdog.log")
+STATE_FILE = Path("/workspace/outputs/pc_download_watchdog_state.json")
+DATA_ROOT = Path("/workspace/raw/phase2_heilongjiang")
+
+# Session 注册表：session 名 -> 启动命令
+# 注意：命令中不需要包含 tmux 相关部分，看门狗会自动包装
+SESSION_REGISTRY = {
+    # 海淀
+    "pc_haidian_s2": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources s2 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_haidian_s1": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources s1 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_haidian_landsat": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources landsat --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_haidian_dem": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources dem --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_haidian_worldcover": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources worldcover --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    # 大庆
+    "pc_daqing_s2": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources s2 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_daqing_s1": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources s1 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_daqing_landsat": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources landsat --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_daqing_dem": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources dem --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_daqing_worldcover": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources worldcover --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    # 齐齐哈尔（DEM/WorldCover 已完成，只需 S2 + Landsat）
+    "pc_qiqihar_s2": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/qiqihar/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources s2 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_qiqihar_landsat": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/qiqihar/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources landsat --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+}
+
+# 文件数量停滞检测配置
+STALL_THRESHOLD_MINUTES = 30  # 30 分钟无增长则判定为停滞
+STALL_CHECK_SOURCES = {
+    "pc_haidian_s2": ("haidian", "s2"),
+    "pc_haidian_s1": ("haidian", "s1"),
+    "pc_haidian_landsat": ("haidian", "landsat"),
+    "pc_haidian_dem": ("haidian", "dem"),
+    "pc_haidian_worldcover": ("haidian", "worldcover"),
+    "pc_daqing_s2": ("daqing", "s2"),
+    "pc_daqing_s1": ("daqing", "s1"),
+    "pc_daqing_landsat": ("daqing", "landsat"),
+    "pc_daqing_dem": ("daqing", "dem"),
+    "pc_daqing_worldcover": ("daqing", "worldcover"),
+    "pc_qiqihar_s2": ("qiqihar", "s2"),
+    "pc_qiqihar_landsat": ("qiqihar", "landsat"),
+}
+
+ERROR_WINDOW_LINES = 50
+ERROR_THRESHOLD = 8  # 最近 50 行中出现 >= 8 个 token 过期错误则重启
+RESTART_WAIT_S = 5
 
 TOKEN_EXPIRY_PATTERNS = [
     "not recognized as being in a supported file format",
@@ -32,12 +76,9 @@ TOKEN_EXPIRY_PATTERNS = [
     "HTTP response code: 403",
 ]
 
-ZERO_DATA_PATTERNS = [
-    "删除全0数据文件",
-    "删除损坏/空文件",
-    "All-zero data",
-]
-
+# ---------------------------------------------------------------------------
+# 日志与状态
+# ---------------------------------------------------------------------------
 
 def log(msg: str):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -47,32 +88,24 @@ def log(msg: str):
         f.write(line + "\n")
 
 
-def get_tmux_output(session: str, n_lines: int = ERROR_WINDOW_LINES) -> str:
-    """获取 tmux session 的最后 N 行输出"""
-    try:
-        result = subprocess.run(
-            ["tmux", "capture-pane", "-p", "-t", session],
-            capture_output=True, text=True, timeout=10
-        )
-        lines = result.stdout.strip().split("\n")
-        return "\n".join(lines[-n_lines:])
-    except Exception as e:
-        return ""
+def load_state() -> dict:
+    if STATE_FILE.exists():
+        try:
+            with open(STATE_FILE) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
 
 
-def count_errors(output: str) -> tuple[int, int]:
-    """返回 (token_expiry_errors, zero_data_fixes)"""
-    token_errors = sum(1 for p in TOKEN_EXPIRY_PATTERNS if p in output)
-    # 更精确：统计 RasterioIOError 出现次数
-    exact_token = output.count("RasterioIOError")
-    exact_403 = output.count("HTTP response code: 403")
-    exact_unsupported = output.count("not recognized as being in a supported file format")
+def save_state(state: dict):
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f, indent=2)
 
-    zero_fixes = sum(1 for p in ZERO_DATA_PATTERNS if p in output)
-    exact_zero = output.count("删除全0数据文件") + output.count("删除损坏/空文件")
 
-    return exact_token + exact_403 + exact_unsupported, exact_zero
-
+# ---------------------------------------------------------------------------
+# tmux / 进程操作
+# ---------------------------------------------------------------------------
 
 def is_session_alive(session: str) -> bool:
     try:
@@ -85,105 +118,147 @@ def is_session_alive(session: str) -> bool:
         return False
 
 
-def get_session_command(session: str) -> str:
-    """从 tmux session 中提取运行的命令"""
+def get_tmux_output(session: str, n_lines: int = ERROR_WINDOW_LINES) -> str:
     try:
         result = subprocess.run(
-            ["tmux", "list-panes", "-t", session, "-F", "#{pane_pid}"],
-            capture_output=True, text=True, timeout=5
+            ["tmux", "capture-pane", "-p", "-t", session],
+            capture_output=True, text=True, timeout=10
         )
-        pid = result.stdout.strip().split("\n")[0]
-        # 获取该 pid 的命令行
-        result2 = subprocess.run(
-            ["ps", "-o", "args=", "-p", pid],
-            capture_output=True, text=True, timeout=5
-        )
-        cmd = result2.stdout.strip()
-        # 提取 python 命令部分
-        if "python" in cmd:
-            # 去掉 bash -c '...' 包装
-            if "bash -c" in cmd:
-                # 尝试提取内部命令
-                idx = cmd.find("python -u")
-                if idx >= 0:
-                    return cmd[idx:].rstrip("'")
-            return cmd
+        lines = result.stdout.strip().split("\n")
+        return "\n".join(lines[-n_lines:])
     except Exception:
-        pass
-    return ""
+        return ""
+
+
+def count_token_errors(output: str) -> int:
+    exact_token = output.count("RasterioIOError")
+    exact_403 = output.count("HTTP response code: 403")
+    exact_unsupported = output.count("not recognized as being in a supported file format")
+    return exact_token + exact_403 + exact_unsupported
+
+
+def count_file_growth(city: str, source: str) -> int:
+    """统计某个 city+source 的 .tif 文件数量"""
+    dir_path = DATA_ROOT / city / source
+    if not dir_path.exists():
+        return 0
+    try:
+        return sum(1 for _ in dir_path.rglob("*.tif"))
+    except Exception:
+        return 0
 
 
 def kill_session(session: str):
     try:
-        subprocess.run(
-            ["tmux", "send-keys", "-t", session, "C-c"],
-            capture_output=True, timeout=5
-        )
-        time.sleep(2)
-        subprocess.run(
-            ["tmux", "kill-session", "-t", session],
-            capture_output=True, timeout=5
-        )
+        subprocess.run(["tmux", "send-keys", "-t", session, "C-c"], capture_output=True, timeout=5)
+        time.sleep(1)
+        subprocess.run(["tmux", "kill-session", "-t", session], capture_output=True, timeout=5)
         log(f"  → 已停止 session: {session}")
     except Exception as e:
         log(f"  → 停止 session {session} 出错: {e}")
 
 
-def restart_session(session: str, cmd: str):
+def create_session(session: str, cmd: str):
+    """创建新的 tmux session 并启动命令"""
     try:
-        # 确保 session 已不存在
-        subprocess.run(
-            ["tmux", "kill-session", "-t", session],
-            capture_output=True, timeout=5
-        )
+        subprocess.run(["tmux", "kill-session", "-t", session], capture_output=True, timeout=5)
     except Exception:
         pass
 
-    # 构建新的 tmux session，使用与之前相同的命令
-    # 命令格式应该是: python -u scripts/preprocessing/download_from_planetary_computer.py ...
-    tmux_cmd = f"bash -c 'source /root/miniconda3/etc/profile.d/conda.sh && conda activate xuannv && cd /workspace/xuannv && {cmd}' 2>&1 | tee -a /workspace/outputs/{session}.log"
+    # 包装命令：激活 conda 环境，cd 到项目目录，执行命令，tee 到日志
+    tmux_cmd = (
+        f"bash -c 'source /root/miniconda3/etc/profile.d/conda.sh && "
+        f"conda activate xuannv && cd /workspace/xuannv && {cmd}' "
+        f"2>&1 | tee -a /workspace/outputs/{session}.log"
+    )
 
     try:
         subprocess.run(
             ["tmux", "new-session", "-d", "-s", session, tmux_cmd],
             capture_output=True, timeout=10
         )
-        log(f"  → 已重启 session: {session}")
+        log(f"  → 已创建并启动 session: {session}")
+        return True
     except Exception as e:
-        log(f"  → 重启 session {session} 出错: {e}")
+        log(f"  → 创建 session {session} 出错: {e}")
+        return False
 
+
+# ---------------------------------------------------------------------------
+# 主逻辑
+# ---------------------------------------------------------------------------
 
 def main():
+    state = load_state()
+    now_ts = time.time()
+
     log("=" * 60)
-    log("PC 下载看门狗检查开始")
+    log("PC 下载看门狗 V2 检查开始")
 
     restarted = []
-    for session in TMUX_SESSIONS:
-        if not is_session_alive(session):
-            log(f"[{session}] ⚠️ session 不存在")
+    created = []
+
+    for session, cmd in SESSION_REGISTRY.items():
+        alive = is_session_alive(session)
+
+        if not alive:
+            log(f"[{session}] ⚠️ session 不存在，自动创建...")
+            if create_session(session, cmd):
+                created.append(session)
+                state[session] = {"created_at": now_ts, "last_file_count": 0, "last_check_ts": now_ts}
             continue
 
+        # 获取 tmux 输出并统计 token 错误
         output = get_tmux_output(session)
-        token_err_count, zero_fix_count = count_errors(output)
+        token_err_count = count_token_errors(output)
 
-        status_emoji = "✅" if token_err_count < ERROR_THRESHOLD else "🔥"
-        log(f"[{session}] {status_emoji} 最近 {ERROR_WINDOW_LINES} 行中: "
-            f"token过期错误={token_err_count}, 全0修复={zero_fix_count}")
+        # 文件数量停滞检测
+        stalled = False
+        if session in STALL_CHECK_SOURCES:
+            city, source = STALL_CHECK_SOURCES[session]
+            current_count = count_file_growth(city, source)
+            prev_state = state.get(session, {})
+            prev_count = prev_state.get("last_file_count", 0)
+            prev_ts = prev_state.get("last_check_ts", 0)
 
-        if token_err_count >= ERROR_THRESHOLD:
-            log(f"  → 判定为 token 过期，准备重启...")
-            cmd = get_session_command(session)
-            if not cmd:
-                log(f"  → 无法提取命令，跳过重启")
-                continue
+            # 更新状态
+            state[session] = {
+                "last_file_count": current_count,
+                "last_check_ts": now_ts,
+            }
+
+            # 如果之前已有记录，检查增长
+            if prev_ts > 0:
+                elapsed_min = (now_ts - prev_ts) / 60
+                if elapsed_min >= STALL_THRESHOLD_MINUTES:
+                    growth = current_count - prev_count
+                    if growth == 0:
+                        stalled = True
+                        log(f"[{session}] 🔥 文件数量停滞: {prev_count} -> {current_count} ({elapsed_min:.0f}分钟无增长)")
+
+            log(f"[{session}] ✅ token错误={token_err_count}, 文件数={current_count}(+{current_count - prev_count})")
+        else:
+            log(f"[{session}] ✅ token错误={token_err_count}")
+
+        # 判定是否需要重启
+        need_restart = token_err_count >= ERROR_THRESHOLD or stalled
+
+        if need_restart:
+            reason = "token过期" if token_err_count >= ERROR_THRESHOLD else "文件停滞"
+            log(f"  → 判定为 {reason}，准备重启...")
             kill_session(session)
             time.sleep(RESTART_WAIT_S)
-            restart_session(session, cmd)
-            restarted.append(session)
+            if create_session(session, cmd):
+                restarted.append(session)
+                state[session] = {"restarted_at": now_ts, "last_file_count": 0, "last_check_ts": now_ts}
 
+    save_state(state)
+
+    if created:
+        log(f"看门狗完成: 已创建 {len(created)} 个 session: {', '.join(created)}")
     if restarted:
         log(f"看门狗完成: 已重启 {len(restarted)} 个 session: {', '.join(restarted)}")
-    else:
+    if not created and not restarted:
         log("看门狗完成: 所有 session 健康")
 
 
