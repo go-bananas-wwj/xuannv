@@ -603,3 +603,78 @@ python scripts/eval/validate_v2.py --checkpoint /workspace/outputs/aef_qwen_v1/e
 
 ---
 *最后更新: 2026-05-08, commit 72055b7*
+
+---
+
+## 实验管理与命名规范（2026-05-13 更新）
+
+### 输出目录命名规范
+
+为避免 `/workspace/outputs/` 目录混乱，所有新实验必须遵循以下命名格式：
+
+```
+{version}_{核心参数}_{卡数}card_{日期}_{可选备注}
+```
+
+**示例：**
+- `v12_recon005_4card_0513` — v12版本, recon=0.05, 4卡, 5月13日
+- `v12_recon010_2card_0513_resume` — v12版本, recon=0.10, 2卡, 从checkpoint恢复
+
+**禁止：** 冗长无意义的命名如 `v13_round6_expX_recon005_full_staged_200patches`
+
+### 缓存清理强制要求
+
+- **每个实验的 `dataset_cache_*.pt` 约 26-32GB**
+- **训练结束后必须立即删除缓存**，释放磁盘空间
+- **自动清理命令：**
+  ```bash
+  find /workspace/outputs -name "dataset_cache_*.pt" -delete
+  ```
+- **启动新训练前**，先检查并清理旧缓存：
+  ```bash
+  du -sh /workspace/outputs/*/dataset_cache_*.pt 2>/dev/null
+  ```
+
+### 长时间训练的后台监控
+
+对于需要数小时的训练任务，**必须启动后台监控任务**追踪关键指标：
+
+1. **创建监控脚本** (`scripts/monitor_{实验名}.py`)：
+   - 每 5 分钟读取 `train.log`
+   - 提取 `active_dims` 和 `recon` 指标
+   - 写入实时报告文件
+
+2. **启动方式**（使用 Python 无缓冲模式）：
+   ```bash
+   cd /workspace/xuannv
+   PYTHONUNBUFFERED=1 /root/miniconda3/envs/xuannv/bin/python \
+       scripts/monitor_{实验名}.py > /workspace/outputs/{实验名}/monitor.log 2>&1
+   ```
+
+3. **监控目标**：
+   - 若 `active_dims < 20` 持续 3 个 epoch → **立即报告坍缩**
+   - 若 `recon > 0.5` 在 warmup 后持续不降 → **检查数据**
+   - 记录完整的 epoch 轨迹到 JSON 历史文件
+
+### 全量数据训练规范
+
+- **必须使用全部 424 个 patch**，禁止用子集（如 200 patches）做实验
+- 配置中 `data.num_samples` 必须保持 `424`
+- `manifest_path` 必须指向 `/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered`
+
+### NPU 使用规范
+
+- **启动前必须执行 `npu-smi info`** 检查占用
+- 多卡训练优先使用连续编号的 NPU（如 0,1,2,3）
+- 通过 `ASCEND_RT_VISIBLE_DEVICES` 指定设备：
+  ```bash
+  export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+  ```
+- **严禁使用 nohup 启动 torchrun**，必须使用 tmux
+
+### 实验废弃与清理
+
+- **确认失败的实验**（已坍缩或崩溃）应立即删除目录，释放空间
+- 保留有价值的 checkpoint（`epoch_best_*.pt`），其余可删
+- 删除前确认无需要恢复的 checkpoint
+

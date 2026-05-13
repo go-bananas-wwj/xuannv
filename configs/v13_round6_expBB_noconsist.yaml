@@ -1,0 +1,26 @@
+# Round 6 ExpBB — recon=0.05 + 仅 Spatial VICReg + decorr + orth (去掉 consistency + cls)
+_base_: xuannv_v12_clean.yaml
+experiment:
+  name: v13_round6_expBB_noconsist
+  output_dir: /workspace/outputs/v13_round6_expBB_noconsist
+training:
+  epochs: 50
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 0
+  reconstruction_weight: 0.05
+  use_spatial_vicreg: true
+  variance_weight: 0.3
+  covariance_weight: 0.1
+  vicreg_min_std: 1.0
+  consistency_weight: 0.0
+  classification_weight: 0.0
+  decorrelation_weight: 0.05
+  orthogonality_weight: 0.01
+  batch_uniformity_weight: 0.0
+  teacher_momentum: 0.996
+  student_frame_drop_rate: 0.5
+  student_source_drop_rate: 0.3
+  save_every: 10
+  max_steps_per_epoch: 100

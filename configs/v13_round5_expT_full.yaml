@@ -1,0 +1,64 @@
+# ============================================================
+# Round 5 ExpT — 完整组合：Spatial VICReg + V4 全部反坍缩机制
+# ============================================================
+# 核心: 复刻 V4 成功机制 + Spatial VICReg 替代 GMP batch_uniformity
+
+_base_: xuannv_v12_clean.yaml
+
+experiment:
+  name: v13_round5_expT_full
+  output_dir: /workspace/outputs/v13_round5_expT_full
+
+training:
+  epochs: 50
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 10
+
+  # ★ 重建为核心
+  reconstruction_weight: 1.0
+
+  # ★ Spatial VICReg（替代 batch_uniformity）
+  use_spatial_vicreg: true
+  variance_weight: 0.3
+  covariance_weight: 0.1
+  vicreg_min_std: 1.0
+
+  # ★ V4 反坍缩机制
+  consistency_weight: 0.05
+  classification_weight: 0.03
+  decorrelation_weight: 0.05
+  orthogonality_weight: 0.01
+
+  # ★ 禁用其他损失
+  batch_uniformity_weight: 0.0
+  pre_norm_uniform_weight: 0.0
+  use_pre_norm_uniform: false
+  use_spatial_uniformity: false
+  use_spatial_raw_uniformity: false
+  temporal_gap_aware_weight: 0.0
+  pixel_change_supervision_weight: 0.0
+  change_consistency_weight: 0.0
+  text_contrastive_weight: 0.0
+  vicreg_weight: 0.0
+  dino_weight: 0.0
+  koleo_weight: 0.0
+  temporal_magnitude_weight: 0.0
+  temporal_cosine_pixel_weight: 0.0
+  pixel_temporal_info_nce_weight: 0.0
+  l2_temporal_weight: 0.0
+  ct_reconstruction_weight: 0.0
+  aux_classification_weight: 0.0
+  bottleneck_cls_weight: 0.0
+
+  # Teacher-Student
+  teacher_momentum: 0.996
+  student_frame_drop_rate: 0.5
+  student_source_drop_rate: 0.3
+  student_front_drop_prob: 0.15
+  student_back_drop_prob: 0.15
+
+  # 保存
+  save_every: 10
+  max_steps_per_epoch: 100

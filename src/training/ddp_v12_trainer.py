@@ -29,6 +29,8 @@ from src.training.losses import (
     consistency_loss_spatial,
     variance_regularizer,
     covariance_loss,
+    decorrelation_loss,
+    classification_loss,
     bottleneck_orthogonality_loss,
 )
 from src.training.memory_bank import EmbeddingMemoryBank
@@ -219,8 +221,8 @@ class DDPv12Trainer:
         self.teacher.bottleneck.kappa = kappa
 
         recon_w = t.reconstruction_weight
-        consist_w = t.consistency_weight
-        uniform_w = t.batch_uniformity_weight
+        consist_w = getattr(t, 'consistency_weight', 0.0)
+        uniform_w = getattr(t, 'batch_uniformity_weight', 0.0)
         recon_warmup = min(1.0, (epoch + 1) / max(getattr(t, 'recon_warmup_epochs', 10), 1))
 
         import itertools
@@ -292,6 +294,27 @@ class DDPv12Trainer:
                     )
                 else:
                     consist = torch.tensor(0.0, device=self.device)
+
+                # Classification Loss (语义监督)
+                cls_w = getattr(t, 'classification_weight', 0.0)
+                cls = torch.tensor(0.0, device=self.device)
+                dummy_cls = torch.tensor(0.0, device=self.device)
+                if cls_w > 0 and "label" in batch:
+                    labels = batch["label"]
+                    if labels.unique().numel() > 1 or labels[0].item() != 0:
+                        cls = classification_loss(student_out.logits.float(), labels)
+                        if student_out.aux_logits is not None:
+                            cls = cls + 0.5 * classification_loss(student_out.aux_logits.float(), labels)
+                        if student_out.bottleneck_logits is not None:
+                            cls = cls + 0.3 * classification_loss(student_out.bottleneck_logits.float(), labels)
+                    else:
+                        # Dummy loss 确保 DDP 所有参数参与梯度
+                        if student_out.logits is not None:
+                            dummy_cls = dummy_cls + student_out.logits.sum() * 0.0
+                        if student_out.aux_logits is not None:
+                            dummy_cls = dummy_cls + student_out.aux_logits.sum() * 0.0
+                        if student_out.bottleneck_logits is not None:
+                            dummy_cls = dummy_cls + student_out.bottleneck_logits.sum() * 0.0
 
             # === VICReg Variance + Covariance (Pre-norm 空间) + Memory Bank ===
             pre_norm = student_out.pre_norm_embedding  # [B, D] — 真正的 pre-norm
@@ -389,6 +412,12 @@ class DDPv12Trainer:
                 active_dims = (std_per_dim > 0.05).sum().item()
                 cov_offdiag = cov.item() if cov_w > 0 else 0.0
 
+            # Decorrelation Loss (Barlow Twins)
+            decorr_w = getattr(t, 'decorrelation_weight', 0.0)
+            decorr = torch.tensor(0.0, device=self.device)
+            if decorr_w > 0 and gathered_pre.shape[0] >= 2:
+                decorr = decorrelation_loss(gathered_pre.float())
+
             # V13: Bottleneck Orthogonality Loss
             orth_w = getattr(t, 'orthogonality_weight', 0.0)
             orth = torch.tensor(0.0, device=self.device)
@@ -398,17 +427,21 @@ class DDPv12Trainer:
             total = (
                 recon_w * recon_warmup * recon
                 + consist_w * consist
+                + cls_w * cls
                 + var_w * var
                 + cov_w * cov
                 + l2_uniform_w * l2_uniform
+                + decorr_w * decorr
                 + orth_w * orth
+                + dummy_cls
             )
 
             if torch.isnan(total) or torch.isinf(total):
                 if self.global_rank == 0 and step % 10 == 0:
                     print(f"  [WARNING] NaN/Inf total at step {step}, skipping.")
                     print(f"    recon={recon.item():.4f} consist={consist.item():.4f} "
-                          f"var={var.item():.4f} cov={cov.item():.4f} l2unif={l2_uniform.item():.4f}")
+                          f"cls={cls.item():.4f} var={var.item():.4f} cov={cov.item():.4f} "
+                          f"decorr={decorr.item():.4f} l2unif={l2_uniform.item():.4f}")
                 self.optimizer.zero_grad()
                 continue
 
@@ -452,9 +485,12 @@ class DDPv12Trainer:
                 "total": total.item() * accum_steps,
                 "recon": recon.item(),
                 "consist": consist.item(),
+                "cls": cls.item(),
                 "var": var.item(),
                 "cov": cov.item(),
                 "l2unif": l2_uniform.item(),
+                "decorr": decorr.item(),
+                "orth": orth.item(),
                 "lr": lr,
             }.items():
                 loss_accum[k] = loss_accum.get(k, 0.0) + v
@@ -463,11 +499,13 @@ class DDPv12Trainer:
             if self.global_rank == 0 and step % 20 == 0:
                 bank_size = self.memory_bank.size
                 print(f"  [Step {step}] recon={recon.item():.4f} "
-                      f"consist={consist.item():.4f} var={var.item():.4f} "
-                      f"cov={cov.item():.4f} l2unif={l2_uniform.item():.4f} "
+                      f"consist={consist.item():.4f} cls={cls.item():.4f} "
+                      f"var={var.item():.4f} cov={cov.item():.4f} "
+                      f"decorr={decorr.item():.4f} orth={orth.item():.4f} "
+                      f"l2unif={l2_uniform.item():.4f} "
                       f"bank={bank_size}/{self.memory_bank.K} "
                       f"std=[{std_min:.4f}/{std_mean:.4f}/{std_max:.4f}] "
-                      f"active_dims={active_dims}/128 "
+                      f"active_dims={active_dims}/{pre_norm_map.shape[1] if pre_norm_map is not None else pre_norm.shape[1]} "
                       f"perturb=[fd={perturb_stats['frame_drop_ratio']:.2f} "
                       f"sd={perturb_stats['source_drop_ratio']:.2f}] "
                       f"lr={lr:.6f}")

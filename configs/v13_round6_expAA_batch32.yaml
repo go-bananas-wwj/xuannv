@@ -1,0 +1,29 @@
+# Round 6 ExpAA — recon=0.1 + batch_size=8 + accum=4 (effective=32) 测试batch size影响
+_base_: xuannv_v12_clean.yaml
+experiment:
+  name: v13_round6_expAA_batch32
+  output_dir: /workspace/outputs/v13_round6_expAA_batch32
+data:
+  batch_size: 8
+training:
+  epochs: 50
+  gradient_accumulation_steps: 4
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 0
+  reconstruction_weight: 0.1
+  use_spatial_vicreg: true
+  variance_weight: 0.3
+  covariance_weight: 0.1
+  vicreg_min_std: 1.0
+  consistency_weight: 0.05
+  classification_weight: 0.03
+  decorrelation_weight: 0.05
+  orthogonality_weight: 0.01
+  batch_uniformity_weight: 0.0
+  teacher_momentum: 0.996
+  student_frame_drop_rate: 0.5
+  student_source_drop_rate: 0.3
+  save_every: 10
+  max_steps_per_epoch: 100

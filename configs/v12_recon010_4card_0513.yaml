@@ -1,0 +1,29 @@
+# v12_recon010_4card_0513 — 4卡DDP全量训练，recon=0.10+完整反坍缩
+# 基于 Round 6 ExpY 成功经验
+_base_: xuannv_v12_clean.yaml
+experiment:
+  name: v12_recon010_4card_0513
+  output_dir: /workspace/outputs/v12_recon010_4card_0513
+  seed: 43
+training:
+  epochs: 50
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 0
+  reconstruction_weight: 0.1
+  use_spatial_vicreg: true
+  variance_weight: 0.3
+  covariance_weight: 0.1
+  vicreg_min_std: 1.0
+  consistency_weight: 0.05
+  classification_weight: 0.03
+  decorrelation_weight: 0.05
+  orthogonality_weight: 0.01
+  batch_uniformity_weight: 0.0
+  teacher_momentum: 0.996
+  student_frame_drop_rate: 0.5
+  student_source_drop_rate: 0.3
+  save_every: 5
+  max_steps_per_epoch: 100
+  save_best_balanced: true
