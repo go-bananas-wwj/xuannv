@@ -525,13 +525,9 @@ class DDPv12Trainer:
         loss_accum = self._reduce_loss_dict(loss_accum)
         loss_accum["lr"] = lr
         # 添加 epoch 级别诊断指标
-        with torch.no_grad():
-            bank_emb = self.memory_bank.get_all()
-            all_pre = bank_emb if bank_emb.shape[0] > 0 else torch.zeros(1, self.memory_bank.dim, device=self.device)
-            std_per_dim = torch.sqrt(all_pre.var(dim=0, unbiased=False) + 1e-6)
-            loss_accum["bank"] = float(self.memory_bank.size)
-            loss_accum["active_dims"] = float((std_per_dim > 0.05).sum().item())
-            loss_accum["std_mean"] = float(std_per_dim.mean().item())
+        # ★ FIX: 不再用 memory bank 计算 active（bank 可能包含历史坍缩嵌入）
+        # 保留 step 累加的平均 active_dims 和 std_mean（已在 loss_accum 中）
+        loss_accum["bank"] = float(self.memory_bank.size)
         return loss_accum
 
     def _compute_recon_loss(self, predictions, batch):
