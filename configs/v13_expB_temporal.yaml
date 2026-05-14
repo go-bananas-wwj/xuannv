@@ -1,0 +1,44 @@
+# V13 ExpB: 基于 V12 ExpB，修复 L2 norm 时间敏感性
+# 核心改动:
+#   1. VICReg 在 L2-norm 空间计算 (use_l2_space_vicreg=true)
+#   2. 禁用 consistency loss (consistency_weight=0)
+#   3. 新增 temporal contrastive loss (temporal_contrastive_weight=0.1)
+#   4. dual window 使用 mixed_scale 模式 (长短间隔混合)
+_base_: xuannv_v12_clean.yaml
+experiment:
+  name: v13_expB_temporal
+  output_dir: /workspace/outputs/v13_expB_temporal
+  seed: 44
+training:
+  epochs: 50
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 0
+  reconstruction_weight: 0.05
+  use_spatial_vicreg: true
+  variance_weight: 0.3
+  covariance_weight: 0.1
+  vicreg_min_std: 1.0
+  inter_variance_weight: 0.1
+  inter_variance_min_std: 0.3
+  consistency_weight: 0.0
+  temporal_contrastive_weight: 0.1
+  use_l2_space_vicreg: true
+  classification_weight: 0.03
+  decorrelation_weight: 0.05
+  orthogonality_weight: 0.01
+  batch_uniformity_weight: 0.0
+  teacher_momentum: 0.996
+  student_frame_drop_rate: 0.5
+  student_source_drop_rate: 0.3
+  save_every: 5
+  max_steps_per_epoch: 100
+  save_best_balanced: true
+data:
+  window_mode: mixed_scale
+  non_overlap: true
+  _mixed_scale_long_prob: 0.5
+  _min_window_frames: 4
+  _max_window_frames: 12
+  _min_window_gap_ms: 15552000000

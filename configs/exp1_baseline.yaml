@@ -1,0 +1,13 @@
+# Exp1: V12 Baseline 对照组
+# 保持 V12 ExpB 原始配置不变
+_base_: v12_expB_inter01.yaml
+experiment:
+  name: exp1_baseline
+  output_dir: /workspace/outputs/exp1_baseline
+  seed: 44
+training:
+  epochs: 10
+  consistency_weight: 0.05
+  temporal_contrastive_weight: 0.0
+  use_l2_space_vicreg: false
+  save_every: 5

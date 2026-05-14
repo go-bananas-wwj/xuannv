@@ -20,14 +20,15 @@ def parse_epoch_summary(path):
     
     # 找最后一个 Epoch 行
     for line in reversed(lines[-200:]):
-        m = re.search(r'Epoch\s+(\d+).*recon=([\d.]+).*active=(\d+).*std_mean=([\d.]+).*inter_var=([\d.]+)', line)
+        # inter_var 在 active/std_mean 之前，调整匹配顺序
+        m = re.search(r'Epoch\s+(\d+).*recon=([\d.]+).*inter_var=([\d.]+).*active=(\d+).*std_mean=([\d.]+)', line)
         if m:
             return {
                 'epoch': int(m.group(1)),
                 'recon': float(m.group(2)),
-                'active': int(m.group(3)),
-                'std_mean': float(m.group(4)),
-                'inter_var': float(m.group(5)),
+                'inter_var': float(m.group(3)),
+                'active': int(m.group(4)),
+                'std_mean': float(m.group(5)),
             }
     return None
 

@@ -167,6 +167,7 @@ class TrainingConfig:
     use_pre_norm_uniform: bool = False
     use_spatial_vicreg: bool = False
     use_spatial_raw_uniformity: bool = False
+    use_l2_space_vicreg: bool = False
     vicreg_min_std: float = 1.0
     # V12 样本间方差
     inter_variance_weight: float = 0.0

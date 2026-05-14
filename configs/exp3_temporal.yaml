@@ -1,0 +1,12 @@
+# Exp3: Temporal Contrastive Loss + Pre-norm VICReg
+_base_: v12_expB_inter01.yaml
+experiment:
+  name: exp3_temporal
+  output_dir: /workspace/outputs/exp3_temporal
+  seed: 46
+training:
+  epochs: 10
+  consistency_weight: 0.0
+  temporal_contrastive_weight: 0.1
+  use_l2_space_vicreg: false
+  save_every: 5

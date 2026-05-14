@@ -627,10 +627,20 @@ class HarbinPatchDataset(Dataset):
                 if abs(center2 - center1) >= min_gap_ms:
                     return cand_w1_start, cand_w1_end, cand_w2_start, cand_w2_end
         # fallback
-        w1_start = float(ts_sorted[0])
-        w1_end = float(ts_sorted[min_frames - 1])
-        w2_start = float(ts_sorted[-min_frames])
-        w2_end = float(ts_sorted[-1])
+        if len(ts_sorted) >= min_frames * 2:
+            w1_start = float(ts_sorted[0])
+            w1_end = float(ts_sorted[min_frames - 1])
+            w2_start = float(ts_sorted[-min_frames])
+            w2_end = float(ts_sorted[-1])
+        elif len(ts_sorted) >= 2:
+            mid = len(ts_sorted) // 2
+            w1_start = float(ts_sorted[0])
+            w1_end = float(ts_sorted[mid - 1])
+            w2_start = float(ts_sorted[mid])
+            w2_end = float(ts_sorted[-1])
+        else:
+            t = float(ts_sorted[0]) if ts_sorted else 1672531200000.0
+            return t, t, t, t
         return w1_start, w1_end, w2_start, w2_end
 
     def _sample_short_gap_windows(self, ts_sorted: list[int]) -> tuple[float, float, float, float]:

@@ -1,0 +1,12 @@
+# Exp2: 禁用 Consistency Loss
+_base_: v12_expB_inter01.yaml
+experiment:
+  name: exp2_no_consistency
+  output_dir: /workspace/outputs/exp2_no_consistency
+  seed: 45
+training:
+  epochs: 10
+  consistency_weight: 0.0
+  temporal_contrastive_weight: 0.0
+  use_l2_space_vicreg: false
+  save_every: 5
