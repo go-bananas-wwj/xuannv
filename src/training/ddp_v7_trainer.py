@@ -33,6 +33,7 @@ from src.models.model import AEFModel
 from src.training.losses import (
     reconstruction_loss, consistency_loss,
     classification_loss, pre_norm_uniformity_loss, directional_uniformity_loss,
+    raw_uniformity_loss,
     temporal_contrastive_loss, temporal_cosine_pixel_loss, pixel_temporal_info_nce_loss,
 )
 from src.training.vicreg_loss import koleo_loss
@@ -174,9 +175,11 @@ class DDPv7Trainer:
                 # KoLeo
                 koleo = koleo_loss(gathered_pre_norm)
 
-                # 保留监控指标
+                # ★ Round8: uniformity 在 query norm (L2) 空间计算
+                query_norm = F.normalize(gathered_pre_norm, p=2, dim=1)
                 pre_unif = pre_norm_uniformity_loss(gathered_pre_norm)
                 enc_unif = directional_uniformity_loss(gathered_pre_norm)
+                raw_unif = raw_uniformity_loss(query_norm.float())
 
                 # Teacher forward (无梯度)
                 with torch.no_grad():
@@ -235,6 +238,7 @@ class DDPv7Trainer:
                 recon_weight = t.reconstruction_weight * recon_warmup
 
                 # === V7 总损失 ===
+                pre_norm_uniform_w = getattr(t, 'pre_norm_uniform_weight', 0.0)
                 total = (
                     recon_weight * recon
                     + t.vicreg_weight * vicreg
@@ -244,6 +248,7 @@ class DDPv7Trainer:
                     + t.aux_classification_weight * aux_cls
                     + t.bottleneck_cls_weight * bn_cls
                     + temporal_w * temporal
+                    + pre_norm_uniform_w * raw_unif
                 )
 
             # 梯度累积
@@ -268,6 +273,7 @@ class DDPv7Trainer:
             loss_accum["koleo"] = loss_accum.get("koleo", 0.0) + koleo.item()
             loss_accum["pre_unif"] = loss_accum.get("pre_unif", 0.0) + pre_unif.item()
             loss_accum["enc_unif"] = loss_accum.get("enc_unif", 0.0) + enc_unif.item()
+            loss_accum["raw_unif"] = loss_accum.get("raw_unif", 0.0) + raw_unif.item()
             loss_accum["consist"] = loss_accum.get("consist", 0.0) + consist.item()
             loss_accum["cls"] = loss_accum.get("cls", 0.0) + cls.item()
             loss_accum["aux_cls"] = loss_accum.get("aux_cls", 0.0) + aux_cls.item()
@@ -519,6 +525,7 @@ def train_worker(local_rank: int, cfg: Config, resume_from: str | None = None, w
                 f"KoLeo: {losses['koleo']:.4f} | "
                 f"PreUnif: {losses['pre_unif']:.4f} | "
                 f"EncUnif: {losses['enc_unif']:.4f} | "
+                f"RawUnif: {losses['raw_unif']:.4f} | "
                 f"Consist: {losses['consist']:.4f} | "
                 f"Cls: {losses['cls']:.4f} | "
                 f"Temporal: {losses.get('temporal', 0):.4f} | "

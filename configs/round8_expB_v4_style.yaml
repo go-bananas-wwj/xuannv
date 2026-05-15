@@ -1,0 +1,26 @@
+# Round8 ExpB: V4 风格 — 反坍缩三件套 + Consistency
+_base_: v12_expB_inter01.yaml
+
+experiment:
+  name: round8_expB_v4_style
+  output_dir: /workspace/outputs/round8_expB_v4_style
+  seed: 202
+
+model:
+  skip_l2_norm_training: true
+  vmf_kappa: 50.0
+
+training:
+  epochs: 20
+  reconstruction_weight: 0.1
+  consistency_weight: 0.05
+  classification_weight: 0.03
+  decorrelation_weight: 0.05
+  orthogonality_weight: 0.01
+  pre_norm_uniform_weight: 0.5
+  variance_weight: 0.25
+  covariance_weight: 0.04
+  vicreg_min_std: 1.0
+  temporal_cosine_pixel_weight: 0.0
+  save_every: 5
+  max_steps_per_epoch: 100
