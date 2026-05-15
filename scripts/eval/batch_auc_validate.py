@@ -26,11 +26,11 @@ sys.path.insert(0, "/workspace/xuannv")
 
 def find_checkpoint(exp_id: int) -> tuple[str, str] | None:
     """查找实验目录、config 和 checkpoint."""
-    # 查找目录
+    # 查找目录（按修改时间取最新的）
     dirs = glob.glob(f"/workspace/outputs/round7_exp{exp_id}_*")
     if not dirs:
         return None
-    exp_dir = dirs[0]
+    exp_dir = max(dirs, key=lambda p: Path(p).stat().st_mtime)
 
     # 查找 config
     configs = glob.glob(f"/workspace/xuannv/configs/round7_8gpu/exp{exp_id}_*.yaml")

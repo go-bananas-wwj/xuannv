@@ -93,6 +93,7 @@ def extract_embedding_map(
     window_end_ms: float,
     device: str | torch.device,
     normalize: bool = True,
+    use_pre_norm: bool = False,
 ) -> np.ndarray:
     """为指定 patch 和时间窗口提取 embedding map [D, H, W].
 
@@ -103,7 +104,9 @@ def extract_embedding_map(
         window_start_ms: 窗口起始时间戳 (ms).
         window_end_ms: 窗口结束时间戳 (ms).
         device: 运行设备.
-        normalize: 是否对 embedding 做 L2 归一化.
+        normalize: 是否对 embedding 做 L2 归一化（仅当 use_pre_norm=False 时有效）.
+        use_pre_norm: 是否使用 pre_norm_map（L2 归一化前的原始 embedding）.
+            当为 True 时，normalize 参数被忽略，返回原始 pre-norm embedding.
 
     Returns:
         numpy array of shape [D, H, W].
@@ -133,9 +136,12 @@ def extract_embedding_map(
             target_metadata=batch_dev["target_metadata"],
         )
 
-    emb = output.embedding_map  # [1, D, H, W]
-    if normalize:
-        emb = F.normalize(emb, p=2, dim=1)
+    if use_pre_norm and output.pre_norm_map is not None:
+        emb = output.pre_norm_map  # [1, D, H, W] — 原始幅度，无 VMF 噪声
+    else:
+        emb = output.embedding_map  # [1, D, H, W]
+        if normalize:
+            emb = F.normalize(emb, p=2, dim=1)
     return emb[0].cpu().numpy()
 
 

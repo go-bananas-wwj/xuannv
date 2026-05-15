@@ -678,3 +678,97 @@ python scripts/eval/validate_v2.py --checkpoint /workspace/outputs/aef_qwen_v1/e
 - 保留有价值的 checkpoint（`epoch_best_*.pt`），其余可删
 - 删除前确认无需要恢复的 checkpoint
 
+
+---
+
+## 已知 Bug 与教训记录
+
+### Bug: matplotlib `imshow(origin='lower')` 导致图像上下翻转
+
+**发现时间**: 2026-05-15
+**影响**: 所有标注叠加卫星图像的可视化结果上下颠倒
+**根因**: `matplotlib.pyplot.imshow(..., origin='lower')` 将数组第 0 行显示在图像底部，而 geopandas 的坐标系默认 y 轴向上（北在上）。当叠加地理坐标系的矢量数据时，两者方向不一致导致错位。
+
+**错误代码**:
+```python
+# ❌ 错误: origin='lower' 导致翻转
+ax.imshow(rgb, extent=[left, right, bottom, top], origin='lower')
+gdf_patch.boundary.plot(ax=ax, color='red')  # 坐标方向正常，但图像翻转了
+```
+
+**正确代码**:
+```python
+# ✅ 正确: 使用默认 origin='upper'，与 rasterio 的 row 0 = 最北端一致
+ax.imshow(rgb, extent=[left, right, bottom, top])  # origin='upper' 为默认值
+gdf_patch.boundary.plot(ax=ax, color='lime')  # 方向一致
+```
+
+**关键原理**:
+- `rasterio.read()` 返回的数组: `data[band, row, col]`，其中 `row=0` 对应影像最北端（y 值最大）
+- `matplotlib.imshow(origin='upper')`: 数组 `row=0` 显示在图像顶部（y 值大在上）→ 与地理坐标一致
+- `matplotlib.imshow(origin='lower')`: 数组 `row=0` 显示在图像底部（y 值大在下）→ **与地理坐标相反**
+
+**教训**:
+1. 地理数据可视化**绝对不要**使用 `origin='lower'`
+2. 卫星影像 + shapefile 叠加时，统一使用 `origin='upper'`（默认值）
+3. 标注验证必须叠加在卫星图像上肉眼确认方向正确
+
+### Bug: Shapefile CRS 未正确处理导致标注映射错误
+
+**发现时间**: 2026-05-15
+**影响**: Few-Shot CD AUC 从 ~0.65 降到 ~0.50（接近随机）
+**根因**: 哈尔滨 shapefile 原始 CRS 为 `None`，原代码 `if gdf.crs is not None and gdf.crs.to_epsg() != 32652` 直接跳过重投影，导致 WGS84 坐标未转换到 UTM。
+
+**错误代码**:
+```python
+# ❌ 错误: crs=None 时跳过重投影
+if gdf.crs is not None and gdf.crs.to_epsg() != 32652:
+    gdf = gdf.to_crs(epsg=32652)
+```
+
+**正确代码**:
+```python
+# ✅ 正确: crs=None 时默认设为 WGS84 再重投影
+if gdf.crs is None:
+    gdf = gdf.set_crs("EPSG:4326")
+if gdf.crs.to_epsg() != 32652:
+    gdf = gdf.to_crs(epsg=32652)
+```
+
+**教训**:
+1. 不要假设 shapefile 一定有 CRS
+2. 叠加验证是发现 CRS 问题的最有效手段
+3. 中国区域常见 CRS: WGS84 (EPSG:4326), CGCS2000 (EPSG:4490), UTM (EPSG:326xx)
+
+### Bug: 变化检测验证使用错误时间窗口
+
+**发现时间**: 2026-05-15
+**影响**: Few-Shot CD AUC 接近随机（0.51），Bare AUC 正常（0.65）
+**根因**: 多重错误叠加
+
+1. **固定半年窗口错误**：脚本使用 `BEFORE=(2023-07, 2023-12)`、`AFTER=(2024-07, 2024-12)`，但标注实际对应的是**相邻月份**（4-6月、6-8月、8-9月、9-10月）。
+2. **数据年份不匹配**：S2 数据 99%+ 为 2025 年帧，2024 年帧仅 579/9321。固定窗口内几乎无数据，before/after 提取到相同 embedding。
+3. **未按标注月份配对**：每个 shapefile 对应特定月份区间，脚本完全忽略此信息。
+
+**错误代码**:
+```python
+# ❌ 错误: 固定半年窗口，与标注月份无关
+BEFORE_WINDOW = (1688169600000.0, 1703980800000.0)  # 2023下半年
+AFTER_WINDOW = (1719792000000.0, 1735603200000.0)   # 2024下半年
+```
+
+**正确做法**:
+```python
+# ✅ 正确: 按 shapefile 对应的月份区间设置窗口
+# june.shp → 4-6月 → before=2025-04, after=2025-06
+# aug.shp → 6-8月 → before=2025-06, after=2025-08
+# 以此类推
+```
+
+**教训**:
+1. **验证前必须检查数据时间范围**：`ls *.tif | cut -c1-6 | sort | uniq -c`
+2. **标注的时间信息必须与数据时间范围匹配**：不能假设数据包含标注对应的所有年份
+3. **变化检测必须按标注的月份区间配对**：相邻月份变化 vs 固定半年窗口 → 完全不同的问题定义
+4. **当数据年份与标注年份不匹配时**，要么重新采集数据，要么将标注映射到数据存在的年份（需确认变化持续性）
+
+**修正**: 变化实际发生在 2025 年，数据也是 2025 年的。之前错误假设标注对应 2024 年。
