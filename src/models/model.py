@@ -367,7 +367,7 @@ class AEFModel(nn.Module):
         num_tgt = self.cfg.data.num_target_sources
         meta_dim = getattr(self.cfg.data, "metadata_dim", 4)
 
-        # Window 1
+        # Window 1 — skip decoder 节省内存，temporal loss 只需要 embedding
         out1 = self.forward(
             source_frames=source_frames,
             source_timestamps_ms=source_timestamps_ms,
@@ -378,11 +378,12 @@ class AEFModel(nn.Module):
             valid_end_ms=valid_end_w1,
             target_relative_time=torch.zeros(B, num_tgt, device=dev),
             target_metadata=torch.zeros(B, num_tgt, meta_dim, device=dev),
+            skip_decoder=True,
         )
         emb_w1 = F.normalize(out1.embedding_map, p=2, dim=1)
         pre_w1 = out1.pre_norm_map if out1.pre_norm_map is not None else out1.embedding_map
 
-        # Window 2
+        # Window 2 — skip decoder 节省内存
         out2 = self.forward(
             source_frames=source_frames,
             source_timestamps_ms=source_timestamps_ms,
@@ -393,6 +394,7 @@ class AEFModel(nn.Module):
             valid_end_ms=valid_end_w2,
             target_relative_time=torch.zeros(B, num_tgt, device=dev),
             target_metadata=torch.zeros(B, num_tgt, meta_dim, device=dev),
+            skip_decoder=True,
         )
         emb_w2 = F.normalize(out2.embedding_map, p=2, dim=1)
         pre_w2 = out2.pre_norm_map if out2.pre_norm_map is not None else out2.embedding_map
