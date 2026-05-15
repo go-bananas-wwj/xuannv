@@ -35,25 +35,18 @@ def compute_active_dims(
     checkpoint_path: str,
     n_batches: int = 50,
     threshold: float = 0.15,
-    device_str: str = "npu:0",
+    device_str: str = "cpu",  # 默认 CPU，避免抢占训练 NPU
 ) -> dict:
     """计算指定 checkpoint 的 active_dims."""
     cfg = load_config(config_path)
-    device = get_device(device_str)
+    cfg.data.preload = False  # 避免长时间预加载
+    device = torch.device(device_str)
 
     # 构建模型
-    model = AEFModel(
-        num_input_sources=cfg.data.num_input_sources,
-        num_target_sources=cfg.data.num_target_sources,
-        embedding_dim=cfg.model.embedding_dim,
-        num_blocks=cfg.model.num_blocks,
-        num_heads=cfg.model.num_heads,
-        vmf_kappa=cfg.model.vmf_kappa,
-        skip_l2_training=cfg.model.skip_l2_norm_training,
-    ).to(device)
+    model = AEFModel(cfg).to(device)
 
     # 加载 checkpoint
-    state = load_checkpoint(checkpoint_path, map_location=device_str)
+    state = load_checkpoint(checkpoint_path, device=device_str)
     if "model_state_dict" in state:
         model.load_state_dict(state["model_state_dict"], strict=False)
     else:
@@ -62,11 +55,7 @@ def compute_active_dims(
 
     # 构建 dataloader（只用 1 个 worker，小 batch）
     from src.data.dataset import HarbinPatchDataset
-    dataset = HarbinPatchDataset(
-        data_root=cfg.data.manifest_path,
-        split="train",
-        cfg=cfg,
-    )
+    dataset = HarbinPatchDataset(cfg)
     loader = DataLoader(
         dataset,
         batch_size=cfg.data.batch_size,
