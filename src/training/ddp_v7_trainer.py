@@ -109,12 +109,17 @@ class DDPv7Trainer:
         n_steps = 0
         epoch_start = time.time()
 
-        for step, batch in enumerate(dataloader):
+        import itertools
+        max_steps = getattr(t, 'max_steps_per_epoch', None)
+        iterator = itertools.islice(dataloader, max_steps) if max_steps else dataloader
+        effective_steps = min(len(dataloader), max_steps) if max_steps else len(dataloader)
+
+        for step, batch in enumerate(iterator):
             # 移动 batch 到 device
             batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
 
             # 学习率
-            lr = get_cosine_lr(epoch, step, len(dataloader), self.cfg)
+            lr = get_cosine_lr(epoch, step, effective_steps, self.cfg)
             for pg in self.optimizer.param_groups:
                 pg["lr"] = lr
 
