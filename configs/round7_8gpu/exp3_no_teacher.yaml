@@ -1,0 +1,34 @@
+# Exp3: 禁用Teacher-Student机制
+# 核心: teacher_momentum=0.0, 对比Exp1看teacher-student的作用
+_base_: ../v12_expB_inter01.yaml
+experiment:
+  name: round7_exp3_no_teacher
+  output_dir: /workspace/outputs/round7_exp3_no_teacher
+  seed: 103
+
+model:
+  skip_l2_norm_training: true
+  active_dims_threshold: 0.15  # pre-norm 空间用更高阈值
+
+training:
+  active_dims_threshold: 0.15  # pre-norm 空间用更高阈值
+  epochs: 50
+  reconstruction_weight: 0.1
+  consistency_weight: 0.0
+  inter_variance_weight: 0.0
+  classification_weight: 0.0
+  decorrelation_weight: 0.0
+  orthogonality_weight: 0.1
+  batch_uniformity_weight: 0.0
+  use_pre_norm_uniform: true
+  pre_norm_uniform_weight: 0.5
+  variance_weight: 0.3
+  covariance_weight: 0.1
+  vicreg_min_std: 0.1
+  teacher_momentum: 0.0
+  teacher_dropout_rate: 0.0
+  student_frame_drop_rate: 0.0
+  student_source_drop_rate: 0.0
+  student_front_drop_prob: 0.0
+  student_back_drop_prob: 0.0
+  save_every: 5

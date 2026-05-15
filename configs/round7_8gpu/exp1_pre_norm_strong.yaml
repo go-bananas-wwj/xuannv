@@ -1,0 +1,28 @@
+# Exp1: 强Pre-norm Uniformity + 正交约束
+# 核心: skip_l2=True, recon=0.1, pre_norm_unif=0.5, orth=0.1
+_base_: ../v12_expB_inter01.yaml
+experiment:
+  name: round7_exp1_pre_norm_strong
+  output_dir: /workspace/outputs/round7_exp1_pre_norm_strong
+  seed: 101
+
+model:
+  skip_l2_norm_training: true
+  active_dims_threshold: 0.15  # pre-norm 空间用更高阈值
+
+training:
+  active_dims_threshold: 0.15  # pre-norm 空间用更高阈值
+  epochs: 50
+  reconstruction_weight: 0.1
+  consistency_weight: 0.0
+  inter_variance_weight: 0.0
+  classification_weight: 0.0
+  decorrelation_weight: 0.0
+  orthogonality_weight: 0.1
+  batch_uniformity_weight: 0.0
+  use_pre_norm_uniform: true
+  pre_norm_uniform_weight: 0.5
+  variance_weight: 0.3
+  covariance_weight: 0.1
+  vicreg_min_std: 0.1
+  save_every: 5

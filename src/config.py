@@ -155,6 +155,8 @@ class TrainingConfig:
     pixel_change_supervision_weight: float = 0.0
     pixel_change_supervision_warmup_epochs: int = 40
     pixel_change_threshold: float = 0.1
+    # Active Dimensions 阈值（pre-norm 空间默认 0.15，L2 空间可用 0.05）
+    active_dims_threshold: float = 0.15
     # V10: Change consistency supervision
     change_consistency_weight: float = 0.0
     change_consistency_warmup_epochs: int = 40

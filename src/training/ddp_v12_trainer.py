@@ -438,12 +438,13 @@ class DDPv12Trainer:
                 std_min = std_per_dim.min().item()
                 std_mean = std_per_dim.mean().item()
                 std_max = std_per_dim.max().item()
-                active_dims = (std_per_dim > 0.05).sum().item()
+                active_dims_threshold = getattr(self.cfg.training, 'active_dims_threshold', 0.15)
+                active_dims = (std_per_dim > active_dims_threshold).sum().item()
                 cov_offdiag = cov.item() if cov_w > 0 else 0.0
                 
                 # ★ 新增：样本间多样性诊断
                 inter_std = torch.sqrt(gathered_pre.var(dim=0, unbiased=False) + 1e-6)
-                inter_active = (inter_std > 0.05).sum().item()
+                inter_active = (inter_std > active_dims_threshold).sum().item()
                 inter_std_mean = inter_std.mean().item()
 
             # Decorrelation Loss (Barlow Twins)
