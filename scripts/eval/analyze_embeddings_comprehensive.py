@@ -34,6 +34,7 @@ sys.path.insert(0, "/workspace/xuannv")
 
 import numpy as np
 import torch
+import torch_npu  # 必须导入以注册 npu 设备
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 

@@ -51,7 +51,7 @@ def find_checkpoint(exp_id: int) -> tuple[str, str] | None:
     return config_path, checkpoint_path
 
 
-def run_auc_validation(config_path: str, checkpoint_path: str, mode: str, n_samples: int, device: str) -> dict:
+def run_auc_validation(config_path: str, checkpoint_path: str, mode: str, n_samples: int, device: str, output_path: str) -> dict:
     """运行单个 AUC 验证."""
     cmd = [
         "python", "scripts/eval/quick_eval_checkpoint.py",
@@ -60,6 +60,7 @@ def run_auc_validation(config_path: str, checkpoint_path: str, mode: str, n_samp
         "--mode", mode,
         "--n-samples", str(n_samples),
         "--device", device,
+        "--output", output_path,
     ]
 
     try:
@@ -135,9 +136,11 @@ def main():
 
         # Pre-norm 验证
         print(f"  运行 pre-norm AUC 验证...")
+        output_dir = Path(args.output).parent
+        pre_norm_output = str(output_dir / f"exp{exp_id}_pre_norm_auc.json")
         pre_norm_result = run_auc_validation(
             config_path, checkpoint_path, "pre-norm",
-            args.n_samples, args.device,
+            args.n_samples, args.device, pre_norm_output,
         )
         result["pre_norm"] = pre_norm_result
         if pre_norm_result["success"]:
@@ -149,9 +152,11 @@ def main():
         # L2-norm 验证
         if not args.skip_l2:
             print(f"  运行 l2-norm AUC 验证...")
+            output_dir = Path(args.output).parent
+            l2_output = str(output_dir / f"exp{exp_id}_l2_norm_auc.json")
             l2_result = run_auc_validation(
                 config_path, checkpoint_path, "l2-norm",
-                args.n_samples, args.device,
+                args.n_samples, args.device, l2_output,
             )
             result["l2_norm"] = l2_result
             if l2_result["success"]:

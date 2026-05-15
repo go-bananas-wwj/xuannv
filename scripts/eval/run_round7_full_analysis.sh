@@ -24,7 +24,7 @@ echo "  预计时间: 8实验 × 5分钟 ≈ 40 分钟"
 python scripts/eval/batch_auc_validate.py \
     --experiments 1,2,3,4,5,6,7,8 \
     --n-samples 200 \
-    --device cpu \
+    --device npu:0 \
     --output "${ANALYSIS_DIR}/round7_auc_results.json"
 
 echo "  ✅ AUC 验证完成"
@@ -36,7 +36,7 @@ echo "  预计时间: 8实验 × 10分钟 ≈ 80 分钟 (CPU)"
 python scripts/eval/analyze_embeddings_comprehensive.py \
     --experiments 1,2,3,4,5,6,7,8 \
     --n-batches 100 \
-    --device cpu \
+    --device npu:0 \
     --output "${ANALYSIS_DIR}/round7_embedding_analysis.json"
 
 echo "  ✅ Embedding 分析完成"
