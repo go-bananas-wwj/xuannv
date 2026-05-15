@@ -213,6 +213,8 @@ class DDPv7Trainer:
 
                 # 时序对比损失
                 temporal_w = getattr(t, 'temporal_magnitude_weight', 0.0)
+                if temporal_w == 0:
+                    temporal_w = getattr(t, 'temporal_cosine_pixel_weight', 0.0)
                 temporal = torch.tensor(0.0, device=self.device)
                 if temporal_w > 0 and "valid_start_w1" in batch:
                     try:

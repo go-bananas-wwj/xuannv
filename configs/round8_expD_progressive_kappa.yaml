@@ -30,4 +30,4 @@ training:
   temporal_cosine_pixel_weight: 0.5
   temporal_magnitude_temperature: 0.1
   save_every: 5
-  max_steps_per_epoch: 100
+  max_steps_per_epoch: 50

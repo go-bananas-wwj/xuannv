@@ -23,4 +23,4 @@ training:
   vicreg_min_std: 1.0
   temporal_cosine_pixel_weight: 0.0
   save_every: 5
-  max_steps_per_epoch: 100
+  max_steps_per_epoch: 50

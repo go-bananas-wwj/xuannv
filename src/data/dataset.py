@@ -891,7 +891,7 @@ class HarbinPatchDataset(Dataset):
         last_day = calendar.monthrange(year, month)[1]
         end_ms = datetime(year, month, last_day, 23, 59, 59).timestamp() * 1000
         
-        frames, ts = self._load_input_frames_impl(patch_id, source_name)
+        frames, ts = self._load_input_frames(patch_id, source_name)
         if len(frames) == 0:
             return frames, ts
         
