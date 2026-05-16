@@ -1,0 +1,61 @@
+topic: AEF_Embedding_ChangeDetection_Research
+items:
+  - name: AEF_Original_Paper_Architecture
+    category: 原始论文
+    description: >
+      调研AlphaEarth Foundations原始论文的完整架构设计：
+      1. VMF bottleneck的设计细节（kappa值、L2归一化策略、训练vs推理时的差异）
+      2. 传感器编码器（SensorEncoderBank）的设计
+      3. STP Block（Space-Time-Precision）的内部机制
+      4. 时间编码方式（TimeCode/WindowCode）
+      5. 解码器（Decoders/Heads）的设计
+      6. 损失函数组合（VICReg, uniformity, reconstruction等权重）
+      7. 训练策略（batch size, epochs, warmup, teacher-student）
+
+  - name: AEF_GitHub_Reproductions
+    category: 复现与参考
+    description: >
+      调研GitHub上AEF或类似Earth Foundation模型的复现项目：
+      1. 是否有官方或社区复现
+      2. 复现中遇到的常见问题
+      3. 对embedding质量的改进方法
+      4. 训练配置的关键参数
+      5. 是否有人解决了embedding collapse问题
+
+  - name: HighQuality_Embedding_2024_2025
+    category: 最新方法
+    description: >
+      调研2024-2025年最新的高质量embedding生成方法：
+      1. DINOv2 / iBOT v2等自监督视觉模型的embedding策略
+      2. 防止embedding collapse的最新技术（not all negatives are equal, hard negative mining）
+      3. 时序/遥感领域的embedding学习方法（SatMAE, Scale-MAE, Prithvi等）
+      4. 多模态融合（光学+SAR+Landsat）的最佳实践
+      5. 对比学习中的temperature scheduling和margin设计
+
+  - name: Embedding_ChangeDetection_Methods
+    category: 变化检测
+    description: >
+      调研基于embedding/特征的变化检测方法：
+      1. 直接使用cosine distance / L2 distance的变化检测（bare方法）
+      2. 使用CD Head（Change Detection Head）的设计
+      3. 时序embedding对比的经典方法（CACo, ChangeStar, BIT等）
+      4. 如何训练模型使其embedding对变化敏感
+      5. 评估指标（AUC, F1, IoU）和benchmark数据集
+      6. 遥感变化检测的最新SOTA方法（2024-2025）
+
+  - name: VICReg_AntiCollapse_Techniques
+    category: 反坍缩技术
+    description: >
+      调研防止embedding collapse的专门技术：
+      1. VICReg原始论文的variance/covariance/invariance设计
+      2. Barlow Twins的去相关损失
+      3. W-MSE (Whitened MSE)
+      4. SwAV的online clustering
+      5. DINO的momentum encoder + centering
+      6. 自适应temperature和margin的技巧
+      7. 维度坍缩的检测和解决方法（rank analysis, effective dimension）
+
+execution:
+  output_dir: /workspace/xuannv/research_results
+  items_per_agent: 1
+  batch_size: 3
