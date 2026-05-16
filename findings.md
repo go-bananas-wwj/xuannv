@@ -1,140 +1,159 @@
-# 发现与决策 — Mini Batch Test 失败分析
+# AEF 对齐检查 — 详细发现
 
-## 需求
-找到能在100-patch子集上快速验证的训练配置，目标：
-- RawUnif < -2.0（反坍缩）
-- cov < 1.0（VICReg协方差可控）
-- Recon < 0.3（重建质量）
-
-## 研究发现
-
-### 发现1：Mini Batch 与 Round 9(exp3) 的关键差异
-
-| 维度 | Round 9 exp3 | Mini Batch exp3 |
-|------|--------------|-----------------|
-| Patches | 424 | 100 |
-| 月度样本 | 11,915 | 2,772 |
-| Steps/epoch | 200 | 50 |
-| Batch size | 4 | 4 |
-| 每epoch采样率 | ~7% | ~7% |
-| skip_l2 | false | false |
-| cov_weight | 0.001 | 0.001 |
-| Epoch 1 cov | 0.043 | 0.214 |
-| Epoch 1 RawUnif | -1.56 | -1.55 |
-
-**关键洞察**: 采样率相同(7%)，但Mini Batch的绝对样本数只有1/4。这意味着：
-- 每个batch的统计估计更不稳定
-- VICReg cov基于batch协方差矩阵，小数据集→高方差估计
-- 但exp3在Mini Batch上cov仍是最低的(0.39@Ep6)，说明skip_l2=false有帮助
-
-### 发现2：Epoch 4 是转折点
-
-所有实验的RawUnif在Epoch 4达到最佳，之后恶化：
-```
-exp3: -1.55 → -1.97 → -1.39
-exp5: -1.42 → -1.82 → -1.40
-exp6: -1.46 → -1.82 → -1.27
-```
-
-**原因假设**: warmup=3 epochs，Epoch 4时学习率达到峰值(1e-4)，可能进入不稳定区域。
-
-### 发现3：高uniform权重加剧cov爆炸
-
-exp4 (uniform=1.0) 的cov最严重(33.2)，说明：
-- uniformity loss推动embedding分散
-- 但cov项同时要求去相关
-- 两者冲突时，低cov权重无法维持约束
-- 模型被迫牺牲cov来满足uniformity
-
-### 发现4：空间感知temporal loss有效
-
-exp1 (无空间加权) vs exp2 (有空间加权):
-- Temporal Loss: 4.96 vs 1.13
-- 验证了weight_map的必要性
-
-## 技术决策
-| 决策 | 理由 |
-|------|------|
-| 提高covariance_weight | 0.001无法抑制cov增长，需0.01+ |
-| 延长warmup | 3ep太短，学习率冲击导致不稳定 |
-| 保持skip_l2=false | exp3 cov控制最好 |
-| 保持空间感知temporal | 已验证有效 |
-
-## 下一步假设（待验证）
-
-1. **假设A**: cov_weight=0.01 + skip_l2=false → cov可控 + RawUnif持续改善
-2. **假设B**: 去掉cov项 + 提高variance_weight=1.0 → 简化约束
-3. **假设C**: warmup=10 + cov_weight=0.01 + uniform=1.0 → 平滑学习 + 强约束
-4. **假设D**: 增加steps/epoch到100 → 更多采样 → 统计更稳定
-
-## 资源
-- docs/FAILED_PARAMETERS_LOG.md — 完整失败记录
-- /workspace/outputs/mini_batch_monitor.log — 训练监控日志
+## 日期: 2026-05-16
 
 ---
 
-## 重大发现：VICReg 根本没参与训练！
+## 1. Mask 可视化结果 ✅
 
-### 代码验证
+变化检测 mask 数据合理：
+- june: 45/424 patches changed, 0.200% pixels
+- aug: 21/424 patches changed, 0.056% pixels  
+- september: 24/424 patches changed, 0.096% pixels
+- october: 27/424 patches changed, 0.100% pixels
 
-`ddp_v7_trainer.py` 中的损失计算：
+可视化图 (`data/change_masks_visualization.png`) 显示：
+- 变化区域以绿色显示在红色背景上，形状合理（线性/块状）
+- patch_000000 在所有时期全红（无变化），与预期一致
+- 变化比例极低但正常（遥感变化通常是局部的）
+
+---
+
+## 2. /grill-me 对齐检查 — 严重不对齐项
+
+### 🔴 CRITICAL: Decoder 条件注入被完全禁用
+
+**位置**: `src/models/decoders.py` V13
+
+**问题**: `ConditionInjector.forward` 直接返回 embedding，不做任何修改：
 ```python
-vicreg = lambda_var * vicreg_var + lambda_cov * vicreg_cov
-# lambda_var=1.0 (default), lambda_cov=0.04 (default)
-
-total = (
-    recon_weight * recon
-    + t.vicreg_weight * vicreg    # vicreg_weight=0.0 !!!
-    + ...
-)
+def forward(self, embedding, window_code=None, relative_time=None, metadata=None):
+    return embedding  # V13: 直接返回，不做条件注入
 ```
 
-所有配置中 `vicreg_weight: 0.0`，且 `vicreg_lambda_cov` 未设置。
+**影响**: 
+- Decoder 无法接收 window_code / relative_time
+- Reconstruction **不 forcing time-conditioned decoding**
+- 这是 **temporal blindness 的根因之一**！
 
-**这意味着**：
-1. 配置中的 `covariance_weight: 0.001` 对 `ddp_v7_trainer` **完全无效**
-2. VICReg (variance + covariance) **完全不参与反向传播**
-3. cov=33.2 只是**统计现象**，反映embedding缺乏去相关约束
+**AEF 原文**: Decoder 应该是条件解码器，接收时间条件并生成时间特定的重建。
 
-### 为什么 Round 9(exp3) cov=0.043？
+---
 
-| 因素 | Round 9 | Mini Batch |
-|------|---------|------------|
-| skip_l2 | false | false (exp3) / true (others) |
-| vicreg_weight | 0.0 | 0.0 |
-| 数据集 | 424 patches | 100 patches |
+### 🔴 CRITICAL: Bottleneck 训练时 Skip L2
 
-**解释**: skip_l2=false → L2归一化 → 协方差矩阵自然受限（元素有界[-1,1]）
-- Round 9大数据集进一步稳定统计
-- Mini Batch数据少 + skip_l2=true → cov爆炸
+**位置**: `src/models/bottleneck.py` + 配置
 
-### 反坍缩措施实际生效的只有
-
+**问题**: 配置 `skip_l2_norm_training: true`，且代码中 `skip_l2_training` 参数生效：
 ```python
-total = (
-    recon_weight * recon           # 0.1
-    + t.consistency_weight * consist  # 0.05
-    + t.classification_weight * cls   # 0.03
-    + temporal_w * temporal           # 0.5
-    + pre_norm_uniform_w * raw_unif   # 0.5
-)
+if self.training and self.skip_l2_training:
+    embedding_map = pre_norm_map  # 不 L2 归一化！
 ```
 
-- `raw_unif`: 推分散，但**不去相关**
-- 缺乏 `variance` 约束 → 某些维度可能坍缩
-- 缺乏 `covariance` 约束 → 维度高度相关
+**影响**: 
+- 训练时 embedding 不在单位球面上
+- Consistency loss 在 non-spherical 空间计算
+- Batch uniformity 无法正确工作（期望 L2-normalized 输入）
 
-### 为什么 Epoch 4 后 RawUnif 恶化？
+**AEF 原文**: 训练时 L2 Norm + VMF 噪声，始终在球面上。
 
-- Epoch 1-4: raw_unif 推embedding分散，RawUnif改善
-- Epoch 4+: 学习率达到峰值，embedding开始在球面上"滑动"
-- 缺乏去相关约束 → embedding聚集在几个方向 → 维度相关增加
-- cov统计值上升 → RawUnif恶化（embedding变集中）
+---
 
-## 修正后的下一步假设
+### 🔴 CRITICAL: Static Target 占比过高
 
-| 假设 | 配置 | 预期效果 |
-|------|------|----------|
-| A | vicreg_weight=1.0, lambda_cov=1.0, skip_l2=false | VICReg参与+去相关约束 |
-| B | vicreg_weight=1.0, lambda_cov=5.0, skip_l2=false | 更强去相关 |
-| C | vicreg_weight=1.0, lambda_cov=1.0, uniform=1.0, skip_l2=false | 强反坍缩+去相关 |
+**位置**: `configs/v2_*.yaml`
+
+**问题**: 
+- 7 targets: S2, S1, Landsat, DEM, WorldCover, DynamicWorld, JRC_Water
+- Static 目标 (DEM/WC/DW/JRC) = 4/7 = 57%
+- AEF 原文 static 目标 ≈ 22%
+
+**影响**: Model 被 bias 向 time-agnostic representations（static 目标不随时间变化）
+
+**修复**: 降低 static source 的 reconstruction weight 或移除部分 static 目标
+
+---
+
+### 🟡 HIGH: 多余的反坍缩损失
+
+**AEF 原文损失**: Reconstruction(1.0) + BatchUniformity(0.05) + Consistency(0.02)
+
+**我们当前的损失** (v12 trainer):
+- Reconstruction
+- Consistency  
+- Classification (auxiliary)
+- VICReg Variance
+- VICReg Covariance
+- Decorrelation (Barlow Twins)
+- Orthogonality
+- Raw Uniformity / Batch Uniformity
+- Temporal Cosine Pixel
+- ...等等
+
+**影响**: 损失过多可能导致梯度冲突，模型无法找到正确优化方向。
+
+---
+
+### 🟡 HIGH: Temporal Loss 与 AEF 设计冲突
+
+**AEF 原文**: **没有显式 temporal contrastive loss**
+- 时间敏感性来自: (1) Teacher-Student consistency + heavy dropout, (2) Reconstruction forcing time-conditioned decoding
+
+**我们**: 有 temporal_cosine_pixel, pixel_temporal_info_nce, gap_aware_temporal 等显式 temporal loss
+
+**影响**: 显式 temporal loss 可能与 AEF 的隐式设计哲学冲突。
+
+---
+
+### 🟡 MEDIUM: 数据年份混合
+
+**当前**: 2025 = 87.7%, 2024 = 6.2%, 2023 = 6.0%
+**Minibatch 100 patches**: 97 patches 有 ZERO 2024 数据
+
+**影响**: 虽然大部分 patch 只有 2025 数据，但仍有 3% patch 有跨 year 数据，可能引入混淆。
+
+---
+
+### 🟡 MEDIUM: Image Size 128
+
+**当前**: 128x128
+**AEF 可能**: 256x256 或更大
+
+**影响**: 较小分辨率可能限制空间细节编码。
+
+---
+
+## 3. 可能对齐良好的项
+
+| 项目 | 状态 | 说明 |
+|------|------|------|
+| Teacher-Student 架构 | ✅ | EMA Teacher + Student view 构建已存在 |
+| Student dropout | ⚠️ | Frame drop 0.5, source drop 0.3 — 接近 AEF |
+| STP Blocks | ⚠️ | 8 blocks, 3 paths — 结构类似 AEF |
+| AdamW optimizer | ✅ | 使用 AdamW + cosine schedule |
+| VMF kappa | ⚠️ | 50.0 — 可能需要调整到 2000 |
+
+---
+
+## 4. 根因假设
+
+**Temporal blindness 的最可能原因**（按优先级）：
+
+1. **Decoder 条件注入被禁用** → Reconstruction 不 forcing time-conditioned decoding
+2. **Bottleneck skip L2 训练时** → Embedding 不在球面上，consistency 无法正确传播时间信号
+3. **Static target 占比 57%** → Model 被 bias 向 time-agnostic
+4. **多余损失干扰** → VICReg/Decorr/Orth 等损失与 AEF 机制冲突
+5. **缺少 AEF 特有的 Batch Uniformity** → 我们的 batch_uniformity_loss_l2 与 AEF 的 cyclic shift 不同
+
+---
+
+## 5. 修复优先级
+
+| 优先级 | 修复项 | 预计影响 |
+|--------|--------|----------|
+| P0 | 恢复 Decoder 条件注入 | 🔥 最大 |
+| P0 | Bottleneck skip_l2=false | 🔥 最大 |
+| P0 | 降低 static 权重至 0.1 | 🔥 大 |
+| P1 | 移除 VICReg/Decorr/Orth/CLS | 中 |
+| P1 | 严格 2025-only 过滤 | 中 |
+| P2 | Image size 256 | 小 |

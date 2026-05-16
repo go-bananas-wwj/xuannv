@@ -6,9 +6,9 @@ from torch import nn
 
 
 class ConditionInjector(nn.Module):
-    """V13: 禁用条件注入 — 直接返回 embedding.
+    """条件注入 — 将时间/窗口/元数据条件注入到 embedding 中.
     
-    保留类结构以兼容旧 checkpoint，但不做任何修改.
+    AEF 对齐: 恢复条件注入，使 decoder 能够利用时间信息生成时间条件化的重建.
     """
 
     def __init__(
@@ -19,8 +19,16 @@ class ConditionInjector(nn.Module):
         metadata_dim: int,
     ) -> None:
         super().__init__()
-        # 保留参数但不再使用
         self.embedding_dim = embedding_dim
+        cond_dim = window_code_dim + relative_time_code_dim + metadata_dim
+        if cond_dim > 0:
+            self.proj = nn.Sequential(
+                nn.Linear(cond_dim, embedding_dim),
+                nn.LayerNorm(embedding_dim),
+                nn.GELU(),
+            )
+        else:
+            self.proj = None
 
     def forward(
         self,
@@ -29,8 +37,26 @@ class ConditionInjector(nn.Module):
         relative_time: torch.Tensor | None = None,
         metadata: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        # V13: 直接返回 embedding，不做任何条件注入
-        return embedding
+        if self.proj is None:
+            return embedding
+        
+        # embedding: [B, D, H, W]
+        B, D, H, W = embedding.shape
+        cond_parts = []
+        if window_code is not None:
+            cond_parts.append(window_code)
+        if relative_time is not None:
+            cond_parts.append(relative_time)
+        if metadata is not None:
+            cond_parts.append(metadata)
+        
+        if len(cond_parts) == 0:
+            return embedding
+        
+        cond = torch.cat(cond_parts, dim=-1)  # [B, total_cond_dim]
+        cond_emb = self.proj(cond)  # [B, D]
+        # 广播到空间维度: [B, D, 1, 1] + [B, D, H, W]
+        return embedding + cond_emb[:, :, None, None]
 
 
 class ContinuousDecoder(nn.Module):

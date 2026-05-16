@@ -142,6 +142,33 @@ def batch_uniformity_loss_l2(embeddings: torch.Tensor, dim_dropout: float = 0.1,
 
 
 # ────────────────────────────────────────────
+# 1c. Cyclic Shift Batch Uniformity (AEF 风格)
+# ────────────────────────────────────────────
+
+def batch_uniformity_cyclic_shift(embeddings: torch.Tensor) -> torch.Tensor:
+    """Cyclic shift batch uniformity — AEF 原文风格.
+    
+    对 batch 中的 embeddings 做循环移位，最小化相邻样本的 dot product。
+    比 all-pairs 更轻量，但要求 batch shuffle 良好。
+    
+    Args:
+        embeddings: [B, D] 已 L2 归一化
+    Returns:
+        scalar loss, 越小越好
+    """
+    if embeddings.shape[0] < 2:
+        return embeddings.new_tensor(0.0)
+    
+    # 循环移位
+    shifted = torch.roll(embeddings, shifts=1, dims=0)
+    
+    # 相邻样本的 dot product
+    sim = (embeddings * shifted).sum(dim=-1)
+    
+    return sim.abs().mean()
+
+
+# ────────────────────────────────────────────
 # 2. Decorrelation Loss (Barlow Twins)
 # ────────────────────────────────────────────
 

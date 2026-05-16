@@ -254,6 +254,7 @@ class HarbinPatchDataset(Dataset):
         """构建月度样本索引: [(patch_id, year, month), ...].
         
         每个 patch 每个月只要有任意输入源有数据，就生成一个样本。
+        V13-fix: 严格 2025-only，过滤掉 2023/2024 数据。
         """
         from datetime import datetime
         from collections import defaultdict
@@ -272,7 +273,9 @@ class HarbinPatchDataset(Dataset):
                     ts = label_to_timestamp_ms(tf.stem)
                     if ts > 0:
                         dt = datetime.fromtimestamp(ts / 1000)
-                        month_groups[(dt.year, dt.month)].append(ts)
+                        # ★ 严格 2025-only
+                        if dt.year == 2025:
+                            month_groups[(dt.year, dt.month)].append(ts)
             
             # 每个月一个样本（只要有数据）
             for (year, month), ts_list in sorted(month_groups.items()):

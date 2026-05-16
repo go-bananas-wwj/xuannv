@@ -296,9 +296,18 @@ class AEFModel(nn.Module):
             target_metadata = target_metadata[:, None, :]
 
         T_tgt = target_relative_time.shape[1]
-        # V13: 简化 decode — 不传递任何时间条件
+        # AEF 对齐: 恢复条件解码 — 传递时间条件
         expanded_map = embedding_map[:, None, ...].repeat(1, T_tgt, 1, 1, 1)
         flat_map = expanded_map.reshape(B * T_tgt, *embedding_map.shape[1:])
+
+        # 准备条件: 扩展到 [B*T_tgt, ...]
+        cond_window = window_code[:, None, :].expand(B, T_tgt, -1).reshape(B * T_tgt, -1)
+        if target_relative_time.dim() == 1:
+            target_relative_time = target_relative_time[:, None]
+        cond_reltime = target_relative_time.reshape(B * T_tgt, -1)
+        if target_metadata.dim() == 2:
+            target_metadata = target_metadata[:, None, :]
+        cond_meta = target_metadata.reshape(B * T_tgt, -1)
 
         max_ch = max(max(self._per_source_out_channels), self.cfg.data.num_classes)
         flat_recon = torch.zeros(B * T_tgt, max_ch, *flat_map.shape[2:], device=flat_map.device, dtype=flat_map.dtype)
@@ -308,12 +317,22 @@ class AEFModel(nn.Module):
             for src_id, dec in enumerate(self.per_source_decoders):
                 mask = (flat_src_idx == src_id)
                 if mask.any():
-                    out = dec(flat_map[mask])  # V13: 不传递时间条件
+                    out = dec(
+                        flat_map[mask],
+                        window_code=cond_window[mask],
+                        relative_time=cond_reltime[mask],
+                        metadata=cond_meta[mask],
+                    )
                     out_ch = self._per_source_out_channels[src_id]
                     flat_recon[mask, :out_ch] = out.to(flat_recon.dtype)
         else:
             # 默认: 全部用第一个 decoder
-            out = self.per_source_decoders[0](flat_map)  # V13: 不传递时间条件
+            out = self.per_source_decoders[0](
+                flat_map,
+                window_code=cond_window,
+                relative_time=cond_reltime,
+                metadata=cond_meta,
+            )
             flat_recon[:, :self._per_source_out_channels[0]] = out.to(flat_recon.dtype)
 
         reconstructions = flat_recon.reshape(B, T_tgt, *flat_recon.shape[1:])
