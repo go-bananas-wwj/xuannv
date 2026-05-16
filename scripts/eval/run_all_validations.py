@@ -42,12 +42,12 @@ for exp_name, gpu_idx in EXPERIMENTS:
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"  [{exp_name}] NPU {gpu_idx} → {ckpt_path}")
+    # ★ 不设置 ASCEND_RT_VISIBLE_DEVICES，直接让 torch_npu 访问指定 npu
     proc = subprocess.Popen(
         cmd,
         stdout=open(log_path, "w"),
         stderr=subprocess.STDOUT,
         cwd="/workspace/xuannv",
-        env={**dict(subprocess.os.environ), "ASCEND_RT_VISIBLE_DEVICES": str(gpu_idx)},
     )
     processes.append((exp_name, proc))
 

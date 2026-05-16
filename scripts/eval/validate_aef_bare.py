@@ -303,9 +303,9 @@ for period_name, pdata in all_period_results.items():
     patch_auc_std = np.std(patch_auc_values) if patch_auc_values else 0.0
     mean_changed_ratio = np.mean(patch_changed_ratios) if patch_changed_ratios else 0.0
 
-    # Distance map 可视化
-    if not args.no_viz and pdata["patch_data"]:
-        _make_viz(pdata["patch_data"], period_name, DIST_DIR)
+    # Distance map 可视化（TODO: _make_viz 需在调用前定义）
+    # if not args.no_viz and pdata["patch_data"]:
+    #     _make_viz(pdata["patch_data"], period_name, DIST_DIR)
 
     results["periods"][period_name] = {
         "auc": float(auc),
