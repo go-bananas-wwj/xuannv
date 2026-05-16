@@ -1,7 +1,7 @@
 experiment:
   name: aef_skip_l2
   seed: 42
-  output_dir: /workspace/outputs/aef_skip_l2
+  output_dir: /workspace/outputs/xuannv_round2/aef_skip_l2
 data:
   dataset_type: harbin_patches
   manifest_path: /workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered
