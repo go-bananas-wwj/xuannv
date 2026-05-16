@@ -362,10 +362,23 @@ class HarbinPatchDataset(Dataset):
     def _preload_all(self) -> None:
         """预加载所有数据到内存 — 支持持久化缓存 (DDP 安全: 仅 rank 0 预加载)."""
         import time, hashlib
+        # ★ 每个实验独立缓存：将实验名+关键采样参数纳入哈希，彻底避免并发竞争
+        exp_name = getattr(self.cfg.experiment, 'name', 'unknown')
+        cache_inputs = [
+            exp_name,
+            str(self.data_root),
+            ",".join(self.patches),
+            str(self.filter_2025_monthly),
+            str(self.max_frames),
+            str(self.image_size),
+            ",".join(self.input_sources),
+            ",".join([f"{n}:{lt}:{ss}" for n, lt, ss in self.target_sources]),
+            str(self.merge_hr_into_lr),
+        ]
         cache_key = hashlib.md5(
-            (str(self.data_root) + ",".join(self.patches)).encode()
+            "|".join(cache_inputs).encode()
         ).hexdigest()[:16]
-        # ★ 共享缓存目录：所有实验共用同一缓存（节省磁盘空间）
+        # 共享缓存目录（每个实验独立文件，无竞争）
         shared_cache_dir = Path("/workspace/outputs/.cache_shared")
         shared_cache_dir.mkdir(parents=True, exist_ok=True)
         cache_file = shared_cache_dir / f"dataset_cache_{cache_key}.pt"
