@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument("--config", type=str, required=True, help="YAML 配置文件路径")
     parser.add_argument("--resume", type=str, default=None, help="恢复训练的检查点路径")
     parser.add_argument("--epochs", type=int, default=None, help="覆盖配置中的训练轮数")
-    parser.add_argument("--save-every", type=int, default=None, help="每隔多少 epoch 保存检查点")
+    # --save-every 已移除：现在只自动保留 recon 最低的 best checkpoint
     parser.add_argument("--local-rank", type=int, default=0)
     parser.add_argument("--wandb-group", type=str, default="aef_v1", help="Wandb group name")
     parser.add_argument("--wandb-off", action="store_true", help="禁用 wandb")
@@ -83,8 +83,7 @@ def main():
     # 覆盖参数
     if args.epochs is not None:
         cfg.training.epochs = args.epochs
-    if args.save_every is not None:
-        cfg.training.save_every = args.save_every
+    # save_every 不再使用，只保留 best checkpoint
 
     # 固定随机种子
     seed = getattr(cfg.experiment, "seed", 42) + global_rank
@@ -133,10 +132,9 @@ def main():
         dist.barrier()
 
     total_epochs = cfg.training.epochs
-    save_every = args.save_every if args.save_every is not None else getattr(cfg.training, "save_every", 10)
     epoch_start_time = time.time()
     
-    # Top-2 best checkpoints（基于 recon loss）
+    # 只保留1个 best checkpoint（基于 recon loss）
     best_checkpoints: list[tuple[float, Path]] = []  # [(recon, path), ...]
 
     for epoch in range(start_epoch, total_epochs):
@@ -160,24 +158,21 @@ def main():
                 f"time={epoch_dt:.1f}s elapsed={int(elapsed//60)}m ETA={eta_str}"
             )
 
-        # 定期保存
-        if (epoch + 1) % save_every == 0:
-            trainer.save_checkpoint(epoch + 1, losses)
-
-        # 动态保存 Top-2 best checkpoints（基于 recon loss）
+        # 只保留最好的 best checkpoint（基于 recon loss）
         if global_rank == 0:
             recon_val = losses["recon"]
-            # 检查是否进入 top-2
-            is_top2 = len(best_checkpoints) < 2 or recon_val < best_checkpoints[-1][0]
-            if is_top2:
-                ckpt_path = trainer.output_dir / f"best_epoch{epoch + 1}.pt"
+            # 当前 recon 比之前最好的还低才保存
+            is_best = len(best_checkpoints) == 0 or recon_val < best_checkpoints[0][0]
+            if is_best:
+                # ★ 修复：ckpt_path 必须与 save_checkpoint 生成的文件名一致
+                ckpt_path = trainer.output_dir / f"epoch_best_epoch{epoch + 1}.pt"
                 trainer.save_checkpoint(f"best_epoch{epoch + 1}", losses)
                 best_checkpoints.append((recon_val, ckpt_path))
                 best_checkpoints.sort(key=lambda x: x[0])
-                logger.Print(f"  [Best] Top-2 recon={recon_val:.4f} at epoch {epoch + 1}")
+                logger.Print(f"  [Best] New best recon={recon_val:.4f} at epoch {epoch + 1}")
                 
-                # 只保留 top-2，删除多余的
-                while len(best_checkpoints) > 2:
+                # 只保留1个最好的，删除旧的
+                while len(best_checkpoints) > 1:
                     old_recon, old_path = best_checkpoints.pop(-1)
                     if old_path.exists():
                         old_path.unlink()
