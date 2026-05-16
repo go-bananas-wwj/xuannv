@@ -136,6 +136,7 @@ class TrainingConfig:
     # V6: Pixel-level temporal losses
     temporal_cosine_pixel_weight: float = 0.0
     temporal_cosine_pixel_temperature: float = 0.05
+    temporal_use_spatial_weight: bool = false  # Round 9: 空间感知 temporal loss
     pixel_temporal_info_nce_weight: float = 0.0
     pixel_temporal_info_nce_temperature: float = 0.1
     pixel_temporal_info_nce_samples: int = 16

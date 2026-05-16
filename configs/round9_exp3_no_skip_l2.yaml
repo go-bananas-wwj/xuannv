@@ -1,0 +1,9 @@
+_base_: config.yaml
+experiment:
+  name: round9_exp3_no_skip_l2
+  output_dir: /workspace/outputs/round9/exp3_no_skip_l2
+  seed: 44
+model:
+  skip_l2_norm_training: false
+training:
+  temporal_use_spatial_weight: true

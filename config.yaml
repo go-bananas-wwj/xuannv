@@ -1,20 +1,24 @@
 # ============================================================
-# xuannv V13 — 月度采样 + 无时间条件Decoder
-# 核心: 按月采样，Decoder不偷看时间，Embedding被迫编码时间信息
-# 目标: S2+S1+Landsat+DEM
+# xuannv Round 9 — 修复版训练配置
+# 核心改进:
+#   1. 恢复 7 个重建目标（+WorldCover/DynamicWorld/JRC Water）
+#   2. 增加训练量: 100 epochs × 200 steps
+#   3. 降低 VICReg Cov 权重 (0.04 -> 0.001)
+#   4. 空间感知 Temporal Loss
+#   5. Batch Size=4
 # ============================================================
 
 experiment:
-  name: xuannv_v13_monthly
+  name: round9_baseline
   seed: 42
-  output_dir: /workspace/outputs/xuannv_v13_monthly
+  output_dir: /workspace/outputs/round9_baseline
 
 data:
   dataset_type: harbin_patches
   manifest_path: /workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered
   stats_dir: /workspace/statistics/harbin_scenes
-  batch_size: 6
-  num_workers: 0  # V13: 避免多进程问题
+  batch_size: 4
+  num_workers: 0
   image_size: 128
   max_frames: 32
   num_samples: 424
@@ -22,7 +26,7 @@ data:
   input_dim: 6
   metadata_dim: 4
   num_input_sources: 3
-  num_target_sources: 4
+  num_target_sources: 7
   random_target_frame: true
   spatial_augmentation: true
   temporal_window_augmentation: true
@@ -37,7 +41,7 @@ data:
     s1: 2
     landsat: 6
 
-  # ★ 目标源配置：S2+S1+Landsat+DEM
+  # ★ 目标源配置：S2+S1+Landsat+DEM+WorldCover+DynamicWorld+JRC_Water
   target_sources:
     - name: s2
       loss_type: 0        # 0=continuous (L1)
@@ -55,6 +59,18 @@ data:
       loss_type: 0
       sensor_src: null
       out_channels: 1
+    - name: worldcover
+      loss_type: 1        # 1=classification (CE)
+      sensor_src: null
+      out_channels: 11
+    - name: dynamic_world
+      loss_type: 1
+      sensor_src: null
+      out_channels: 9
+    - name: jrc_water
+      loss_type: 0        # 连续值回归（数据范围 0-98）
+      sensor_src: null
+      out_channels: 1
 
 model:
   input_dim: 6
@@ -68,60 +84,59 @@ model:
   relative_time_code_dim: 16
   num_blocks: 8
   num_heads: 8
-  vmf_kappa: 2000.0
+  vmf_kappa: 50.0
   bottleneck_noise_scale: 0.02
   metadata_dim: 4
   num_sensor_types: 16
   gradient_checkpointing: true
   per_source_decoders: true
   decoder_hidden_mult: 1
-  skip_l2_norm_training: false
+  skip_l2_norm_training: true
 
 training:
-  epochs: 200
-  gradient_accumulation_steps: 1  # V13: 排查NaN
-  lr: 0.000001  # V13: 降低学习率排查NaN
+  epochs: 100
+  gradient_accumulation_steps: 1
+  lr: 0.0001
+  lr_min: 0.000001
   weight_decay: 0.01
   grad_clip_norm: 1.0
 
-  # ★ 方案A: 以重建为核心，降低 uniformity/consistency
-  reconstruction_weight: 0.5       # 主任务，保持不变
-  consistency_weight: 0.0    # V13-fix: 禁用 — 当前设计下 consistency 加速坍缩
-  variance_weight: 0.3
-  covariance_weight: 0.1
-  batch_uniformity_weight: 0.05
-  memory_bank_size: 512
+  # ★ 损失权重
+  reconstruction_weight: 0.1
+  consistency_weight: 0.05
+  classification_weight: 0.03
+  decorrelation_weight: 0.0
+  orthogonality_weight: 0.01
+  pre_norm_uniform_weight: 0.5
+  variance_weight: 0.25
+  covariance_weight: 0.001    # ★ Round 9: 从 0.04 大幅降低
+  vicreg_min_std: 1.0
+
+  # ★ 空间感知 Temporal Loss
+  temporal_cosine_pixel_weight: 0.5
+  temporal_magnitude_temperature: 0.1
+  temporal_use_spatial_weight: true  # ★ Round 9 新参数
 
   # ★ 源特定重建权重
-  source_recon_weights: [1.0, 1.0, 1.0, 0.05]  # S2, S1, Landsat, DEM
+  source_recon_weights: [1.0, 1.0, 1.0, 0.05, 0.5, 0.5, 0.3]  # S2, S1, Landsat, DEM, WC, DW, JRC
 
-  # ★ 全部置0：移除所有复杂损失
+  # 禁用其他复杂损失
   temporal_gap_aware_weight: 0.0
-  temporal_gap_aware_weight_end: 0.0
-  temporal_gap_aware_weight_ramp_epochs: 0
-  temporal_gap_aware_warmup_epochs: 0
   pixel_change_supervision_weight: 0.0
-  pixel_change_supervision_warmup_epochs: 0
   change_consistency_weight: 0.0
-  change_consistency_warmup_epochs: 0
-  classification_weight: 0.0
-  decorrelation_weight: 0.0
-  orthogonality_weight: 0.0
   text_contrastive_weight: 0.0
   vicreg_weight: 0.0
   dino_weight: 0.0
   koleo_weight: 0.0
   temporal_magnitude_weight: 0.0
-  temporal_cosine_pixel_weight: 0.0
   pixel_temporal_info_nce_weight: 0.0
   l2_temporal_weight: 0.0
   ct_reconstruction_weight: 0.0
   aux_classification_weight: 0.0
   bottleneck_cls_weight: 0.0
-  pre_norm_uniform_weight: 0.0
   encoder_uniform_weight: 0.0
 
-  # Teacher-Student（AEF核心机制）
+  # Teacher-Student
   teacher_momentum: 0.996
   teacher_dropout_rate: 0.1
   student_frame_drop_rate: 0.5
@@ -130,18 +145,17 @@ training:
   student_back_drop_prob: 0.15
 
   # Kappa
-  kappa_start: 2000.0
-  kappa_end: 2000.0
+  kappa_start: 50.0
+  kappa_end: 50.0
   kappa_warmup_epochs: 0
 
   # 学习率调度
-  lr_min: 0.000001
-  warmup_epochs: 10
-  recon_warmup_epochs: 10
   lr_schedule: cosine_no_restart
+  warmup_epochs: 10
+  recon_warmup_epochs: 0
 
-  # 每 epoch 最大步数（抽样训练，加速迭代）
-  max_steps_per_epoch: 100
+  # 每 epoch 最大步数
+  max_steps_per_epoch: 200
 
   # 保存
   save_every: 20

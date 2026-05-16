@@ -385,16 +385,14 @@ def temporal_cosine_pixel_loss(
     emb_w1: torch.Tensor,
     emb_w2: torch.Tensor,
     temperature: float = 0.05,
+    use_spatial_weight: bool = False,
 ) -> torch.Tensor:
-    """Pixel-level cosine temporal loss — 每个像素独立优化方向差异.
+    """Pixel-level cosine temporal loss — 空间加权版本 (Round 9 fix).
 
-    核心改进 (Rev B fix):
-    - 每个像素位置独立 F.normalize (||x|| 是单像素 norm，不大，Jacobian 不压缩)
-    - 不使用 spatial mean (避免梯度稀释 1/(H*W))
-    - 非 hinge loss (所有像素持续有梯度，不会因达到 margin 而停止)
-    - 直接优化 cosine similarity -> 0 (方向正交)
-
-    梯度大小: 与 emb 绝对 scale 无关，只与像素级方向差异有关.
+    核心改进:
+    - use_spatial_weight=True: 基于 embedding 自身差异计算自适应空间权重
+    - 变化区域（差异大）被推得更远，未变化区域（差异小）保持相似
+    - use_spatial_weight=False: 回退到全局平均（与之前兼容）
     """
     if emb_w1.shape[0] < 1:
         return emb_w1.new_tensor(0.0)
@@ -405,8 +403,27 @@ def temporal_cosine_pixel_loss(
     f2 = F.normalize(emb_w2, p=2, dim=1)
     # 逐像素 cos_sim: [B, H, W]
     cos_map = (f1 * f2).sum(dim=1)
-    # 直接最小化所有像素的 cos_sim (非 hinge)
-    loss = cos_map.mean() / temperature
+
+    if use_spatial_weight:
+        # ★ Round 9: 自适应空间加权
+        # 基于 embedding 差异计算变化掩码
+        with torch.no_grad():
+            # 计算像素级 embedding 差异幅度 [B, H, W]
+            diff = torch.abs(emb_w1 - emb_w2).mean(dim=1)
+            # 归一化到 [0, 1]
+            diff_min = diff.view(B, -1).min(dim=1, keepdim=True)[0].view(B, 1, 1)
+            diff_max = diff.view(B, -1).max(dim=1, keepdim=True)[0].view(B, 1, 1)
+            w = (diff - diff_min) / (diff_max - diff_min + 1e-8)
+            
+            # 变化区域（w 高）需要 cos_sim -> -1（正交）
+            # 未变化区域（w 低）需要 cos_sim -> 1（相似）
+            target_sim = 1.0 - 2.0 * w  # [B, H, W]
+        
+        # 加权 hinge loss: 变化区域需要更大的差异
+        loss = F.relu(cos_map - target_sim).mean() / temperature
+    else:
+        # 回退到全局平均（旧行为）
+        loss = cos_map.mean() / temperature
     return loss
 
 
