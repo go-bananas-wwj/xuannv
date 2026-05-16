@@ -9,9 +9,9 @@ EXPERIMENTS=(
     "aef_high_consist"
     "aef_no_static"
     "aef_skip_l2"
-    "aef_128d"
+    "aef_diff_recon"
     "aef_high_kappa"
-    "aef_low_uniform"
+    "aef_cyclic_unif"
     "aef_no_uniform"
 )
 
