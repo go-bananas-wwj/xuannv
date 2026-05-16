@@ -49,3 +49,4 @@ fusion_result.json
 *.log
 nohup.out
 kernel_meta/
+wandb/
