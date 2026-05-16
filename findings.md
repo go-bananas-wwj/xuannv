@@ -70,3 +70,71 @@ exp1 (无空间加权) vs exp2 (有空间加权):
 ## 资源
 - docs/FAILED_PARAMETERS_LOG.md — 完整失败记录
 - /workspace/outputs/mini_batch_monitor.log — 训练监控日志
+
+---
+
+## 重大发现：VICReg 根本没参与训练！
+
+### 代码验证
+
+`ddp_v7_trainer.py` 中的损失计算：
+```python
+vicreg = lambda_var * vicreg_var + lambda_cov * vicreg_cov
+# lambda_var=1.0 (default), lambda_cov=0.04 (default)
+
+total = (
+    recon_weight * recon
+    + t.vicreg_weight * vicreg    # vicreg_weight=0.0 !!!
+    + ...
+)
+```
+
+所有配置中 `vicreg_weight: 0.0`，且 `vicreg_lambda_cov` 未设置。
+
+**这意味着**：
+1. 配置中的 `covariance_weight: 0.001` 对 `ddp_v7_trainer` **完全无效**
+2. VICReg (variance + covariance) **完全不参与反向传播**
+3. cov=33.2 只是**统计现象**，反映embedding缺乏去相关约束
+
+### 为什么 Round 9(exp3) cov=0.043？
+
+| 因素 | Round 9 | Mini Batch |
+|------|---------|------------|
+| skip_l2 | false | false (exp3) / true (others) |
+| vicreg_weight | 0.0 | 0.0 |
+| 数据集 | 424 patches | 100 patches |
+
+**解释**: skip_l2=false → L2归一化 → 协方差矩阵自然受限（元素有界[-1,1]）
+- Round 9大数据集进一步稳定统计
+- Mini Batch数据少 + skip_l2=true → cov爆炸
+
+### 反坍缩措施实际生效的只有
+
+```python
+total = (
+    recon_weight * recon           # 0.1
+    + t.consistency_weight * consist  # 0.05
+    + t.classification_weight * cls   # 0.03
+    + temporal_w * temporal           # 0.5
+    + pre_norm_uniform_w * raw_unif   # 0.5
+)
+```
+
+- `raw_unif`: 推分散，但**不去相关**
+- 缺乏 `variance` 约束 → 某些维度可能坍缩
+- 缺乏 `covariance` 约束 → 维度高度相关
+
+### 为什么 Epoch 4 后 RawUnif 恶化？
+
+- Epoch 1-4: raw_unif 推embedding分散，RawUnif改善
+- Epoch 4+: 学习率达到峰值，embedding开始在球面上"滑动"
+- 缺乏去相关约束 → embedding聚集在几个方向 → 维度相关增加
+- cov统计值上升 → RawUnif恶化（embedding变集中）
+
+## 修正后的下一步假设
+
+| 假设 | 配置 | 预期效果 |
+|------|------|----------|
+| A | vicreg_weight=1.0, lambda_cov=1.0, skip_l2=false | VICReg参与+去相关约束 |
+| B | vicreg_weight=1.0, lambda_cov=5.0, skip_l2=false | 更强去相关 |
+| C | vicreg_weight=1.0, lambda_cov=1.0, uniform=1.0, skip_l2=false | 强反坍缩+去相关 |
