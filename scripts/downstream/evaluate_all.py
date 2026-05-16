@@ -294,10 +294,10 @@ def main():
 
     # 1. 变化检测 (4个时间段)
     period_map = {
-        "june": ("2024-04", "2024-06"),
-        "aug": ("2024-06", "2024-08"),
-        "september": ("2024-08", "2024-09"),
-        "october": ("2024-09", "2024-10"),
+        "june": ("2025-04", "2025-06"),
+        "aug": ("2025-06", "2025-08"),
+        "september": ("2025-08", "2025-09"),
+        "october": ("2025-09", "2025-10"),
     }
 
     results["change_detection"] = {}
@@ -314,7 +314,7 @@ def main():
     if head_ckpt.exists():
         results["water_detection"] = evaluate_segmentation(
             embedding_dir, Path(args.label_dir) / "water", head_ckpt,
-            "water_detection", "2024-06", device, args.embedding_dim
+            "water_detection", "2025-06", device, args.embedding_dim
         )
 
     # 3. 建筑物分割
@@ -322,7 +322,7 @@ def main():
     if head_ckpt.exists():
         results["building_segmentation"] = evaluate_segmentation(
             embedding_dir, Path(args.label_dir) / "building", head_ckpt,
-            "building_segmentation", "2024-06", device, args.embedding_dim
+            "building_segmentation", "2025-06", device, args.embedding_dim
         )
 
     # 4. 土地利用分割
@@ -330,7 +330,7 @@ def main():
     if head_ckpt.exists():
         results["landuse_segmentation"] = evaluate_classification(
             embedding_dir, Path(args.label_dir) / "landuse", head_ckpt,
-            "landuse_segmentation", "2024-06", 7, device, args.embedding_dim
+            "landuse_segmentation", "2025-06", 7, device, args.embedding_dim
         )
 
     # 保存结果

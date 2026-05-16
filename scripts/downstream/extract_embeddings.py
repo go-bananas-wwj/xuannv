@@ -25,7 +25,7 @@ from src.data.dataset import HarbinPatchDataset
 from src.utils.checkpoint import load_checkpoint
 
 
-MONTHS = [(2024, 4), (2024, 6), (2024, 8), (2024, 9), (2024, 10)]
+MONTHS = [(2025, 4), (2025, 6), (2025, 8), (2025, 9), (2025, 10)]
 
 
 def month_to_window(year: int, month: int):

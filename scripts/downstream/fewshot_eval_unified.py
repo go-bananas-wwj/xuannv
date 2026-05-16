@@ -170,10 +170,10 @@ def load_change_detection_data(embedding_dir: Path):
     mask_dir = Path("/workspace/xuannv/data/change_masks")
 
     periods = [
-        ("june", "2024-04", "2024-06"),
-        ("aug", "2024-06", "2024-08"),
-        ("september", "2024-08", "2024-09"),
-        ("october", "2024-09", "2024-10"),
+        ("june", "2025-04", "2025-06"),
+        ("aug", "2025-06", "2025-08"),
+        ("september", "2025-08", "2025-09"),
+        ("october", "2025-09", "2025-10"),
     ]
 
     for period, before_month, after_month in periods:
@@ -209,7 +209,7 @@ def load_water_data(embedding_dir: Path):
     """加载水体检测数据."""
     data = []
     label_dir = Path("/workspace/xuannv/data/labels/water")
-    month = "2024-06"  # 用6月的embedding
+    month = "2025-06"  # 用6月的embedding
 
     for label_file in label_dir.glob("*.npy"):
         pid = label_file.stem
@@ -234,7 +234,7 @@ def load_landuse_data(embedding_dir: Path):
     """加载土地利用分割数据."""
     data = []
     label_dir = Path("/workspace/xuannv/data/labels/landuse")
-    month = "2024-06"
+    month = "2025-06"
 
     for label_file in label_dir.glob("*.npy"):
         pid = label_file.stem

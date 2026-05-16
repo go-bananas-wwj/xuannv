@@ -477,10 +477,10 @@ def main():
 
     if args.task == "change_detection":
         period_map = {
-            "june": ("2024-04", "2024-06"),
-            "aug": ("2024-06", "2024-08"),
-            "september": ("2024-08", "2024-09"),
-            "october": ("2024-09", "2024-10"),
+            "june": ("2025-04", "2025-06"),
+            "aug": ("2025-06", "2025-08"),
+            "september": ("2025-08", "2025-09"),
+            "october": ("2025-09", "2025-10"),
         }
         before, after = period_map[args.period]
         result = train_change_detection(
