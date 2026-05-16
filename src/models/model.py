@@ -230,6 +230,9 @@ class AEFModel(nn.Module):
         dual_window: bool = False,
         valid_start_w2: torch.Tensor | None = None,
         valid_end_w2: torch.Tensor | None = None,
+        # Round 2: 目标窗口编码（跨时相重建）
+        target_valid_start_ms: torch.Tensor | None = None,
+        target_valid_end_ms: torch.Tensor | None = None,
     ) -> AEFOutput:
         if source_type_ids is None:
             if source_frames.dim() == 6:
@@ -300,11 +303,24 @@ class AEFModel(nn.Module):
         expanded_map = embedding_map[:, None, ...].repeat(1, T_tgt, 1, 1, 1)
         flat_map = expanded_map.reshape(B * T_tgt, *embedding_map.shape[1:])
 
-        # 准备条件: 扩展到 [B*T_tgt, ...]
-        cond_window = window_code[:, None, :].expand(B, T_tgt, -1).reshape(B * T_tgt, -1)
-        if target_relative_time.dim() == 1:
-            target_relative_time = target_relative_time[:, None]
-        cond_reltime = target_relative_time.reshape(B * T_tgt, -1)
+        # Round 2: 使用目标窗口的 window_code（跨时相重建）
+        if target_valid_start_ms is not None and target_valid_end_ms is not None:
+            target_window_code = self.window_encoder(
+                target_valid_start_ms.float().view(-1),
+                target_valid_end_ms.float().view(-1),
+            )
+            cond_window = target_window_code[:, None, :].expand(B, T_tgt, -1).reshape(B * T_tgt, -1)
+        else:
+            cond_window = window_code[:, None, :].expand(B, T_tgt, -1).reshape(B * T_tgt, -1)
+        
+        # Round 2: 编码 relative_time
+        # target_relative_time: [B, S_tgt] 或 [B, S_tgt, 1]
+        if target_relative_time.dim() == 2 and target_relative_time.shape[-1] != 1:
+            target_relative_time = target_relative_time.unsqueeze(-1)  # [B, S_tgt, 1]
+        # 先 reshape 再编码
+        flat_reltime = target_relative_time.reshape(B * T_tgt, -1)  # [B*T, 1]
+        encoded_reltime = self.relative_time_encoder(flat_reltime)  # [B*T, reltime_dim]
+        cond_reltime = encoded_reltime
         if target_metadata.dim() == 2:
             target_metadata = target_metadata[:, None, :]
         cond_meta = target_metadata.reshape(B * T_tgt, -1)

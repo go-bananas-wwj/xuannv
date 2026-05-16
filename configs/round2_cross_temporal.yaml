@@ -23,6 +23,10 @@ data:
   temporal_window_min_frames: 4
   temporal_window_max_frames: 24
   preload: true
+  # Round 2: 跨时相重建配置
+  cross_temporal: true
+  cross_temporal_prob: 0.9
+  cross_temporal_min_gap_months: 2
   source_channels:
     s2: 6
     s1: 2
@@ -180,7 +184,7 @@ training:
   pre_norm_uniform_weight: 0.0
   variance_weight: 0.0
   covariance_weight: 0.0
-  batch_uniformity_weight: 0.05
+  batch_uniformity_weight: 0.01
   vicreg_min_std: 1.0
   source_recon_weights:
   - 1.0

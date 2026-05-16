@@ -60,6 +60,10 @@ class DataConfig:
     # 跨时相掩码重建
     ct_mask_ratio: float = 0.0
     ct_mask_patch_size: int = 8
+    # Round 2: 跨时相重建配置
+    cross_temporal: bool = False
+    cross_temporal_prob: float = 0.0
+    cross_temporal_min_gap_months: int = 2
     # 快速验证: 随机采样部分 patch
     max_patches: int | None = None
     # 精确指定 patch 列表（优先级高于 max_patches）

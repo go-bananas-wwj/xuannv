@@ -97,7 +97,7 @@ class ContinuousDecoder(nn.Module):
         relative_time: torch.Tensor | None = None,
         metadata: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        x = self.injector(embedding_map)  # V13: 不传递任何条件
+        x = self.injector(embedding_map, window_code, relative_time, metadata)
         return self.head(x)
 
 

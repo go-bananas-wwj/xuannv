@@ -225,6 +225,11 @@ class HarbinPatchDataset(Dataset):
         # 跨时相掩码重建配置
         self.ct_mask_ratio = getattr(d, "ct_mask_ratio", 0.3)   # 掩码比例
         self.ct_mask_patch_size = getattr(d, "ct_mask_patch_size", 8)  # 掩码 patch 尺寸
+        
+        # ★ Round 2: 跨时相重建配置
+        self.cross_temporal = getattr(d, "cross_temporal", False)
+        self.cross_temporal_prob = getattr(d, "cross_temporal_prob", 0.0)
+        self.cross_temporal_min_gap = getattr(d, "cross_temporal_min_gap_months", 2)
 
         self.patches = self._discover_patches()
         # V13-fix: 支持随机采样部分 patch 用于快速验证
@@ -255,11 +260,13 @@ class HarbinPatchDataset(Dataset):
         
         每个 patch 每个月只要有任意输入源有数据，就生成一个样本。
         V13-fix: 严格 2025-only，过滤掉 2023/2024 数据。
+        Round 2: 同时保存每个 patch 的月份列表用于跨时相采样。
         """
         from datetime import datetime
         from collections import defaultdict
         
         samples = []
+        self._patch_months: dict[str, list[tuple[int, int]]] = {}  # Round 2
         for patch_id in self.patches:
             # 收集该 patch 所有输入源的时间戳
             month_groups = defaultdict(list)
@@ -277,8 +284,10 @@ class HarbinPatchDataset(Dataset):
                         if dt.year == 2025:
                             month_groups[(dt.year, dt.month)].append(ts)
             
+            months = sorted(month_groups.keys())
+            self._patch_months[patch_id] = months
             # 每个月一个样本（只要有数据）
-            for (year, month), ts_list in sorted(month_groups.items()):
+            for (year, month) in months:
                 samples.append((patch_id, year, month))
         
         return samples
@@ -904,6 +913,23 @@ class HarbinPatchDataset(Dataset):
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         return self._get_item(idx)
 
+    def _sample_target_month(self, patch_id: str, year: int, month_a: int) -> int | None:
+        """Round 2: 为跨时相重建采样目标月份 month_B.
+        
+        从该 patch 的可用月份中随机选择，满足 |month_B - month_A| >= min_gap.
+        若无满足条件的月份，返回 None.
+        """
+        months = self._patch_months.get(patch_id, [])
+        if not months:
+            return None
+        available_months = [m for y, m in months if y == year]
+        if not available_months:
+            return None
+        candidates = [m for m in available_months if abs(m - month_a) >= self.cross_temporal_min_gap]
+        if not candidates:
+            return None
+        return random.choice(candidates)
+
     def _load_monthly_frames(self, patch_id: str, source_name: str, year: int, month: int) -> tuple[np.ndarray, np.ndarray]:
         """只加载指定自然月内的帧."""
         from datetime import datetime
@@ -922,8 +948,20 @@ class HarbinPatchDataset(Dataset):
         return frames[mask], ts[mask]
     
     def _get_item(self, idx: int) -> dict[str, torch.Tensor]:
-        """V13: 月度采样 — 每个样本 = (patch, month), 输入/目标都是当月1帧."""
-        patch_id, year, month = self.monthly_samples[idx]
+        """V13: 月度采样 — 每个样本 = (patch, month), 输入/目标都是当月1帧.
+        Round 2: 支持跨时相重建 (输入 month_A, 目标 month_B).
+        """
+        patch_id, year, month_a = self.monthly_samples[idx]
+        
+        # Round 2: 决定是否使用跨时相采样
+        month_b = month_a
+        if self.training and self.cross_temporal and self.cross_temporal_prob > 0:
+            if random.random() < self.cross_temporal_prob:
+                month_b = self._sample_target_month(patch_id, year, month_a)
+                if month_b is None:
+                    month_b = month_a  # fallback
+        
+        month = month_a  # 输入月份
         S_inp = self.num_input_sources
         T = self.max_frames
         C = self.input_dim
@@ -1008,17 +1046,30 @@ class HarbinPatchDataset(Dataset):
                                 target_source_idx[t_idx] = t_idx
                                 target_relative_time[t_idx] = 0.5
             elif tgt_name in ("s2", "s1", "landsat"):
-                # 动态目标: 复用输入帧（同一帧）
-                s_idx = self.input_sources.index(tgt_name)
-                if source_mask[s_idx, 0]:
-                    data = source_frames[s_idx, 0].copy()
+                # Round 2: 动态目标从 month_B 加载（跨时相重建）
+                if month_b == month_a:
+                    # 同月：复用输入帧
+                    s_idx = self.input_sources.index(tgt_name)
+                    if source_mask[s_idx, 0]:
+                        data = source_frames[s_idx, 0].copy()
+                else:
+                    # 跨月：从 month_B 加载目标帧
+                    tgt_frames, tgt_ts = self._load_monthly_frames(patch_id, tgt_name, year, month_b)
+                    if len(tgt_frames) > 0:
+                        data = tgt_frames[0]
+                    else:
+                        data = None
+                
+                if data is not None:
                     data = self._pad_channels(data, self.reconstruction_channels)
                     data = self._resize_to_target(data, target_res, is_categorical=is_categorical)
                     target_images[t_idx, :data.shape[0]] = data
                     target_mask[t_idx] = True
                     target_loss_type[t_idx] = loss_type
                     target_source_idx[t_idx] = t_idx
-                    target_relative_time[t_idx] = 0.5
+                    # Round 2: target_relative_time 表示 month_B 相对于 month_A 的偏移
+                    gap_months = month_b - month_a
+                    target_relative_time[t_idx] = gap_months / 12.0 + 0.5  # 归一化到 [0,1] 附近
             # else: worldcover/dynamic_world/jrc_water 已去掉
 
         # 4. 空间增强
@@ -1040,6 +1091,16 @@ class HarbinPatchDataset(Dataset):
         # V13-MAE: 生成重建掩码（随机mask 50%空间区域）
         recon_mask = self._generate_recon_mask() if self.training else None
 
+        # Round 2: 计算目标月份的时间范围
+        if month_b != month_a:
+            from datetime import datetime
+            import calendar
+            target_valid_start = datetime(year, month_b, 1).timestamp() * 1000
+            target_valid_end = datetime(year, month_b, calendar.monthrange(year, month_b)[1], 23, 59, 59).timestamp() * 1000
+        else:
+            target_valid_start = valid_start
+            target_valid_end = valid_end
+        
         return {
             "patch_id": patch_id,
             "year_month": (year, month),
@@ -1054,6 +1115,9 @@ class HarbinPatchDataset(Dataset):
             "valid_end_w1": torch.tensor(w1_end, dtype=torch.float64),
             "valid_start_w2": torch.tensor(w2_start, dtype=torch.float64),
             "valid_end_w2": torch.tensor(w2_end, dtype=torch.float64),
+            # Round 2: 新增目标时间窗口
+            "target_valid_start_ms": torch.tensor(target_valid_start, dtype=torch.float32),
+            "target_valid_end_ms": torch.tensor(target_valid_end, dtype=torch.float32),
             "spatial_mask": torch.from_numpy(spatial_mask) if spatial_mask is not None else torch.ones((self.image_size, self.image_size), dtype=torch.float32),
             "recon_mask": torch.from_numpy(recon_mask) if recon_mask is not None else torch.ones((target_res, target_res), dtype=torch.float32),
             "target_images": torch.from_numpy(target_images),
