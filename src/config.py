@@ -62,6 +62,8 @@ class DataConfig:
     ct_mask_patch_size: int = 8
     # 快速验证: 随机采样部分 patch
     max_patches: int | None = None
+    # 精确指定 patch 列表（优先级高于 max_patches）
+    patch_list: list[str] | None = None
 
 
 @dataclass

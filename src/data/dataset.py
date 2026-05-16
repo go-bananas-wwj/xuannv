@@ -281,6 +281,12 @@ class HarbinPatchDataset(Dataset):
         return samples
     
     def _discover_patches(self) -> list[str]:
+        d = self.cfg.data
+        # ★ 精确指定 patch 列表（最高优先级）
+        patch_list = getattr(d, "patch_list", None)
+        if patch_list:
+            return sorted(patch_list)
+
         if self.data_root.suffix == ".json":
             with self.data_root.open("r") as f:
                 manifest = json.load(f)

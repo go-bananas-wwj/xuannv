@@ -1,0 +1,257 @@
+# ============================================================
+# Mini Batch Test — 100-Patch 快速验证配置 (方案A)
+# 核心参数:
+#   - 100 patches (91变化 + 9随机)
+#   - 20 epochs × 50 steps = 1,000 total steps
+#   - 预计耗时: ~3小时
+# ============================================================
+
+experiment:
+  name: mini_batch_test
+  seed: 42
+  output_dir: /workspace/outputs/mini_batch_test
+
+data:
+  dataset_type: harbin_patches
+  manifest_path: /workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered
+  stats_dir: /workspace/statistics/harbin_scenes
+  batch_size: 4
+  num_workers: 0
+  image_size: 128
+  max_frames: 32
+  num_samples: 100
+  num_classes: 11
+  input_dim: 6
+  metadata_dim: 4
+  num_input_sources: 3
+  num_target_sources: 7
+  random_target_frame: true
+  spatial_augmentation: true
+  temporal_window_augmentation: true
+  temporal_window_prob: 0.5
+  temporal_window_min_frames: 4
+  temporal_window_max_frames: 24
+  preload: true
+  patch_list:
+    - patch_000010
+    - patch_000013
+    - patch_000027
+    - patch_000033
+    - patch_000039
+    - patch_000040
+    - patch_000041
+    - patch_000055
+    - patch_000059
+    - patch_000061
+    - patch_000062
+    - patch_000063
+    - patch_000067
+    - patch_000079
+    - patch_000080
+    - patch_000081
+    - patch_000084
+    - patch_000087
+    - patch_000088
+    - patch_000093
+    - patch_000101
+    - patch_000104
+    - patch_000109
+    - patch_000112
+    - patch_000115
+    - patch_000116
+    - patch_000136
+    - patch_000138
+    - patch_000139
+    - patch_000142
+    - patch_000143
+    - patch_000146
+    - patch_000152
+    - patch_000157
+    - patch_000158
+    - patch_000161
+    - patch_000163
+    - patch_000167
+    - patch_000168
+    - patch_000170
+    - patch_000174
+    - patch_000177
+    - patch_000181
+    - patch_000184
+    - patch_000185
+    - patch_000186
+    - patch_000187
+    - patch_000193
+    - patch_000197
+    - patch_000206
+    - patch_000215
+    - patch_000216
+    - patch_000217
+    - patch_000229
+    - patch_000230
+    - patch_000235
+    - patch_000237
+    - patch_000240
+    - patch_000246
+    - patch_000251
+    - patch_000255
+    - patch_000256
+    - patch_000261
+    - patch_000264
+    - patch_000270
+    - patch_000271
+    - patch_000281
+    - patch_000282
+    - patch_000285
+    - patch_000289
+    - patch_000297
+    - patch_000304
+    - patch_000307
+    - patch_000308
+    - patch_000311
+    - patch_000320
+    - patch_000331
+    - patch_000332
+    - patch_000335
+    - patch_000339
+    - patch_000343
+    - patch_000344
+    - patch_000349
+    - patch_000350
+    - patch_000353
+    - patch_000355
+    - patch_000358
+    - patch_000365
+    - patch_000366
+    - patch_000370
+    - patch_000371
+    - patch_000377
+    - patch_000386
+    - patch_000387
+    - patch_000388
+    - patch_000397
+    - patch_000399
+    - patch_000400
+    - patch_000411
+    - patch_000418
+
+  source_channels:
+    s2: 6
+    s1: 2
+    landsat: 6
+
+  target_sources:
+    - name: s2
+      loss_type: 0
+      sensor_src: s2
+      out_channels: 6
+    - name: s1
+      loss_type: 0
+      sensor_src: s1
+      out_channels: 2
+    - name: landsat
+      loss_type: 0
+      sensor_src: landsat
+      out_channels: 6
+    - name: dem
+      loss_type: 0
+      sensor_src: null
+      out_channels: 1
+    - name: worldcover
+      loss_type: 1
+      sensor_src: null
+      out_channels: 11
+    - name: dynamic_world
+      loss_type: 1
+      sensor_src: null
+      out_channels: 9
+    - name: jrc_water
+      loss_type: 0
+      sensor_src: null
+      out_channels: 1
+
+model:
+  input_dim: 6
+  stem_dim: 128
+  precision_dim: 128
+  time_dim: 256
+  space_dim: 256
+  embedding_dim: 128
+  time_code_dim: 64
+  window_code_dim: 64
+  relative_time_code_dim: 16
+  num_blocks: 8
+  num_heads: 8
+  vmf_kappa: 50.0
+  bottleneck_noise_scale: 0.02
+  metadata_dim: 4
+  num_sensor_types: 16
+  gradient_checkpointing: true
+  per_source_decoders: true
+  decoder_hidden_mult: 1
+  skip_l2_norm_training: true
+
+training:
+  epochs: 20
+  gradient_accumulation_steps: 1
+  lr: 0.0001
+  lr_min: 0.000001
+  weight_decay: 0.01
+  grad_clip_norm: 1.0
+
+  reconstruction_weight: 0.1
+  consistency_weight: 0.05
+  classification_weight: 0.03
+  decorrelation_weight: 0.0
+  orthogonality_weight: 0.01
+  pre_norm_uniform_weight: 0.5
+  variance_weight: 0.25
+  covariance_weight: 0.001
+  vicreg_min_std: 1.0
+
+  temporal_cosine_pixel_weight: 0.5
+  temporal_magnitude_temperature: 0.1
+  temporal_use_spatial_weight: true
+
+  source_recon_weights: [1.0, 1.0, 1.0, 0.05, 0.5, 0.5, 0.3]
+
+  temporal_gap_aware_weight: 0.0
+  pixel_change_supervision_weight: 0.0
+  change_consistency_weight: 0.0
+  text_contrastive_weight: 0.0
+  vicreg_weight: 0.0
+  dino_weight: 0.0
+  koleo_weight: 0.0
+  temporal_magnitude_weight: 0.0
+  pixel_temporal_info_nce_weight: 0.0
+  l2_temporal_weight: 0.0
+  ct_reconstruction_weight: 0.0
+  aux_classification_weight: 0.0
+  bottleneck_cls_weight: 0.0
+  encoder_uniform_weight: 0.0
+
+  teacher_momentum: 0.996
+  teacher_dropout_rate: 0.1
+  student_frame_drop_rate: 0.5
+  student_source_drop_rate: 0.3
+  student_front_drop_prob: 0.15
+  student_back_drop_prob: 0.15
+
+  kappa_start: 50.0
+  kappa_end: 50.0
+  kappa_warmup_epochs: 0
+
+  lr_schedule: cosine_no_restart
+  warmup_epochs: 3
+  recon_warmup_epochs: 0
+
+  max_steps_per_epoch: 50
+
+  save_every: 5
+  save_best_balanced: true
+  best_balanced_uniform_min: 0.0
+  best_balanced_uniform_max: 0.3
+  early_stop_patience: 20
+
+evaluation:
+  knn_k: 5
+  bootstrap_samples: 100
