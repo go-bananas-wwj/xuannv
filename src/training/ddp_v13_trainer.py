@@ -264,6 +264,8 @@ class DDPv13Trainer:
                         target_metadata=batch["target_metadata"],
                         target_loss_type=batch.get("target_loss_type"),
                         target_source_idx=batch.get("target_source_idx"),
+                        target_valid_start_ms=batch.get("target_valid_start_ms"),
+                        target_valid_end_ms=batch.get("target_valid_end_ms"),
                     )
 
                 # Student forward: 扰动输入
@@ -290,6 +292,8 @@ class DDPv13Trainer:
                     target_metadata=batch["target_metadata"],
                     target_loss_type=batch.get("target_loss_type"),
                     target_source_idx=batch.get("target_source_idx"),
+                    target_valid_start_ms=batch.get("target_valid_start_ms"),
+                    target_valid_end_ms=batch.get("target_valid_end_ms"),
                 )
 
                 # Reconstruction

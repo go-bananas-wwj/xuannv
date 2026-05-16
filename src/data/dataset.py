@@ -1047,6 +1047,7 @@ class HarbinPatchDataset(Dataset):
                                 target_relative_time[t_idx] = 0.5
             elif tgt_name in ("s2", "s1", "landsat"):
                 # Round 2: 动态目标从 month_B 加载（跨时相重建）
+                data = None
                 if month_b == month_a:
                     # 同月：复用输入帧
                     s_idx = self.input_sources.index(tgt_name)
@@ -1057,8 +1058,6 @@ class HarbinPatchDataset(Dataset):
                     tgt_frames, tgt_ts = self._load_monthly_frames(patch_id, tgt_name, year, month_b)
                     if len(tgt_frames) > 0:
                         data = tgt_frames[0]
-                    else:
-                        data = None
                 
                 if data is not None:
                     data = self._pad_channels(data, self.reconstruction_channels)
