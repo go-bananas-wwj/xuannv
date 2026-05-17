@@ -506,5 +506,39 @@ if gdf.crs.to_epsg() != 32652:
 2. 标注时间信息必须与数据时间范围匹配
 3. 变化检测必须按标注的月份区间配对
 
+## 下游评估自动化 Pipeline
+
+当需要对多个训练实验进行系统性下游评估（embedding 提取 → KNN/MLP/CD → 报告生成）时，使用项目级 skill `aef-evaluation-pipeline`。
+
+### Skill 位置
+
+`.kimi/skills/aef-evaluation-pipeline/SKILL.md`
+
+### 触发条件
+
+- 提到"评估"、"下游"、"embedding 提取"、"变化检测"、"AUC"
+- 提到"对比实验"、"调参"、"KNN"、"MLP"、"Pipeline"
+- 需要对多个实验做系统性对比
+
+### 核心流程
+
+1. **并行提取 Embedding**: 7 卡并行，断点续传，约 25 分钟/实验
+2. **KNN 评估**: 3 任务（WorldCover/JRC Water/Dynamic World），k=5
+3. **MLP 评估**: PixelMLPHead(hidden=256)，50 epochs
+4. **变化检测 AUC**: 4 时期加权平均（Cosine + LR）
+5. **报告生成**: Markdown 汇总 + 排名 + 结论分析
+
+### 关键脚本
+
+- `scripts/eval/launch_all_round4_eval.sh` — 7 卡并行提取
+- `scripts/eval/launch_downstream_v2.sh` — 下游评估批量启动
+- `scripts/eval/generate_report.py` — 报告生成（待实现）
+
+### 常见陷阱
+
+1. **NPU 设备映射**: `ASCEND_RT_VISIBLE_DEVICES=X` 时 PyTorch 内必须用 `npu:0`
+2. **标签映射**: WorldCover 标签是 ESA 编码（10,30,40...），必须映射到 0-based
+3. **JRC Water 过滤**: 必须过滤 `label < num_classes`，否则会保留 0-98 全部值
+
 ---
-*最后更新: 2026-05-16*
+*最后更新: 2026-05-17*
