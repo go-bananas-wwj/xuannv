@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """生成对比可视化: (1) 同period跨实验对比 (2) KNN结果条形图."""
-import sys, warnings
+import sys, warnings, argparse
 warnings.filterwarnings('ignore')
 sys.path.insert(0, "/workspace/xuannv")
 
@@ -11,12 +11,17 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--output-dir", type=str, default="/workspace/outputs/xuannv_round1",
+                    help="实验输出根目录")
+args = parser.parse_args()
+
 EXPERIMENTS = [
     "aef_baseline", "aef_high_consist", "aef_no_static", "aef_skip_l2",
     "aef_diff_recon", "aef_high_kappa", "aef_cyclic_unif", "aef_no_uniform",
 ]
 PERIODS = ["apr_jun", "jun_aug", "aug_sept", "sept_oct"]
-DATA_ROOT = Path("/workspace/outputs/xuannv_round1")
+DATA_ROOT = Path(args.output_dir)
 VIZ_DIR = DATA_ROOT / "comparison_viz"
 VIZ_DIR.mkdir(parents=True, exist_ok=True)
 

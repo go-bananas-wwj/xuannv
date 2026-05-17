@@ -127,6 +127,7 @@ def main():
         cmd = (
             f"cd /workspace/xuannv && "
             f"/root/miniconda3/envs/xuannv/bin/python scripts/eval/generate_comparison_viz.py "
+            f"--output-dir {output_dir} "
             f"> {viz_log} 2>&1"
         )
         ok = run(cmd, "Generating comparison visualizations", timeout=600)
