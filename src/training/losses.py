@@ -600,6 +600,41 @@ def temporal_magnitude_loss(
 
 
 # ────────────────────────────────────────────
+# 6b. Coding Rate Loss (MCR²)
+# ────────────────────────────────────────────
+
+def coding_rate_loss(embeddings: torch.Tensor, eps: float = 0.01) -> torch.Tensor:
+    """Maximal Coding Rate Reduction (MCR²) Loss.
+
+    基于率失真理论，最大化整体编码率：
+    R(Z; eps) = 0.5 * log det(I + d/(N*eps²) * ZZ^T)
+
+    对低秩构型（坍缩）施加无限惩罚，比VICReg的hinge variance更严格。
+
+    Args:
+        embeddings: [N, D] pre-norm embedding
+        eps: 正则化参数，防止奇异
+
+    Returns:
+        scalar loss, 负值（最大化编码率）
+    """
+    if embeddings.shape[0] < 2:
+        return embeddings.new_tensor(0.0)
+
+    N, D = embeddings.shape
+    # 中心化
+    emb_centered = embeddings - embeddings.mean(dim=0, keepdim=True)
+    # 协方差矩阵
+    cov = (emb_centered.T @ emb_centered) / N
+
+    I = torch.eye(D, device=embeddings.device, dtype=embeddings.dtype)
+    # 编码率
+    logdet = torch.logdet(I + (D / (N * eps**2 + 1e-8)) * cov + 1e-6 * I)
+
+    return -0.5 * logdet
+
+
+# ────────────────────────────────────────────
 # 7. Change Consistency Loss (V10)
 # ────────────────────────────────────────────
 
