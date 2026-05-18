@@ -374,6 +374,7 @@ class XuannvV2Trainer:
             if inter_var_w > 0 and gathered_pre is not None and gathered_pre.shape[0] >= 2:
                 inter_var = variance_regularizer(gathered_pre.float(), min_std=inter_min_std)
                 inter_cov = covariance_loss(gathered_pre.float())
+                # inter_var 通过 var/cov 通道进入 total loss，不在 total 中重复加
                 var = var + inter_var_w * inter_var
                 cov = cov + inter_var_w * inter_cov
 
@@ -474,7 +475,7 @@ class XuannvV2Trainer:
                 + decorr_w * decorr
                 + orth_w * orth
                 + dummy_cls
-                + inter_var_w * inter_var
+                # inter_var 已融入 var，此处不再重复
             )
 
             if torch.isnan(total) or torch.isinf(total):

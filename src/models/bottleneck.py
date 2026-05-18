@@ -130,8 +130,8 @@ class VMFBottleneck(nn.Module):
         emb_w1 = self._apply_norm(fused_w1)
         emb_w2 = self._apply_norm(fused_w2)
 
-        # V11: pre_w 与 emb 相同（兼容旧接口，不再区分 pre-norm 和 L2-norm）
-        return emb_w1, emb_w2, emb_w1, emb_w2, change_score, diff_feat
+        # 返回真正的 pre-norm（fused 后、L2 前），用于 temporal loss / VICReg
+        return emb_w1, emb_w2, fused_w1, fused_w2, change_score, diff_feat
 
     def _apply_norm(self, pre_norm_map: torch.Tensor) -> torch.Tensor:
         """对 pre-norm map 应用 L2 Norm + VMF 噪声.

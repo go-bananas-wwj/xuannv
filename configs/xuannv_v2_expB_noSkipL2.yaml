@@ -1,0 +1,37 @@
+# 玄女V2 Experiment B — 标准 L2 Norm 训练 (对照)
+# 核心假设: 严格对齐 AEF 论文，训练时 L2 Norm + VMF，反坍缩靠 VICReg 补偿
+_base_: xuannv_v2.yaml
+
+experiment:
+  name: xuannv_v2_expB_noSkipL2
+  output_dir: /workspace/outputs/xuannv_v2_expB_noSkipL2
+  seed: 42
+
+model:
+  skip_l2_norm_training: false  # ★ 标准 L2 Norm (论文做法)
+
+training:
+  epochs: 50
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 0
+
+  # 核心损失权重 (与 ExpA 完全一致，唯一变量是 skip_l2)
+  reconstruction_weight: 1.0
+  consistency_weight: 0.15
+  batch_uniformity_weight: 0.1
+
+  # VICReg 辅助反坍缩
+  variance_weight: 0.3
+  covariance_weight: 0.1
+  vicreg_min_std: 1.0
+
+  # Spatial Uniformity
+  use_spatial_uniformity: true
+  spatial_uniformity_samples: 4096
+
+  # 保存
+  save_every: 5
+  max_steps_per_epoch: 100
+  save_best_balanced: true

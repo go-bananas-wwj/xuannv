@@ -59,13 +59,13 @@ model:
   input_dim: 6
   stem_dim: 128
   precision_dim: 128        # 论文 d_p
-  time_dim: 512             # 论文 d_t
-  space_dim: 1024           # 论文 d_s
+  time_dim: 384             # 玄女V2: 从论文512降维，平衡容量与效率
+  space_dim: 768            # 玄女V2: 从论文1024降维
   embedding_dim: 64         # 论文 embedding_dim
   time_code_dim: 64
   window_code_dim: 64
   relative_time_code_dim: 16
-  num_blocks: 15            # 论文 15 blocks
+  num_blocks: 8             # 玄女V2: 从论文15减到8，参数量从993M降到358M
   num_heads: 8
   vmf_kappa: 8000.0         # 论文 κ
   bottleneck_noise_scale: 0.02

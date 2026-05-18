@@ -74,6 +74,7 @@ class AEFModel(nn.Module):
             input_sources=input_sources,
         )
         self.time_encoder = TimeCodeEncoder(m.time_code_dim)
+        self.time_to_summary = nn.Linear(m.time_code_dim, m.precision_dim)
         self.window_encoder = WindowCodeEncoder(m.window_code_dim)
         self.relative_time_encoder = RelativeTimeCodeEncoder(m.relative_time_code_dim)
 
@@ -201,8 +202,9 @@ class AEFModel(nn.Module):
         attn = torch.softmax(attn_scores, dim=-1)
         summary = torch.einsum("bt,btchw->bchw", attn, x)
 
-        # Dummy 使用 time_codes，确保 time_encoder 参数参与梯度流
-        summary = summary + time_codes.sum() * 0.0
+        # 将逐帧时间编码融入空间摘要（替代之前的 dummy 操作）
+        time_summary = time_codes.mean(dim=1)  # [B, time_code_dim]
+        summary = summary + self.time_to_summary(time_summary)[:, :, None, None]
 
         return summary, window_code, attn
 
@@ -402,7 +404,7 @@ class AEFModel(nn.Module):
             pre_w1: [B, D, H, W] pre-norm (window 1) — 用于 temporal loss
             pre_w2: [B, D, H, W] pre-norm (window 2) — 用于 temporal loss
         """
-        B = source_frames.shape[0] if source_frames.dim() > 5 else source_frames.shape[1]
+        B = source_frames.shape[0]  # 无论 5D [B,T,C,H,W] 还是 6D [B,S,T,C,H,W]，第0维都是 batch
         dev = source_frames.device
         num_tgt = self.cfg.data.num_target_sources
         meta_dim = getattr(self.cfg.data, "metadata_dim", 4)
