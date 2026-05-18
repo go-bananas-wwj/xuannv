@@ -49,6 +49,9 @@ def compute_source_stats(dataset: HarbinPatchDataset, source_name: str, max_patc
             data = read_tif(tif_path, dataset.image_size)
             if data is None:
                 continue
+            # 修复：光学源先log变换，再算统计量
+            if source_name in {"s2", "s2_hr", "landsat"}:
+                data = np.log(np.clip(data, 0, None) + 1) / 10.0
             all_samples.append(data)
     
     if not all_samples:

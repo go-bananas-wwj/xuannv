@@ -149,7 +149,11 @@ def normalize_data(data: np.ndarray, source_name: str, stats: dict, num_classes:
         data = np.clip(data, lo, hi)
 
     # 3. 光学源: log(x+1)/10 变换
+    # 修复：检测大庆/海淀的0-1归一化数据，先还原到原始反射率范围
     if source_name in LOG_TRANSFORM_SOURCES:
+        if data.max() < 2.0:
+            # 数据已经是0-1范围（GEE导出时不同scale），先×10000还原
+            data = data * 10000.0
         data = np.log(np.clip(data, 0, None) + 1) / 10.0
 
     # 4. z-score 归一化
