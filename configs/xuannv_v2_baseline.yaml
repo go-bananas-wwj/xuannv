@@ -14,6 +14,10 @@ training:
   warmup_epochs: 10
   recon_warmup_epochs: 0
 
+  # 玄女V2: 在所有像素上计算 uniformity
+  use_spatial_uniformity: true
+  spatial_uniformity_samples: 4096
+
   # 保守损失权重 — 优先验证架构正确性
   reconstruction_weight: 0.05
   consistency_weight: 0.05

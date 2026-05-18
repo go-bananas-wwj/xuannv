@@ -408,6 +408,7 @@ class XuannvV2Trainer:
                 l2_uniform_w = pre_norm_uniform_w
             elif use_spatial_unif and l2_uniform_w > 0:
                 # Spatial uniformity on embedding_map [B, D, H, W]
+                # 玄女V2: 对齐论文, 在所有像素上计算 uniformity (而非仅 batch 级别)
                 emb_map = student_out.embedding_map  # [B, D, H, W]
                 if dist.is_initialized() and self.world_size > 1:
                     gathered_map = [torch.zeros_like(emb_map) for _ in range(self.world_size)]
@@ -415,7 +416,11 @@ class XuannvV2Trainer:
                     gathered_map = torch.cat(gathered_map, dim=0)
                 else:
                     gathered_map = emb_map
-                l2_uniform = batch_uniformity_loss_l2(gathered_map.float())
+                spatial_samples = getattr(t, 'spatial_uniformity_samples', 0)
+                l2_uniform = batch_uniformity_loss_l2(
+                    gathered_map.float(),
+                    max_samples=spatial_samples if spatial_samples > 0 else 4096,
+                )
             else:
                 # Standard L2 uniformity on embedding vector
                 embedding = student_out.embedding  # [B, D]

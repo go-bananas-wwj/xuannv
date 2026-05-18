@@ -97,6 +97,10 @@ training:
   # 源特定重建权重
   source_recon_weights: [1.0, 1.0, 1.0, 0.05]  # S2, S1, Landsat, DEM
 
+  # ★ 玄女V2: Spatial Uniformity (对齐论文, 在所有像素上计算, 非仅 batch 级别)
+  use_spatial_uniformity: true
+  spatial_uniformity_samples: 4096  # 0=不限制, 使用全部 H*W 像素
+
   # ★ 禁用所有论文未提及的复杂损失
   temporal_gap_aware_weight: 0.0
   temporal_gap_aware_weight_end: 0.0
