@@ -989,8 +989,14 @@ class HarbinPatchDataset(Dataset):
 
             # V13-fix: 加载当月所有可用帧（而非只选1帧），让 frame drop / valid_period 真正生效
             n_use = min(n_avail, self.max_frames)
-            use_indices = list(range(n_avail))
-            for i, idx in enumerate(use_indices[:n_use]):
+            if self.training and n_avail > n_use:
+                # 训练时随机采样，避免总是偏向最早日期的帧
+                use_indices = sorted(random.sample(range(n_avail), n_use))
+            else:
+                # 验证时等间距采样
+                step = max(1, n_avail / n_use)
+                use_indices = [min(int(i * step), n_avail - 1) for i in range(n_use)]
+            for i, idx in enumerate(use_indices):
                 source_frames[s_idx, i] = frames[idx]
                 source_ts[s_idx, i] = ts[idx]
                 source_mask[s_idx, i] = True
