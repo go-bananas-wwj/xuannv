@@ -55,6 +55,7 @@ class AEFModel(nn.Module):
         self.cfg = cfg
         m = cfg.model
         d = cfg.data
+        self.image_size = getattr(d, 'image_size', 128)
 
         # 传感器编码器 (仅 3 类输入)
         # 推导 input_sources (对齐 dataset.py 逻辑)
@@ -272,10 +273,12 @@ class AEFModel(nn.Module):
         B = summary_map.shape[0]
         if skip_decoder:
             # 返回 dummy 值，只保留 embedding 相关输出
+            # 重建目标分辨率与原始输入同分辨率 (128x128)
             num_classes = self.cfg.data.num_classes
             num_tgt = self.cfg.data.num_target_sources
             reconstructions = torch.zeros(B, num_tgt, max(self._per_source_out_channels),
-                                          *embedding_map.shape[2:], device=embedding_map.device, dtype=embedding_map.dtype)
+                                          self.image_size, self.image_size,
+                                          device=embedding_map.device, dtype=embedding_map.dtype)
             logits = torch.zeros(B, num_classes, device=embedding_map.device, dtype=embedding_map.dtype)
             aux_logits = torch.zeros(B, num_classes, device=embedding_map.device, dtype=embedding_map.dtype)
             bottleneck_logits = torch.zeros(B, num_classes, device=embedding_map.device, dtype=embedding_map.dtype)
@@ -326,7 +329,8 @@ class AEFModel(nn.Module):
         cond_meta = target_metadata.reshape(B * T_tgt, -1)
 
         max_ch = max(max(self._per_source_out_channels), self.cfg.data.num_classes)
-        flat_recon = torch.zeros(B * T_tgt, max_ch, *flat_map.shape[2:], device=flat_map.device, dtype=flat_map.dtype)
+        dec_h, dec_w = flat_map.shape[2], flat_map.shape[3]  # decoder 输出分辨率 (通常 64x64)
+        flat_recon = torch.zeros(B * T_tgt, max_ch, dec_h, dec_w, device=flat_map.device, dtype=flat_map.dtype)
 
         if target_source_idx is not None:
             flat_src_idx = target_source_idx.reshape(B * T_tgt)
@@ -351,7 +355,16 @@ class AEFModel(nn.Module):
             )
             flat_recon[:, :self._per_source_out_channels[0]] = out.to(flat_recon.dtype)
 
-        reconstructions = flat_recon.reshape(B, T_tgt, *flat_recon.shape[1:])
+        # ★ 新增: bilinear upsample 回到原始分辨率 (128x128)
+        if dec_h != self.image_size or dec_w != self.image_size:
+            flat_recon = F.interpolate(
+                flat_recon,
+                size=(self.image_size, self.image_size),
+                mode='bilinear',
+                align_corners=False,
+            )
+
+        reconstructions = flat_recon.reshape(B, T_tgt, max_ch, self.image_size, self.image_size)
 
         # 分类头 (V13: 不使用，但保留参数以兼容旧 checkpoint)
         logits = self.classification_head(embedding)

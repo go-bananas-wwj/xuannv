@@ -896,7 +896,7 @@ class HarbinPatchDataset(Dataset):
         这样 decoder 必须依赖 embedding 才能重建被 mask 的区域，
         常数 embedding 无法完成重建 → 结构免疫坍缩。
         """
-        target_res = self.image_size // 2
+        target_res = self.image_size  # 对齐原始分辨率
         total_pixels = target_res * target_res
         n_visible = max(1, int(total_pixels * 0.5))  # 50% 可见
         mask = np.zeros((target_res, target_res), dtype=np.float32)
