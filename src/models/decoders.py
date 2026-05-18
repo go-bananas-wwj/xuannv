@@ -89,12 +89,10 @@ class ContinuousDecoder(nn.Module):
         self.injector = ConditionInjector(
             embedding_dim, window_code_dim, relative_time_code_dim, metadata_dim,
         )
-        # 条件维度拼接后输入 MLP
-        cond_dim = window_code_dim + relative_time_code_dim + metadata_dim
-        input_dim = embedding_dim + (cond_dim if cond_dim > 0 else 0)
-
+        # ConditionInjector 已将条件 broadcast 加到 embedding 上（加法，非拼接），
+        # 所以 MLP 输入维度就是 embedding_dim.
         self.mlp = nn.Sequential(
-            nn.Linear(input_dim, hidden_width),
+            nn.Linear(embedding_dim, hidden_width),
             nn.GELU(),
             nn.LayerNorm(hidden_width),
             nn.Linear(hidden_width, hidden_width),
@@ -138,11 +136,9 @@ class CategoricalDecoder(nn.Module):
         self.injector = ConditionInjector(
             embedding_dim, window_code_dim, relative_time_code_dim, metadata_dim,
         )
-        cond_dim = window_code_dim + relative_time_code_dim + metadata_dim
-        input_dim = embedding_dim + (cond_dim if cond_dim > 0 else 0)
-
+        # ConditionInjector 已将条件 broadcast 加到 embedding 上（加法，非拼接）。
         self.mlp = nn.Sequential(
-            nn.Linear(input_dim, hidden_width),
+            nn.Linear(embedding_dim, hidden_width),
             nn.GELU(),
             nn.LayerNorm(hidden_width),
             nn.Linear(hidden_width, hidden_width),

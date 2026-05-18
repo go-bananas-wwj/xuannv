@@ -1013,8 +1013,8 @@ class HarbinPatchDataset(Dataset):
             import calendar
             valid_end = datetime(year, month, calendar.monthrange(year, month)[1], 23, 59, 59).timestamp() * 1000
 
-        # 3. 构建目标 — 与输入同一帧（自编码器）
-        target_res = H // 2
+        # 3. 构建目标 — 与输入同一帧（自编码器），保持原始分辨率
+        target_res = H  # 128×128，与输入同分辨率
         tgt_ch = max(self.reconstruction_channels, self.num_classes)
         target_images = np.zeros((S_tgt, tgt_ch, target_res, target_res), dtype=np.float32)
         target_relative_time = np.zeros(S_tgt, dtype=np.float32)
