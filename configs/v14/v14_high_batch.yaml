@@ -82,13 +82,13 @@ training:
   covariance_weight: 0.1
   decorr_weight: 0.0
   early_stop_patience: 20
-  epochs: 20
+  epochs: 50
   grad_clip_norm: 1.0
   gradient_accumulation_steps: 4
   lr: 0.0001
   lr_min: 1.0e-06
   lr_schedule: cosine_no_restart
-  max_steps_per_epoch: 1000
+  max_steps_per_epoch: 200
   orthogonality_weight: 0.0
   pre_norm_uniform_weight: 0.0
   recon_warmup_epochs: 0

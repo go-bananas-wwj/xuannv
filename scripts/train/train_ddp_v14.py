@@ -139,7 +139,7 @@ def main():
         # 保存检查点
         if (epoch + 1) % cfg.training.save_every == 0 or epoch == cfg.training.epochs - 1:
             if global_rank == 0:
-                trainer.save_checkpoint(epoch)
+                trainer.save_checkpoint(epoch, metrics)
 
     if dist.is_initialized():
         dist.destroy_process_group()

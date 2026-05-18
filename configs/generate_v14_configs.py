@@ -92,7 +92,7 @@ training:
   lr: 0.0001
   lr_min: 1.0e-06
   lr_schedule: cosine_no_restart
-  max_steps_per_epoch: 1000
+  max_steps_per_epoch: 200
   orthogonality_weight: 0.0
   pre_norm_uniform_weight: 0.0
   recon_warmup_epochs: 0
@@ -120,12 +120,12 @@ training:
 
 EXPERIMENTS = [
     # (name, kappa, consist, temporal, cr_weight, batch_unif, var_weight, cov_weight, accum_steps, epochs, save_every, seed)
-    ("v14_multi_shared_ts",     5000, 0.05, 0.1, 0.1,  0.1, 0.5, 0.1, 1, 20, 10, 42),
-    ("v14_multi_baseline",      5000, 0.05, 0.1, 0.0,  0.1, 0.5, 0.1, 1, 20, 10, 43),
-    ("v14_harbin_only",         5000, 0.05, 0.1, 0.1,  0.1, 0.5, 0.1, 1, 20, 10, 44),
-    ("v14_high_consist",        5000, 0.10, 0.1, 0.1,  0.1, 0.5, 0.1, 1, 20, 10, 45),
-    ("v14_high_batch",          5000, 0.05, 0.1, 0.1,  0.1, 0.5, 0.1, 4, 20, 10, 46),
-    ("v14_high_temporal",       5000, 0.05, 0.25, 0.1, 0.1, 0.5, 0.1, 1, 20, 10, 47),
+    ("v14_multi_shared_ts",     5000, 0.05, 0.1, 0.1,  0.1, 0.5, 0.1, 1, 50, 10, 42),
+    ("v14_multi_baseline",      5000, 0.05, 0.1, 0.0,  0.1, 0.5, 0.1, 1, 50, 10, 43),
+    ("v14_harbin_only",         5000, 0.05, 0.1, 0.1,  0.1, 0.5, 0.1, 1, 50, 10, 44),
+    ("v14_high_consist",        5000, 0.10, 0.1, 0.1,  0.1, 0.5, 0.1, 1, 50, 10, 45),
+    ("v14_high_batch",          5000, 0.05, 0.1, 0.1,  0.1, 0.5, 0.1, 4, 50, 10, 46),
+    ("v14_high_temporal",       5000, 0.05, 0.25, 0.1, 0.1, 0.5, 0.1, 1, 50, 10, 47),
 ]
 
 out_dir = "/workspace/xuannv/configs/v14"
