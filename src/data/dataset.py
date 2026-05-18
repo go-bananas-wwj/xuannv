@@ -1061,6 +1061,10 @@ class HarbinPatchDataset(Dataset):
                     if valid_indices:
                         random_idx = random.choice(valid_indices)
                         data = source_frames[s_idx, random_idx].copy()
+                        # 关键修复：从输入中排除目标帧，避免重建变成复制
+                        if len(valid_indices) > 1:
+                            source_mask[s_idx, random_idx] = False
+                            source_frames[s_idx, random_idx] = 0.0
                 else:
                     # 跨月：从 month_B 加载目标帧，同样随机采样1帧
                     tgt_frames, tgt_ts = self._load_monthly_frames(patch_id, tgt_name, year, month_b)
