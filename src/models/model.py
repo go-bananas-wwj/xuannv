@@ -13,7 +13,7 @@ import torch.nn.functional as F
 import torch.utils.checkpoint as _checkpoint
 
 from src.models.bottleneck import VMFBottleneck
-from src.models.blocks import STPBlock
+from src.models.blocks import STPEncoder
 from src.models.decoders import ContinuousDecoder, CategoricalDecoder
 from src.models.sensor_encoders import SensorEncoderBank
 from src.models.time_encoding import TimeCodeEncoder, WindowCodeEncoder, RelativeTimeCodeEncoder
@@ -77,18 +77,15 @@ class AEFModel(nn.Module):
         self.window_encoder = WindowCodeEncoder(m.window_code_dim)
         self.relative_time_encoder = RelativeTimeCodeEncoder(m.relative_time_code_dim)
 
-        # STP blocks (前 N 层禁用 Space)
-        n_space_disabled = getattr(m, 'num_blocks_disable_space', 0)
-        self.stp_blocks = nn.ModuleList([
-            STPBlock(
-                channels=m.precision_dim,
-                num_heads=m.num_heads,
-                time_code_dim=m.time_code_dim,
-                use_space=(i >= n_space_disabled),
-            )
-            for i in range(m.num_blocks)
-        ])
-        self.use_checkpoint = m.gradient_checkpointing
+        # STP Encoder — 玄女V2: 严格对齐论文的三路径独立 + 跨尺度交换
+        self.stp_encoder = STPEncoder(
+            precision_dim=m.precision_dim,
+            time_dim=m.time_dim,
+            space_dim=m.space_dim,
+            num_blocks=m.num_blocks,
+            num_heads=m.num_heads,
+            use_checkpoint=m.gradient_checkpointing,
+        )
 
         # 时间条件摘要
         self.summary_query = nn.Linear(m.window_code_dim, m.precision_dim)
@@ -193,13 +190,8 @@ class AEFModel(nn.Module):
         valid_end = valid_end_f if valid_end_ms.dtype != torch.float32 else valid_end_ms.view(-1)
         window_code = self.window_encoder(valid_start, valid_end)
 
-        # STP 主干
-        x = frames
-        for block in self.stp_blocks:
-            if self.use_checkpoint and self.training:
-                x = _checkpoint.checkpoint(block, x, time_codes, mask, use_reentrant=False)
-            else:
-                x = block(x, time_codes, mask)
+        # STP 主干 — 玄女V2
+        x = self.stp_encoder(frames, timestamps, mask)
 
         # 时间条件摘要
         pooled = x.mean(dim=(-2, -1))  # [B, T, C]

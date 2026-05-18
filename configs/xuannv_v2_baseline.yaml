@@ -1,0 +1,30 @@
+# 玄女V2 Baseline — 保守基线实验
+# 继承 xuannv_v2.yaml，覆盖关键训练参数
+_base_: xuannv_v2.yaml
+
+experiment:
+  name: xuannv_v2_baseline
+  output_dir: /workspace/outputs/xuannv_v2_baseline
+  seed: 42
+
+training:
+  epochs: 50
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 0
+
+  # 保守损失权重 — 优先验证架构正确性
+  reconstruction_weight: 0.05
+  consistency_weight: 0.05
+  batch_uniformity_weight: 0.05
+
+  # VICReg
+  variance_weight: 0.3
+  covariance_weight: 0.1
+  vicreg_min_std: 1.0
+
+  # 保存频率
+  save_every: 5
+  max_steps_per_epoch: 100
+  save_best_balanced: true
