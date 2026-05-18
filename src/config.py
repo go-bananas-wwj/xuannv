@@ -68,6 +68,8 @@ class DataConfig:
     max_patches: int | None = None
     # 精确指定 patch 列表（优先级高于 max_patches）
     patch_list: list[str] | None = None
+    # V14: 多区域混合训练 manifest
+    multi_region_manifest: str | None = None
 
 
 @dataclass
@@ -102,7 +104,7 @@ class ModelConfig:
 @dataclass
 class TrainingConfig:
     epochs: int = 400
-    gradient_accumulation_steps: int = 6
+    gradient_accumulation_steps: int = 1
     lr: float = 5e-5
     weight_decay: float = 0.01
     grad_clip_norm: float = 1.0
@@ -119,6 +121,7 @@ class TrainingConfig:
     uniformity_adaptive: bool = True
     consistency_weight: float = 0.15
     classification_weight: float = 0.05
+    coding_rate_weight: float = 0.0
     text_contrastive_weight: float = 0.0
     # 反坍缩四件套
     orthogonality_weight: float = 1.0

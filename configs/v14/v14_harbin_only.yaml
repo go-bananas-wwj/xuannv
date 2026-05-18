@@ -43,7 +43,7 @@ data:
   temporal_window_max_frames: 24
   temporal_window_min_frames: 4
   temporal_window_prob: 0.5
-  multi_region_manifest: /workspace/xuannv/configs/multi_region_manifest.json
+  multi_region_manifest: /workspace/xuannv/configs/harbin_only_manifest.json
   cloud_filter_threshold: 0.5
   variance_weighted: false
   filter_2025_monthly: false
