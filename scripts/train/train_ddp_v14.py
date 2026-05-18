@@ -101,7 +101,16 @@ def main():
         from src.data.dataset import HarbinPatchDataset
         dataset = HarbinPatchDataset(cfg)
 
-    dataloader = build_dataloader(dataset, cfg, is_train=True)
+    dataset.training = True
+    from torch.utils.data import DataLoader
+    dataloader = DataLoader(
+        dataset,
+        batch_size=cfg.data.batch_size,
+        shuffle=True,
+        num_workers=0,
+        pin_memory=True,
+        drop_last=True,
+    )
 
     if global_rank == 0:
         print(f"[V14] Dataset size: {len(dataset)} patches")
