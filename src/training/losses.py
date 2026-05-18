@@ -294,11 +294,14 @@ def consistency_loss_spatial(teacher_map: torch.Tensor, student_map: torch.Tenso
     """教师-学生 Spatial Map 一致性损失.
     
     Args:
-        teacher_map: [B, D, H, W] — 必须是 L2-normalized（bottleneck 已做）
-        student_map: [B, D, H, W] — 必须是 L2-normalized
+        teacher_map: [B, D, H, W]
+        student_map: [B, D, H, W]
     """
-    # bottleneck 已做 L2 Norm，此处直接计算 cosine similarity，避免双重 normalize
-    sim = torch.sum(teacher_map * student_map, dim=1)  # [B, H, W]
+    # 保留 normalize: skip_l2=false 时是 no-op，skip_l2=true 时确保 cosine 计算正确
+    teacher = F.normalize(teacher_map, dim=1)  # [B, D, H, W]
+    student = F.normalize(student_map, dim=1)  # [B, D, H, W]
+    
+    sim = torch.sum(teacher * student, dim=1)  # [B, H, W]
     
     # 1 - similarity = distance
     return 0.5 * (1.0 - sim).mean()
