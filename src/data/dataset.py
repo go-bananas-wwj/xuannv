@@ -1049,15 +1049,18 @@ class HarbinPatchDataset(Dataset):
                 # Round 2: 动态目标从 month_B 加载（跨时相重建）
                 data = None
                 if month_b == month_a:
-                    # 同月：复用输入帧
+                    # 同月：从可用输入帧中随机采样1帧作为目标
                     s_idx = self.input_sources.index(tgt_name)
-                    if source_mask[s_idx, 0]:
-                        data = source_frames[s_idx, 0].copy()
+                    valid_indices = [i for i in range(self.max_frames) if source_mask[s_idx, i]]
+                    if valid_indices:
+                        random_idx = random.choice(valid_indices)
+                        data = source_frames[s_idx, random_idx].copy()
                 else:
-                    # 跨月：从 month_B 加载目标帧
+                    # 跨月：从 month_B 加载目标帧，同样随机采样1帧
                     tgt_frames, tgt_ts = self._load_monthly_frames(patch_id, tgt_name, year, month_b)
                     if len(tgt_frames) > 0:
-                        data = tgt_frames[0]
+                        random_idx = random.randint(0, len(tgt_frames) - 1)
+                        data = tgt_frames[random_idx]
                 
                 if data is not None:
                     data = self._pad_channels(data, self.reconstruction_channels)
