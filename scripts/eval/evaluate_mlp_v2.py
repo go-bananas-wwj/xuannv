@@ -127,8 +127,8 @@ def prepare_data(spatial_maps, patch_ids, label_dir, label_file, device, task_na
     )
 
 
-def train_mlp_head(X_train, y_train, X_test, y_test, in_dim, num_classes, device, epochs=50):
-    head = PixelMLPHead(in_dim=in_dim, hidden_dim=256, num_classes=num_classes, dropout=0.3).to(device)
+def train_mlp_head(X_train, y_train, X_test, y_test, in_dim, num_classes, device, epochs=50, hidden_dim=256, dropout=0.3):
+    head = PixelMLPHead(in_dim=in_dim, hidden_dim=hidden_dim, num_classes=num_classes, dropout=dropout).to(device)
     optimizer = torch.optim.AdamW(head.parameters(), lr=1e-3, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     
@@ -207,6 +207,8 @@ def main():
     p.add_argument("--device", default="npu:0")
     p.add_argument("--epochs", type=int, default=50)
     p.add_argument("--month", type=int, default=6)
+    p.add_argument("--hidden-dim", type=int, default=256, help="MLP hidden dimension")
+    p.add_argument("--dropout", type=float, default=0.3, help="MLP dropout")
     args = p.parse_args()
     
     device = torch.device(args.device)
@@ -234,7 +236,7 @@ def main():
             continue
         
         print(f"      train={len(X_train)}, test={len(X_test)}, classes={actual_num_classes}")
-        report = train_mlp_head(X_train, y_train, X_test, y_test, D, actual_num_classes, device, args.epochs)
+        report = train_mlp_head(X_train, y_train, X_test, y_test, D, actual_num_classes, device, args.epochs, args.hidden_dim, args.dropout)
         report["task"] = task_name
         report["epochs"] = args.epochs
         all_reports[task_name] = report
