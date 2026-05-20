@@ -1,0 +1,104 @@
+# ============================================================
+# 玄女V2 Experiment D — Skip L2 + 7-Target + 低Recon + 高Uniformity
+# 
+# 核心思路:
+#   1. 保留 skip_l2_norm_training (用户验证有效)
+#   2. 加入 7 个 target 源重建 (含 WorldCover/Dynamic World 分类目标)
+#      强迫模型学习更丰富的语义特征，用满 embedding 维度
+#   3. reconstruction_weight 从 1.0 → 0.3 (降低重建压力)
+#   4. pre_norm_uniform_weight 0.5 (高 uniformity，强迫分散)
+#   5. 100 epoch + 每轮 100 steps (随机采样充分覆盖)
+#   6. 参考 v12_expC_inter02 成功经验: 低 recon + VICReg + decorr + orth
+# ============================================================
+_base_: xuannv_v2.yaml
+
+experiment:
+  name: v2_skipL2_7target_lowrecon_7card_0520
+  output_dir: /workspace/outputs/v2_skipL2_7target_lowrecon_7card_0520
+  seed: 42
+
+data:
+  # ★ 7 个 target 源 (4 continuous + 2 categorical + 1 binary)
+  num_target_sources: 7
+  num_classes: 11  # WorldCover 最大类别数
+  target_sources:
+    - name: s2
+      loss_type: 0        # continuous (L1)
+      sensor_src: s2
+      out_channels: 6
+    - name: s1
+      loss_type: 0
+      sensor_src: s1
+      out_channels: 2
+    - name: landsat
+      loss_type: 0
+      sensor_src: landsat
+      out_channels: 6
+    - name: dem
+      loss_type: 0
+      sensor_src: null
+      out_channels: 1
+    - name: worldcover
+      loss_type: 1        # categorical (CE)
+      sensor_src: null
+      out_channels: 11
+    - name: dynamic_world
+      loss_type: 1        # categorical (CE)
+      sensor_src: null
+      out_channels: 9
+    - name: jrc_water
+      loss_type: 0        # continuous (L1)
+      sensor_src: null
+      out_channels: 1
+
+model:
+  skip_l2_norm_training: true  # 保留 skip L2
+  reconstruction_channels: 6   # decoder 最大输出通道
+
+training:
+  epochs: 100
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 0
+
+  # ★ 核心权重调整: 低 recon + 高 uniformity
+  reconstruction_weight: 0.3
+  consistency_weight: 0.15
+  classification_weight: 0.03
+
+  # Pre-norm 空间 raw uniformity (skip_l2_norm 最匹配)
+  use_pre_norm_uniform: true
+  pre_norm_uniform_weight: 0.5
+  batch_uniformity_weight: 0.0   # 被 pre_norm_uniform 覆盖
+
+  # VICReg (参考 v12_expC_inter02 成功经验)
+  use_spatial_vicreg: true       # 在 [B*H*W, D] 上计算，绕过 GMP
+  variance_weight: 0.3
+  covariance_weight: 0.1
+  vicreg_min_std: 1.0
+
+  # 辅助反坍缩 (参考 v12_expC_inter02)
+  decorrelation_weight: 0.05
+  orthogonality_weight: 0.01
+
+  # 每个 target 源的重建权重 (WorldCover/DW 语义目标权重大于 DEM)
+  source_recon_weights:
+    - 1.0   # s2
+    - 1.0   # s1
+    - 1.0   # landsat
+    - 0.05  # dem
+    - 0.5   # worldcover
+    - 0.5   # dynamic_world
+    - 0.3   # jrc_water
+
+  # Teacher-Student
+  teacher_momentum: 0.996
+  student_frame_drop_rate: 0.5
+  student_source_drop_rate: 0.3
+
+  # 训练效率
+  max_steps_per_epoch: 100
+  save_every: 10
+  save_best_balanced: true
+  grad_clip_norm: 1.0
