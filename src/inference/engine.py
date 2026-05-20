@@ -85,6 +85,72 @@ def load_cd_head(
     return head
 
 
+def _find_monthly_idx(dataset: HarbinPatchDataset, patch_id: str, year: int, month: int) -> int:
+    """在 dataset.monthly_samples 中查找 (patch_id, year, month) 对应的索引."""
+    for idx, (pid, y, m) in enumerate(dataset.monthly_samples):
+        if pid == patch_id and y == year and m == month:
+            return idx
+    raise ValueError(f"未找到 {patch_id} 在 {year}-{month:02d} 的月度样本")
+
+
+def extract_embedding_for_month(
+    model: AEFModel,
+    dataset: HarbinPatchDataset,
+    patch_id: str,
+    year: int,
+    month: int,
+    device: str | torch.device,
+    normalize: bool = True,
+    use_pre_norm: bool = False,
+) -> np.ndarray:
+    """为指定 patch 和具体年月提取 embedding map [D, H, W].
+
+    Args:
+        model: 已加载的 AEFModel.
+        dataset: 对应的 HarbinPatchDataset.
+        patch_id: Patch ID (如 "patch_000000").
+        year: 年份 (如 2025).
+        month: 月份 (1-12).
+        device: 运行设备.
+        normalize: 是否对 embedding 做 L2 归一化.
+        use_pre_norm: 是否使用 pre_norm_map.
+
+    Returns:
+        numpy array of shape [D, H, W].
+    """
+    idx = _find_monthly_idx(dataset, patch_id, year, month)
+    device = get_device(device_str=str(device) if device else None)
+    batch = dataset[idx]
+
+    batch_dev = {}
+    for k, v in batch.items():
+        if isinstance(v, torch.Tensor):
+            batch_dev[k] = v.unsqueeze(0).to(device)
+        else:
+            batch_dev[k] = v
+
+    with torch.no_grad():
+        output = model(
+            source_frames=batch_dev["source_frames"],
+            source_timestamps_ms=batch_dev["source_timestamps_ms"],
+            source_frame_mask=batch_dev["source_frame_mask"],
+            source_input_mask=batch_dev["source_input_mask"],
+            source_type_ids=batch_dev["source_type_ids"],
+            valid_start_ms=batch_dev["valid_start_ms"],
+            valid_end_ms=batch_dev["valid_end_ms"],
+            target_relative_time=batch_dev["target_relative_time"],
+            target_metadata=batch_dev["target_metadata"],
+        )
+
+    if use_pre_norm and output.pre_norm_map is not None:
+        emb = output.pre_norm_map  # [1, D, H, W] — 原始幅度，无 VMF 噪声
+    else:
+        emb = output.embedding_map  # [1, D, H, W]
+        if normalize:
+            emb = F.normalize(emb, p=2, dim=1)
+    return emb[0].cpu().numpy()
+
+
 def extract_embedding_map(
     model: AEFModel,
     dataset: HarbinPatchDataset,
@@ -95,18 +161,21 @@ def extract_embedding_map(
     normalize: bool = True,
     use_pre_norm: bool = False,
 ) -> np.ndarray:
-    """为指定 patch 和时间窗口提取 embedding map [D, H, W].
+    """为指定月度样本索引和时间窗口提取 embedding map [D, H, W].
+
+    ⚠️ 注意: patch_idx 是 monthly_samples 中的索引 (0..N_months-1)，
+    不是 dataset.patches 中的索引 (0..N_patches-1)。
+    如需通过 patch_id + year + month 查找，请使用 extract_embedding_for_month().
 
     Args:
         model: 已加载的 AEFModel.
         dataset: 对应的 HarbinPatchDataset.
-        patch_idx: patch 在 dataset.patches 中的索引.
+        patch_idx: 月度样本在 dataset.monthly_samples 中的索引.
         window_start_ms: 窗口起始时间戳 (ms).
         window_end_ms: 窗口结束时间戳 (ms).
         device: 运行设备.
-        normalize: 是否对 embedding 做 L2 归一化（仅当 use_pre_norm=False 时有效）.
-        use_pre_norm: 是否使用 pre_norm_map（L2 归一化前的原始 embedding）.
-            当为 True 时，normalize 参数被忽略，返回原始 pre-norm embedding.
+        normalize: 是否对 embedding 做 L2 归一化.
+        use_pre_norm: 是否使用 pre_norm_map.
 
     Returns:
         numpy array of shape [D, H, W].
@@ -137,9 +206,9 @@ def extract_embedding_map(
         )
 
     if use_pre_norm and output.pre_norm_map is not None:
-        emb = output.pre_norm_map  # [1, D, H, W] — 原始幅度，无 VMF 噪声
+        emb = output.pre_norm_map
     else:
-        emb = output.embedding_map  # [1, D, H, W]
+        emb = output.embedding_map
         if normalize:
             emb = F.normalize(emb, p=2, dim=1)
     return emb[0].cpu().numpy()

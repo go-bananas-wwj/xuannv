@@ -32,6 +32,7 @@ parser.add_argument("--checkpoint", type=str, required=True)
 parser.add_argument("--device", type=str, default="npu:0")
 parser.add_argument("--annot-dir", type=str, default="/workspace/哈尔滨松北新区变化检测汇总文件/变化检测shp文件")
 parser.add_argument("--grid", type=str, default="/workspace/index/harbin/grid/harbin_grid.geojson")
+parser.add_argument("--use-pre-norm", action="store_true", help="使用pre_norm_map而非embedding_map")
 args = parser.parse_args()
 
 CONFIG_PATH = args.config
@@ -128,12 +129,39 @@ for period, changes in changes_by_period.items():
     print(f"    {period}: {len(changes)} 个")
 
 # ──────────────────────────────────────────
+# 构建 patch+月份 → dataset索引 映射
+# ──────────────────────────────────────────
+print("构建 patch+月份索引映射...")
+patch_month_to_idx: dict[tuple[str, int, int], int] = {}
+for idx, (pid, year, month) in enumerate(dataset.monthly_samples):
+    patch_month_to_idx[(pid, year, month)] = idx
+print(f"  共 {len(patch_month_to_idx)} 个映射")
+
+
+def _get_month_from_window(valid_start_ms: float, valid_end_ms: float) -> tuple[int, int]:
+    """从时间窗口推断年份和月份."""
+    from datetime import datetime
+    # 使用窗口中点
+    mid_ms = (valid_start_ms + valid_end_ms) / 2
+    dt = datetime.fromtimestamp(mid_ms / 1000)
+    return dt.year, dt.month
+
+
+# ──────────────────────────────────────────
 # 提取 embedding
 # ──────────────────────────────────────────
 @torch.no_grad()
 def extract_embedding(model, dataset, patch_id, valid_start, valid_end):
-    """提取单个patch在指定时间窗口的embedding."""
-    idx = dataset.patches.index(patch_id)
+    """提取单个patch在指定时间窗口的embedding.
+    
+    关键修复: 使用 patch_month_to_idx 映射找到正确的 dataset 索引，
+    避免 dataset.patches.index() 与 monthly_samples 索引错位。
+    """
+    year, month = _get_month_from_window(valid_start, valid_end)
+    key = (patch_id, year, month)
+    if key not in patch_month_to_idx:
+        raise ValueError(f"找不到 {patch_id} 在 {year}-{month:02d} 的数据")
+    idx = patch_month_to_idx[key]
     item = dataset[idx]
 
     source_frames = item["source_frames"].unsqueeze(0).to(DEVICE)
@@ -158,7 +186,7 @@ def extract_embedding(model, dataset, patch_id, valid_start, valid_end):
         target_metadata=target_metadata,
         skip_decoder=True,
     )
-    emb = out.embedding_map  # [1, D, H, W]
+    emb = out.pre_norm_map if args.use_pre_norm else out.embedding_map  # [1, D, H, W]
     emb = F.normalize(emb, p=2, dim=1)
     return emb.squeeze(0).cpu().numpy()  # [D, H, W]
 
@@ -296,7 +324,8 @@ output = {
     },
     "periods": period_results,
 }
-output_path = os.path.join(os.path.dirname(CKPT_PATH), "bare_auc.json")
+suffix = "_prenorm" if args.use_pre_norm else ""
+output_path = os.path.join(os.path.dirname(CKPT_PATH), f"bare_auc{suffix}.json")
 with open(output_path, "w") as f:
     json.dump(output, f, indent=2)
 print(f"\n  结果已保存: {output_path}")

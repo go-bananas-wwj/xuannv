@@ -147,3 +147,155 @@ valid_pixels = has_data & (tgt_cls >= 0) & (tgt_cls < num_classes)
 2. 没有单独的 worldcover/dynamic_world 重建质量监控
 3. 总 loss 的下降趋势掩盖了分类 loss 的异常
 
+
+---
+
+## 2026-05-16: 系统性索引错位 Bug — `dataset.patches.index()` vs `dataset[idx]`
+
+### 问题描述
+
+`HarbinPatchDataset` 的 `__getitem__` 访问的是 **月度样本索引** (`monthly_samples[idx]`)，而非 **patch 索引** (`patches[idx]`)。
+
+```python
+# dataset.py:910-954
+def __len__(self): 
+    return len(self.monthly_samples)  # 例如 5088
+
+def __getitem__(self, idx):
+    patch_id, year, month = self.monthly_samples[idx]  # idx 是月度样本索引！
+```
+
+但大量评测脚本错误地用 `dataset.patches.index(pid)`（patch 在 patches 列表中的索引，0-423）作为 `dataset[idx]` 的索引。这导致：
+- **idx 0-11**: 碰巧对应 patch_0 的 12 个月（运气对）
+- **idx 12+**: 对应完全不同的 patch 和月份（严重错误）
+
+### 影响评估
+
+| 场景 | 后果 |
+|------|------|
+| 第1个 patch (idx=0) | 正确访问 patch_0 的 1 月份 |
+| 第2个 patch (idx=1) | 错误访问 patch_0 的 2 月份（不是 patch_1！） |
+| 第13个 patch (idx=12) | 错误访问 patch_1 的 1 月份 |
+| 第424个 patch (idx=423) | 错误访问 patch_35 的 3 月份 |
+
+**对于 AUC 验证：**
+- 提取的 embedding 来自**错误的 patch 和错误的月份**
+- 变化检测 AUC 实际上是「随机 patch 组合」的 AUC，而非真实 before/after 对比
+- **之前报告的 AUC≈0.48 全部是假阴性**，不代表模型真实能力
+
+### 受影响的文件（18个）
+
+**验证脚本（索引错位 + 时间窗口过时）：**
+
+| 文件 | 行号 | 问题 |
+|------|:----:|------|
+| `validate_v12_auc.py` | L165 | `pidx = dataset.patches.index(pid)` → `dataset[pidx]` |
+| `validate_v12_bare.py` | L165 | ✅ **已修复**（使用 `patch_month_to_idx` 映射） |
+| `validate_v7_level1_bare.py` | L49 | `item = dataset[dataset.patches.index(patch_id)]` |
+| `validate_v7_downstream_heads.py` | L71 | `item = dataset[dataset.patches.index(patch_id)]` |
+| `validate_v5_bare.py` | L82-83 | 通过 `extract_embedding_map` 间接使用 |
+| `validate_v10_bare.py` | L144 | `extract_embedding(idx, ...)` 中 idx 来自 `patches.index` |
+| `validate_aef_bare.py` | L97 | `idx = dataset.patches.index(patch_id)` |
+
+**CD Head 训练脚本：**
+
+| 文件 | 行号 | 问题 |
+|------|:----:|------|
+| `train_cd_head_v8.py` | L276 | `dataset.patches.index(pid)` → `extract_embedding_map` |
+| `train_cd_head_v8_v2.py` | L72 | `idx = dataset.patches.index(pid)` → `extract_fn` |
+| `fewshot_change_detection.py` | L424 | `dataset.patches.index(pid)` → `extract_embedding_map` |
+| `full_evaluation_pipeline.py` | L93 | `idx = dataset.patches.index(pid)` → `extract_fn` |
+
+**Embedding 提取脚本：**
+
+| 文件 | 行号 | 问题 |
+|------|:----:|------|
+| `extract_embeddings_for_knn.py` | L22 | `idx = dataset.patches.index(pid)` |
+| `extract_monthly_embeddings_all_patches.py` | L69 | `pidx = dataset.patches.index(pid)` → `extract_embedding_map` |
+| `extract_v4_monthly_embeddings.py` | L54 | `pidx = dataset.patches.index(pid)` → `extract_embedding_map` |
+| `extract_v5_monthly_embeddings.py` | L54 | `pidx = dataset.patches.index(pid)` → `extract_embedding_map` |
+| `extract_v5_prenorm_embeddings.py` | L46 | `pidx = dataset.patches.index(pid)` → `extract_embedding_map` |
+
+**下游评估脚本：**
+
+| 文件 | 行号 | 问题 |
+|------|:----:|------|
+| `comprehensive_downstream_eval.py` | L315 | `item_idx = dataset.patches.index(pid)` |
+| `eval_downstream_knn_v2.py` | L42 | `idx = dataset.patches.index(pid)` |
+| `eval_reconstruction_v8.py` | L54 | `idx = dataset.patches.index(pid)` |
+
+**API 级别问题：**
+
+| 文件 | 行号 | 问题 |
+|------|:----:|------|
+| `src/inference/engine.py` | L103 | `extract_embedding_map` 文档说 "patch_idx: patch 索引"，但实现做 `dataset[patch_idx]`（实际是月度样本索引） |
+
+### 未受影响的文件（正确用法）
+
+| 文件 | 正确原因 |
+|------|----------|
+| `extract_embeddings_v2.py` | 使用 `DataLoader`，通过 `__getitem__` 正确迭代 |
+| `extract_v12_embeddings_all_months.py` | 使用 `DataLoader`，正确 |
+| `extract_v12_embedding_diagnostics_v2.py` | 直接使用 `dataset[idx]`，idx 是月度样本索引 |
+| `validate_v12_bare.py` (修复后) | 使用 `patch_month_to_idx` 映射 |
+
+### 修复方案
+
+**方案 A：每个脚本独立修复（推荐用于紧急修复）**
+
+像 `validate_v12_bare.py` 一样，构建 `patch_month_to_idx` 映射：
+```python
+patch_month_to_idx = {}
+for idx, (pid, year, month) in enumerate(dataset.monthly_samples):
+    patch_month_to_idx[(pid, year, month)] = idx
+
+# 使用时
+idx = patch_month_to_idx[(patch_id, year, month)]
+item = dataset[idx]  # 正确！
+```
+
+**方案 B：修复 API（推荐长期方案）**
+
+修改 `src/inference/engine.py:extract_embedding_map`：
+```python
+def extract_embedding_map(model, dataset, patch_id, year, month, ...):
+    """接受 patch_id + year + month，内部查找正确索引."""
+    for idx, (pid, y, m) in enumerate(dataset.monthly_samples):
+        if pid == patch_id and y == year and m == month:
+            batch = dataset[idx]
+            break
+```
+
+### 为什么之前没发现
+
+1. **第一个 patch 碰巧对**：`dataset[0]` 确实是 patch_0，开发者测试时只用 patch_0，没发现问题
+2. **AUC≈0.5 被解释为"模型不行"**：实际上模型可能是对的，只是评测用了错误数据
+3. **没有 eyeball 验证**：没有人工抽查 "这个 patch 的这个月份 embedding 是否合理"
+4. **DataLoader 路径是对的**：训练时用的 DataLoader 是正确的，所以训练本身不受影响
+5. **索引命名误导**：`patches.index(pid)` 返回的确实是 patch 索引，让人误以为可以直接用于 dataset 索引
+
+### 额外问题：时间窗口过时
+
+以下脚本硬编码了 **2023/2024 年** 的时间窗口，但哈尔滨变化检测标注对应 **2025 年**：
+
+| 脚本 | 硬编码窗口 |
+|------|-----------|
+| `validate_v12_auc.py` | 2023H2 vs 2024H2 |
+| `validate_v7_level1_bare.py` | 2023H2 vs 2024H2 |
+| `validate_v7_downstream_heads.py` | 2023H2 vs 2024H2 |
+| `validate_v5_bare.py` | 2023H2 vs 2024H2 |
+| `validate_v10_bare.py` | 2023H2 vs 2024H2 |
+| `train_cd_head_v8.py` | 2023H2 vs 2024H2 |
+| `train_cd_head_v8_v2.py` | 2023H2 vs 2024H2 |
+| `full_evaluation_pipeline.py` | 2023H2 vs 2024H2 |
+| `extract_embeddings_multigpu.py` | 2023H2 vs 2024H2 |
+
+**后果**：即使索引正确，这些脚本也在对比**没有标注覆盖的时间窗口**，AUC 依然无意义。
+
+### 教训
+
+1. **永远不要用 `dataset.patches.index()` 作为 `dataset[]` 的索引**：两者语义完全不同
+2. **评测脚本必须用 DataLoader 或显式映射**：避免手动索引
+3. **时间窗口必须与标注对齐**：硬编码时间窗口前必须确认标注的对应时间
+4. **第一个 patch 测试是陷阱**：只测 patch_0 会隐藏索引错位问题
+5. **API 文档必须与实现一致**：`extract_embedding_map` 的文档误导了所有调用者

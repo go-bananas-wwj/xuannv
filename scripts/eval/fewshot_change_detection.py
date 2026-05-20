@@ -34,15 +34,15 @@ warnings.filterwarnings('ignore')
 ANNOT_DIR = "/workspace/哈尔滨松北新区变化检测汇总文件/变化检测shp文件"
 GRID_PATH = "/workspace/index/harbin/grid/harbin_grid.geojson"
 
-# 2025年各月份时间窗口 (ms)
+# 2025年各月份时间窗口 (ms) — 修正为真正的2025年值
 MONTH_WINDOWS_2025 = {
-    "2025-04": (1711929600000, 1714521599000),
-    "2025-05": (1714492800000, 1717171199000),
-    "2025-06": (1717171200000, 1719791999000),
-    "2025-07": (1719763200000, 1722441599000),
-    "2025-08": (1722441600000, 1725119999000),
-    "2025-09": (1725120000000, 1727711999000),
-    "2025-10": (1727712000000, 1730390399000),
+    "2025-04": (1743436800000, 1746028799000),
+    "2025-05": (1746028800000, 1748707199000),
+    "2025-06": (1748707200000, 1751299199000),
+    "2025-07": (1751299200000, 1753977599000),
+    "2025-08": (1753977600000, 1756655999000),
+    "2025-09": (1756656000000, 1759247999000),
+    "2025-10": (1759248000000, 1761926399000),
 }
 
 # Shapefile → 月份区间映射 (变化发生在相邻月份之间)
@@ -78,7 +78,7 @@ def load_backbone(config_path: str, checkpoint_path: str, device: str):
     from src.config import load_config
     from src.models.model import AEFModel
     from src.data.dataset import HarbinPatchDataset
-    from src.inference.engine import extract_embedding_map
+    from src.inference.engine import extract_embedding_for_month
 
     cfg = load_config(config_path)
     model = AEFModel(cfg).to(device)
@@ -92,7 +92,7 @@ def load_backbone(config_path: str, checkpoint_path: str, device: str):
     dataset = HarbinPatchDataset(cfg)
     dataset.training = False
     dataset._spatial_augmentation = False
-    return model, dataset, extract_embedding_map, cfg
+    return model, dataset, extract_embedding_for_month, cfg
 
 
 def load_annotations():
@@ -211,15 +211,23 @@ class SimpleCDHead(nn.Module):
 
 MIN_CHANGE_PIXELS = 10  # 最小变化像素阈值，过滤过小mask的patch
 
+def _month_from_window(window_ms):
+    """从时间窗口推断月份."""
+    from datetime import datetime
+    mid = (window_ms[0] + window_ms[1]) / 2 / 1000
+    dt = datetime.fromtimestamp(mid)
+    return dt.year, dt.month
+
+
 def extract_all_data(model, dataset, extract_fn, device, patch_infos, use_pre_norm=False):
     """提取所有 patch 的 before/after embedding + mask.
     
-    按 (before_window, after_window) 分组，为每个窗口组合提取 embedding。
+    使用 extract_embedding_for_month (patch_id, year, month) 避免索引错位.
     """
     data = []
     skipped_small = 0
     skipped_no_data = 0
-    for pid, pidx, bounds, changes in patch_infos:
+    for pid, _pidx, bounds, changes in patch_infos:
         # 按窗口分组
         window_groups = {}
         for geom, bwin, awin in changes:
@@ -228,8 +236,10 @@ def extract_all_data(model, dataset, extract_fn, device, patch_infos, use_pre_no
         
         for (bwin, awin), geoms in window_groups.items():
             try:
-                eb = extract_fn(model, dataset, pidx, bwin[0], bwin[1], device, normalize=True, use_pre_norm=use_pre_norm)
-                ea = extract_fn(model, dataset, pidx, awin[0], awin[1], device, normalize=True, use_pre_norm=use_pre_norm)
+                byear, bmonth = _month_from_window(bwin)
+                ayear, amonth = _month_from_window(awin)
+                eb = extract_fn(model, dataset, pid, byear, bmonth, device, normalize=True, use_pre_norm=use_pre_norm)
+                ea = extract_fn(model, dataset, pid, ayear, amonth, device, normalize=True, use_pre_norm=use_pre_norm)
                 mask = rasterize_annotations(geoms, bounds)
                 n_changed = int(mask.sum())
                 if n_changed < MIN_CHANGE_PIXELS:
@@ -421,7 +431,7 @@ def main():
     for pid, changes in patch_changes.items():
         if pid not in dataset.patches:
             continue
-        patch_infos.append((pid, dataset.patches.index(pid), patch_bounds[pid], changes))
+        patch_infos.append((pid, 0, patch_bounds[pid], changes))  # pidx 不再使用，设为0
 
     print(f"  有效标注 patch: {len(patch_infos)}")
     if len(patch_infos) < 5:
