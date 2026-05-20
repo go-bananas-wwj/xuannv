@@ -28,6 +28,13 @@ import json
 def compute_cloud_score(data: np.ndarray) -> float:
     """计算云量评分，越低越 clear。"""
     blue, green, red, nir, swir1, swir2 = data.astype(np.float32)
+    
+    # 自适应：检测0-1范围数据（GEE导出不同scale），先×10000还原
+    if data.max() < 2.0:
+        blue, green, red, nir, swir1, swir2 = [
+            band * 10000.0 for band in [blue, green, red, nir, swir1, swir2]
+        ]
+    
     brightness = (blue + green + red).mean() / 3.0
     ndvi = np.nanmean((nir - red) / (nir + red + 1e-6))
     # 亮度归一化到 [0,1] (假设最大 ~10000)，NDVI 到 [-1,1]

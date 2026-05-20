@@ -96,9 +96,11 @@ torchrun --nproc_per_node=3 scripts/train_ddp.py \
 2. 默认对比两个 checkpoint:
    - V1: `/workspace/outputs/xuannv_embdding_v1/epoch_399.pt`
    - V2: `/workspace/outputs/xuannv_embdding_v2/epoch_499.pt`
-3. 时间窗口:
-   - Before: `2023Q3-Q4`
-   - After: `2024Q3-2025Q4`
+3. 时间窗口（哈尔滨标注为2025年变化）:
+   - june.shp: 2025-04 vs 2025-06
+   - aug.shp: 2025-06 vs 2025-08
+   - September.shp: 2025-08 vs 2025-09
+   - October.shp: 2025-09 vs 2025-10
 4. 计算 `change_map = (1 - cos_sim) / 2.0`
 5. 在 20 个有标注的 patch 上计算 ROC-AUC
 

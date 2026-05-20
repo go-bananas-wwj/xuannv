@@ -22,8 +22,8 @@ ANNOT_DIR = "/workspace/哈尔滨松北新区变化检测汇总文件/变化检�
 GRID_PATH = "/workspace/index/harbin/grid/harbin_grid.geojson"
 
 # 时间窗口
-BEFORE_WINDOW = (1688169600000.0, 1703980800000.0)  # 2023Q3-Q4
-AFTER_WINDOW = (1719792000000.0, 1735603200000.0)   # 2024Q3-Q4
+BEFORE_WINDOW = (1688169600000.0, 1703980800000.0)  # ⚠️ 已过时，标注为2025年变化
+AFTER_WINDOW = (1719792000000.0, 1735603200000.0)   # ⚠️ 已过时，标注为2025年变化
 
 
 def load_model(ckpt_path, device):

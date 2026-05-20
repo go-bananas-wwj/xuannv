@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""V12 Bare AUC: 无CD Head，直接用cosine distance评估embedding时间敏感性."""
+"""V12 Bare AUC: 无CD Head，直接用cosine distance评估embedding时间敏感性.
+
+变化检测标注对应2025年具体月份对：
+  - june.shp: 2025-04 → 2025-06
+  - aug.shp: 2025-06 → 2025-08
+  - September.shp: 2025-08 → 2025-09
+  - October.shp: 2025-09 → 2025-10
+"""
 import sys, json, time, os, warnings
 warnings.filterwarnings('ignore')
 sys.path.insert(0, "/workspace/xuannv")
@@ -33,9 +40,25 @@ DEVICE = args.device
 ANNOT_DIR = args.annot_dir
 GRID_PATH = args.grid
 
-# 时间窗口
-BEFORE_WINDOW = (1688169600000.0, 1703980800000.0)  # 2023Q3-Q4
-AFTER_WINDOW = (1719792000000.0, 1735603200000.0)   # 2024Q3-Q4
+# 2025年各月份对时间窗口（毫秒，UTC）
+PERIODS = {
+    "june": {
+        "before": (1743436800000, 1746028799000),   # 2025-04
+        "after":  (1748707200000, 1751299199000),   # 2025-06
+    },
+    "aug": {
+        "before": (1748707200000, 1751299199000),   # 2025-06
+        "after":  (1753977600000, 1756655999000),   # 2025-08
+    },
+    "September": {
+        "before": (1753977600000, 1756655999000),   # 2025-08
+        "after":  (1756656000000, 1759247999000),   # 2025-09
+    },
+    "October": {
+        "before": (1756656000000, 1759247999000),   # 2025-09
+        "after":  (1759248000000, 1761926399000),   # 2025-10
+    },
+}
 
 print("="*60)
 print("  V12 Bare AUC Validation")
@@ -82,19 +105,27 @@ for feat in grid_data["features"]:
     patch_bounds[pid] = (min(xs), min(ys), max(xs), max(ys))
 
 print("加载标注数据...")
-all_changes = []
+# 按 period 分组存储变化标注
+changes_by_period: dict[str, list] = {p: [] for p in PERIODS}
 for shp_name in ["june.shp", "aug.shp", "September.shp", "October.shp"]:
+    period = shp_name.replace(".shp", "")
     try:
         gdf = gpd.read_file(f"{ANNOT_DIR}/{shp_name}")
-        if gdf.crs is not None and gdf.crs.to_epsg() != 32652:
+        # CRS fix (from AGENTS.md)
+        if gdf.crs is None:
+            gdf = gdf.set_crs("EPSG:4326")
+        if gdf.crs.to_epsg() != 32652:
             gdf = gdf.to_crs(epsg=32652)
         for _, row in gdf.iterrows():
             if row.geometry is not None:
-                all_changes.append({"geometry": row.geometry, "period": shp_name.replace(".shp", "")})
+                changes_by_period[period].append({"geometry": row.geometry, "period": period})
     except Exception as e:
         print(f"  Warning: could not load {shp_name}: {e}")
 
-print(f"  共 {len(all_changes)} 个变化标注")
+total_changes = sum(len(v) for v in changes_by_period.values())
+print(f"  共 {total_changes} 个变化标注")
+for period, changes in changes_by_period.items():
+    print(f"    {period}: {len(changes)} 个")
 
 # ──────────────────────────────────────────
 # 提取 embedding
@@ -131,70 +162,97 @@ def extract_embedding(model, dataset, patch_id, valid_start, valid_end):
     emb = F.normalize(emb, p=2, dim=1)
     return emb.squeeze(0).cpu().numpy()  # [D, H, W]
 
-# 找出有标注的patch
-annotated_pids = set()
-for change in all_changes:
-    geom = change["geometry"]
-    for pid, bounds in patch_bounds.items():
-        if box(*bounds).intersects(geom):
-            annotated_pids.add(pid)
-            break
-
-print(f"\n带标注的patch: {len(annotated_pids)} 个")
-
 # ──────────────────────────────────────────
-# 计算 Bare AUC
+# 计算 Bare AUC（按 period 分别计算 + 全局汇总）
 # ──────────────────────────────────────────
 all_scores = []
 all_labels = []
 all_changed_means = []
 all_unchanged_means = []
+period_results = {}
 
-for pid in sorted(annotated_pids):
-    try:
-        emb_before = extract_embedding(model, dataset, pid, BEFORE_WINDOW[0], BEFORE_WINDOW[1])
-        emb_after = extract_embedding(model, dataset, pid, AFTER_WINDOW[0], AFTER_WINDOW[1])
-    except Exception as e:
-        print(f"  [Skip] {pid}: {e}")
+for period, period_info in PERIODS.items():
+    changes = changes_by_period.get(period, [])
+    if not changes:
         continue
 
-    D, H, W = emb_before.shape
-    changed_mask = np.zeros((H, W), dtype=bool)
-
-    for change in all_changes:
+    # 找出该 period 有标注的 patch
+    annotated_pids = set()
+    for change in changes:
         geom = change["geometry"]
-        bounds = patch_bounds.get(pid)
-        if bounds is None:
+        for pid, bounds in patch_bounds.items():
+            if box(*bounds).intersects(geom):
+                annotated_pids.add(pid)
+                break
+
+    period_scores = []
+    period_labels = []
+    period_changed_means = []
+    period_unchanged_means = []
+
+    for pid in sorted(annotated_pids):
+        try:
+            emb_before = extract_embedding(model, dataset, pid, period_info["before"][0], period_info["before"][1])
+            emb_after = extract_embedding(model, dataset, pid, period_info["after"][0], period_info["after"][1])
+        except Exception as e:
+            print(f"  [Skip] {pid} ({period}): {e}")
             continue
-        minx, miny, maxx, maxy = bounds
-        if not box(minx, miny, maxx, maxy).intersects(geom):
+
+        D, H, W = emb_before.shape
+        changed_mask = np.zeros((H, W), dtype=bool)
+
+        for change in changes:
+            geom = change["geometry"]
+            bounds = patch_bounds.get(pid)
+            if bounds is None:
+                continue
+            minx, miny, maxx, maxy = bounds
+            if not box(minx, miny, maxx, maxy).intersects(geom):
+                continue
+
+            for y in range(H):
+                for x in range(W):
+                    px = minx + (x + 0.5) / W * (maxx - minx)
+                    py = maxy - (y + 0.5) / H * (maxy - miny)
+                    pt = box(px, py, px, py)
+                    if geom.contains(pt) or geom.intersects(pt):
+                        changed_mask[y, x] = True
+
+        # 像素级 cosine distance
+        cos_map = np.sum(emb_before * emb_after, axis=0)  # [H, W]
+        dist_map = 1.0 - cos_map  # [H, W]
+
+        labels_flat = changed_mask.flatten()
+        scores_flat = dist_map.flatten()
+
+        if labels_flat.sum() == 0 or labels_flat.sum() == len(labels_flat):
             continue
 
-        for y in range(H):
-            for x in range(W):
-                px = minx + (x + 0.5) / W * (maxx - minx)
-                py = maxy - (y + 0.5) / H * (maxy - miny)
-                pt = box(px, py, px, py)
-                if geom.contains(pt) or geom.intersects(pt):
-                    changed_mask[y, x] = True
+        period_scores.extend(scores_flat.tolist())
+        period_labels.extend(labels_flat.tolist())
+        all_scores.extend(scores_flat.tolist())
+        all_labels.extend(labels_flat.tolist())
 
-    # 像素级 cosine distance
-    cos_map = np.sum(emb_before * emb_after, axis=0)  # [H, W]
-    dist_map = 1.0 - cos_map  # [H, W]
+        changed_mean = float(dist_map[changed_mask].mean()) if changed_mask.any() else 0.0
+        unchanged_mean = float(dist_map[~changed_mask].mean()) if (~changed_mask).any() else 0.0
+        period_changed_means.append(changed_mean)
+        period_unchanged_means.append(unchanged_mean)
+        all_changed_means.append(changed_mean)
+        all_unchanged_means.append(unchanged_mean)
 
-    labels_flat = changed_mask.flatten()
-    scores_flat = dist_map.flatten()
-
-    if labels_flat.sum() == 0 or labels_flat.sum() == len(labels_flat):
-        continue
-
-    all_scores.extend(scores_flat.tolist())
-    all_labels.extend(labels_flat.tolist())
-
-    changed_mean = float(dist_map[changed_mask].mean()) if changed_mask.any() else 0.0
-    unchanged_mean = float(dist_map[~changed_mask].mean()) if (~changed_mask).any() else 0.0
-    all_changed_means.append(changed_mean)
-    all_unchanged_means.append(unchanged_mean)
+    # 该 period 的 AUC
+    if len(period_labels) > 0 and sum(period_labels) > 0 and sum(period_labels) < len(period_labels):
+        period_auc = roc_auc_score(period_labels, period_scores)
+        period_changed = np.mean(period_changed_means) if period_changed_means else 0.0
+        period_unchanged = np.mean(period_unchanged_means) if period_unchanged_means else 0.0
+        period_results[period] = {
+            "auc": float(period_auc),
+            "changed_mean": float(period_changed),
+            "unchanged_mean": float(period_unchanged),
+            "separation": float(period_changed - period_unchanged),
+            "n_samples": len(period_labels),
+            "n_positive": int(sum(period_labels)),
+        }
 
 # ──────────────────────────────────────────
 # 结果输出
@@ -209,10 +267,17 @@ unchanged_mean = np.mean(all_unchanged_means)
 separation = changed_mean - unchanged_mean
 
 print("\n" + "="*60)
-print(f"  Bare AUC: {auc:.4f}")
+print("  Bare AUC 结果")
+print("="*60)
+print(f"\n  全局 AUC: {auc:.4f}")
 print(f"  Changed mean dist:   {changed_mean:.4f}")
 print(f"  Unchanged mean dist: {unchanged_mean:.4f}")
 print(f"  Separation:          {separation:.4f}")
+
+print("\n  分时期 AUC:")
+for period, res in period_results.items():
+    print(f"    {period:12s}: AUC={res['auc']:.4f}  separation={res['separation']:.4f}  "
+          f"n={res['n_samples']} pos={res['n_positive']}")
 print("="*60)
 
 # Uniformity 诊断
@@ -220,3 +285,18 @@ if len(all_scores) > 10:
     emb_all = np.array(all_scores)
     print(f"\n  Score stats: min={emb_all.min():.4f} max={emb_all.max():.4f} "
           f"mean={emb_all.mean():.4f} std={emb_all.std():.4f}")
+
+# 保存 JSON
+output = {
+    "global": {
+        "auc": float(auc),
+        "changed_mean": float(changed_mean),
+        "unchanged_mean": float(unchanged_mean),
+        "separation": float(separation),
+    },
+    "periods": period_results,
+}
+output_path = os.path.join(os.path.dirname(CKPT_PATH), "bare_auc.json")
+with open(output_path, "w") as f:
+    json.dump(output, f, indent=2)
+print(f"\n  结果已保存: {output_path}")

@@ -54,6 +54,9 @@ def compute_source_stats(dataset: HarbinPatchDataset, source_name: str, max_patc
                 continue
             # 修复：光学源先log变换，再算统计量
             if source_name in {"s2", "s2_hr", "landsat"}:
+                # 自适应：检测到0-1范围数据（GEE导出不同scale），先×10000还原
+                if data.max() < 2.0:
+                    data = data * 10000.0
                 data = np.log(np.clip(data, 0, None) + 1) / 10.0
             all_samples.append(data)
     
