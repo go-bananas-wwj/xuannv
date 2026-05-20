@@ -63,7 +63,7 @@ training:
   recon_warmup_epochs: 0
 
   # ★ 核心权重调整: 低 recon + 高 uniformity
-  reconstruction_weight: 0.3
+  reconstruction_weight: 0.2
   consistency_weight: 0.15
   classification_weight: 0.03
 
