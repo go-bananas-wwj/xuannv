@@ -107,8 +107,16 @@ def load_annotations():
                 if geom is None:
                     continue
                 pid = row.get("patch_id", None)
+                if not pid:
+                    # 空间匹配找到所属patch
+                    pt = geom.centroid
+                    for candidate_pid, bounds in patch_bounds.items():
+                        if bounds[0] <= pt.x <= bounds[2] and bounds[1] <= pt.y <= bounds[3]:
+                            pid = candidate_pid
+                            break
                 if pid:
                     patch_changes.setdefault(pid, {}).setdefault(period, []).append(geom)
+            print(f"  {shp_name}: {len(gdf)} polygons")
         except Exception as e:
             print(f"  Skip {shp_name}: {e}")
     return patch_changes, patch_bounds
