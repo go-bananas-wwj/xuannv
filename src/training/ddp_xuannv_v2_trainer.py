@@ -215,6 +215,10 @@ class XuannvV2Trainer:
 
     def train_epoch(self, epoch: int, dataloader: DataLoader) -> dict[str, float]:
         self.model.train()
+        
+        # ★ 每 epoch 清空 memory bank，避免早期坍缩样本跨 epoch 污染 uniformity
+        self.memory_bank.clear()
+        
         t = self.cfg.training
         accum_steps = getattr(t, "gradient_accumulation_steps", 2)
         loss_accum: dict[str, float] = {}
@@ -399,13 +403,9 @@ class XuannvV2Trainer:
                 l2_uniform_w = pre_norm_uniform_w
             elif use_pre_norm_unif and pre_norm_uniform_w > 0:
                 # Pre-norm raw uniformity（欧氏空间，无 L2 Jacobian 屏障）
-                if dist.is_initialized() and self.world_size > 1:
-                    gathered_pre_unif = [torch.zeros_like(pre_norm) for _ in range(self.world_size)]
-                    dist.all_gather(gathered_pre_unif, pre_norm)
-                    gathered_pre_unif = torch.cat(gathered_pre_unif, dim=0)
-                else:
-                    gathered_pre_unif = pre_norm
-                l2_uniform = raw_uniformity_loss(gathered_pre_unif.float())
+                # ★ 使用 all_pre（含 memory bank）替代单独的 gathered_pre_unif
+                # all_pre = gathered_pre [B*world_size, D] + bank_emb [K, D]，约 540 样本
+                l2_uniform = raw_uniformity_loss(all_pre.float())
                 l2_uniform_w = pre_norm_uniform_w
             elif use_spatial_unif and l2_uniform_w > 0:
                 # Spatial uniformity on embedding_map [B, D, H, W]
