@@ -236,6 +236,8 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--use-pre-norm", action="store_true", help="使用pre_norm embedding")
     parser.add_argument("--output", type=str, default=None)
+    parser.add_argument("--hidden-dim", type=int, default=64, help="CD Head hidden dim")
+    parser.add_argument("--dropout", type=float, default=0.3, help="CD Head dropout")
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -337,9 +339,9 @@ def main():
         val_data = [all_data[i] for i in val_idx]
         print(f"  Train: {len(train_data)} | Val: {len(val_data)}")
 
-        cd_head = ChangeDetectionHeadV3(embedding_dim=cfg.model.embedding_dim, hidden_dim=64, dropout=0.3)
+        cd_head = ChangeDetectionHeadV3(embedding_dim=cfg.model.embedding_dim, hidden_dim=args.hidden_dim, dropout=args.dropout)
         n_params = sum(p.numel() for p in cd_head.parameters())
-        print(f"  CD Head V3 params: {n_params:,}")
+        print(f"  CD Head V3 (h={args.hidden_dim}) params: {n_params:,}")
 
         best_auc, best_state = train_fold(cd_head, train_data, val_data, device, epochs=args.epochs, lr=args.lr)
         print(f"  Fold {fold_idx+1} Best Val AUC: {best_auc:.4f}")
