@@ -21,6 +21,7 @@ description: AlphaEarth Foundations 改进版 (xuannv_embdding) 项目专家知�
 | V1 | `qwen_v1_scenes.yaml` | ~0.97 (不敏感) | ~0.498 (随机) | 基线 |
 | V2 | `qwen_v2_temporal.yaml` | 改善中 | 改善中 | 加入时序对比损失 |
 | V3 | `qwen_v3_temporal.yaml` | 双窗口采样 | 待验证 | 在 V2 上微调 |
+| ExpD | `xuannv_v2_expD_7target_lowrecon.yaml` | 0.578 (cosine) | 0.730 (LR) | 7-target + skip L2 + high uniform |
 
 ## 模块速查表
 
@@ -90,6 +91,68 @@ torchrun --nproc_per_node=3 scripts/train_ddp.py \
 - **emb_w1/emb_w2 来源**: `encode_dual_window()` 对同一 batch 用两个不同 `valid_period` 分别编码
 - **V3 改进**: 数据集中启用 `non_overlapping_windows=true`，随机抽取两段不重叠的时间窗口
 
+## 验证 Pipeline (推荐)
+
+### 标准验证流程
+
+训练进行中时，**不要停止训练**，直接在空闲 NPU 上并行验证：
+
+```bash
+# 1. 提取 Embedding（基础步骤，必须先做）
+python scripts/eval/extract_embeddings_v2.py \
+    --config configs/xuannv_v2_expD_7target_lowrecon.yaml \
+    --checkpoint /workspace/outputs/.../epoch_best_xxx.pt \
+    --output-dir /workspace/outputs/.../evaluation/embeddings \
+    --device npu:0 \
+    --batch-size 4
+
+# 2. Bare CD AUC（零样本基线）
+python scripts/eval/evaluate_cd_v2.py \
+    --embedding-file /workspace/outputs/.../evaluation/embeddings/patch_embeddings.npz \
+    --output-dir /workspace/outputs/.../evaluation/change_detection
+
+# 3. MLP 下游分类
+python scripts/eval/evaluate_mlp_v2.py \
+    --embedding-file /workspace/outputs/.../evaluation/embeddings/patch_embeddings.npz \
+    --output-dir /workspace/outputs/.../evaluation/mlp_downstream \
+    --device npu:0 \
+    --epochs 50
+
+# 4. Few-Shot CD（冻结 backbone，训练 CD Head）
+python scripts/eval/fewshot_change_detection.py \
+    --config configs/xuannv_v2_expD_7target_lowrecon.yaml \
+    --checkpoint /workspace/outputs/.../epoch_best_xxx.pt \
+    --k-shots 1,5,10,20 \
+    --n-splits 5 \
+    --device npu:0
+
+# 5. Few-Shot 下游分类（基于 embedding，少量像素训练）
+python scripts/eval/fewshot_downstream_from_embedding.py \
+    --embedding-file /workspace/outputs/.../evaluation/embeddings/patch_embeddings.npz \
+    --k-pixels 100,1000,10000,100000 \
+    --n-splits 3 \
+    --device npu:0
+```
+
+### 验证注意事项
+
+| 注意点 | 说明 |
+|--------|------|
+| **不要停止训练** | 验证和训练并行，用空闲 NPU |
+| **batch_size ≤ 4** | NPU 单卡推理时 batch_size 不能太大，否则 Conv2D 内存分配失败 |
+| **设备 ID 映射** | 设置 `ASCEND_RT_VISIBLE_DEVICES=7` 后，物理 NPU 7 映射为逻辑 `npu:0` |
+| **KNN 不用做** | sklearn KNN 在 142 万像素上极慢（CPU 单线程 20+ 分钟），且结果通常比 MLP 差 |
+
+### 评估脚本说明
+
+| 脚本 | 输入 | 输出 | 耗时 | 是否必须 |
+|------|------|------|------|---------|
+| `extract_embeddings_v2.py` | config + checkpoint | `patch_embeddings.npz` [N,12,D,H,W] | ~40min (batch=4) | ✅ 必须先做 |
+| `evaluate_cd_v2.py` | embedding 文件 | AUC (cosine + LR) | ~5min | ✅ 核心指标 |
+| `evaluate_mlp_v2.py` | embedding 文件 | Acc/mIoU (3 tasks) | ~15min | ✅ 下游语义 |
+| `fewshot_change_detection.py` | config + checkpoint | Few-Shot CD AUC | ~30min | ⭐ 推荐 |
+| `fewshot_downstream_from_embedding.py` | embedding 文件 | Few-Shot Acc | ~20min | ⭐ 推荐 |
+
 ## 验证变化检测流程
 
 1. 使用 `validate_v2.py`
@@ -128,6 +191,8 @@ python3 -u demo/app.py --port 7868
 | Reconstruction 极高 | 数据加载失败 / NaN 过多 | 检查 stats_dir 路径；查看 target_mask 是否为全 False |
 | DDP 卡住 | 某个进程数据加载异常 | 检查 num_workers；尝试单卡 `CUDA_VISIBLE_DEVICES=5 python3 scripts/train_ddp.py` |
 | checkpoint 加载失败 | 键不匹配 | 确认 resume 的 checkpoint 与当前 config 的模型结构一致 |
+| `Memory_Allocation_Failure` | batch_size 过大 | 将 batch_size 降到 4 或更小 |
+| `Invalid device ID` | ASCEND_RT_VISIBLE_DEVICES 设置后设备映射错误 | 设置 `VISIBLE_DEVICES=7` 后用 `npu:0`，不要再用 `npu:7` |
 
 ## 常用 shell 命令
 
