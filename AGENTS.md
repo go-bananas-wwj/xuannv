@@ -458,6 +458,20 @@ python scripts/eval/validate_v12_auc.py --checkpoint /workspace/outputs/.../epoc
 - 项目名前缀重复如 `xuannv_v2_expA`
 - 缺少日期后缀导致同类型目录难以区分
 
+### 文档创建规范（强制）
+
+- **所有新文档必须在文件名中包含日期后缀**，格式为 `YYYYMMDD`
+- 计划类文档：实验完成后应归档到 `archive/docs/legacy/`，禁止长期留在 `docs/` 根目录
+- 示例：
+  - `EXPERIMENT_PLAN_v14_20260520.md`
+  - `BUG_FIX_20260515.md`
+  - `EVAL_REPORT_v2_E_20260523.md`
+
+**禁止：**
+- 无日期后缀的文档如 `EXPERIMENT_PLAN.md`（难以区分版本）
+- 重复文件（md5 一致的副本必须删除）
+- 已完成的计划文档长期滞留根目录
+
 ### 全量数据训练规范
 
 - **必须使用全部 424 个 patch**

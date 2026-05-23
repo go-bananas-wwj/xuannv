@@ -188,6 +188,7 @@ class ChangeDetectionHeadV3(nn.Module):
 
 
 class MultiClassChangeDetectionHead(nn.Module):
+    """@deprecated: 仅 archive/ 中使用，活跃代码无引用。保留用于 git history 兼容。"""
     """多类别变化检测头.
 
     输出 3 个独立通道，分别对应:
@@ -254,6 +255,7 @@ class MultiClassChangeDetectionHead(nn.Module):
 
 
 class ClassSpecificCDHead(nn.Module):
+    """@deprecated: 仅 archive/ 中使用，活跃代码无引用。保留用于 git history 兼容。"""
     """类特定轻量变化检测头 — 每类独立参数，对齐 AlphaEarth 轻量下游头设计.
 
     所有类别共享轻量差异编码器 (1x1 conv 降维)，
@@ -311,6 +313,7 @@ class ClassSpecificCDHead(nn.Module):
 
 
 class PrototypeFewShotHead(nn.Module):
+    """@deprecated: 仅 archive/ 中使用，活跃代码无引用。保留用于 git history 兼容。"""
     """可学习原型 Few-Shot 分类头 (像素级).
 
     输入: before/after embedding maps [B, D, H, W]

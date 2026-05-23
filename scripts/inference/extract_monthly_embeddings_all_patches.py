@@ -23,9 +23,9 @@ from tqdm import tqdm
 from src.inference.engine import extract_embedding_map, load_backbone
 from src.utils.device import get_device
 
-CONFIG_PATH = "configs/qwen_v1_scenes.yaml"
-CKPT_PATH = "/workspace/outputs/aef_qwen_v2/epoch_499.pt"
-OUTPUT_DIR = Path("/workspace/outputs/aef_qwen_v2/monthly_embeddings_2025")
+CONFIG_PATH = "configs/xuannv_v2_expE_pure_recon.yaml"
+CKPT_PATH = "/workspace/outputs/exp_v2_E_pure_recon_7card_100ep_0523/epoch_best_epoch43.pt"
+OUTPUT_DIR = Path("/workspace/outputs/exp_v2_E_pure_recon_7card_100ep_0523/monthly_embeddings_2025")
 
 MONTHLY_WINDOWS = {
     "2025-04": (1743465600000.0, 1746057600000.0),

@@ -62,6 +62,7 @@ class PixelMLPHead(nn.Module):
 
 
 class PixelMLPHeadV2(nn.Module):
+    """@deprecated: 仅 archive/ 中使用，活跃代码无引用。保留用于 git history 兼容。"""
     """3 层 MLP 像素级分类器 (更强表达能力)."""
 
     def __init__(
