@@ -3,8 +3,8 @@
 **日期**: 2026-05-20  
 **分支**: `v12-clean-dynamic`  
 **Commit**: `66697f7`  
-**模型**: `/workspace/outputs/xuannv_v2_expA_skipL2/epoch_best_epoch48.pt`  
-**Config**: `configs/xuannv_v2_expA_skipL2.yaml`
+**模型**: `/workspace/outputs/exp_v2_A_skipL2_50ep_0520/epoch_best_epoch48.pt`  
+**Config**: `configs/exp_v2_A_skipL2_50ep_0520.yaml`
 
 ---
 
@@ -12,7 +12,7 @@
 
 | 参数 | 值 |
 |------|-----|
-| 实验名称 | xuannv_v2_expA_skipL2 |
+| 实验名称 | exp_v2_A_skipL2_50ep_0520 |
 | Embedding 维度 | 64 |
 | STP Blocks | 4 |
 | Skip L2 Norm (训练) | ✅ true |
@@ -290,4 +290,4 @@ summary = torch.einsum("bqthw,btchw->bqchw", attn, x)  # [B, 1, C, H, W]
 ---
 
 *报告生成时间: 2026-05-20*  
-*评测数据路径: `/workspace/outputs/xuannv_v2_expA_skipL2/`*
+*评测数据路径: `/workspace/outputs/exp_v2_A_skipL2_50ep_0520/`*

@@ -34,7 +34,7 @@ EXPERIMENTS = [
     "r6_temporal_recon_consist",
 ]
 
-OUTPUT_ROOT = "/workspace/outputs/round6"
+OUTPUT_ROOT = "/workspace/outputs/round6_0518"
 MONITOR_LOG = f"{OUTPUT_ROOT}/monitor.log"
 REPORT_FILE = f"{OUTPUT_ROOT}/monitor_report.md"
 

@@ -12,11 +12,11 @@
 
 | 实验 | 名称 | 核心配置 | 卡数 | Epoch | Best Epoch |
 |------|------|----------|------|-------|------------|
-| **ExpA** | xuannv_v2_expA_skipL2 | skip_l2=true, 4 target, 50ep | - | 50 | 48 |
-| **ExpB** | xuannv_v2_expB_noSkipL2 | skip_l2=false, 4 target, 50ep | - | 50 | 24 |
-| **ExpC** | v2_skipL2_full_3card_0519 | skip_l2=true, 4 target, 50ep | 3 | 50 | 36 |
-| **ExpD** | v2_skipL2_7target_lowrecon_7card_0520 | skip_l2=true, 7 target, 100ep | 7 | 100 | 29 |
-| **ExpE** | v2_skipL2_4target_pure_recon_7card_0521 | skip_l2=true, 4 target, 100ep | 7 | 60(停) | 52 |
+| **ExpA** | exp_v2_A_skipL2_50ep_0520 | skip_l2=true, 4 target, 50ep | - | 50 | 48 |
+| **ExpB** | exp_v2_B_noSkipL2_50ep_0519 | skip_l2=false, 4 target, 50ep | - | 50 | 24 |
+| **ExpC** | exp_v2_C_full_3card_50ep_0520 | skip_l2=true, 4 target, 50ep | 3 | 50 | 36 |
+| **ExpD** | exp_v2_D_7target_7card_100ep_0521 | skip_l2=true, 7 target, 100ep | 7 | 100 | 29 |
+| **ExpE** | exp_v2_E_pure_recon_7card_100ep_0523 | skip_l2=true, 4 target, 100ep | 7 | 60(停) | 52 |
 
 ### 1.2 关键配置对比
 
@@ -111,7 +111,7 @@
 |------|------------|------|-----|-----------|---------|
 | v12_expA_baseline | 0.499 | - | - | - | - |
 | v12_expB_inter01 | 0.516 | - | - | - | - |
-| ExpA (xuannv_v2_expA_skipL2) | 0.521 | 0.424 | 0.636 | 0.628 | 0.515 |
+| ExpA (exp_v2_A_skipL2_50ep_0520) | 0.521 | 0.424 | 0.636 | 0.628 | 0.515 |
 | **ExpE** | **0.534** | **0.590** | **0.648** | **0.563** | **0.445** |
 
 > **分析**: Bare AUC 使用 cosine distance，容易低估变化信号。ExpE 的 Global AUC=0.534 虽不高，但 Aug 期间达到 0.648，说明模型捕获了部分时间变化信息。
@@ -253,7 +253,7 @@
 ### ExpE 输出文件
 
 ```
-/workspace/outputs/v2_skipL2_4target_pure_recon_7card_0521/
+/workspace/outputs/exp_v2_E_pure_recon_7card_100ep_0523/
 ├── epoch_best_epoch52.pt              # 最佳模型 (1.1GB)
 ├── cd_head_v12_best.pt                 # 最佳 CD Head
 ├── train.log                           # 完整训练日志

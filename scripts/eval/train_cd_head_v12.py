@@ -4,7 +4,7 @@
 用法:
     python scripts/eval/train_cd_head_v12.py \
         --config configs/xuannv_v12_clean.yaml \
-        --checkpoint /workspace/outputs/xuannv_v2_expA_skipL2/epoch_best_epoch48.pt \
+        --checkpoint /workspace/outputs/exp_v2_A_skipL2_50ep_0520/epoch_best_epoch48.pt \
         --device npu:0 \
         --use-pre-norm
 """

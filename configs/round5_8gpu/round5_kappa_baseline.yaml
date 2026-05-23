@@ -48,7 +48,7 @@ evaluation:
   knn_k: 5
 experiment:
   name: round5_kappa_baseline
-  output_dir: /workspace/outputs/round5/round5_kappa_baseline
+  output_dir: /workspace/outputs/round5_0517/round5_kappa_baseline
   seed: 42
 model:
   bottleneck_noise_scale: 0.02

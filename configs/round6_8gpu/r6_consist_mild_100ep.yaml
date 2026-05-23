@@ -48,7 +48,7 @@ evaluation:
   knn_k: 5
 experiment:
   name: r6_consist_mild_100ep
-  output_dir: /workspace/outputs/round6/r6_consist_mild_100ep
+  output_dir: /workspace/outputs/round6_0518/r6_consist_mild_100ep
   seed: 42
 model:
   bottleneck_noise_scale: 0.02

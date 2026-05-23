@@ -3,8 +3,8 @@
 _base_: xuannv_v2.yaml
 
 experiment:
-  name: xuannv_v2_expA_skipL2
-  output_dir: /workspace/outputs/xuannv_v2_expA_skipL2
+  name: exp_v2_A_skipL2_50ep_0520
+  output_dir: /workspace/outputs/exp_v2_A_skipL2_50ep_0520
   seed: 42
 
 model:

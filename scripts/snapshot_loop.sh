@@ -1,6 +1,6 @@
 #!/bin/bash
 # 每10分钟抓取训练快照
-OUTDIR="/workspace/outputs/v2_skipL2_7target_lowrecon_7card_0520/snapshots"
+OUTDIR="/workspace/outputs/exp_v2_D_7target_7card_100ep_0521/snapshots"
 mkdir -p "$OUTDIR"
 while true; do
     TS=$(date +%Y%m%d_%H%M%S)

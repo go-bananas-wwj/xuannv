@@ -3,8 +3,8 @@
 _base_: xuannv_v2.yaml
 
 experiment:
-  name: v2_skipL2_full_3card_0519
-  output_dir: /workspace/outputs/v2_skipL2_full_3card_0519
+  name: exp_v2_C_full_3card_50ep_0520
+  output_dir: /workspace/outputs/exp_v2_C_full_3card_50ep_0520
   seed: 42
 
 model:

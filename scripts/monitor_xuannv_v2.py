@@ -11,8 +11,8 @@ from datetime import datetime
 sys.path.insert(0, "/workspace/xuannv")
 
 EXPERIMENTS = [
-    ("ExpA_skipL2", "/workspace/outputs/xuannv_v2_expA_skipL2/train.log"),
-    ("ExpB_noSkipL2", "/workspace/outputs/xuannv_v2_expB_noSkipL2/train.log"),
+    ("ExpA_skipL2", "/workspace/outputs/exp_v2_A_skipL2_50ep_0520/train.log"),
+    ("ExpB_noSkipL2", "/workspace/outputs/exp_v2_B_noSkipL2_50ep_0519/train.log"),
 ]
 
 MONITOR_LOG = "/workspace/outputs/xuannv_v2_monitor.log"

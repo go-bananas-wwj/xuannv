@@ -615,6 +615,40 @@ class XuannvV2Trainer:
             old_ckpt.unlink()
             print(f"[ddp_v12] Removed old best checkpoint: {old_ckpt}")
 
+    def soft_restart(self, path: str) -> None:
+        """软重启: 从旧 checkpoint 加载 backbone，跳过 size mismatch 的 head.
+        
+        strict=False 只能忽略 missing/unexpected keys，不能处理 size mismatch。
+        因此需要手动过滤掉 shape 不匹配的参数（如 num_classes 变化导致的 head 变化）。
+        """
+        ckpt = torch.load(path, map_location=self.device, weights_only=False)
+        state_dict = ckpt["model_state_dict"]
+        model_state = self.model.module.state_dict()
+        
+        # 过滤掉 size mismatch 的 key
+        filtered_state = {}
+        for k, v in state_dict.items():
+            if k in model_state:
+                if v.shape == model_state[k].shape:
+                    filtered_state[k] = v
+                else:
+                    if self.global_rank == 0:
+                        print(f"[soft_restart] Skip size-mismatch: {k} ({list(v.shape)} -> {list(model_state[k].shape)})")
+        
+        missing, unexpected = self.model.module.load_state_dict(filtered_state, strict=False)
+        if self.global_rank == 0:
+            print(f"[soft_restart] Loaded {len(filtered_state)}/{len(state_dict)} keys. Missing: {len(missing)}, Unexpected: {len(unexpected)}")
+        
+        # 重置 teacher
+        self.teacher = copy.deepcopy(self.model.module)
+        self.teacher.eval()
+        for p in self.teacher.parameters():
+            p.requires_grad = False
+        
+        epoch = ckpt.get("epoch", 0)
+        if self.global_rank == 0:
+            print(f"[soft_restart] Soft-restarted from epoch {epoch}. Encoder preserved, heads reset.")
+
     def load_checkpoint(self, path: str) -> int:
         ckpt = torch.load(path, map_location=self.device, weights_only=False)
         missing, unexpected = self.model.module.load_state_dict(ckpt["model_state_dict"], strict=False)

@@ -1,0 +1,87 @@
+# ============================================================
+# 玄女V2 Experiment E — 纯重建 + 反坍缩 (去掉语义标签)
+#
+# 核心思路:
+#   1. 去掉时间不匹配的语义标签 (WorldCover 2021 / DynamicWorld / JRC Water)
+#   2. 只保留时间对齐的图像重建: S2 + S1 + Landsat + DEM
+#   3. 保持低 recon_weight (0.15)，避免坍缩
+#   4. 保留所有反坍缩损失 (pre_norm_uniform, VICReg, decorr, orth)
+#   5. 从 ExpD Epoch 29 best checkpoint soft-restart
+# ============================================================
+_base_: xuannv_v2.yaml
+
+experiment:
+  name: exp_v2_E_pure_recon_7card_100ep_0523
+  output_dir: /workspace/outputs/exp_v2_E_pure_recon_7card_100ep_0523
+  seed: 42
+
+data:
+  # ★ 4 个 target 源 (全部 time-aligned)
+  num_target_sources: 4
+  num_classes: 1  # 无分类目标
+  target_sources:
+    - name: s2
+      loss_type: 0        # continuous (L1)
+      sensor_src: s2
+      out_channels: 6
+    - name: s1
+      loss_type: 0
+      sensor_src: s1
+      out_channels: 2
+    - name: landsat
+      loss_type: 0
+      sensor_src: landsat
+      out_channels: 6
+    - name: dem
+      loss_type: 0
+      sensor_src: null
+      out_channels: 1
+
+model:
+  skip_l2_norm_training: true  # 保留 skip L2
+  reconstruction_channels: 6   # decoder 最大输出通道
+
+training:
+  epochs: 100
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 0
+
+  # ★ 降低 recon_weight (从 0.2 → 0.15)，参考 V12 经验
+  reconstruction_weight: 0.15
+  consistency_weight: 0.15
+  classification_weight: 0.03
+
+  # Pre-norm 空间 raw uniformity
+  use_pre_norm_uniform: true
+  pre_norm_uniform_weight: 0.5
+  batch_uniformity_weight: 0.0
+
+  # VICReg
+  use_spatial_vicreg: true
+  variance_weight: 0.3
+  covariance_weight: 0.1
+  vicreg_min_std: 1.0
+
+  # 辅助反坍缩
+  decorrelation_weight: 0.05
+  orthogonality_weight: 0.01
+
+  # 每个 target 源的重建权重 (纯图像重建)
+  source_recon_weights:
+    - 1.0   # s2
+    - 1.0   # s1
+    - 1.0   # landsat
+    - 0.05  # dem
+
+  # Teacher-Student
+  teacher_momentum: 0.996
+  student_frame_drop_rate: 0.5
+  student_source_drop_rate: 0.3
+
+  # 训练效率
+  max_steps_per_epoch: 100
+  save_every: 10
+  save_best_balanced: true  # ★ 启用综合评分选 best
+  grad_clip_norm: 1.0

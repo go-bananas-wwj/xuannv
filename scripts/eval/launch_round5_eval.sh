@@ -24,8 +24,8 @@ for i in "${!EXP_NAMES[@]}"; do
     EXP="${EXP_NAMES[$i]}"
     GPU="${ASCEND_DEVICES[$i]}"
     CONFIG="configs/round5_8gpu/${EXP}.yaml"
-    CKPT="/workspace/outputs/round5/${EXP}/epoch_best_epoch20.pt"
-    OUT_DIR="/workspace/outputs/round5/${EXP}/evaluation"
+    CKPT="/workspace/outputs/round5_0517/${EXP}/epoch_best_epoch20.pt"
+    OUT_DIR="/workspace/outputs/round5_0517/${EXP}/evaluation"
     EMB_DIR="${OUT_DIR}/embeddings"
     
     if [[ ! -f "$CKPT" ]]; then

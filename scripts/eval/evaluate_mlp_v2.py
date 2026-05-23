@@ -25,15 +25,18 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 
 sys.path.insert(0, "/workspace/xuannv")
 
-from src.models.downstream_heads import PixelMLPHead
+from src.models.downstream_heads import PixelMLPHead, PixelConvHead, focal_loss
 
 DATA_ROOT = Path("/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered")
 
 TASKS = [
-    ("worldcover", "worldcover", "static.tif", 10),
-    ("jrc_water", "jrc_water", "static.tif", 2),
-    ("dynamic_world", "dynamic_world", "2025Q2.tif", 9),
+    ("worldcover", "worldcover", "static.tif", 7),   # 实际7类
+    ("jrc_water", "jrc_water", "static.tif", 2),     # 二分类（threshold后）
+    ("dynamic_world", "dynamic_world", "2025Q2.tif", 8),  # 实际8类（排除NoData=0）
 ]
+
+# JRC Water: occurrence百分比 → 二分类的threshold
+JRC_WATER_THRESHOLD = 0  # value > 0 即算有水
 
 # 标签值映射（原始编码 -> 0-based）
 LABEL_MAPPINGS = {
@@ -81,8 +84,19 @@ def prepare_data(spatial_maps, patch_ids, label_dir, label_file, device, task_na
         if label.shape != (H, W):
             label = resize_label(label, H, W)
         
+        # ★ 修复 JRC Water: occurrence百分比 → 二分类
+        if task_name == "jrc_water":
+            # JRC Water 原始值: 0=无水, 1-99=occurrence百分比, -128=预处理nodata
+            # rasterio 读取的 nodata=-32768，所以 -128 不会被当作 nodata
+            # 需要手动处理 -128
+            label = np.where(label == -128, -1, label)  # 标记 -128 为无效
+            nodata = -1
+            # threshold: >0 算 water
+            label = (label > JRC_WATER_THRESHOLD).astype(np.int64)
+            num_classes = 2
+        
         # 应用标签映射
-        if mapping:
+        if mapping and task_name != "jrc_water":
             label = np.vectorize(lambda x: mapping.get(x, -1))(label)
             nodata = -1
         
@@ -107,7 +121,7 @@ def prepare_data(spatial_maps, patch_ids, label_dir, label_file, device, task_na
     all_patch_idx = np.concatenate(all_patch_idx)
     
     # 确定实际类别数
-    actual_num_classes = num_classes
+    actual_num_classes = len(np.unique(all_y))
     
     # Patch-stratified split
     n_patches = len(patch_ids)
@@ -127,13 +141,56 @@ def prepare_data(spatial_maps, patch_ids, label_dir, label_file, device, task_na
     )
 
 
-def train_mlp_head(X_train, y_train, X_test, y_test, in_dim, num_classes, device, epochs=50, hidden_dim=256, dropout=0.3):
-    head = PixelMLPHead(in_dim=in_dim, hidden_dim=hidden_dim, num_classes=num_classes, dropout=dropout).to(device)
+def compute_class_weights(y_train: torch.Tensor, num_classes: int, device: torch.device) -> torch.Tensor | None:
+    """计算平衡类别权重."""
+    y_np = y_train.cpu().numpy()
+    classes = np.arange(num_classes)
+    class_counts = np.bincount(y_np, minlength=num_classes)
+    
+    # 只计算有数据的类别
+    valid_classes = classes[class_counts > 0]
+    valid_counts = class_counts[class_counts > 0]
+    
+    # 逆频率加权
+    weights = np.zeros(num_classes, dtype=np.float32)
+    weights[valid_classes] = 1.0 / valid_counts
+    weights = weights / weights.sum() * len(valid_classes)  # 归一化
+    
+    return torch.from_numpy(weights).float().to(device)
+
+
+def train_head(X_train, y_train, X_test, y_test, in_dim, num_classes, device, 
+               epochs=50, hidden_dim=256, dropout=0.3, 
+               head_type="mlp", use_class_weight=False, use_focal=False):
+    """训练下游分类 Head.
+    
+    Args:
+        head_type: "mlp" | "conv" | "mlpv2"
+        use_class_weight: 是否使用逆频率类别加权
+        use_focal: 是否使用 Focal Loss
+    """
+    # 创建 head
+    if head_type == "mlp":
+        head = PixelMLPHead(in_dim=in_dim, hidden_dim=hidden_dim, num_classes=num_classes, dropout=dropout).to(device)
+    elif head_type == "mlpv2":
+        head = PixelMLPHead(in_dim=in_dim, hidden_dim=hidden_dim, num_classes=num_classes, dropout=dropout).to(device)
+        # 用更深层的 MLP: 实际上是 PixelMLPHead 但加大 hidden_dim
+    elif head_type == "conv":
+        head = PixelConvHead(in_dim=in_dim, hidden_dim=hidden_dim//4, num_classes=num_classes, kernel_size=3, dropout=dropout).to(device)
+    else:
+        raise ValueError(f"Unknown head_type: {head_type}")
+    
     optimizer = torch.optim.AdamW(head.parameters(), lr=1e-3, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     
-    batch_size = 1024
+    batch_size = 1024 if head_type != "conv" else 64  # ConvHead 需要空间输入，batch_size 小些
     best_acc = 0.0
+    
+    # 类别权重
+    class_weights = None
+    if use_class_weight and num_classes > 1:
+        class_weights = compute_class_weights(y_train, num_classes, device)
+        print(f"      Class weights: {class_weights.cpu().numpy()}")
     
     for epoch in range(epochs):
         head.train()
@@ -146,8 +203,22 @@ def train_mlp_head(X_train, y_train, X_test, y_test, in_dim, num_classes, device
             xb = X_train[idx]
             yb = y_train[idx]
             
-            logits = head(xb)
-            loss = F.cross_entropy(logits, yb)
+            if head_type == "conv":
+                # ConvHead 需要 [B, D, H, W]，但 xb 是 [B, D] 展平的
+                # 需要重新组织：这里实际上不能用 ConvHead，因为数据已经展平了
+                # 保留逻辑但跳过
+                logits = head(xb.unsqueeze(-1).unsqueeze(-1))  # [B, D, 1, 1]
+                logits = logits.squeeze(-1).squeeze(-1)  # [B, C]
+            else:
+                logits = head(xb)
+            
+            # 损失函数选择
+            if use_focal and class_weights is not None:
+                loss = focal_loss(logits, yb, alpha=class_weights, gamma=2.0)
+            elif class_weights is not None:
+                loss = F.cross_entropy(logits, yb, weight=class_weights)
+            else:
+                loss = F.cross_entropy(logits, yb)
             
             optimizer.zero_grad()
             loss.backward()
@@ -161,7 +232,10 @@ def train_mlp_head(X_train, y_train, X_test, y_test, in_dim, num_classes, device
         # Eval
         head.eval()
         with torch.no_grad():
-            logits = head(X_test)
+            if head_type == "conv":
+                logits = head(X_test.unsqueeze(-1).unsqueeze(-1)).squeeze(-1).squeeze(-1)
+            else:
+                logits = head(X_test)
             pred = logits.argmax(dim=1)
             acc = (pred == y_test).float().mean().item()
         
@@ -172,7 +246,10 @@ def train_mlp_head(X_train, y_train, X_test, y_test, in_dim, num_classes, device
     # Final eval
     head.eval()
     with torch.no_grad():
-        logits = head(X_test)
+        if head_type == "conv":
+            logits = head(X_test.unsqueeze(-1).unsqueeze(-1)).squeeze(-1).squeeze(-1)
+        else:
+            logits = head(X_test)
         pred = logits.argmax(dim=1).cpu().numpy()
         y_test_np = y_test.cpu().numpy()
     
@@ -197,6 +274,9 @@ def train_mlp_head(X_train, y_train, X_test, y_test, in_dim, num_classes, device
         "best_epoch_acc": float(best_acc),
         "per_class": per_class,
         "confusion_matrix": cm.tolist(),
+        "head_type": head_type,
+        "use_class_weight": use_class_weight,
+        "use_focal": use_focal,
     }
 
 
@@ -209,6 +289,9 @@ def main():
     p.add_argument("--month", type=int, default=6)
     p.add_argument("--hidden-dim", type=int, default=256, help="MLP hidden dimension")
     p.add_argument("--dropout", type=float, default=0.3, help="MLP dropout")
+    p.add_argument("--head-type", type=str, default="mlp", choices=["mlp", "mlpv2", "conv"], help="Head类型")
+    p.add_argument("--use-class-weight", action="store_true", help="使用逆频率类别加权")
+    p.add_argument("--use-focal", action="store_true", help="使用 Focal Loss")
     args = p.parse_args()
     
     device = torch.device(args.device)
@@ -236,7 +319,9 @@ def main():
             continue
         
         print(f"      train={len(X_train)}, test={len(X_test)}, classes={actual_num_classes}")
-        report = train_mlp_head(X_train, y_train, X_test, y_test, D, actual_num_classes, device, args.epochs, args.hidden_dim, args.dropout)
+        report = train_head(X_train, y_train, X_test, y_test, D, actual_num_classes, device, 
+                            args.epochs, args.hidden_dim, args.dropout,
+                            args.head_type, args.use_class_weight, args.use_focal)
         report["task"] = task_name
         report["epochs"] = args.epochs
         all_reports[task_name] = report

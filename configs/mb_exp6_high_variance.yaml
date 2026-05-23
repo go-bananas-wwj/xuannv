@@ -158,7 +158,7 @@ evaluation:
   knn_k: 5
 experiment:
   name: mb_exp6_high_variance
-  output_dir: /workspace/outputs/mb_exp6_high_variance
+  output_dir: /workspace/outputs/ablation_mb_exp6_high_variance_0516
   seed: 42
 model:
   bottleneck_noise_scale: 0.02

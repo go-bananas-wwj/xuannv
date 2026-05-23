@@ -52,7 +52,7 @@ evaluation:
   knn_k: 5
 experiment:
   name: v14_high_temporal
-  output_dir: /workspace/outputs/v14/v14_high_temporal
+  output_dir: /workspace/outputs/exp_v14_0518/v14_high_temporal
   seed: 47
 model:
   bottleneck_noise_scale: 0.02

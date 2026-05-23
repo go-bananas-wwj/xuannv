@@ -14,7 +14,7 @@ from pathlib import Path
 from datetime import datetime
 
 # 配置
-LOG_DIR = Path("/workspace/outputs/v2_skipL2_7target_lowrecon_7card_0520")
+LOG_DIR = Path("/workspace/outputs/exp_v2_D_7target_7card_100ep_0521")
 TRAIN_NAME = "expD_train"
 CHECK_INTERVAL = 300  # 5 分钟检查一次
 RESTART_COOLDOWN = 60  # 重启后冷却时间

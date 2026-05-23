@@ -7,7 +7,7 @@ from pathlib import Path
 from datetime import datetime
 
 TRAIN_NAME = "expD_train"
-LOG_DIR = Path("/workspace/outputs/v2_skipL2_7target_lowrecon_7card_0520")
+LOG_DIR = Path("/workspace/outputs/exp_v2_D_7target_7card_100ep_0521")
 CONFIG = "/workspace/xuannv/configs/xuannv_v2_expD_7target_lowrecon.yaml"
 SCRIPT = "/workspace/xuannv/scripts/train/train_ddp_xuannv_v2.py"
 NPUS, NPROC = "0,1,2,3,4,5,6", 7

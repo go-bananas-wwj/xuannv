@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 cd /workspace/xuannv
-EVAL_DIR=/workspace/outputs/v2_skipL2_7target_lowrecon_7card_0520/evaluation
-CKPT=/workspace/outputs/v2_skipL2_7target_lowrecon_7card_0520/epoch_best_epoch29.pt
+EVAL_DIR=/workspace/outputs/exp_v2_D_7target_7card_100ep_0521/evaluation
+CKPT=/workspace/outputs/exp_v2_D_7target_7card_100ep_0521/epoch_best_epoch29.pt
 CONFIG=configs/xuannv_v2_expD_7target_lowrecon.yaml
 
 echo "=========================================="
@@ -72,7 +72,7 @@ from pathlib import Path
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 
-EVAL_DIR = Path("/workspace/outputs/v2_skipL2_7target_lowrecon_7card_0520/evaluation")
+EVAL_DIR = Path("/workspace/outputs/exp_v2_D_7target_7card_100ep_0521/evaluation")
 DATA_ROOT = Path("/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered")
 
 # 加载 embedding

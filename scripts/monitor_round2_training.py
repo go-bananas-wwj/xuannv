@@ -5,8 +5,8 @@ import time
 import os
 import sys
 
-LOG_FILE = "/workspace/outputs/xuannv_round2/round2_cross_temporal/train.log"
-CHECKPOINT_DIR = "/workspace/outputs/xuannv_round2/round2_cross_temporal"
+LOG_FILE = "/workspace/outputs/round2_0517/round2_cross_temporal/train.log"
+CHECKPOINT_DIR = "/workspace/outputs/round2_0517/round2_cross_temporal"
 CONFIG = "configs/round2_cross_temporal.yaml"
 
 def get_last_epoch():

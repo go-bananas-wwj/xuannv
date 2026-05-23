@@ -48,7 +48,7 @@ evaluation:
   knn_k: 5
 experiment:
   name: r6_no_consist_k5k
-  output_dir: /workspace/outputs/round6/r6_no_consist_k5k
+  output_dir: /workspace/outputs/round6_0518/r6_no_consist_k5k
   seed: 42
 model:
   bottleneck_noise_scale: 0.02

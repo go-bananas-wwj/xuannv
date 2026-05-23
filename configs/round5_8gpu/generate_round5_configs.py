@@ -175,7 +175,7 @@ def main():
     for exp in EXPERIMENTS:
         cfg = deep_merge(BASE_CONFIG, exp["overrides"])
         cfg["experiment"]["name"] = exp["name"]
-        cfg["experiment"]["output_dir"] = f"/workspace/outputs/round5/{exp['name']}"
+        cfg["experiment"]["output_dir"] = f"/workspace/outputs/round5_0517/{exp['name']}"
 
         path = config_dir / f"{exp['name']}.yaml"
         with open(path, "w") as f:

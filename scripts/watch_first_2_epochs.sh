@@ -1,6 +1,6 @@
 #!/bin/bash
-LOG_A="/workspace/outputs/xuannv_v2_expA_skipL2/train.log"
-LOG_B="/workspace/outputs/xuannv_v2_expB_noSkipL2/train.log"
+LOG_A="/workspace/outputs/exp_v2_A_skipL2_50ep_0520/train.log"
+LOG_B="/workspace/outputs/exp_v2_B_noSkipL2_50ep_0519/train.log"
 REPORT="/workspace/outputs/xuannv_v2_epoch2_report.log"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 开始监控前2个 epoch..." > "$REPORT"

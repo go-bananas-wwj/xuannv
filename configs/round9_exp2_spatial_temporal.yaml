@@ -1,7 +1,7 @@
 _base_: config.yaml
 experiment:
   name: round9_exp2_spatial_temporal
-  output_dir: /workspace/outputs/round9/exp2_spatial_temporal
+  output_dir: /workspace/outputs/round9_0516/exp2_spatial_temporal
   seed: 43
 training:
   temporal_use_spatial_weight: true

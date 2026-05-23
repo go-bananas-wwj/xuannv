@@ -158,7 +158,7 @@ evaluation:
   knn_k: 5
 experiment:
   name: mb_exp2_spatial
-  output_dir: /workspace/outputs/mb_exp2_spatial
+  output_dir: /workspace/outputs/ablation_mb_exp2_spatial_0516
   seed: 42
 model:
   bottleneck_noise_scale: 0.02

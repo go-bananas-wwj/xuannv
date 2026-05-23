@@ -21,6 +21,7 @@ sys.path.insert(0, "/workspace/xuannv")
 
 import numpy as np
 import torch
+import torch_npu  # 必须导入以注册 npu 设备
 import torch.nn as nn
 import torch.nn.functional as F
 import rasterio
@@ -28,7 +29,7 @@ from pathlib import Path
 from sklearn.metrics import accuracy_score
 
 DATA_ROOT = Path("/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered")
-EVAL_DIR = Path("/workspace/outputs/v2_skipL2_7target_lowrecon_7card_0520/evaluation")
+EVAL_DIR = Path("/workspace/outputs/exp_v2_D_7target_7card_100ep_0521/evaluation")
 
 TASKS = [
     ("worldcover", "worldcover", "static.tif", 10),
@@ -108,6 +109,9 @@ def prepare_fewshot_data(spatial_maps, patch_ids, label_dir, label_file, task_na
             mask = label_flat != nodata
         else:
             mask = label_flat >= 0
+        
+        # 通用过滤：确保 label 在有效范围内
+        mask = mask & (label_flat >= 0) & (label_flat < num_classes)
 
         if task_name == "dynamic_world":
             mask = mask & (label_flat > 0) & (label_flat <= num_classes)

@@ -56,7 +56,7 @@ evaluation:
   knn_k: 5
 experiment:
   name: {name}
-  output_dir: /workspace/outputs/v14/{name}
+  output_dir: /workspace/outputs/exp_v14_0518/{name}
   seed: {seed}
 model:
   bottleneck_noise_scale: 0.02

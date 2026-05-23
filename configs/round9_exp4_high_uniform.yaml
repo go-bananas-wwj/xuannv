@@ -1,7 +1,7 @@
 _base_: config.yaml
 experiment:
   name: round9_exp4_high_uniform
-  output_dir: /workspace/outputs/round9/exp4_high_uniform
+  output_dir: /workspace/outputs/round9_0516/exp4_high_uniform
   seed: 45
 training:
   temporal_use_spatial_weight: true

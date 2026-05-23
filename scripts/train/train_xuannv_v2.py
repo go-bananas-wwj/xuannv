@@ -142,6 +142,8 @@ def main():
 
     total_epochs = cfg.training.epochs
     best_recon = float("inf")
+    best_score = float("-inf")
+    save_best_balanced = getattr(cfg.training, "save_best_balanced", False)
     save_every = args.save_every if args.save_every is not None else getattr(cfg.training, "save_every", 20)
     epoch_start_time = time.time()
     bank_size = 0
@@ -181,12 +183,23 @@ def main():
         if (epoch + 1) % save_every == 0:
             trainer.save_checkpoint(epoch + 1, losses)
 
-        # 基于 reconstruction loss 选 best
-        if losses["recon"] < best_recon:
-            best_recon = losses["recon"]
-            trainer.save_checkpoint(f"best_epoch{epoch + 1}", losses)
-            if global_rank == 0:
-                logger.Print(f"  [Best] New best recon={best_recon:.4f} at epoch {epoch + 1}")
+        # 选 best checkpoint
+        if save_best_balanced:
+            # 综合评分: std_mean 越高越好, recon 越低越好
+            # recon 典型范围 0.08-0.30, std_mean 典型范围 0.40-1.00
+            # 加权平衡两者贡献
+            score = losses.get("std_mean", 0.0) - losses["recon"] * 0.5
+            if score > best_score:
+                best_score = score
+                trainer.save_checkpoint(f"best_epoch{epoch + 1}", losses)
+                if global_rank == 0:
+                    logger.Print(f"  [Best] New best score={best_score:.4f} (std_mean={losses.get('std_mean', 0):.4f}, recon={losses['recon']:.4f}) at epoch {epoch + 1}")
+        else:
+            if losses["recon"] < best_recon:
+                best_recon = losses["recon"]
+                trainer.save_checkpoint(f"best_epoch{epoch + 1}", losses)
+                if global_rank == 0:
+                    logger.Print(f"  [Best] New best recon={best_recon:.4f} at epoch {epoch + 1}")
 
         if trainer.scheduler is not None:
             trainer.scheduler.step()

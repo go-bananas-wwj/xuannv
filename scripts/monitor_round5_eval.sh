@@ -1,8 +1,8 @@
 #!/bin/bash
 # Round 5 下游评估监控脚本
 
-REPORT_FILE="/workspace/outputs/round5/eval_monitor_report.md"
-mkdir -p /workspace/outputs/round5
+REPORT_FILE="/workspace/outputs/round5_0517/eval_monitor_report.md"
+mkdir -p /workspace/outputs/round5_0517
 
 declare -a EXP_NAMES=(
     "round5_consist_mild"
@@ -16,7 +16,7 @@ while true; do
     STATUS=""
     
     for EXP in "${EXP_NAMES[@]}"; do
-        OUT_DIR="/workspace/outputs/round5/${EXP}/evaluation"
+        OUT_DIR="/workspace/outputs/round5_0517/${EXP}/evaluation"
         
         # 检查各步骤是否完成
         EXTRACT_DONE="⏳"

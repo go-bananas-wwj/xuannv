@@ -431,12 +431,32 @@ python scripts/eval/validate_v12_auc.py --checkpoint /workspace/outputs/.../epoc
 
 ## 实验管理与命名规范
 
-### 输出目录命名
+### 输出目录命名（强制规范）
 
-格式: `{version}_{核心参数}_{卡数}card_{日期}_{可选备注}`
+所有新实验的输出目录必须遵循以下统一命名格式：
 
-示例: `v13_baseline_4card_0516`
-禁止: 冗长命名如 `v13_round6_expX_recon005_full_staged_200patches`
+```
+{分类前缀}_{版本/阶段}_{实验名}_{日期}
+```
+
+| 元素 | 说明 | 示例 |
+|------|------|------|
+| 分类前缀 | `exp`(主实验) / `quick`(短训) / `ablation`(消融) / `base`(基线) / `_`(系统目录) | `exp_v2_E_pure_recon_7card_100ep_0523` |
+| 版本/阶段 | `v2`, `v12`, `v13`, `round1~9`, `mb` 等 | `exp_v2_...` |
+| 实验名 | 简洁核心特征 | `pure_recon`, `skipL2` |
+| 日期 | 目录创建日期 `MMDD` | `_0523` |
+
+**已整理的现有目录示例：**
+- `exp_v2_E_pure_recon_7card_100ep_0523` — V2 主实验，纯重建，7卡，5月23日
+- `quick_v2_baseline_10ep_0516` — V2 Quick 短训，基线，10 epoch，5月16日
+- `ablation_mb_exp1_baseline_0516` — MB 消融实验1，基线，5月16日
+- `round5_0517` — Round 5 系列实验，5月17日
+- `base_aef_128d_0516` — AEF 基线，128维，5月16日
+
+**禁止：**
+- 冗长无意义命名如 `v13_round6_expX_recon005_full_staged_200patches`
+- 项目名前缀重复如 `xuannv_v2_expA`
+- 缺少日期后缀导致同类型目录难以区分
 
 ### 全量数据训练规范
 

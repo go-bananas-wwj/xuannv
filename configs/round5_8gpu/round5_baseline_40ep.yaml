@@ -48,7 +48,7 @@ evaluation:
   knn_k: 5
 experiment:
   name: round5_baseline_40ep
-  output_dir: /workspace/outputs/round5/round5_baseline_40ep
+  output_dir: /workspace/outputs/round5_0517/round5_baseline_40ep
   seed: 42
 model:
   bottleneck_noise_scale: 0.02

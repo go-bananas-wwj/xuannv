@@ -1,7 +1,7 @@
 _base_: config.yaml
 experiment:
   name: round9_exp1_baseline
-  output_dir: /workspace/outputs/round9/exp1_baseline
+  output_dir: /workspace/outputs/round9_0516/exp1_baseline
   seed: 42
 training:
   temporal_use_spatial_weight: false

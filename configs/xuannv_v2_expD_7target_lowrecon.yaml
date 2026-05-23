@@ -13,8 +13,8 @@
 _base_: xuannv_v2.yaml
 
 experiment:
-  name: v2_skipL2_7target_lowrecon_7card_0520
-  output_dir: /workspace/outputs/v2_skipL2_7target_lowrecon_7card_0520
+  name: exp_v2_D_7target_7card_100ep_0521
+  output_dir: /workspace/outputs/exp_v2_D_7target_7card_100ep_0521
   seed: 42
 
 data:

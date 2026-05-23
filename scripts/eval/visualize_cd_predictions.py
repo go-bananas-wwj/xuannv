@@ -3,9 +3,9 @@
 
 用法:
     python scripts/eval/visualize_cd_predictions.py \
-        --config configs/xuannv_v2_expA_skipL2.yaml \
-        --backbone /workspace/outputs/xuannv_v2_expA_skipL2/epoch_best_epoch48.pt \
-        --cd-head /workspace/outputs/xuannv_v2_expA_skipL2/cd_head_v12_best.pt \
+        --config configs/exp_v2_A_skipL2_50ep_0520.yaml \
+        --backbone /workspace/outputs/exp_v2_A_skipL2_50ep_0520/epoch_best_epoch48.pt \
+        --cd-head /workspace/outputs/exp_v2_A_skipL2_50ep_0520/cd_head_v12_best.pt \
         --device npu:0
 """
 import sys, os, argparse
@@ -23,7 +23,7 @@ from shapely.geometry import box, Point
 
 ANNOT_DIR = "/workspace/哈尔滨松北新区变化检测汇总文件/变化检测shp文件"
 GRID_PATH = "/workspace/index/harbin/grid/harbin_grid.geojson"
-OUTPUT_DIR = "/workspace/outputs/xuannv_v2_expA_skipL2/visualization"
+OUTPUT_DIR = "/workspace/outputs/exp_v2_A_skipL2_50ep_0520/visualization"
 
 # 2025年period窗口
 PERIOD_MONTHS = {
