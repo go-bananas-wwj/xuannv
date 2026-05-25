@@ -50,3 +50,11 @@ fusion_result.json
 nohup.out
 kernel_meta/
 wandb/
+
+# Node modules
+node_modules/
+**/node_modules/
+
+# Patent figure test files
+**/patent_figures_test*.md
+
