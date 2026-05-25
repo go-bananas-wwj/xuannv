@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="535.575pt" height="568.355pt" viewBox="0 0 535.575 568.355" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-05-25T13:22:51.584036</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.8, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 568.355 
+L 535.575 568.355 
+L 535.575 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 46.39236 222.39125 
+L 228.59514 222.39125 
+Q 228.699375 222.39125 228.699375 222.287015 
+L 228.699375 149.530985 
+Q 228.699375 149.42675 228.59514 149.42675 
+L 46.39236 149.42675 
+Q 46.288125 149.42675 46.288125 149.530985 
+L 46.288125 222.287015 
+Q 46.288125 222.39125 46.39236 222.39125 
+z
+" clip-path="url(#pf359abd931)" style="fill: #ffffff; stroke: #000000; stroke-width: 1.5; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 46.39236 337.04975 
+L 228.59514 337.04975 
+Q 228.699375 337.04975 228.699375 336.945515 
+L 228.699375 264.189485 
+Q 228.699375 264.08525 228.59514 264.08525 
+L 46.39236 264.08525 
+Q 46.288125 264.08525 46.288125 264.189485 
+L 46.288125 336.945515 
+Q 46.288125 337.04975 46.39236 337.04975 
+z
+" clip-path="url(#pf359abd931)" style="fill: #f8f0f0; stroke: #b64342; stroke-width: 1.5; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 306.97986 222.39125 
+L 489.18264 222.39125 
+Q 489.286875 222.39125 489.286875 222.287015 
+L 489.286875 149.530985 
+Q 489.286875 149.42675 489.18264 149.42675 
+L 306.97986 149.42675 
+Q 306.875625 149.42675 306.875625 149.530985 
+L 306.875625 222.287015 
+Q 306.875625 222.39125 306.97986 222.39125 
+z
+" clip-path="url(#pf359abd931)" style="fill: #ffffff; stroke: #000000; stroke-width: 1.5; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 306.97986 337.04975 
+L 489.18264 337.04975 
+Q 489.286875 337.04975 489.286875 336.945515 
+L 489.286875 264.189485 
+Q 489.286875 264.08525 489.18264 264.08525 
+L 306.97986 264.08525 
+Q 306.875625 264.08525 306.875625 264.189485 
+L 306.875625 336.945515 
+Q 306.875625 337.04975 306.97986 337.04975 
+z
+" clip-path="url(#pf359abd931)" style="fill: #f0f0f8; stroke: #0f4d92; stroke-width: 1.5; stroke-linejoin: miter"/>
+   </g>
+   <g id="text_1">
+    <text style="font-weight: 700; font-size: 13px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; text-anchor: middle" x="137.49375" y="85.716187" transform="rotate(-0 137.49375 85.716187)">训练阶段</text>
+   </g>
+   <g id="text_2">
+    <text style="font-weight: 700; font-size: 13px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; text-anchor: middle" x="398.08125" y="85.697906" transform="rotate(-0 398.08125 85.697906)">推理阶段</text>
+   </g>
+   <g id="text_3">
+    <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif" transform="translate(117.49375 182.882203)">嵌入向量</text>
+    <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif" transform="translate(104.495313 195.574859)">(原始幅度空间)</text>
+   </g>
+   <g id="patch_6">
+    <path d="M 137.49375 224.390826 
+Q 137.49375 240.632452 137.49375 255.532437 
+" style="fill: none; stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
+    <path d="M 139.69375 251.132437 
+L 137.49375 255.532437 
+L 135.29375 251.132437 
+z
+" style="stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
+   </g>
+   <g id="text_4">
+    <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif" transform="translate(102.49375 297.443047)">反坍缩损失计算</text>
+    <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif" transform="translate(99.495313 310.135703)">(原始幅度空间中)</text>
+   </g>
+   <g id="text_5">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; fill: #8bcf8b" transform="translate(110.49375 376.553375)">梯度始终非零</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; fill: #8bcf8b" transform="translate(109.144453 386.917719)">⇒ 有效反坍缩</text>
+   </g>
+   <g id="text_6">
+    <text style="font-weight: 700; font-size: 20px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; text-anchor: middle; fill: #767676" x="267.7875" y="243.221812" transform="rotate(-0 267.7875 243.221812)">VS</text>
+   </g>
+   <g id="text_7">
+    <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif" transform="translate(378.08125 182.882203)">嵌入向量</text>
+    <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif" transform="translate(365.082812 195.574859)">(原始幅度空间)</text>
+   </g>
+   <g id="patch_7">
+    <path d="M 398.08125 224.390826 
+Q 398.08125 240.632452 398.08125 255.532437 
+" style="fill: none; stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
+    <path d="M 400.28125 251.132437 
+L 398.08125 255.532437 
+L 395.88125 251.132437 
+z
+" style="stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
+   </g>
+   <g id="text_8">
+    <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif" transform="translate(351.585937 297.415234)">L2归一化 + 分布噪声</text>
+    <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif" transform="translate(361.582031 309.929141)">→ 单位球面嵌入</text>
+   </g>
+   <g id="text_9">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; fill: #3775ba" transform="translate(375.58125 376.439328)">标准化输出</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; fill: #3775ba" transform="translate(365.231953 386.645047)">⇒ 便于下游使用</text>
+   </g>
+   <g id="text_10">
+    <text style="font-style: italic; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; text-anchor: middle; fill: #4d4d4d" x="267.7875" y="486.332656" transform="rotate(-0 267.7875 486.332656)">现有技术：训练阶段即施加归一化，导致反坍缩梯度消失</text>
+   </g>
+   <g id="text_11">
+    <text style="font-weight: 700; font-size: 16px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; text-anchor: middle" x="267.7875" y="19.98" transform="rotate(-0 267.7875 19.98)">图6  预归一化两阶段策略对比图</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="pf359abd931">
+   <rect x="7.2" y="39.98" width="521.175" height="521.175"/>
+  </clipPath>
+ </defs>
+</svg>
