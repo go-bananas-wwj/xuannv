@@ -145,6 +145,11 @@ def normalize_data(data: np.ndarray, source_name: str, stats: dict, num_classes:
 
     # 2. SAR 源: dB 范围裁剪
     if source_name in SAR_SOURCES:
+        # 修复：检测 PC 下载的 DN 值（sigma0 * 10000 格式），先转 dB
+        if data.max() > 100:
+            # PC sentinel-1-grd 提供的是 sigma0 * 10000 格式的定点数
+            # 先还原到线性 sigma0，再转 dB: 10*log10(sigma0)
+            data = np.log10(np.clip(data / 10000.0, 1e-10, None)) * 10.0
         lo, hi = SAR_CLIP_RANGE
         data = np.clip(data, lo, hi)
 

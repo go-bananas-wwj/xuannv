@@ -49,6 +49,7 @@ def _preload_patch_worker(args: tuple) -> tuple[str, dict, int]:
         stats,
         merge_hr_into_lr,
         filter_2025_monthly,
+        max_frames,
     ) = args
 
     data_root = Path(data_root_str)
@@ -108,6 +109,10 @@ def _preload_patch_worker(args: tuple) -> tuple[str, dict, int]:
 
         frames_list: list[np.ndarray] = []
         timestamps: list[float] = []
+
+        # 限制预加载帧数，避免缓存过大
+        if len(tif_files) > max_frames:
+            tif_files = tif_files[::max(1, len(tif_files) // max_frames)][:max_frames]
 
         for tif_path in tif_files:
             stem = tif_path.stem
@@ -451,6 +456,7 @@ class HarbinPatchDataset(Dataset):
                     self.stats,
                     self.merge_hr_into_lr,
                     self.filter_2025_monthly,
+                    self.max_frames,
                 ))
             print(f"[Dataset] Parallel preloading with {n_workers} workers...")
             with ProcessPoolExecutor(max_workers=n_workers) as executor:

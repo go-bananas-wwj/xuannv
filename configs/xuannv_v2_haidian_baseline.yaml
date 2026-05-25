@@ -1,0 +1,98 @@
+# ============================================================
+# 玄女V2 — 海淀区独立训练基线
+#
+# 基于 ExpE 成功经验:
+#   - skip_l2_norm_training: true
+#   - recon_weight: 0.15
+#   - 纯重建 + 反坍缩
+#   - save_best_balanced
+#
+# 数据状态:
+#   - 400 patches, 5 个目标源 (s2, s1, landsat, dem, worldcover)
+#   - S2 已云筛选 (s2_cloud_filtered/)
+#   - S1 DN→dB 转换已修复
+#   - 统计量已重新计算 (haidian_v2/)
+# ============================================================
+_base_: xuannv_v2.yaml
+
+experiment:
+  name: exp_v2_haidian_baseline_8card_100ep
+  output_dir: /workspace/outputs/exp_v2_haidian_baseline_8card_100ep
+  seed: 42
+
+data:
+  # ★ 海淀区数据路径
+  manifest_path: /workspace/raw/phase2_heilongjiang/haidian
+  stats_dir: /workspace/statistics/haidian_v2
+  num_samples: 400
+
+  # ★ 4 个 target 源 (纯图像重建，对齐 ExpE)
+  num_target_sources: 4
+  num_classes: 1  # 无分类目标
+  target_sources:
+    - name: s2
+      loss_type: 0        # continuous (L1)
+      sensor_src: s2
+      out_channels: 6
+    - name: s1
+      loss_type: 0
+      sensor_src: s1
+      out_channels: 2
+    - name: landsat
+      loss_type: 0
+      sensor_src: landsat
+      out_channels: 6
+    - name: dem
+      loss_type: 0
+      sensor_src: null
+      out_channels: 1
+
+model:
+  skip_l2_norm_training: true
+  reconstruction_channels: 6
+  per_source_decoders: true
+
+training:
+  epochs: 100
+  lr: 0.0001
+  lr_min: 0.000001
+  warmup_epochs: 10
+  recon_warmup_epochs: 0
+
+  # ★ ExpE 损失权重
+  reconstruction_weight: 0.15
+  consistency_weight: 0.15
+  classification_weight: 0.03
+
+  # Pre-norm 空间 raw uniformity
+  use_pre_norm_uniform: true
+  pre_norm_uniform_weight: 0.8  # Epoch 20 干预：从 0.5 提高到 0.8
+  batch_uniformity_weight: 0.0
+
+  # VICReg
+  use_spatial_vicreg: true
+  variance_weight: 0.3
+  covariance_weight: 0.1
+  vicreg_min_std: 1.0
+
+  # 辅助反坍缩
+  decorrelation_weight: 0.05
+  orthogonality_weight: 0.01
+
+  # 每个 target 源的重建权重
+  source_recon_weights:
+    - 1.0   # s2
+    - 1.0   # s1
+    - 1.0   # landsat
+    - 0.05  # dem
+
+  # Teacher-Student
+  teacher_momentum: 0.996
+  student_frame_drop_rate: 0.5
+  student_source_drop_rate: 0.3
+
+  # 训练效率
+  max_steps_per_epoch: 100
+  save_every: 10
+  save_best_balanced: true
+  grad_clip_norm: 1.0

@@ -50,13 +50,27 @@ def compute_source_stats(data_root: Path, source_name: str, s2_dir: str, max_pat
         tif_files = sorted(patch_dir.glob("*.tif"))
         if not tif_files:
             continue
-        # 只取第一张计算通道数
-        try:
-            data = read_tif(tif_files[0], image_size=-1)  # 原始尺寸
-            if data is not None:
+        # 对每个 patch 最多采样 5 个时间步
+        sample_files = tif_files[::max(1, len(tif_files) // 5)]
+        for tif_path in sample_files:
+            try:
+                data = read_tif(tif_path, image_size=-1)  # 原始尺寸
+                if data is None:
+                    continue
+                # 跳过 shape 异常的样本
+                if len(all_samples) > 0 and data.shape != all_samples[0].shape:
+                    continue
+                # 修复：光学源先 log 变换，再算统计量
+                if source_name in {"s2", "s2_hr", "landsat"}:
+                    if data.max() < 2.0:
+                        data = data * 10000.0
+                    data = np.log(np.clip(data, 0, None) + 1) / 10.0
+                # 修复：SAR 源 DN → dB 转换
+                if source_name in {"s1", "s1_hr"} and data.max() > 100:
+                    data = np.log10(np.clip(data / 10000.0, 1e-10, None)) * 10.0
                 all_samples.append(data)
-        except Exception as e:
-            pass
+            except Exception:
+                pass
 
     if not all_samples:
         print(f"  [{source_name}] 无有效样本")
