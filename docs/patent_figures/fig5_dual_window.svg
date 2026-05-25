@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="535.36125pt" height="568.50125pt" viewBox="0 0 535.36125 568.50125" xmlns="http://www.w3.org/2000/svg" version="1.1">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="572.4pt" height="402.48pt" viewBox="0 0 572.4 402.48" xmlns="http://www.w3.org/2000/svg" version="1.1">
  <metadata>
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-05-25T13:22:51.261025</dc:date>
+    <dc:date>2026-05-25T13:43:08.657820</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -21,208 +21,148 @@
  </defs>
  <g id="figure_1">
   <g id="patch_1">
-   <path d="M 0 568.50125 
-L 535.36125 568.50125 
-L 535.36125 0 
-L 0 0 
+   <path d="M 0 402.48 
+L 572.4 402.48 
+L 572.4 -0 
+L 0 -0 
 z
 " style="fill: #ffffff"/>
   </g>
   <g id="axes_1">
    <g id="patch_2">
-    <path d="M 87.948994 238.305275 
-L 239.027756 238.305275 
-Q 241.632563 238.305275 241.632563 235.700469 
-L 241.632563 188.813956 
-Q 241.632563 186.20915 239.027756 186.20915 
-L 87.948994 186.20915 
-Q 85.344188 186.20915 85.344188 188.813956 
-L 85.344188 235.700469 
-Q 85.344188 238.305275 87.948994 238.305275 
+    <path d="M 107.64 154.6704 
+L 275.04 154.6704 
+L 275.04 115.8624 
+L 107.64 115.8624 
+L 107.64 154.6704 
 z
-" clip-path="url(#p1d74150d68)" style="fill: #ffffff; stroke: #000000; stroke-width: 2; stroke-linejoin: miter"/>
+" clip-path="url(#pa18cb08ce2)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_3">
-    <path d="M 296.333494 238.305275 
-L 447.412256 238.305275 
-Q 450.017063 238.305275 450.017063 235.700469 
-L 450.017063 188.813956 
-Q 450.017063 186.20915 447.412256 186.20915 
-L 296.333494 186.20915 
-Q 293.728688 186.20915 293.728688 188.813956 
-L 293.728688 235.700469 
-Q 293.728688 238.305275 296.333494 238.305275 
+    <path d="M 330.84 154.6704 
+L 498.24 154.6704 
+L 498.24 115.8624 
+L 330.84 115.8624 
+L 330.84 154.6704 
 z
-" clip-path="url(#p1d74150d68)" style="fill: #ffffff; stroke-dasharray: 7.4,3.2; stroke-dashoffset: 0; stroke: #000000; stroke-width: 2; stroke-linejoin: miter"/>
-   </g>
-   <g id="patch_4">
-    <path d="M 226.107917 97.645737 
-L 309.253333 97.645737 
-Q 309.357525 97.645737 309.357525 97.541545 
-L 309.357525 66.492255 
-Q 309.357525 66.388062 309.253333 66.388062 
-L 226.107917 66.388062 
-Q 226.003725 66.388062 226.003725 66.492255 
-L 226.003725 97.541545 
-Q 226.003725 97.645737 226.107917 97.645737 
-z
-" clip-path="url(#p1d74150d68)" style="fill: #f0f0f0; stroke: #4d4d4d; stroke-width: 1.5; stroke-linejoin: miter"/>
+" clip-path="url(#pa18cb08ce2)" style="fill: none; stroke-dasharray: 3.7,1.6; stroke-dashoffset: 0; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="line2d_1">
-    <path d="M 33.248063 274.772562 
-L 502.113188 274.772562 
-" clip-path="url(#p1d74150d68)" style="fill: none; stroke: #000000; stroke-width: 2; stroke-linecap: square"/>
+    <path d="M 51.84 209.0016 
+L 520.56 209.0016 
+" clip-path="url(#pa18cb08ce2)" style="fill: none; stroke: #000000; stroke-linecap: square"/>
    </g>
    <g id="line2d_2">
-    <path d="M 33.248063 285.191787 
-L 33.248063 264.353337 
-" clip-path="url(#p1d74150d68)" style="fill: none; stroke: #000000; stroke-width: 2; stroke-linecap: square"/>
+    <path d="M 51.84 216.7632 
+L 51.84 201.24 
+" clip-path="url(#pa18cb08ce2)" style="fill: none; stroke: #000000; stroke-linecap: square"/>
    </g>
    <g id="line2d_3">
-    <path d="M 502.113188 285.191787 
-L 502.113188 264.353337 
-" clip-path="url(#p1d74150d68)" style="fill: none; stroke: #000000; stroke-width: 2; stroke-linecap: square"/>
+    <path d="M 520.56 216.7632 
+L 520.56 201.24 
+" clip-path="url(#pa18cb08ce2)" style="fill: none; stroke: #000000; stroke-linecap: square"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 118.8 309.9024 
+L 252.72 309.9024 
+L 252.72 271.0944 
+L 118.8 271.0944 
+L 118.8 309.9024 
+z
+" clip-path="url(#pa18cb08ce2)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_5">
-    <path d="M 80.238767 441.480162 
-L 194.641858 441.480162 
-Q 194.74605 441.480162 194.74605 441.37597 
-L 194.74605 389.48823 
-Q 194.74605 389.384037 194.641858 389.384037 
-L 80.238767 389.384037 
-Q 80.134575 389.384037 80.134575 389.48823 
-L 80.134575 441.37597 
-Q 80.134575 441.480162 80.238767 441.480162 
+    <path d="M 330.84 309.9024 
+L 464.76 309.9024 
+L 464.76 271.0944 
+L 330.84 271.0944 
+L 330.84 309.9024 
 z
-" clip-path="url(#p1d74150d68)" style="fill: #e8f0f8; stroke: #0f4d92; stroke-width: 1.5; stroke-linejoin: miter"/>
-   </g>
-   <g id="patch_6">
-    <path d="M 340.719392 441.480162 
-L 455.122483 441.480162 
-Q 455.226675 441.480162 455.226675 441.37597 
-L 455.226675 389.48823 
-Q 455.226675 389.384037 455.122483 389.384037 
-L 340.719392 389.384037 
-Q 340.6152 389.384037 340.6152 389.48823 
-L 340.6152 441.37597 
-Q 340.6152 441.480162 340.719392 441.480162 
-z
-" clip-path="url(#p1d74150d68)" style="fill: #f8e8e8; stroke: #b64342; stroke-width: 1.5; stroke-linejoin: miter"/>
+" clip-path="url(#pa18cb08ce2)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="text_1">
-    <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; text-anchor: middle" x="267.680625" y="85.3169" transform="rotate(-0 267.680625 85.3169)">同一地点</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="51.84" y="230.483725" transform="rotate(-0 51.84 230.483725)">2023.04</text>
    </g>
    <g id="text_2">
-    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; text-anchor: middle" x="33.248063" y="317.410475" transform="rotate(-0 33.248063 317.410475)">2023.04</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="520.56" y="230.483725" transform="rotate(-0 520.56 230.483725)">2025.10</text>
    </g>
    <g id="text_3">
-    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; text-anchor: middle" x="502.113188" y="317.410475" transform="rotate(-0 502.113188 317.410475)">2025.10</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="286.2" y="231.199819" transform="rotate(-0 286.2 231.199819)">时间轴</text>
    </g>
    <g id="text_4">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; text-anchor: middle" x="267.680625" y="319.110162" transform="rotate(-0 267.680625 319.110162)">时间轴</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="191.34" y="134.307787" transform="rotate(-0 191.34 134.307787)">时间窗口1</text>
    </g>
    <g id="text_5">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; text-anchor: middle" x="163.488375" y="215.504087" transform="rotate(-0 163.488375 215.504087)">时间窗口1</text>
+    <text style="font-size: 7px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="191.34" y="149.030675" transform="rotate(-0 191.34 149.030675)">不重叠</text>
    </g>
    <g id="text_6">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; text-anchor: middle; fill: #b64342" x="163.488375" y="235.520662" transform="rotate(-0 163.488375 235.520662)">不重叠</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="414.54" y="134.307787" transform="rotate(-0 414.54 134.307787)">时间窗口2</text>
    </g>
    <g id="text_7">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; text-anchor: middle" x="371.872875" y="215.504087" transform="rotate(-0 371.872875 215.504087)">时间窗口2</text>
-   </g>
-   <g id="patch_7">
-    <path d="M 266.157551 98.94035 
-Q 215.585901 141.926253 166.036499 184.043244 
-" style="fill: none; stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
-    <path d="M 170.813859 182.869858 
-L 166.036499 184.043244 
-L 167.964206 179.517325 
-z
-" style="stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
-   </g>
-   <g id="patch_8">
-    <path d="M 269.203699 98.94035 
-Q 319.775349 141.926253 369.324751 184.043244 
-" style="fill: none; stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
-    <path d="M 367.397044 179.517325 
-L 369.324751 184.043244 
-L 364.547391 182.869858 
-z
-" style="stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
-   </g>
-   <g id="patch_9">
-    <path d="M 163.488375 272.773806 
-Q 163.488375 256.538842 163.488375 241.645518 
-" style="fill: none; stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
-    <path d="M 161.288375 246.045518 
-L 163.488375 241.645518 
-L 165.688375 246.045518 
-z
-" style="stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
-   </g>
-   <g id="patch_10">
-    <path d="M 371.872875 272.773806 
-Q 371.872875 256.538842 371.872875 241.645518 
-" style="fill: none; stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
-    <path d="M 369.672875 246.045518 
-L 371.872875 241.645518 
-L 374.072875 246.045518 
-z
-" style="stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
+    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(165.061406 289.057978)">嵌入向量1</text>
+    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(169.306172 297.957572)">emb_w1</text>
    </g>
    <g id="text_8">
-    <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif" transform="translate(114.441875 413.488819)">嵌入向量1</text>
-    <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif" transform="translate(119.158281 424.062881)">emb_w1</text>
+    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(377.101406 289.057978)">嵌入向量2</text>
+    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(381.346172 297.957572)">emb_w2</text>
+   </g>
+   <g id="patch_6">
+    <path d="M 191.34 207.001984 
+Q 191.34 181.837532 191.34 157.567507 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
+    <path d="M 189.34 161.567507 
+L 191.34 157.567507 
+L 193.34 161.567507 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 414.54 207.001984 
+Q 414.54 181.837532 414.54 157.567507 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
+    <path d="M 412.54 161.567507 
+L 414.54 157.567507 
+L 416.54 161.567507 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
+   </g>
+   <g id="patch_8">
+    <path d="M 191.244128 156.670727 
+Q 188.550013 212.882125 185.898718 268.200121 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
+    <path d="M 188.087918 264.300453 
+L 185.898718 268.200121 
+L 184.092504 264.10896 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 414.255449 156.649409 
+Q 406.170092 212.881757 398.212032 268.228782 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
+    <path d="M 400.760958 264.554143 
+L 398.212032 268.228782 
+L 396.801676 263.984858 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
+   </g>
+   <g id="patch_10">
+    <path d="M 255.835854 290.4984 
+Q 291.777669 290.4984 327.719484 290.4984 
+" style="fill: none; stroke: #000000; stroke-linecap: round"/>
+    <path d="M 259.835854 292.4984 
+L 255.835854 290.4984 
+L 259.835854 288.4984 
+" style="fill: none; stroke: #000000; stroke-linecap: round"/>
+    <path d="M 323.719484 288.4984 
+L 327.719484 290.4984 
+L 323.719484 292.4984 
+" style="fill: none; stroke: #000000; stroke-linecap: round"/>
    </g>
    <g id="text_9">
-    <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif" transform="translate(374.9225 413.488819)">嵌入向量2</text>
-    <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif" transform="translate(379.638906 424.062881)">emb_w2</text>
-   </g>
-   <g id="patch_11">
-    <path d="M 163.148943 240.273983 
-Q 150.464486 313.843832 138.007983 386.091547 
-" style="fill: none; stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
-    <path d="M 140.923586 382.129318 
-L 138.007983 386.091547 
-L 136.587561 381.381727 
-z
-" style="stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
-   </g>
-   <g id="patch_12">
-    <path d="M 372.212307 240.273983 
-Q 384.896764 313.843832 397.353267 386.091547 
-" style="fill: none; stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
-    <path d="M 398.773689 381.381727 
-L 397.353267 386.091547 
-L 394.437664 382.129318 
-z
-" style="stroke: #000000; stroke-width: 1.2; stroke-linecap: round"/>
-   </g>
-   <g id="patch_13">
-    <path d="M 141.116597 415.4321 
-Q 267.680409 415.4321 394.244221 415.4321 
-" style="fill: none; stroke: #4d4d4d; stroke-width: 1.5; stroke-linecap: round"/>
-    <path d="M 145.516597 417.6321 
-L 141.116597 415.4321 
-L 145.516597 413.2321 
-" style="fill: none; stroke: #4d4d4d; stroke-width: 1.5; stroke-linecap: round"/>
-    <path d="M 389.844221 413.2321 
-L 394.244221 415.4321 
-L 389.844221 417.6321 
-" style="fill: none; stroke: #4d4d4d; stroke-width: 1.5; stroke-linecap: round"/>
-   </g>
-   <g id="text_10">
-    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; fill: #4d4d4d" transform="translate(240.680625 454.124619)">时序对比损失</text>
-    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; fill: #4d4d4d" transform="translate(246.982031 464.488962)">(约束差异)</text>
-   </g>
-   <g id="text_11">
-    <text style="font-weight: 700; font-size: 16px; font-family: 'WenQuanYi Zen Hei', 'Arial', 'DejaVu Sans', 'Liberation Sans', sans-serif; text-anchor: middle" x="267.680625" y="20.34" transform="rotate(-0 267.680625 20.34)">图5  双窗口时序对比示意图</text>
+    <text style="font-weight: 700; font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="286.2" y="320.304" transform="rotate(-0 286.2 320.304)">时序对比损失</text>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="p1d74150d68">
-   <rect x="7.2" y="40.34" width="520.96125" height="520.96125"/>
+  <clipPath id="pa18cb08ce2">
+   <rect x="7.2" y="7.2" width="558" height="388.08"/>
   </clipPath>
  </defs>
 </svg>
