@@ -130,7 +130,7 @@ def draw_fig1():
         _arrow(ax, x1, centers[dec_idx] - layer_h/2 - 0.4,
                x2, centers[loss_idx] + layer_h/2 + 0.4)
 
-    fig.savefig(OUTPUT_DIR / "fig1_system_architecture.png", dpi=300,
+    fig.savefig(OUTPUT_DIR / "fig1_system_architecture.png", dpi=600,
                 bbox_inches='tight', facecolor='white', edgecolor='none')
     fig.savefig(OUTPUT_DIR / "fig1_system_architecture.svg", bbox_inches='tight',
                 facecolor='white', edgecolor='none')
@@ -199,7 +199,7 @@ def draw_fig4():
 
     _text(ax, 50, 6, "注：新增数据源时，只需增加对应的专用输入头", fontsize=FS_LABEL)
 
-    fig.savefig(OUTPUT_DIR / "fig4_input_heads.png", dpi=300,
+    fig.savefig(OUTPUT_DIR / "fig4_input_heads.png", dpi=600,
                 bbox_inches='tight', facecolor='white', edgecolor='none')
     fig.savefig(OUTPUT_DIR / "fig4_input_heads.svg", bbox_inches='tight',
                 facecolor='white', edgecolor='none')

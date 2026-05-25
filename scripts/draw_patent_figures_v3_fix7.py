@@ -82,8 +82,8 @@ def draw_fig1():
     _text(ax, box_center_x, out_y - 0.5, "通用嵌入向量", fontsize=FS_BOX)
     _arrow(ax, box_center_x, centers[-1] - layer_h/2 - 0.5, box_center_x, out_y + 2.5, lw=1.0)
 
-    fig.savefig(OUTPUT_DIR / "fig1_system_architecture.png", dpi=300, bbox_inches='tight', pad_inches=0.25, facecolor='white', edgecolor='none')
-    fig.savefig(OUTPUT_DIR / "fig1_system_architecture.svg", dpi=300, bbox_inches='tight', pad_inches=0.25, facecolor='white', edgecolor='none')
+    fig.savefig(OUTPUT_DIR / "fig1_system_architecture.png", dpi=600, bbox_inches='tight', pad_inches=0.25, facecolor='white', edgecolor='none')
+    fig.savefig(OUTPUT_DIR / "fig1_system_architecture.svg", dpi=600, bbox_inches='tight', pad_inches=0.25, facecolor='white', edgecolor='none')
     plt.close(fig)
     print("✓ fig1")
 
