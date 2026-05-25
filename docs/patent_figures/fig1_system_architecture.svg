@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="460.8pt" height="679.68pt" viewBox="0 0 460.8 679.68" xmlns="http://www.w3.org/2000/svg" version="1.1">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="516.6pt" height="837.832472pt" viewBox="0 0 516.6 837.832472" xmlns="http://www.w3.org/2000/svg" version="1.1">
  <metadata>
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-05-25T13:43:07.213582</dc:date>
+    <dc:date>2026-05-25T13:48:24.344568</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -21,347 +21,336 @@
  </defs>
  <g id="figure_1">
   <g id="patch_1">
-   <path d="M 0 679.68 
-L 460.8 679.68 
-L 460.8 0 
+   <path d="M 0 837.832472 
+L 516.6 837.832472 
+L 516.6 0 
 L 0 0 
 z
 " style="fill: #ffffff"/>
   </g>
   <g id="axes_1">
    <g id="patch_2">
-    <path d="M 158.976 97.0128 
-L 178.32 97.0128 
-L 178.32 23.832 
-L 158.976 23.832 
-L 158.976 97.0128 
+    <path d="M 177.948 115.8624 
+L 203.058 115.8624 
+L 203.058 7.2 
+L 177.948 7.2 
+L 177.948 115.8624 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_3">
-    <path d="M 187.248 97.0128 
-L 206.592 97.0128 
-L 206.592 23.832 
-L 187.248 23.832 
-L 187.248 97.0128 
+    <path d="M 213.102 115.8624 
+L 238.212 115.8624 
+L 238.212 7.2 
+L 213.102 7.2 
+L 213.102 115.8624 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_4">
-    <path d="M 215.52 97.0128 
-L 234.864 97.0128 
-L 234.864 23.832 
-L 215.52 23.832 
-L 215.52 97.0128 
+    <path d="M 248.256 115.8624 
+L 273.366 115.8624 
+L 273.366 7.2 
+L 248.256 7.2 
+L 248.256 115.8624 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_5">
-    <path d="M 243.792 97.0128 
-L 263.136 97.0128 
-L 263.136 23.832 
-L 243.792 23.832 
-L 243.792 97.0128 
+    <path d="M 283.41 115.8624 
+L 308.52 115.8624 
+L 308.52 7.2 
+L 283.41 7.2 
+L 283.41 115.8624 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_6">
-    <path d="M 272.064 97.0128 
-L 291.408 97.0128 
-L 291.408 23.832 
-L 272.064 23.832 
-L 272.064 97.0128 
+    <path d="M 318.564 115.8624 
+L 343.674 115.8624 
+L 343.674 7.2 
+L 318.564 7.2 
+L 318.564 115.8624 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_7">
-    <path d="M 300.336 97.0128 
-L 319.68 97.0128 
-L 319.68 23.832 
-L 300.336 23.832 
-L 300.336 97.0128 
+    <path d="M 353.718 115.8624 
+L 378.828 115.8624 
+L 378.828 7.2 
+L 353.718 7.2 
+L 353.718 115.8624 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_8">
-    <path d="M 158.976 193.4784 
-L 319.68 193.4784 
-L 319.68 120.2976 
-L 158.976 120.2976 
-L 158.976 193.4784 
+    <path d="M 177.948 251.6904 
+L 378.828 251.6904 
+L 378.828 143.028 
+L 177.948 143.028 
+L 177.948 251.6904 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_9">
-    <path d="M 158.976 289.944 
-L 206.592 289.944 
-L 206.592 216.7632 
-L 158.976 216.7632 
-L 158.976 289.944 
+    <path d="M 177.948 387.5184 
+L 238.212 387.5184 
+L 238.212 278.856 
+L 177.948 278.856 
+L 177.948 387.5184 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_10">
-    <path d="M 215.52 289.944 
-L 263.136 289.944 
-L 263.136 216.7632 
-L 215.52 216.7632 
-L 215.52 289.944 
+    <path d="M 248.256 387.5184 
+L 308.52 387.5184 
+L 308.52 278.856 
+L 248.256 278.856 
+L 248.256 387.5184 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_11">
-    <path d="M 272.064 289.944 
-L 319.68 289.944 
-L 319.68 216.7632 
-L 272.064 216.7632 
-L 272.064 289.944 
+    <path d="M 318.564 387.5184 
+L 378.828 387.5184 
+L 378.828 278.856 
+L 318.564 278.856 
+L 318.564 387.5184 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_12">
-    <path d="M 158.976 386.4096 
-L 319.68 386.4096 
-L 319.68 313.2288 
-L 158.976 313.2288 
-L 158.976 386.4096 
+    <path d="M 177.948 523.3464 
+L 378.828 523.3464 
+L 378.828 414.684 
+L 177.948 414.684 
+L 177.948 523.3464 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_13">
-    <path d="M 158.976 482.8752 
-L 234.864 482.8752 
-L 234.864 409.6944 
-L 158.976 409.6944 
-L 158.976 482.8752 
+    <path d="M 177.948 659.1744 
+L 273.366 659.1744 
+L 273.366 550.512 
+L 177.948 550.512 
+L 177.948 659.1744 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_14">
-    <path d="M 243.792 482.8752 
-L 319.68 482.8752 
-L 319.68 409.6944 
-L 243.792 409.6944 
-L 243.792 482.8752 
+    <path d="M 283.41 659.1744 
+L 378.828 659.1744 
+L 378.828 550.512 
+L 283.41 550.512 
+L 283.41 659.1744 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_15">
-    <path d="M 158.976 579.3408 
-L 192.456 579.3408 
-L 192.456 506.16 
-L 158.976 506.16 
-L 158.976 579.3408 
+    <path d="M 177.948 795.0024 
+L 220.635 795.0024 
+L 220.635 686.34 
+L 177.948 686.34 
+L 177.948 795.0024 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_16">
-    <path d="M 201.384 579.3408 
-L 234.864 579.3408 
-L 234.864 506.16 
-L 201.384 506.16 
-L 201.384 579.3408 
+    <path d="M 230.679 795.0024 
+L 273.366 795.0024 
+L 273.366 686.34 
+L 230.679 686.34 
+L 230.679 795.0024 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_17">
-    <path d="M 243.792 579.3408 
-L 277.272 579.3408 
-L 277.272 506.16 
-L 243.792 506.16 
-L 243.792 579.3408 
+    <path d="M 283.41 795.0024 
+L 326.097 795.0024 
+L 326.097 686.34 
+L 283.41 686.34 
+L 283.41 795.0024 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_18">
-    <path d="M 286.2 579.3408 
-L 319.68 579.3408 
-L 319.68 506.16 
-L 286.2 506.16 
-L 286.2 579.3408 
+    <path d="M 336.141 795.0024 
+L 378.828 795.0024 
+L 378.828 686.34 
+L 336.141 686.34 
+L 336.141 795.0024 
 z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_19">
-    <path d="M 158.976 615.9312 
-L 319.68 615.9312 
-L 319.68 589.32 
-L 158.976 589.32 
-L 158.976 615.9312 
-z
-" clip-path="url(#peee57c32fb)" style="fill: none; stroke: #000000; stroke-width: 0.6; stroke-linejoin: miter"/>
+    <path d="M 378.828 838.832472 
+L 378.828 810.5256 
+L 177.948 810.5256 
+L 177.948 838.832472 
+" clip-path="url(#p70f9da7553)" style="fill: none; stroke: #000000; stroke-width: 0.6; stroke-linejoin: miter"/>
    </g>
    <g id="text_1">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="20.592" y="63.76615" transform="rotate(-0 20.592 63.76615)">输入层</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="22.266" y="64.87495" transform="rotate(-0 22.266 64.87495)">输入层</text>
    </g>
    <g id="text_2">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="168.648" y="63.05865" transform="rotate(-0 168.648 63.05865)">光学遥感</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="190.503" y="64.16745" transform="rotate(-0 190.503 64.16745)">光学遥感</text>
    </g>
    <g id="text_3">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="196.92" y="63.000525" transform="rotate(-0 196.92 63.000525)">SAR遥感</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="225.657" y="64.109325" transform="rotate(-0 225.657 64.109325)">SAR遥感</text>
    </g>
    <g id="text_4">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="225.192" y="63.0624" transform="rotate(-0 225.192 63.0624)">多光谱遥感</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="260.811" y="64.1712" transform="rotate(-0 260.811 64.1712)">多光谱遥感</text>
    </g>
    <g id="text_5">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="253.464" y="62.973025" transform="rotate(-0 253.464 62.973025)">无人机</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="295.965" y="64.081825" transform="rotate(-0 295.965 64.081825)">无人机</text>
    </g>
    <g id="text_6">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="281.736" y="62.980525" transform="rotate(-0 281.736 62.980525)">激光雷达</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="331.119" y="64.089325" transform="rotate(-0 331.119 64.089325)">激光雷达</text>
    </g>
    <g id="text_7">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="310.008" y="62.99615" transform="rotate(-0 310.008 62.99615)">地面传感器</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="366.273" y="64.10495" transform="rotate(-0 366.273 64.10495)">地面传感器</text>
    </g>
    <g id="text_8">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="20.592" y="160.017688" transform="rotate(-0 20.592 160.017688)">网格划分层</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="22.266" y="200.488888" transform="rotate(-0 22.266 200.488888)">网格划分层</text>
    </g>
    <g id="text_9">
-    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(212.328 154.673859)">离散格网系统</text>
-    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(209.629406 165.070266)">(多级网格单元)</text>
+    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(251.388 195.330509)">离散格网系统</text>
+    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(248.689406 205.356016)">(多级网格单元)</text>
    </g>
    <g id="text_10">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="20.592" y="256.516881" transform="rotate(-0 20.592 256.516881)">编码层</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="22.266" y="336.350481" transform="rotate(-0 22.266 336.350481)">编码层</text>
    </g>
    <g id="text_11">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="182.784" y="256.0286" transform="rotate(-0 182.784 256.0286)">专用输入头</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="208.08" y="335.8622" transform="rotate(-0 208.08 335.8622)">专用输入头</text>
    </g>
    <g id="text_12">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="239.328" y="255.89235" transform="rotate(-0 239.328 255.89235)">时间编码器</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="278.388" y="335.72595" transform="rotate(-0 278.388 335.72595)">时间编码器</text>
    </g>
    <g id="text_13">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(275.872 251.395975)">多路径时空</text>
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(271.872 260.458725)">特征提取单元</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(328.696 331.3907)">多路径时空</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(324.696 340.1312)">特征提取单元</text>
    </g>
    <g id="text_14">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="20.592" y="353.16295" transform="rotate(-0 20.592 353.16295)">嵌入层</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="22.266" y="472.35895" transform="rotate(-0 22.266 472.35895)">嵌入层</text>
    </g>
    <g id="text_15">
-    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(217.465031 342.044466)">VMF瓶颈层</text>
-    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(201.978703 352.704122)">(训练保留原始幅度</text>
-    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(198.831516 363.112059)">推理L2归一化+噪声)</text>
+    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(256.525031 461.61618)">VMF瓶颈层</text>
+    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(241.038703 471.89397)">(训练保留原始幅度</text>
+    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(237.891516 481.932345)">推理L2归一化+噪声)</text>
    </g>
    <g id="text_16">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="20.592" y="449.22855" transform="rotate(-0 20.592 449.22855)">解码层</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="22.266" y="607.78695" transform="rotate(-0 22.266 607.78695)">解码层</text>
    </g>
    <g id="text_17">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="196.92" y="448.811675" transform="rotate(-0 196.92 448.811675)">动态目标解码器</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="225.657" y="607.370075" transform="rotate(-0 225.657 607.370075)">动态目标解码器</text>
    </g>
    <g id="text_18">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="281.736" y="448.80355" transform="rotate(-0 281.736 448.80355)">静态目标解码器</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="331.119" y="607.36195" transform="rotate(-0 331.119 607.36195)">静态目标解码器</text>
    </g>
    <g id="text_19">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="20.592" y="545.918369" transform="rotate(-0 20.592 545.918369)">损失层</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="22.266" y="743.839169" transform="rotate(-0 22.266 743.839169)">损失层</text>
    </g>
    <g id="text_20">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="175.716" y="545.33165" transform="rotate(-0 175.716 545.33165)">重建损失</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="199.2915" y="743.25245" transform="rotate(-0 199.2915 743.25245)">重建损失</text>
    </g>
    <g id="text_21">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="218.124" y="545.347275" transform="rotate(-0 218.124 545.347275)">反坍缩损失</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="252.0225" y="743.268075" transform="rotate(-0 252.0225 743.268075)">反坍缩损失</text>
    </g>
    <g id="text_22">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="260.532" y="545.32415" transform="rotate(-0 260.532 545.32415)">一致性损失</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="304.7535" y="743.24495" transform="rotate(-0 304.7535 743.24495)">一致性损失</text>
    </g>
    <g id="text_23">
-    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="302.94" y="545.3904" transform="rotate(-0 302.94 545.3904)">时序对比损失</text>
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="357.4845" y="743.3112" transform="rotate(-0 357.4845 743.3112)">时序对比损失</text>
    </g>
    <g id="patch_20">
-    <path d="M 239.328 102.34105 
-Q 239.328 108.657803 239.328 114.080129 
+    <path d="M 278.388 121.74708 
+Q 278.388 129.446718 278.388 136.251929 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
-    <path d="M 241.328 110.080129 
-L 239.328 114.080129 
-L 237.328 110.080129 
+    <path d="M 280.388 132.251929 
+L 278.388 136.251929 
+L 276.388 132.251929 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
    <g id="patch_21">
-    <path d="M 239.328 198.80665 
-Q 239.328 205.123403 239.328 210.545729 
+    <path d="M 278.388 257.57508 
+Q 278.388 265.274718 278.388 272.079929 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
-    <path d="M 241.328 206.545729 
-L 239.328 210.545729 
-L 237.328 206.545729 
+    <path d="M 280.388 268.079929 
+L 278.388 272.079929 
+L 276.388 268.079929 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
    <g id="patch_22">
-    <path d="M 239.328 295.27225 
-Q 239.328 301.589003 239.328 307.011329 
+    <path d="M 278.388 393.40308 
+Q 278.388 401.102718 278.388 407.907929 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
-    <path d="M 241.328 303.011329 
-L 239.328 307.011329 
-L 237.328 303.011329 
+    <path d="M 280.388 403.907929 
+L 278.388 407.907929 
+L 276.388 403.907929 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
    <g id="patch_23">
-    <path d="M 239.328 391.73785 
-Q 239.328 398.054603 239.328 403.476929 
+    <path d="M 278.388 529.23108 
+Q 278.388 536.930718 278.388 543.735929 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
-    <path d="M 241.328 399.476929 
-L 239.328 403.476929 
-L 237.328 399.476929 
+    <path d="M 280.388 539.735929 
+L 278.388 543.735929 
+L 276.388 539.735929 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
    <g id="patch_24">
-    <path d="M 239.328 488.20345 
-Q 239.328 494.520203 239.328 499.942529 
+    <path d="M 278.388 665.05908 
+Q 278.388 672.758718 278.388 679.563929 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
-    <path d="M 241.328 495.942529 
-L 239.328 499.942529 
-L 237.328 495.942529 
+    <path d="M 280.388 675.563929 
+L 278.388 679.563929 
+L 276.388 675.563929 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
    <g id="text_24">
-    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="239.328" y="605.670834" transform="rotate(-0 239.328 605.670834)">通用嵌入向量 (64维)</text>
+    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="278.388" y="829.094034" transform="rotate(-0 278.388 829.094034)">通用嵌入向量 (64维)</text>
    </g>
    <g id="patch_25">
-    <path d="M 239.328 584.664989 
-Q 239.328 585.994667 239.328 586.429919 
+    <path d="M 245.238018 333.1872 
+Q 278.391547 333.1872 310.650649 333.1872 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
-    <path d="M 241.328 582.429919 
-L 239.328 586.429919 
-L 237.328 582.429919 
+    <path d="M 306.650649 331.1872 
+L 310.650649 333.1872 
+L 306.650649 335.1872 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
    <g id="patch_26">
-    <path d="M 213.054229 253.3536 
-Q 239.326687 253.3536 264.704718 253.3536 
+    <path d="M 235.186049 333.1872 
+Q 235.698747 333.1872 235.317017 333.1872 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
-    <path d="M 260.704718 251.3536 
-L 264.704718 253.3536 
-L 260.704718 255.3536 
+    <path d="M 231.317017 331.1872 
+L 235.317017 333.1872 
+L 231.317017 335.1872 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
    <g id="patch_27">
-    <path d="M 204.128953 253.3536 
-Q 204.362269 253.3536 203.701158 253.3536 
+    <path d="M 225.657 665.05908 
+Q 225.657 672.758718 225.657 679.563929 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
-    <path d="M 199.701158 251.3536 
-L 203.701158 253.3536 
-L 199.701158 255.3536 
+    <path d="M 227.657 675.563929 
+L 225.657 679.563929 
+L 223.657 675.563929 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
    <g id="patch_28">
-    <path d="M 196.92 488.20345 
-Q 196.92 494.520203 196.92 499.942529 
+    <path d="M 331.119 665.05908 
+Q 331.119 672.758718 331.119 679.563929 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
-    <path d="M 198.92 495.942529 
-L 196.92 499.942529 
-L 194.92 495.942529 
-" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
-   </g>
-   <g id="patch_29">
-    <path d="M 281.736 488.20345 
-Q 281.736 494.520203 281.736 499.942529 
-" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
-    <path d="M 283.736 495.942529 
-L 281.736 499.942529 
-L 279.736 495.942529 
+    <path d="M 333.119 675.563929 
+L 331.119 679.563929 
+L 329.119 675.563929 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="peee57c32fb">
-   <rect x="7.2" y="7.2" width="446.4" height="665.28"/>
+  <clipPath id="p70f9da7553">
+   <rect x="7.2" y="7.2" width="502.2" height="776.16"/>
   </clipPath>
  </defs>
 </svg>
