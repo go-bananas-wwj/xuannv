@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-05-25T14:28:27.304983</dc:date>
+    <dc:date>2026-05-25T13:43:08.846813</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -36,7 +36,7 @@ L 252.72 88.6968
 L 74.16 88.6968 
 L 74.16 143.028 
 z
-" clip-path="url(#p0793a02831)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p574eefd955)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_3">
     <path d="M 74.16 247.8096 
@@ -45,7 +45,7 @@ L 252.72 177.9552
 L 74.16 177.9552 
 L 74.16 247.8096 
 z
-" clip-path="url(#p0793a02831)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p574eefd955)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_4">
     <path d="M 330.84 143.028 
@@ -54,7 +54,7 @@ L 509.4 88.6968
 L 330.84 88.6968 
 L 330.84 143.028 
 z
-" clip-path="url(#p0793a02831)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p574eefd955)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_5">
     <path d="M 330.84 247.8096 
@@ -63,7 +63,7 @@ L 509.4 177.9552
 L 330.84 177.9552 
 L 330.84 247.8096 
 z
-" clip-path="url(#p0793a02831)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p574eefd955)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="text_1">
     <text style="font-weight: 700; font-size: 11px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="163.44" y="41.666712" transform="rotate(-0 163.44 41.666712)">训练阶段</text>
@@ -120,7 +120,7 @@ L 418.12 163.299288
   </g>
  </g>
  <defs>
-  <clipPath id="p0793a02831">
+  <clipPath id="p574eefd955">
    <rect x="7.2" y="7.2" width="558" height="388.08"/>
   </clipPath>
  </defs>
