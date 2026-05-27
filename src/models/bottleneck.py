@@ -1,10 +1,10 @@
-"""VMF Bottleneck — V11: 对齐 AEF 原文，训练/推理统一 L2 归一化.
+"""VMF Bottleneck — V13: 训练时可跳过 L2 归一化，推理时标准 L2 + VMF.
 
-核心设计 (对齐 AEF 论文 Supplemental S2.2):
-- 训练时: Conv1x1 → L2 Norm → VMF noise → 球面 embedding
-- 推理时: Conv1x1 → L2 Norm → VMF sample → 球面 embedding
-- 所有损失 (uniformity/consistency/reconstruction) 都在同一 L2-norm 空间计算
-- 这是 AEF 原文的精确实现，区别于 V10 的 skip_l2_training 设计
+核心设计 (V13):
+- 训练时 (skip_l2_training=True):  Conv1x1 → pre_norm → 损失在欧氏空间计算
+  * 避免 L2 归一化的 Jacobian 梯度屏障 (I - uu^T) / ||x||，使 uniformity 梯度永远非零
+- 训练时 (skip_l2_training=False): Conv1x1 → L2 Norm → VMF noise → 球面 embedding
+- 推理时: 始终 Conv1x1 → L2 Norm → VMF sample → 球面 embedding
 
 Difference Module (V10 保留):
 - forward_dual_window: 显式编码双窗口差分 + change_gate
@@ -30,14 +30,14 @@ def sample_vmf(mean_direction: torch.Tensor, kappa: float) -> torch.Tensor:
 
 
 class VMFBottleneck(nn.Module):
-    """V11 VMF 瓶颈 — 对齐 AEF 原文，训练/推理统一 L2 归一化."""
+    """V13 VMF 瓶颈 — 训练时可跳过 L2 归一化(skip_l2_training)，推理时标准 L2+VMF."""
 
     def __init__(
         self,
         channels: int,
         embedding_dim: int,
         kappa: float = 2000.0,
-        skip_l2_training: bool = False,  # V11: 忽略此参数，始终 L2 归一化
+        skip_l2_training: bool = False,  # V13: True 时训练阶段跳过 L2 归一化，推理时始终应用 L2
     ) -> None:
         super().__init__()
         self.to_embedding = nn.Conv2d(channels, embedding_dim, kernel_size=1)
@@ -66,10 +66,10 @@ class VMFBottleneck(nn.Module):
             features: [B, C, H, W]  summary_map from STP encoder
 
         Returns:
-            embedding_map: [B, D, H, W]  L2-normalized
-            embedding_vector: [B, D]  L2-normalized (global mean)
-            pre_norm_embedding: [B, D]  与 embedding_vector 相同 (兼容旧接口)
-            pre_norm_map: [B, D, H, W]  与 embedding_map 相同 (兼容旧接口)
+            embedding_map:    [B, D, H, W]  training+skip_l2=True 时为 pre-norm，否则 L2-normalized
+            embedding_vector: [B, D]         同上 (global mean pooling over spatial)
+            pre_norm_embedding:[B, D]         原始 pre-norm 幅度（用于 VICReg variance/covariance）
+            pre_norm_map:     [B, D, H, W]   原始 pre-norm 空间特征（用于 temporal loss）
         """
         pre_norm_map = self.to_embedding(features)  # [B, D, H, W]
         # V13: 训练时支持跳过 L2 Norm，避免 (I-uu^T)/||x|| Jacobian 梯度屏障
@@ -136,7 +136,7 @@ class VMFBottleneck(nn.Module):
     def _apply_norm(self, pre_norm_map: torch.Tensor) -> torch.Tensor:
         """对 pre-norm map 应用 L2 Norm + VMF 噪声.
 
-        V11 变更: 训练/推理统一处理，始终 L2 归一化。
+        仅在 skip_l2_training=False 或推理阶段被调用（forward 中的 else 分支）。
         VMF 噪声在训练时加在方向向量上（AEF 原文方式）。
         """
         direction = F.normalize(pre_norm_map, p=2, dim=1)

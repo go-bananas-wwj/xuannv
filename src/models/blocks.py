@@ -213,12 +213,13 @@ class TimeOperator(nn.Module):
         # Scaled dot-product attention
         scores = torch.matmul(q, k.transpose(-2, -1)) / (self.head_dim ** 0.5)
 
-        # Frame mask: 屏蔽无效帧 (应用于 query 维度)
+        # Frame mask: 屏蔽无效帧作为 key（防止有效帧关注到零填充帧）
+        # scores: [B*H*W, num_heads, T_query, T_key]
         if frame_mask is not None:
-            # frame_mask: [B, T] -> [B*H*W, 1, T, 1]
+            # frame_mask: [B, T] -> [B*H*W, 1, 1, T]（沿 key 维度屏蔽）
             mask = frame_mask.unsqueeze(1)  # [B, 1, T]
             mask = mask.repeat_interleave(H * W, dim=0)  # [B*H*W, 1, T]
-            mask = mask.unsqueeze(-1)  # [B*H*W, 1, T, 1]
+            mask = mask.unsqueeze(2)  # [B*H*W, 1, 1, T] ← key 维度，禁止关注无效帧
             scores = scores.masked_fill(~mask, float('-inf'))
 
         # Softmax NaN 防护: 如果某行全 -inf, 替换为 0
