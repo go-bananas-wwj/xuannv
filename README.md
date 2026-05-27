@@ -48,43 +48,6 @@ raw_uniformity_loss 原理:
   → 推理时不再 OOD → 可以生成不同的 before/after embedding
 ```
 
-## 目录结构
-
-```
-xuannv_embdding/
-├── README.md
-├── pyproject.toml
-├── configs/
-│   └── qwen_v1_scenes.yaml      # 训练配置
-├── src/
-│   ├── __init__.py
-│   ├── config.py                # 配置系统 (YAML 数据类)
-│   ├── data/
-│   │   ├── __init__.py
-│   │   └── dataset.py           # 数据集 (单景+temporal aug)
-│   ├── models/
-│   │   ├── __init__.py
-│   │   ├── model.py             # 主模型 (AEFModel)
-│   │   ├── bottleneck.py        # VMF 瓶颈 (训练 skip L2) ★核心改进
-│   │   ├── blocks.py            # STP block (三路径)
-│   │   ├── sensor_encoders.py   # 传感器编码器
-│   │   ├── decoders.py          # 条件解码器
-│   │   └── time_encoding.py     # 时间/窗口编码
-│   ├── training/
-│   │   ├── __init__.py
-│   │   ├── losses.py            # 损失函数 ★核心改进
-│   │   └── trainer.py           # DDP 训练器
-│   └── utils/
-│       ├── __init__.py
-│       └── io.py
-└── scripts/
-    ├── train/                   # 训练脚本
-    │   └── train_ddp.py         # DDP 训练入口
-    ├── inference/               # 推理脚本
-    ├── eval/                    # 评估脚本
-    └── visualize/               # 可视化脚本
-```
-
 ## 快速开始
 
 ### 1. 安装
@@ -94,54 +57,36 @@ cd /workspace/xuannv
 pip install -e .
 ```
 
-### 2. 训练 (DDP 多GPU)
+### 2. 训练 (NPU DDP)
 
 ```bash
 cd /workspace/xuannv
 
-# 3卡 DDP
-CUDA_VISIBLE_DEVICES=5,6,7 torchrun --nproc_per_node=3 \
-    scripts/train/train_ddp.py --config configs/qwen_v1_scenes.yaml \
-    --save-every 50 --warmup-epochs 10
+# 4卡 NPU DDP 示例 (V2 海淀区基线)
+export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+torchrun --nproc_per_node=4 \
+    scripts/train/train_xuannv_v2.py \
+    --config configs/xuannv_v2_haidian_baseline.yaml
 ```
 
-### 3. 提取月度 Embedding
+> **注意**: 本项目已全面适配华为 Ascend 910B NPU (`torch_npu` + `hccl`)，训练脚本默认使用 NPU。
 
-```bash
-cd /workspace/xuannv
-python scripts/inference/extract_monthly_embeddings_all_patches.py \
-    --gpu_idx 0 --total_gpus 2
-```
+### 3. 详细文档
 
-## 训练配置说明
-
-| 参数 | 值 | 说明 |
-|------|-----|------|
-| embedding_dim | 128 | embedding 维度 |
-| vmf_kappa | 2000 | VMF 浓度 (原版500→2000) |
-| max_frames | 32 | 最大帧数 (单景数据更多) |
-| skip_l2_norm_training | true | ★ 训练跳过 L2 |
-| temporal_window_augmentation | true | ★ 时间窗口增强 |
-| raw_uniformity_weight | 0.3 | 主 uniformity 信号 |
-| decorrelation_weight | 0.01 | 去相关 |
-| variance_weight | 1.0 | 方差正则 |
-| orthogonality_weight | 1.0 | 权重正交 |
+完整信息（代码结构、配置系统、损失函数体系、训练监控、开发规范等）见 **[AGENTS.md](AGENTS.md)**。
 
 ## 训练监控指标
 
-训练中应关注以下指标:
-
 | 指标 | 正常范围 | 异常信号 |
 |------|----------|----------|
-| `raw_unif` | -4.0 ~ -1.0 | > -0.5 表示坍缩 |
-| `pre_unif` | 接近 raw_unif | 差距大说明有问题 |
-| `recon` | < 0.3 | > 0.5 重建质量差 |
-| `var_reg` | 接近 0 | > 0.5 方差坍缩 |
+| `l2unif` | -0.9 ~ -0.7 | > -0.5 表示坍缩 |
+| `std_mean` | > 0.60 | < 0.50 方差不足 |
+| `active` | 64/64 | < 50 维度坍缩 |
+| `recon` | < 0.1 | > 0.3 重建失败 |
 | `orth` | < 0.3 | > 0.5 权重不正交 |
-| `decorr` | < 1.0 | > 2.0 强相关 |
 
 ## 与原版代码的关系
 
 - **完全独立实现**: 所有代码从零编写，不复制原版
 - **参考接口设计**: 数据加载协议、模型输入输出格式与原版兼容
-- **可并行使用**: 训练输出到 `/workspace/outputs/xuannv_embdding_v1/`，不影响原版输出
+- **可并行使用**: 训练输出到 `/workspace/outputs/`，不影响原版输出
