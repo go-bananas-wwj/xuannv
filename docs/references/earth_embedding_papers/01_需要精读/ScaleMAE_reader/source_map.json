@@ -1,0 +1,135 @@
+[
+  {
+    "id": "F001",
+    "page": 1,
+    "type": "F",
+    "original": "Figure 1. Scale-MAE learns better representations for multiscale tasks compared to vanilla MAE. (Column 1) The top image spans an area at 0.3m GSD and the bottom image shows the same region at a coarser GSD. (Columns 2-4) The following columns show a ground truth building segmentation, Scale-MAE segmentation from a finetuned UperNet, and segmentation from an analogously finetuned UperNet from a vanilla MAE, respectively. Scale-MAE demonstrates better performance across images at both scales. See the supplementary material for more examples.",
+    "translation": "图1. 与vanilla MAE相比，Scale-MAE为多尺度任务学习了更好的表示。（第1列）上方图像跨越0.3m GSD的区域，下方图像显示同一区域在更粗GSD下的样貌。（第2-4列）后续列分别展示真实建筑物分割、经finetuned UperNet的Scale-MAE分割，以及经类似finetuned UperNet的vanilla MAE分割。Scale-MAE在两种尺度的图像上均表现出更好的性能。更多示例见补充材料。"
+  },
+  {
+    "id": "F002",
+    "page": 2,
+    "type": "F",
+    "original": "Figure 2. Scale-MAE employs the Masked Autoencoder framework. An input image is patchified and masked before being passed into an MAE encoder. A Ground Sample Distance Positional Encoding (GSDPE) is added to the encoder input, which scales the positional encodings to the area of ground covered. The Scale-MAE decoders has three stages: (1) Decoding, which uses a smaller number of transformer layers than MAE to decode the encoded values (2) Upsampling, which progressively deconvolves the decoded feature map to a larger size before being passed through the Laplacian Blocks (abbreviated LB, see Section 3), (3) Reconstruction, which then reconstructs low and high frequency features at different scales. These outputs are used to compute an aggregate loss with ground truth low and high frequency features, where following super resolution literature [2], an L1 loss is used for high frequency output to better reconstruct edges and an L2 loss is used for low frequency output to better reconstruct average values.",
+    "translation": "图2. Scale-MAE采用Masked Autoencoder框架。输入图像被patchify并掩码后传入MAE编码器。Ground Sample Distance Positional Encoding (GSDPE)被添加到编码器输入中，将位置编码缩放到地面覆盖区域。Scale-MAE解码器有三个阶段：(1) 解码（Decoding），使用比MAE更少的transformer层来解码编码值；(2) 上采样（Upsampling），逐步反卷积解码后的特征图到更大尺寸，然后传入Laplacian Blocks（简称LB，见第3节）；(3) 重建（Reconstruction），重建不同尺度的低频和高频特征。这些输出用于与真实低频和高频特征计算聚合损失，遵循超分辨率文献[2]，高频输出使用L1损失以更好地重建边缘，低频输出使用L2损失以更好地重建平均值。"
+  },
+  {
+    "id": "F003",
+    "page": 3,
+    "type": "F",
+    "original": "Figure 3. Ground Sample Distance Positional Encoding (GSDPE). (Left) Input images at the same pixel resolution but different GSDs are shown. The image on the bottom is a subset of the image on the top. (Center) This overlap in location, albeit at a different resolution, is reflected in the GSDPE. The finer image with smaller spatial extent is represented by a corresponding subsection of the overall sine wave on the bottom. (Right) A standard positional encoding is strictly dependent on the image resolution and uses the same embedding for both. The colors behind the sine waves show the intensity and quantization of the encoding.",
+    "translation": "图3. Ground Sample Distance Positional Encoding (GSDPE)。(左) 展示了相同像素分辨率但不同GSD的输入图像。底部图像是顶部图像的子集。(中) 这种位置上的重叠，尽管分辨率不同，在GSDPE中得到了反映。空间范围更小的精细图像由底部整体正弦波的相应子区间表示。(右) 标准位置编码严格依赖于图像分辨率，对两者使用相同的嵌入。正弦波背后的颜色展示了编码的强度和量化。"
+  },
+  {
+    "id": "F004",
+    "page": 4,
+    "type": "F",
+    "original": "Figure 4. Scale-MAE reconstruction. Examples from Functional Map of the World are shown. From left to right, an input image at 224x224 resolution is shown. Its corresponding mask is visualized as well. Columns 3 and 4 show the low and high frequency produced by the Scale-MAE decoder. The last column is the reconstruction obtained from summing the low and high frequency features together.",
+    "translation": "图4. Scale-MAE重建。展示了Functional Map of the World的示例。从左到右，显示了一张224x224分辨率的输入图像，其对应的掩码也被可视化。第3和第4列展示了Scale-MAE解码器产生的低频和高频。最后一列是通过将低频和高频特征相加得到的重建结果。"
+  },
+  {
+    "id": "F005",
+    "page": 5,
+    "type": "F",
+    "original": "Figure 5. Learning better representations at all scales. Scale-MAE (blue) features perform better than state-of-the-art. We evaluate kNN accuracy on eight datasets with a large variance in GSD. Scale-MAE consistently produces better results at coarser resolutions. In addition to using evaluation datasets at different GSDs, to further test the multiscale representations, we create multiple test sets for each dataset in which we downsampled the full resolution validation set to coarser GSDs at fixed percentages: X^{G%}_{val}, G ∈ {12.5, 25, 50, 100}, where EuroSat does not include the 12.5% because the images are at a resolution of 64px, our patch size is 16px, and an input image of 8px is too small.",
+    "translation": "图5. 在所有尺度上学习更好的表示。Scale-MAE（蓝色）特征优于最先进方法。我们在八个GSD方差很大的数据集上评估kNN精度。Scale-MAE在更粗的分辨率上始终产生更好的结果。除了使用不同GSD的评估数据集外，为了进一步测试多尺度表示，我们为每个数据集创建了多个测试集，将全分辨率验证集下采样到固定百分比的更粗GSD：X^{G%}_{val}, G ∈ {12.5, 25, 50, 100}，其中EuroSat不包含12.5%，因为图像分辨率为64px，patch size为16px，8px的输入图像太小。"
+  },
+  {
+    "id": "F006",
+    "page": 6,
+    "type": "F",
+    "original": "Figure 6. SpaceNet v1 evaluation across downscaled images for both Scale-MAE and SatMAE. Scale-MAE maintains higher semantic segmentation performance over SatMAE, even with images of coarser GSD.",
+    "translation": "图6. Scale-MAE和SatMAE在下采样图像上的SpaceNet v1评估。即使使用更粗GSD的图像，Scale-MAE仍保持比SatMAE更高的语义分割性能。"
+  },
+  {
+    "id": "F007",
+    "page": 7,
+    "type": "F",
+    "original": "Figure 7. (top) The Laplacian Block (LB) is a fully convolutional architecture consists of a chain of Feature Mapping Block followed by one final Reconstruction Block. (bottom) The UpSampling Block (UB) consists of a series of transpose convolution layers separated by LayerNorm and GELU activation.",
+    "translation": "图7. (上) Laplacian Block (LB)是一种全卷积架构，由一系列Feature Mapping Block链和一个最终的Reconstruction Block组成。(下) UpSampling Block (UB)由一系列转置卷积层组成，层间以LayerNorm和GELU激活分隔。"
+  },
+  {
+    "id": "F008",
+    "page": 8,
+    "type": "F",
+    "original": "Figure 8. Visualization of Segmentation Results on SpaceNet. The left, center, right columns are ground truth labels, Scale-MAE and vanilla MAE, respectively. The top row shows a 0.3m GSD image and the bottom row shows a 3.0m GSD image. As shown in the figure, Scale-MAE performs better at both higher and lower GSDs.",
+    "translation": "图8. SpaceNet分割结果可视化。左、中、右列分别为真实标签、Scale-MAE和vanilla MAE。顶行显示0.3m GSD图像，底行显示3.0m GSD图像。如图所示，Scale-MAE在更高和更低GSD下均表现更好。"
+  },
+  {
+    "id": "T001",
+    "page": 6,
+    "type": "T",
+    "original": "Table 1. Scale-MAE performs better, across all GSDs (as in Figure 5), for all datasets we experimented with compared to SatMAE. The average improvement across all datasets for Scale-MAE compared to SatMAE is 5.6% and 2.4% compared to ConvMAE with ViT-Large backbones.",
+    "translation": "表1. 在我们实验的所有数据集上，Scale-MAE在所有GSD下（如图5所示）均优于SatMAE。使用ViT-Large主干网络，Scale-MAE相比SatMAE的平均提升为5.6%，相比ConvMAE为2.4%。"
+  },
+  {
+    "id": "T002",
+    "page": 7,
+    "type": "T",
+    "original": "Table 2. Transfer classification results on RESISC-45. Frozen indicates a linear probe and finetune is a full end-to-end finetuning of the entire model.",
+    "translation": "表2. RESISC-45迁移分类结果。Frozen表示线性探测，finetune表示对整个模型进行完整的端到端微调。"
+  },
+  {
+    "id": "T003",
+    "page": 7,
+    "type": "T",
+    "original": "Table 3. Full finetuning results on FMoW-RGB. †: We reproduce SatMAE and ConvMAE by taking their publicly available codebases and pretraining on FMoW dataset for 800 epochs. The results differ from their reported results, but are evaluated consistently with ours. * Reports the results from the SatMAE paper [13].",
+    "translation": "表3. FMoW-RGB完整微调结果。†: 我们通过获取SatMAE和ConvMAE的公开代码库并在FMoW数据集上预训练800轮来复现它们。结果与其报告的结果不同，但评估方式与我们的保持一致。* 报告SatMAE论文[13]中的结果。"
+  },
+  {
+    "id": "T004",
+    "page": 7,
+    "type": "T",
+    "original": "Table 4. Semantic segmentation results on SpaceNet v1. Scale-MAE outperforms other methods across backbone and segmentation architectures, where Sup. (Scratch) indicates a supervised model trained from scratch (a randomly initialized network).",
+    "translation": "表4. SpaceNet v1语义分割结果。Scale-MAE在主干网络和分割架构上均优于其他方法，其中Sup. (Scratch)表示从头训练的监督模型（随机初始化的网络）。"
+  },
+  {
+    "id": "T005",
+    "page": 8,
+    "type": "T",
+    "original": "Table 5. mIoU on semantic segmentation tasks. SN1/2 (SpaceNet v1/2), RI: Rio, SH: Shanghai, VE: Vegas, PA: Paris, KH: Khartoum; INR: INRIA; G15: GID-15. Conv., Sat., and Scale. are ConvMAE, SatMAE, and Scale-MAE.",
+    "translation": "表5. 语义分割任务的mIoU。SN1/2 (SpaceNet v1/2), RI: 里约, SH: 上海, VE: 拉斯维加斯, PA: 巴黎, KH: 喀土穆; INR: INRIA; G15: GID-15。Conv.、Sat.和Scale.分别指ConvMAE、SatMAE和Scale-MAE。"
+  },
+  {
+    "id": "T006",
+    "page": 8,
+    "type": "T",
+    "original": "Table 6. Ablation results indicating the importance of GSDPE as determined by a KNN classification on RESISC-45 at a relative GSD of 50% and 100% of its native GSD. Using the GSDPE leads to better performance for both Scale-MAE and the Vanilla MAE. MAE + LP denotes the vanilla MAE with the addition of our progressive Laplacian decoder.",
+    "translation": "表6. 消融实验结果，表明GSDPE的重要性，通过在RESISC-45的相对GSD为其原生GSD的50%和100%时进行KNN分类确定。使用GSDPE使Scale-MAE和Vanilla MAE均获得更好性能。MAE + LP表示添加了渐进式Laplacian解码器的vanilla MAE。"
+  },
+  {
+    "id": "T007",
+    "page": 8,
+    "type": "T",
+    "original": "Table 7. Ablation results indicating that a 75% mask rate is optimal as determined by a KNN classification on RESISC-45 at a relative GSD of 50% and 100% of its native GSD.",
+    "translation": "表7. 消融实验结果，表明75%的掩码率是最优的，通过在RESISC-45的相对GSD为其原生GSD的50%和100%时进行KNN分类确定。"
+  },
+  {
+    "id": "T008",
+    "page": 9,
+    "type": "T",
+    "original": "Table 8. Ablation results indicating that fewer transformer layers in the decoding stage tend to work better for Scale-MAE as determined by a KNN classification on RESISC-45 at a relative GSD of 50% and 100% of its native GSD.",
+    "translation": "表8. 消融实验结果，表明解码阶段使用更少的transformer层对Scale-MAE效果更好，通过在RESISC-45的相对GSD为其原生GSD的50%和100%时进行KNN分类确定。"
+  },
+  {
+    "id": "T009",
+    "page": 9,
+    "type": "T",
+    "original": "Table 9. These ablation results indicate that reconstructing both the low resolution and high resolution components lead to robust performance. Note: when the high resolution component is reconstructed, the low-resolution residual is not used—the high resolution result is directly reconstructed. The \"Combined\" entry merges the low and high resolution results instead of treating them as separate losses. The evaluations are a kNN classification (k=20) on RESISC-45 at relative GSDs 50% and 100% of its native GSD.",
+    "translation": "表9. 这些消融实验结果表明，同时重建低分辨率和高分辨率组件可带来稳健的性能。注意：当重建高分辨率组件时，不使用低分辨率残差——直接重建高分辨率结果。\"Combined\"条目将低分辨率和高分辨率结果合并，而非作为单独的损失处理。评估是在RESISC-45的相对GSD为其原生GSD的50%和100%时进行的kNN分类（k=20）。"
+  },
+  {
+    "id": "T010",
+    "page": 13,
+    "type": "T",
+    "original": "Table 10. Statistics of all datasets used in our experiments. Task types are classification (C) and semantic segmentation (SS).",
+    "translation": "表10. 我们实验中使用的所有数据集的统计信息。任务类型为分类（C）和语义分割（SS）。"
+  },
+  {
+    "id": "T011",
+    "page": 14,
+    "type": "T",
+    "original": "Table 11. Scale-MAE outperforms SatMAE and ConvMAE on kNN classification across a variety of k, across a variety of resolutions. kNN Classification results for Scale-MAE, SatMAE and ConvMAE across a variety of k. Resolution is reported in pixels.",
+    "translation": "表11. Scale-MAE在多种k值和多种分辨率下的kNN分类中均优于SatMAE和ConvMAE。Scale-MAE、SatMAE和ConvMAE在多种k值下的kNN分类结果。分辨率以像素报告。"
+  }
+]

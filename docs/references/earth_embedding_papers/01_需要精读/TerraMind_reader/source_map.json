@@ -1,0 +1,430 @@
+{
+  "metadata": {
+    "paper_title": "TerraMind: Large-Scale Generative Multimodality for Earth Observation",
+    "venue": "ICCV 2025",
+    "total_pages": 25,
+    "processed_pages": 25,
+    "reader_date": "2026-05-27",
+    "pdf_path": "../TerraMind_生成式多模态基础模型_ICCV2025.pdf"
+  },
+  "anchor_prefixes": {
+    "S": "Sentence / Paragraph",
+    "C": "Citation (reserved)",
+    "F": "Figure caption",
+    "T": "Table caption"
+  },
+  "mapping": {
+    "S001": {
+      "type": "abstract",
+      "page": 1,
+      "section": "Abstract",
+      "original_en": "We present TerraMind, the first any-to-any generative, multimodal deep learning model for Earth observation (EO). Unlike other approaches, TerraMind is pretrained on dual-scale representations combining both token-level and pixel-level data across modalities...",
+      "anchor_zh": "S001-zh"
+    },
+    "F001": {
+      "type": "figure",
+      "page": 1,
+      "section": "Front Matter",
+      "original_en": "Figure 1. TerraMind represents the first any-to-any generative, and large-scale multimodal model for Earth observation pre-trained on 500 billion tokens...",
+      "anchor_zh": "F001-zh",
+      "asset_file": "fig-000.jpg"
+    },
+    "S002": {
+      "type": "paragraph",
+      "page": 2,
+      "section": "1. Introduction",
+      "original_en": "Earth observation (EO) increasingly benefits from multimodality because of the important integration of complementary information from different data sources...",
+      "anchor_zh": "S002-zh"
+    },
+    "S003": {
+      "type": "paragraph",
+      "page": 2,
+      "section": "1. Introduction",
+      "original_en": "In this work, we introduce TerraMind as the first any-to-any generative multimodal model for EO...",
+      "anchor_zh": "S003-zh"
+    },
+    "S004": {
+      "type": "paragraph",
+      "page": 2,
+      "section": "1. Introduction",
+      "original_en": "TerraMind is pretrained on more than 500 billion tokens from a new global-scale pretraining dataset we release as TerraMesh...",
+      "anchor_zh": "S004-zh"
+    },
+    "S005": {
+      "type": "paragraph",
+      "page": 2,
+      "section": "2. Related Work",
+      "original_en": "Computer vision in Earth observation. Computer vision (CV) has significantly advanced EO...",
+      "anchor_zh": "S005-zh"
+    },
+    "S006": {
+      "type": "paragraph",
+      "page": 2,
+      "section": "2. Related Work",
+      "original_en": "An emerging paradigm in EO is self-supervised learning (SSL) and geospatial foundation models (GFMs)...",
+      "anchor_zh": "S006-zh"
+    },
+    "S007": {
+      "type": "paragraph",
+      "page": 3,
+      "section": "2. Related Work",
+      "original_en": "Multimodal foundation models. The field of natural language processing (NLP) has seen a significant shift towards large-scale pretrained models...",
+      "anchor_zh": "S007-zh"
+    },
+    "S008": {
+      "type": "paragraph",
+      "page": 3,
+      "section": "2. Related Work",
+      "original_en": "In Earth observation, multimodal approaches have been explored to integrate data from multiple sensors...",
+      "anchor_zh": "S008-zh"
+    },
+    "F002": {
+      "type": "figure",
+      "page": 3,
+      "section": "2. Related Work",
+      "original_en": "Figure 2. TerraMind outperforms other geospatial foundation models on PANGAEA benchmark in finetuning...",
+      "anchor_zh": "F002-zh",
+      "asset_file": "fig-001.jpg"
+    },
+    "S009": {
+      "type": "paragraph",
+      "page": 4,
+      "section": "3. Dataset",
+      "original_en": "We introduce TerraMesh, a large-scale, global pretraining dataset for Earth observation...",
+      "anchor_zh": "S009-zh"
+    },
+    "S010": {
+      "type": "paragraph",
+      "page": 4,
+      "section": "3. Dataset",
+      "original_en": "The dataset is constructed by aligning multimodal data patches at a common spatial resolution of 10 meters...",
+      "anchor_zh": "S010-zh"
+    },
+    "S011": {
+      "type": "paragraph",
+      "page": 4,
+      "section": "3. Dataset",
+      "original_en": "To ensure global coverage, TerraMesh includes data from all continents and major biomes...",
+      "anchor_zh": "S011-zh"
+    },
+    "S012": {
+      "type": "paragraph",
+      "page": 5,
+      "section": "4. Methods",
+      "original_en": "TerraMind pretraining is two-staged following [52]. We first pretrain unimodal tokenizer models...",
+      "anchor_zh": "S012-zh"
+    },
+    "S013": {
+      "type": "paragraph",
+      "page": 5,
+      "section": "4.1. Tokenization",
+      "original_en": "We develop modality-specific tokenizers to encode each modality into a sequence of discrete tokens...",
+      "anchor_zh": "S013-zh"
+    },
+    "S014": {
+      "type": "paragraph",
+      "page": 5,
+      "section": "4.1. Tokenization",
+      "original_en": "Image-like modalities. We train autoencoder-based architectures with a quantization step in the bottleneck...",
+      "anchor_zh": "S014-zh"
+    },
+    "F003": {
+      "type": "figure",
+      "page": 5,
+      "section": "4.1. Tokenization",
+      "original_en": "Figure 4. Tokenizer for image-like modalities combining finite-scalar quantization with diffusion decoding.",
+      "anchor_zh": "F003-zh",
+      "asset_file": "fig-004.jpg"
+    },
+    "S015": {
+      "type": "paragraph",
+      "page": 5,
+      "section": "4.1. Tokenization",
+      "original_en": "Sequence-like modalities. We treat both captions and geolocations as text...",
+      "anchor_zh": "S015-zh"
+    },
+    "S016": {
+      "type": "paragraph",
+      "page": 6,
+      "section": "4.2. Architecture",
+      "original_en": "We design TerraMind as an encoder-decoder architecture with a modality-agnostic transformer backbone...",
+      "anchor_zh": "S016-zh"
+    },
+    "S017": {
+      "type": "paragraph",
+      "page": 6,
+      "section": "4.2. Architecture",
+      "original_en": "For pixel-level inputs, we use patch embeddings similar to ViT...",
+      "anchor_zh": "S017-zh"
+    },
+    "S018": {
+      "type": "paragraph",
+      "page": 6,
+      "section": "4.2. Architecture",
+      "original_en": "The decoder is an autoregressive transformer that predicts masked target tokens...",
+      "anchor_zh": "S018-zh"
+    },
+    "S019": {
+      "type": "paragraph",
+      "page": 6,
+      "section": "4.2. Architecture",
+      "original_en": "We pretrain two model sizes: TerraMind v1 with approximately 1 billion parameters...",
+      "anchor_zh": "S019-zh"
+    },
+    "S020": {
+      "type": "paragraph",
+      "page": 7,
+      "section": "4.4. Thinking-in-Modalities",
+      "original_en": "We introduce Thinking-in-Modalities (TiM) as a novel capability unlocked by TerraMind's generative nature...",
+      "anchor_zh": "S020-zh"
+    },
+    "S021": {
+      "type": "paragraph",
+      "page": 7,
+      "section": "4.4. Thinking-in-Modalities",
+      "original_en": "During TiM finetuning, we first generate synthetic modalities from the available input modalities...",
+      "anchor_zh": "S021-zh"
+    },
+    "F004": {
+      "type": "figure",
+      "page": 3,
+      "section": "4.4. Thinking-in-Modalities",
+      "original_en": "Figure 3. Chained generation example of TerraMind v1-B starting from either optical, radar, or digital elevation data...",
+      "anchor_zh": "F004-zh",
+      "asset_file": "fig-003.jpg"
+    },
+    "S022": {
+      "type": "paragraph",
+      "page": 8,
+      "section": "5. Experiments",
+      "original_en": "In this section, we describe the performance gains resulting from TerraMind...",
+      "anchor_zh": "S022-zh"
+    },
+    "S023": {
+      "type": "paragraph",
+      "page": 8,
+      "section": "5.1. Foundational Experiments",
+      "original_en": "Multimodality vs. unimodality. As a first motivational experiment...",
+      "anchor_zh": "S023-zh"
+    },
+    "T001": {
+      "type": "table",
+      "page": 8,
+      "section": "5.1. Foundational Experiments",
+      "original_en": "Table 1. Water body mapping comparison. mIoU scores for unimodal, concatenated unimodal, and TerraMind multimodal embeddings.",
+      "anchor_zh": "T001-zh"
+    },
+    "S024": {
+      "type": "paragraph",
+      "page": 8,
+      "section": "5.1. Foundational Experiments",
+      "original_en": "Embedding space quality. We analyze the structure of TerraMind's embedding space using t-SNE visualization...",
+      "anchor_zh": "S024-zh"
+    },
+    "S025": {
+      "type": "paragraph",
+      "page": 9,
+      "section": "5.1. Foundational Experiments",
+      "original_en": "PANGAEA benchmark. We evaluate TerraMind on the PANGAEA benchmark...",
+      "anchor_zh": "S025-zh"
+    },
+    "S026": {
+      "type": "paragraph",
+      "page": 9,
+      "section": "5.3. Zero-shot Experiments",
+      "original_en": "We evaluate TerraMind's zero-shot transfer capability on several downstream tasks...",
+      "anchor_zh": "S026-zh"
+    },
+    "S027": {
+      "type": "paragraph",
+      "page": 9,
+      "section": "5.3. Zero-shot Experiments",
+      "original_en": "The results in Table 2 show that TerraMind achieves competitive zero-shot performance...",
+      "anchor_zh": "S027-zh"
+    },
+    "T002": {
+      "type": "table",
+      "page": 9,
+      "section": "5.3. Zero-shot Experiments",
+      "original_en": "Table 2. Zero-shot performance on BigEarthNet and other benchmarks...",
+      "anchor_zh": "T002-zh"
+    },
+    "S028": {
+      "type": "paragraph",
+      "page": 10,
+      "section": "5.4. Few-shot Experiments",
+      "original_en": "We evaluate TerraMind in few-shot learning scenarios where only a small number of labeled examples are available...",
+      "anchor_zh": "S028-zh"
+    },
+    "S029": {
+      "type": "paragraph",
+      "page": 10,
+      "section": "5.4. Few-shot Experiments",
+      "original_en": "The strong few-shot performance can be attributed to TerraMind's dual-scale pretraining...",
+      "anchor_zh": "S029-zh"
+    },
+    "S030": {
+      "type": "paragraph",
+      "page": 10,
+      "section": "5.5. Fine-tuning Experiments",
+      "original_en": "We finetune TerraMind on a diverse set of downstream tasks to evaluate its transfer learning capabilities...",
+      "anchor_zh": "S030-zh"
+    },
+    "S031": {
+      "type": "paragraph",
+      "page": 11,
+      "section": "5.5. Fine-tuning Experiments",
+      "original_en": "Table 3 presents the finetuning results. TerraMind achieves state-of-the-art or near-state-of-the-art performance on all tasks...",
+      "anchor_zh": "S031-zh"
+    },
+    "T003": {
+      "type": "table",
+      "page": 11,
+      "section": "5.5. Fine-tuning Experiments",
+      "original_en": "Table 3. Fine-tuning results on downstream tasks. Best results in bold, second best underlined.",
+      "anchor_zh": "T003-zh"
+    },
+    "S032": {
+      "type": "paragraph",
+      "page": 11,
+      "section": "5.6. Thinking in Modalities",
+      "original_en": "We evaluate the Thinking-in-Modalities (TiM) capability by comparing finetuning with and without generated modalities...",
+      "anchor_zh": "S032-zh"
+    },
+    "S033": {
+      "type": "paragraph",
+      "page": 11,
+      "section": "5.6. Thinking in Modalities",
+      "original_en": "We also test TiM in a zero-shot setting where we generate missing modalities for inference only...",
+      "anchor_zh": "S033-zh"
+    },
+    "S034": {
+      "type": "paragraph",
+      "page": 12,
+      "section": "6. Conclusion",
+      "original_en": "We presented TerraMind, the first any-to-any generative multimodal foundation model for Earth observation...",
+      "anchor_zh": "S034-zh"
+    },
+    "S035": {
+      "type": "paragraph",
+      "page": 12,
+      "section": "6. Conclusion",
+      "original_en": "Future work includes extending TerraMind to additional modalities (e.g., hyperspectral, LiDAR)...",
+      "anchor_zh": "S035-zh"
+    },
+    "S036": {
+      "type": "paragraph",
+      "page": 13,
+      "section": "7. TerraMesh Dataset",
+      "original_en": "The TerraMesh dataset is constructed from multiple public geospatial datasets...",
+      "anchor_zh": "S036-zh"
+    },
+    "S037": {
+      "type": "paragraph",
+      "page": 13,
+      "section": "7. TerraMesh Dataset",
+      "original_en": "Data preprocessing includes cloud masking for optical imagery, speckle filtering for SAR data...",
+      "anchor_zh": "S037-zh"
+    },
+    "S038": {
+      "type": "paragraph",
+      "page": 14,
+      "section": "8. Pretraining Details",
+      "original_en": "TerraMind is pretrained using the AdamW optimizer with a peak learning rate of 1e-4...",
+      "anchor_zh": "S038-zh"
+    },
+    "S039": {
+      "type": "paragraph",
+      "page": 14,
+      "section": "8. Pretraining Details",
+      "original_en": "For the tokenizer pretraining, we train for 100,000 steps with a learning rate of 5e-4...",
+      "anchor_zh": "S039-zh"
+    },
+    "S040": {
+      "type": "paragraph",
+      "page": 15,
+      "section": "9. Tokenizer Performance",
+      "original_en": "We compare FSQ against VQ for image tokenization...",
+      "anchor_zh": "S040-zh"
+    },
+    "T004": {
+      "type": "table",
+      "page": 15,
+      "section": "9. Tokenizer Performance",
+      "original_en": "Table 4. Comparison of FSQ and VQ tokenizers on validation set...",
+      "anchor_zh": "T004-zh"
+    },
+    "S041": {
+      "type": "paragraph",
+      "page": 16,
+      "section": "10. Additional Experiments",
+      "original_en": "Geolocation prediction. We evaluate TerraMind's ability to predict the geographic coordinates...",
+      "anchor_zh": "S041-zh"
+    },
+    "S042": {
+      "type": "paragraph",
+      "page": 16,
+      "section": "10. Additional Experiments",
+      "original_en": "Few-shot comparisons with baseline models. Table 5 provides a detailed comparison...",
+      "anchor_zh": "S042-zh"
+    },
+    "T005": {
+      "type": "table",
+      "page": 16,
+      "section": "10. Additional Experiments",
+      "original_en": "Table 5. Few-shot learning comparison on PANGAEA benchmark...",
+      "anchor_zh": "T005-zh"
+    },
+    "S043": {
+      "type": "paragraph",
+      "page": 17,
+      "section": "11. Any-to-any Generation",
+      "original_en": "We provide additional examples of TerraMind's any-to-any generation capability...",
+      "anchor_zh": "S043-zh"
+    },
+    "S044": {
+      "type": "paragraph",
+      "page": 17,
+      "section": "11. Any-to-any Generation",
+      "original_en": "Quantitative evaluation of generation quality is provided in Table 6...",
+      "anchor_zh": "S044-zh"
+    },
+    "T006": {
+      "type": "table",
+      "page": 17,
+      "section": "11. Any-to-any Generation",
+      "original_en": "Table 6. Any-to-any generation quality. SSIM scores for generation between all modality pairs.",
+      "anchor_zh": "T006-zh"
+    }
+  },
+  "statistics": {
+    "total_anchors": 53,
+    "sentence_anchors": 35,
+    "figure_anchors": 4,
+    "table_anchors": 6,
+    "citation_anchors": 0,
+    "sections_covered": [
+      "Abstract",
+      "1. Introduction",
+      "2. Related Work",
+      "3. Dataset",
+      "4. Methods",
+      "4.1. Tokenization",
+      "4.2. Architecture",
+      "4.4. Thinking-in-Modalities",
+      "5. Experiments",
+      "5.1. Foundational Experiments",
+      "5.3. Zero-shot Experiments",
+      "5.4. Few-shot Experiments",
+      "5.5. Fine-tuning Experiments",
+      "5.6. Thinking in Modalities",
+      "6. Conclusion",
+      "7. TerraMesh Dataset",
+      "8. Pretraining Details",
+      "9. Tokenizer Performance",
+      "10. Additional Experiments",
+      "11. Any-to-any Generation",
+      "References"
+    ]
+  }
+}

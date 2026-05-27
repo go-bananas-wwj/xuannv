@@ -58,3 +58,6 @@ node_modules/
 # Patent figure test files
 **/patent_figures_test*.md
 
+
+# NPU CANN 运行时缓存
+kernel_meta/

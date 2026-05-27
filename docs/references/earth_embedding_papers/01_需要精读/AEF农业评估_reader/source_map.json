@@ -1,0 +1,805 @@
+{
+  "blocks": [
+    {
+      "id": "S001",
+      "page": 1,
+      "type": "paragraph",
+      "original": "Harvesting AlphaEarth: Benchmarking the Geospatial Foundation Model for\nAgricultural Downstream Tasks\nYuchi Ma1*, Yawen Shen2, Anu Swatantran2, David B. Lobell1\n1Department of Earth System Science and Center on Food Security and the Environment, Stanford University, USA\n2Corteva Agriscience™, USA\nCorrespondence to: Yuchi Ma (yuchima8@gmail.com)",
+      "translation": "Harvesting AlphaEarth：针对农业下游任务对地理空间基础模型进行基准测试\n马宇驰1*，沈亚文2，Anu Swatantran2，David B. Lobell1\n1斯坦福大学地球系统科学系及粮食安全与环境中心，美国\n2Corteva Agriscience™，美国\n通讯作者：马宇驰 (yuchima8@gmail.com)",
+      "index": 0
+    },
+    {
+      "id": "H001",
+      "page": 1,
+      "type": "heading",
+      "original": "Keywords: Geospatial Foundation Model, AlphaEarth Foundation, Yield Prediction, Agricultural Practice Mapping",
+      "translation": "关键词：Geospatial Foundation Model, AlphaEarth Foundation, Yield Prediction, Agricultural Practice Mapping",
+      "index": 1
+    },
+    {
+      "id": "H002",
+      "page": 1,
+      "type": "heading",
+      "original": "Abstract",
+      "translation": "摘要",
+      "index": 2
+    },
+    {
+      "id": "S002",
+      "page": 1,
+      "type": "paragraph",
+      "original": "Geospatial foundation models (GFMs), pretrained on massive Earth observations (EO), have emerged as a\npromising approach to overcoming the limitations in existing featurization methods. Although most studies\non GFMs have released the source codes and pre-trained weights, their deployment still demands extensive\nconfiguration, environment setup, inference EO preparation, and model fine-tuning. More recently, Google\nDeepMind has introduced AlphaEarth Foundation (AEF), a GFM pre-trained using multi-source EOs across\ncontinuous time. An annual and global embedding dataset is produced using AEF that is ready for analysis\nand modeling. The internal experiments show that AEF embeddings have outperformed operational models\nin 15 EO tasks without re-training. However, those experiments are mostly about land cover and land use\nclassification. Applying AEF and other GFMs to agricultural monitoring require an in-depth evaluation in\ncritical agricultural downstream tasks. There is also a lack of comprehensive comparison between the AEF-\nbased models and traditional remote sensing (RS)-based models under different scenarios, which could\noffer valuable guidance for researchers and practitioners. This study addresses some of these gaps by\nevaluating AEF embeddings in three agricultural downstream tasks in the U.S., including crop yield\nprediction, tillage mapping, and cover crop mapping. Datasets are compiled from both public and private\nsources to comprehensively evaluate AEF embeddings across tasks at different scales and locations, and\nRS-based models are trained as comparison models. AEF-based models generally exhibit strong\nperformance on all tasks and are competitive with purpose-built RS-based models in yield prediction and\ncounty-level tillage mapping when trained on local data. However, we also find several limitations in\ncurrent AEF embeddings, such as limited spatial transferability compared to RS-based models, low\ninterpretability, and limited time sensitivity. These limitations recommend caution when applying AEF\nembeddings in agriculture, where time sensitivity, generalizability, and interpretability is important. To our\nknowledge, this is the first study that systematically implements and evaluates embeddings from GFMs in\nagricultural downstream tasks across space, time, and spatial resolutions. The evaluation results and\nanalyses can inform the design of future AEF versions and other GFMs and support their applications in\nagriculture and Earth science domains. Moreover, the proposed benchmarking workflow and datasets can\nbe readily applied to evaluate future GFMs and facilitate their use in agricultural downstream applications.\nThe code and data will be publicly available at https://github.com/yuchima8/Harvest_AlphaEarth.",
+      "translation": "地理空间基础模型（GFMs）基于海量地球观测（EO）数据进行预训练，已成为克服现有特征化方法局限性的有前景的途径。尽管大多数GFM研究已开源代码和预训练权重，但其部署仍需要大量配置、环境搭建、推理EO数据准备以及模型微调。近期，Google DeepMind推出了AlphaEarth Foundation（AEF），一种基于多源EO数据在连续时间上进行预训练的GFM。利用AEF生成的年度全球嵌入数据集可直接用于分析和建模。内部实验表明，AEF嵌入在无需重新训练的15项EO任务中超越了现有业务模型。然而，这些实验主要集中于土地覆盖和土地利用分类。将AEF及其他GFMs应用于农业监测，需要对关键农业下游任务进行深入评估。此外，目前缺乏AEF基础模型与传统遥感（RS）基础模型在不同场景下的全面比较，而这种比较可为研究人员和实践者提供宝贵指导。本研究通过在美国三项农业下游任务（作物产量预测、耕作制图和覆盖作物制图）中评估AEF嵌入，填补了部分空白。数据集来自公开和私有来源，以在不同尺度和位置的任务中全面评估AEF嵌入，同时训练RS基础模型作为对比。AEF基础模型在所有任务上均表现强劲，在利用本地数据训练时，在产量预测和县级耕作制图方面与专门构建的RS基础模型具有竞争力。然而，我们也发现当前AEF嵌入存在若干局限性，如与RS基础模型相比空间迁移能力有限、可解释性低以及时间敏感性有限。这些局限性提示在将AEF嵌入应用于农业时需谨慎，因为农业领域对时间敏感性、泛化能力和可解释性要求很高。据我们所知，这是首个系统地在农业下游任务中实现和评估GFM嵌入、并跨越空间、时间和空间分辨率的研究。评估结果和分析可为未来AEF版本及其他GFMs的设计提供参考，并支持其在农业和地球科学领域的应用。此外，所提出的基准测试工作流程和数据集可便捷地应用于评估未来的GFMs，并促进其在农业下游应用中的使用。代码和数据将公开于 https://github.com/yuchima8/Harvest_AlphaEarth。",
+      "index": 3
+    },
+    {
+      "id": "S003",
+      "page": 1,
+      "type": "paragraph",
+      "original": "1. Introduction\nEarth observation (EO), grounded in remote sensing imagery, has enabled scalable and timely monitoring\nof dynamic Earth system processes, with agriculture being one of its most widely applied domains. Since\nthe launch of the first Landsat satellite in 1972, there were early studies that explored the association\n1",
+      "translation": "1. 引言\n基于遥感影像的地球观测（EO）已实现动态地球系统过程的可扩展且及时的监测，农业是其最广泛应用的领域之一。自1972年首颗Landsat卫星发射以来，早期研究便探索了卫星光谱观测与地面作物状况之间的关联（Deering, 1978; Kauth and Thomas, 1976）。在过去半个世纪中，卫星平台的快速发展和地球观测数据的可用性深刻地改变了农业生态系统的研究和实践，如耕地制图（Zhang et al., 2025）、作物产量预测（Xiong et al., 2026）、农业实践检测（Luo et al., 2023）、农业碳排放 outcome 测量（Guan et al., 2023）和粮食安全评估（Nakalembe et al., 2021）。",
+      "index": 4
+    },
+    {
+      "id": "S004",
+      "page": 2,
+      "type": "paragraph",
+      "original": "between satellite spectral observations and crop conditions on the ground (Deering, 1978; Kauth and\nThomas, 1976). Over the past half century, the rapid expansion of satellite platforms and the availability of\nEarth observations have profoundly transformed research and practices in agroecosystems, such as cropland\nmapping (Zhang et al., 2025), crop yield prediction (Xiong et al., 2026), agricultural practice detection (Luo\net al., 2023), agricultural carbon outcome measurement (Guan et al., 2023), and food security assessment\n(Nakalembe et al., 2021).\nDespite the progress, there are still several bottlenecks that limit the application of EO in agriculture. A\nmajor challenge lies in the varying availability of EO data, driven by differences in satellite track overlap\nand cloud cover. Infrequent observations or data gaps can substantially reduce the effectiveness of cropland\nmonitoring. Data harmonization is another common challenge when multi-modal EO data are used, arising\nfrom discrepancies in sensor design, spatial resolution, spectral response functions, and temporal revisit\nfrequencies. In the past decade, machine learning (ML) and deep learning (DL) models based on EO have\ndemonstrated potential across multiple agricultural downstream tasks. However, training ML/DL models\nrequires abundant, high-quality, and task-specific labels. These ground truth labels, such as cropland types\nor crop yield records, are typically collected through expert annotation or field surveys, which are both\ntime-consuming and resource intensive.\nRecently, geospatial foundation models (GFMs) have emerged as a promising approach to overcome the\nabovementioned bottlenecks, as they are trained on broad, large-scale data and can be readily adapted to a\nwide range of downstream EO tasks. GFMs are typically pre-trained in a self-supervised way, wherein the\nmodel exploits the input data itself to construct learning objectives, such as image reconstruction (He et al.,\n2022) or contrastive learning (Wang et al., 2022). This pre-training process requires no task-specific labels\nand enables the model to extract generic features from the input remote sensing data that can be adapted to\ndiverse downstream tasks through fine-tuning or zero-shot learning.\nEarly GFMs were trained based on a single modality and targeted at a few related downstream tasks. For\nexample, SatMAE (Cong et al., 2022), one of the first GFMs, was pre-trained on multi-spectral Sentinel-2\nimages using Masked Autoencoders (He et al., 2022) and evaluated on cropland classification and semantic\nsegmentation. Similarly, Scale-MAE (Reed et al., 2023) was pre-trained by jointly learning representations\nfrom optical images at both low and high scales, achieving improved accuracy in 8 land-use classification\ndatasets. In addition to encoding spatial information, NASA and IBM released a multi-temporal GFM\nnamed Prithvi-EO-2.0 (Szwarcman et al., 2024), which explicitly leverages transformer attention across\nboth spatial and temporal dimensions via pre-training on a decade of satellite imagery from the Harmonized\nLandsat–Sentinel-2 archive. Recent efforts have shifted towards building multi-modal GFMs that accept\ninputs from more than one source, such as optical, multispectral, hyperspectral, and SAR images. For\ninstance, the DOFA model (Xiong et al., 2024) incorporates a universal feature learning module designed\nfor heterogeneous data modalities and was jointly trained using observations from five sensors. SkySense++\n(Wu et al., 2025) integrates data from 11 satellite platforms and was pretrained progressively to learn both\ngeneral representations and semantically enriched representations.\nAlthough an increasing number of GFMs has been developed and released, several limitations remain in\ntheir application to practical downstream tasks. Even though most GFM studies have released source codes\nand pre-trained models, their deployment still demands extensive configuration and environment setup,\nposing challenges for users with limited expertise in deep learning or foundation models. Meanwhile,\n2",
+      "translation": "尽管取得了进展，仍有若干瓶颈限制了EO在农业中的应用。一个主要挑战在于EO数据的可变可用性，这受卫星轨道重叠和云覆盖的影响。观测频率低或数据缺口会显著降低耕地监测的有效性。当使用多模态EO数据时，数据 harmonization 是另一个常见挑战，源于传感器设计、空间分辨率、光谱响应函数和时间重访频率的差异。在过去十年中，基于EO的机器学习和深度学习模型在多个农业下游任务中展现了潜力。然而，训练ML/DL模型需要大量高质量且任务特定的标签。这些地面真实标签，如耕地类型或作物产量记录，通常通过专家标注或田间调查收集，既耗时又资源密集。",
+      "index": 5
+    },
+    {
+      "id": "S005",
+      "page": 3,
+      "type": "paragraph",
+      "original": "adapting these GFMs requires fine-tuning with task-specific labels together with remote sensing\nobservations, which still involve intensive image collection and pre-processing.\nMost recently, Google DeepMind introduced AlphaEarth Foundation (AEF) (Brown et al., 2025), a GFM\nwith ~480M parameters that generates near-global geospatial representation that assimilates spatial,\ntemporal, climate, topography, and measurement contexts across multiple sources. AEF achieves\ncontinuous time-series EO featurization via several innovations, such as a Space-Time Precision encoder,\nan adaptive decoding scheme, and a spatially dense information time-bottleneck. Pre-trained using ~3\nbillion images sampled from ~5 million locations worldwide, AEF learns general representations that\ncapture temporal dynamics of Earth’s surface and climatic activities. At inference, it ingests annual multi-\nsource EOs and encodes Earth’s surface into 64-dimentional embeddings at 10 m spatial resolution. The\nannual AEF embeddings are publicly available on Google Earth Engine in 2017–2024.\nAEF can potentially transform EO tasks since it has largely addressed the challenges of data harmonization\nand data gaps. Internal evaluation showed that AEF embeddings have consistently outperformed previous\nfeaturization approaches tested on 15 EO tasks without re-training (Brown et al., 2025). However, certain\naspects of AEF remain insufficiently evaluated. First, AEF embeddings have been evaluated mostly on land\nuse and land cover mapping tasks, with no insights into critical agricultural downstream tasks, such as crop\nyield prediction and agricultural practice mapping. Second, internal evaluations were conducted in the same\nregion and the same period, with no testing of the spatial or temporal generalizability of the AEF\nembeddings. More importantly, it remains unclear how AEF embeddings compare with commonly used\nremote sensing features across different scenarios, an evaluation that could offer valuable guidance for\nresearchers and practitioners.\nTo answer these questions and facilitate better application of AEF embeddings in agriculture and potentially\nother EO tasks, we proposed a benchmarking workflow that systematically evaluates AEF embeddings\nacross three agricultural downstream tasks: crop yield prediction, tillage classification, and cover crop\nmapping. Ground truth labels were compiled from both public and private sources to comprehensively\nevaluate AEF embeddings across tasks at different scales and locations. In addition to local experiments,\nwe also evaluated AEF’s generalizability across space, time, and scales. Meanwhile, remote sensing-based\nmodels were trained as baselines for comparison in each task.\nThe structure of the paper is as follows: In Section 2, we describe each of the downstream task and the\ncorresponding sources of the ground truth data. In Section 3, we introduce the AEF embeddings and the\nremote sensing features. The details about the data downloading and pre-processing procedures are\nprovided. In addition, ML models and evaluation schemes are illustrated. In Section 4, we present the\nevaluation results of the AEF-based models and RS-based models across three tasks. The space- and scale-\ntransfer experiments have also been conducted. In Section 5, we summarize the advantages and limitations\nof AEF embeddings in agricultural applications. In Section 6, we conclude this study and discuss potential\nfuture research.",
+      "translation": "最近，地理空间基础模型（GFMs）作为克服上述瓶颈的有前景的方法出现，因为它们在广泛的大规模数据上进行训练，可以 readily 适应各种下游EO任务。GFMs通常以自监督方式进行预训练，其中模型利用输入数据本身构建学习目标，如图像重建（He et al., 2022）或对比学习（Wang et al., 2022）。这一预训练过程不需要任务特定的标签，使模型能够从输入遥感数据中提取通用特征，这些特征可通过微调或零样本学习适应多样化的下游任务。",
+      "index": 6
+    },
+    {
+      "id": "S006",
+      "page": 3,
+      "type": "paragraph",
+      "original": "2. Experimental tasks and ground truth data\nWe evaluated the potential of AEF embeddings for crop yield prediction, tillage classification, and cover\ncrop mapping at both the regional scale (county level) and the field scale. The corresponding agricultural\ndata were collected as ground truth labels for model training and evaluation. In particular, the county-level\nagricultural data are provided by the governments’ agricultural agencies, which are public available. Field-\n3",
+      "translation": "2. 实验任务与 ground truth 数据\n我们在县级和 field 尺度上评估了AEF嵌入在作物产量预测、耕作分类和覆盖作物制图方面的潜力。相应的农业数据被收集作为模型训练和评估的 ground truth 标签。具体而言，县级农业数据由政府农业机构提供，公开可用。field 尺度农业数据通常存储在政府数据库或商业系统中，由于隐私问题难以获取（Deines et al., 2021; Ma et al., 2024b）。Corteva Agriscience 收集并提供了美国 field 尺度的农业数据用于本研究的模型训练和评估。更多细节如下。",
+      "index": 7
+    },
+    {
+      "id": "S007",
+      "page": 4,
+      "type": "paragraph",
+      "original": "level agricultural data are typically stored in governmental databases or commercial systems and are hard\nto acquire due to privacy concerns (Deines et al., 2021; Ma et al., 2024b). Corteva Agriscience collected\nand provided the agricultural data at the field level in the U.S. for model training and evaluation in this\nstudy. More details are given below.\n2.1 Crop yield prediction\nCrop yield prediction provides essential information for farm resource management, food security\nmonitoring, and market planning (Becker-Reshef et al., 2019). Many governments conduct monthly and\nannual agricultural surveys to estimate crop progress and predict yield within the growing season. More\nrecently, ML-based yield prediction models using EO have proven an effective and cost-efficient approach\nthat can accurately predict crop yields. Specifically, raw remote sensing or derived vegetation indices are\nused as predictor variables to train ML models, together with the corresponding ground truth yield records.\nThe trained ML models are implemented to predict yields in unseen regions or years.",
+      "translation": "2.1 作物产量预测\n作物产量预测为农场资源管理、粮食安全监测和市场规划提供重要信息（Becker-Reshef et al., 2019）。许多政府进行月度及年度农业调查，以估算作物生长进度并预测生长季内的产量。近来，基于EO的ML产量预测模型已被证明是一种有效且成本效益高的方法，可以准确预测作物产量。具体而言，原始遥感数据或 derived 植被指数被用作预测变量来训练ML模型，同时配合相应的 ground truth 产量记录。训练好的ML模型被用于预测未见区域或年份的产量。",
+      "index": 8
+    },
+    {
+      "id": "F001",
+      "page": 4,
+      "type": "figure_caption",
+      "original": "Figure 1 The study areas in the U.S., covering (a) 12 states in the U.S. Corn belt for corn and soybean, and",
+      "translation": "图1 美国研究区域，包括（a）美国玉米带12个州（玉米和大豆），以及（b）11个中西部州（冬小麦）。涉及的州包括科罗拉多（CO）、伊利诺伊（IL）、印第安纳（IN）、艾奥瓦（IA）、堪萨斯（KS）、密歇根（MI）、明尼苏达（MN）、密苏里（MO）、内布拉斯加（NE）、北达科他（ND）、俄克拉荷马（OK）、得克萨斯（TX）、南达科他（SD）和威斯康星（WI）。",
+      "index": 9
+    },
+    {
+      "id": "S008",
+      "page": 4,
+      "type": "paragraph",
+      "original": "(b) 11 Midwestern states for winter wheat. The states include Colorado (CO), Illinois (IL), Indiana (IN),\nIowa (IA), Kansas (KS), Michigan (MI), Minnesota (MN), Missouri (MO), Nebraska (NE), North Dakota\n(ND), Oklahoma (OK), Texas (TX), South Dekota (SD), and Wisconsin (WI).\nWe evaluated the performance of AEF embeddings for yield prediction in the U.S., which is the world’s\nlargest agricultural producer and export (Kogan et al., 2013). The county-level yield data for corn, soybean,\nand winter wheat in the U.S. from 2017 to 2024 were obtained from the United States Department of\nAgriculture National Agricultural Statistics Service (USDA-NASS) (USDA-NASS, 2024), which publishes\nannual yield statistics after the growing season. Corn and soybean yield data were collected from 12 U.S.\nCorn Belt states and winter wheat yield data from 11 Midwestern states, which are the major crop producers\nand account for more than 70% of the national crop production (Figure 1).\nIn addition, we also evaluated AEF embeddings on field-level yield prediction, which provides fine-scale\ninformation to support farm management. The ground-based measures of yields were collected using in-\nfield yield monitoring system during harvesting by Corteva Agriscience (Deines et al., 2021). This Corteva\nyield datasets include multi-year field-level yield data and the field locations for corn, soybean, and winter\nwheat. Corn and soybean fields distribute across the U.S. Corn Belt and winter wheat fields span the U.S.\nWheat Belt and Midwest (Ma et al., 2024b), including 89,938 corn fields and 73,492 soybean fields in\n2017–2018, and 20,401 winter wheat fields in 2017–2022.\n4",
+      "translation": "我们在美国评估了AEF嵌入的产量预测性能，美国是世界上最大的农业生产国和出口国（Kogan et al., 2013）。2017至2024年美国玉米、大豆和冬小麦的县级产量数据来自美国农业部国家农业统计服务局（USDA-NASS）（USDA-NASS, 2024），该机构在生长季后发布年度产量统计。玉米和大豆产量数据来自12个美国玉米带州，冬小麦产量数据来自11个中西部州，这些州是主要作物生产区，占全国作物产量的70%以上（图1）。\n此外，我们还评估了AEF嵌入在field尺度产量预测上的表现，这提供了支持农场管理的精细尺度信息。地面产量测量由Corteva Agriscience在收获期间使用田间产量监测系统收集（Deines et al., 2021）。该Corteva产量数据集包括多年field尺度产量数据和玉米、大豆、冬小麦的field位置。玉米和大豆field分布在美国玉米带，冬小麦field跨越美国小麦带和中西部（Ma et al., 2024b），包括2017–2018年的89,938个玉米field和73,492个大豆field，以及2017–2022年的20,401个冬小麦field。",
+      "index": 10
+    },
+    {
+      "id": "S009",
+      "page": 5,
+      "type": "paragraph",
+      "original": "2.2 Spring tillage mapping\nTillage is an agricultural practice that farmers implement to prepare the land for sowing. Conventional high-\nintensity tillage often leaves little crop residue and causes large disturbance to the soil, which accelerates\nsoil erosion and increase greenhouse gas emissions (Lu et al., 2022). Low-intensity tillage, including\nconservation tillage and no-till, has been promoted worldwide to conserve soil and water (Claassen et al.,\n2017). Due to its far-reaching environmental impacts, tillage mapping based on ML and remote sensing\nobservations has drawn considerable research attention. In addition to raw spectral bands and VIs, tillage-\nrelated indices have been derived to detect crop residue cover and classify tillage practices, such as\nNormalized Difference Tillage Index (NDTI) (Van Deventer et al., 1997).\nWe evaluated the performance of AEF embeddings for spring tillage mapping in the U.S. Corn Belt at both\nthe county level and the field level (",
+      "translation": "2.2 春季耕作制图\n耕作是农民为播种而准备土地的一种农业实践。传统高强度耕作通常留下少量作物残茬并对土壤造成较大扰动，加速土壤侵蚀并增加温室气体排放（Lu et al., 2022）。低强度耕作，包括保护性耕作和免耕，已在全球推广以节约土壤和水资源（Claassen et al., 2017）。由于其深远的环境影响，基于ML和遥感观测的耕作制图吸引了大量研究关注。除原始光谱波段和植被指数（VIs）外，还衍生了与耕作相关的指数来检测作物残茬覆盖并分类耕作实践，如归一化差分耕作指数（NDTI）（Van Deventer et al., 1997）。",
+      "index": 11
+    },
+    {
+      "id": "S010",
+      "page": 5,
+      "type": "paragraph",
+      "original": "Figure 1 (a)). County-level tillage statistics were collected from USDA-\nNASS, which record the area of cropland managed under different tillage systems, including conventional\ntillage, conservation tillage, and no-till (Zulauf and Brown, 2019). The tillage statistics are compiled\nthrough the USDA Census of Agriculture every five years and are currently available in 2017 and 2022. We\ncollected the data and combined conservation tillage and no-till as low-intensity tillage. The proportion of\ncropland under low-intensity tillage within each county were calculated as the ground truth data, and there\nare overall 2,001 county-year records.\nField-level Spring tillage data were collected from farmers by Corteva Agriscience. The Corteva tillage\ndataset contains grower-submitted records of tillage operations and the field boundaries spanning 2016–\n2023 throughout the U.S. Corn Belt. We used the data in 2017–2023 and categorized the tillage activity for\neach field into low- or high-intensity tillage according to the corresponding intensity levels, resulting in a\ntotal of 24,514 field-yield records.\n2.3 Cover crop mapping\nCover cropping is another conservation agricultural practice in which non-cash crops are cultivated during\nthe interval between the harvest of cash crops and the planting of the next (Plastina et al., 2020). It helps\nprevent periods of bare soil in croplands and reduce the risk of soil erosion (Koudahe et al., 2022), nitrogen\nleaching (Abdalla et al., 2019), and weed infestation (Alonso-Ayuso et al., 2018). In the U.S., the adoption\nof cover crops has expanded substantially in recent decade, with the national cover crop area nearly\ndoubling from 10.3 million acres in 2012 to 18.0 million acres in 2022 (Lobell et al., 2025; Zulauf et al.,\n2024). EO-based methods have been developed to detect and track the adoption of cover crops (Fendrich\net al., 2023; Zhou et al., 2022).\nWe evaluated the performance of AEF embeddings for cover crop mapping in the U.S. Corn Belt at the\nfield level (",
+      "translation": "我们在美国玉米带县级和field尺度评估了AEF嵌入的春季耕作制图性能（图1（a））。县级耕作统计数据来自USDA-NASS，记录了不同耕作系统下的耕地面积，包括传统耕作、保护性耕作和免耕（Zulauf and Brown, 2019）。耕作统计数据通过USDA农业普查每五年编制一次，目前可得2017和2022年数据。我们收集了数据并将保护性耕作和免耕合并为低强度耕作。计算了每个县内低强度耕作耕地面积比例作为ground truth数据，共2,001个县-年记录。\nfield尺度春季耕作数据由Corteva Agriscience从农民处收集。Corteva耕作数据集包含2016–2023年间美国玉米带农民提交的耕作操作记录和field边界。我们使用了2017–2023年的数据，并根据相应的强度水平将每个field的耕作活动分类为低强度或高强度耕作，共24,514个field-耕作记录。",
+      "index": 12
+    },
+    {
+      "id": "S011",
+      "page": 5,
+      "type": "paragraph",
+      "original": "Figure 1 (a)). Again, the field-level cover crop data were collected from farmers by Corteva\nAgriscience. Each data record specified if a cover crop was used in a field and provided the field boundary,\nthe start and end dates of cover cropping, and the species planted. The annual cover crop dataset covers the\n12 states in the U.S. Corn Belt and spans from 2017 to 2024. Since the planting dates of the cover crops\ncan happen in the fall after the harvest, or in the spring before the planting, we concatenated two-year AEF\nembeddings as the input predictors. Therefore, we dropped year 2017 and did experiments for 2018–2024,\nleading to a total number of 47,709 field-year samples. We did not conduct county-level cover crop mapping\nexperiments because county-level data are available only for 2017 and 2022, and AEF embeddings for 2016\nare unavailable, which prevents the construction of two-year AEF embedding inputs as predictors.\n5",
+      "translation": "2.3 覆盖作物制图\n覆盖作物种植是另一种保护性农业实践，在非现金作物收获后至下一季作物播种前的间隔期内种植非现金作物（Plastina et al., 2020）。它有助于防止耕地出现裸土期，降低土壤侵蚀（Koudahe et al., 2022）、氮素淋失（Abdalla et al., 2019）和杂草侵染（Alonso-Ayuso et al., 2018）的风险。在美国，覆盖作物的采用近十年来大幅扩展，全国覆盖作物面积从2012年的1,030万英亩几乎翻倍至2022年的1,800万英亩（Lobell et al., 2025; Zulauf et al., 2024）。已开发出基于EO的方法来检测和追踪覆盖作物的采用（Fendrich et al., 2023; Zhou et al., 2022）。",
+      "index": 13
+    },
+    {
+      "id": "S012",
+      "page": 6,
+      "type": "paragraph",
+      "original": "A summary of the datasets and experimental settings for each downstream tasks is given in Table 1.",
+      "translation": "我们在美国玉米带field尺度评估了AEF嵌入的覆盖作物制图性能（图1（a））。同样，field尺度覆盖作物数据由Corteva Agriscience从农民处收集。每条数据记录指明了某field是否使用了覆盖作物，并提供了field边界、覆盖作物种植的开始和结束日期以及种植物种。年度覆盖作物数据集覆盖美国玉米带12个州，时间跨度为2017至2024年。由于覆盖作物可在秋季收获后或春季播种前种植，我们将两年的AEF嵌入拼接作为输入预测变量。因此，我们舍弃了2017年，对2018–2024年进行实验，共47,709个field-年样本。我们没有进行县级覆盖作物制图实验，因为县级数据仅在2017和2022年可用，而2016年的AEF嵌入不可用，这阻碍了两年度AEF嵌入输入作为预测变量的构建。",
+      "index": 14
+    },
+    {
+      "id": "T001",
+      "page": 6,
+      "type": "table_caption",
+      "original": "Table 1 A summary of the experimental settings.",
+      "translation": "表1 实验设置总结。",
+      "index": 15
+    },
+    {
+      "id": "S013",
+      "page": 6,
+      "type": "paragraph",
+      "original": "Task Level Year Crop # Samples\nCorn 6,325\nCounty 2017–2024 Soybean 6,024\nWinter Wheat 3,020\nYield Prediction\nCorn 89,938\n2017–2018\nField Soybean 73,492\n2017–2022 Winter Wheat 20,401\nCounty 2017&2022 N/A 2,001\nTillage Mapping\nField 2017–2023 N/A 24,514\nCover Crop Mapping Field 2018–2024 N/A 47,709",
+      "translation": "Task | Level | Year | Crop | # Samples\nCorn | County | 2017–2024 | 6,325\nSoybean | County | 2017–2024 | 6,024\nWinter Wheat | County | 2017–2024 | 3,020\nCorn | Field | 2017–2018 | 89,938\nSoybean | Field | 2017–2018 | 73,492\nWinter Wheat | Field | 2017–2022 | 20,401\nTillage Mapping | County | 2017&2022 | N/A | 2,001\nTillage Mapping | Field | 2017–2023 | N/A | 24,514\nCover Crop Mapping | Field | 2018–2024 | N/A | 47,709",
+      "index": 16
+    },
+    {
+      "id": "H003",
+      "page": 6,
+      "type": "heading",
+      "original": "3. Materials",
+      "translation": "3. 材料与方法",
+      "index": 17
+    },
+    {
+      "id": "S014",
+      "page": 6,
+      "type": "paragraph",
+      "original": "3.1 Alpha Earth Foundation model\nThe AEF model was trained on ~3 billions of observations across optical (Landsat 8/9, Sentinel-2), radar\n(Sentinel-1), LiDAR (GEDI), Climate (ERA5-Land), gravity fields (GRACE), Elevation (GLO-30), and\ntext sources (Wikipedia) (Brown et al., 2025). A space–time encoder and a teacher–student framework was\nemployed to capture spatial, temporal, and measurement contexts in a compact form. Consequently, it\ntransformed sparse, heterogeneous EOs from multiple sources into a universal 64-dimensional embedding\nspace for global mapping. The resulting 64-dimensional embeddings are time-continuous and sensor-\nagnostic at 10-meter resolution, achieving near-global spatial coverage and excluding polar extremes\nbeyond ~82° N/S.\nThe AEF embeddings are publicly available as annualized, global layers spanning 2017 to 2024, hosted on\nGoogle Earth Engine (GEE) as an image dataset. The 64-band annual embeddings are stored as image layers,\nwith individual bands labeled sequentially from A00 to A63.\n3.2 Remote sensing, climate, and topographic data\nIn addition to AEF embeddings, we extracted traditionally used features from remote sensing, climate, and\ntopographic sources, which are available on GEE.",
+      "translation": "3.1 AlphaEarth Foundation 模型\nAEF模型基于约30亿个观测值进行训练，涵盖光学（Landsat 8/9, Sentinel-2）、雷达（Sentinel-1）、激光雷达（GEDI）、气候（ERA5-Land）、重力场（GRACE）、高程（GLO-30）和文本来源（Wikipedia）（Brown et al., 2025）。采用空间-时间编码器和教师-学生框架来以紧凑形式捕获空间、时间和测量上下文。因此，它将来自多源的稀疏、异构EO转换为用于全球制图的通用64维嵌入空间。所得64维嵌入具有时间连续性和传感器无关性，空间分辨率为10米，实现了近全球空间覆盖，排除了约82° N/S 以外的极地极端区域。\nAEF嵌入作为2017至2024年的年度全球图层公开可用，托管在Google Earth Engine（GEE）上作为影像数据集。64波段年度嵌入以影像图层形式存储，各波段依次标记为A00至A63。",
+      "index": 18
+    },
+    {
+      "id": "S015",
+      "page": 6,
+      "type": "paragraph",
+      "original": "3.2.1 Satellite optical remote sensing\nThe Landsat family of sensors was selected, which provide 30-meter spatial resolution global observations\nover decadal time spans. All available Landsat Collection 2 Tier 1 Land Surface Reflectance data from 2017\nto 2024 were used, including Landsat 7 Enhanced Thematic Mapper Plus (ETM+), Landsat 8 Optical Land\nImager (OLI), and Landsat 9 OLI. We extracted the reflectance data from six bands, including Red, Green,\nBlue, Near Infrared (NIR), Shortwave Infrared 1 (SWIR1), and Shortwave Infrared 2 (SWIR2).",
+      "translation": "3.2.1 卫星光学遥感\n选择了Landsat系列传感器，其提供30米空间分辨率的全球观测，时间跨度达数十年。使用了2017至2024年间所有可用的Landsat Collection 2 Tier 1地表反射率数据，包括Landsat 7增强型专题制图仪Plus（ETM+）、Landsat 8光学陆地成像仪（OLI）和Landsat 9 OLI。我们从六个波段提取了反射率数据，包括红（Red）、绿（Green）、蓝（Blue）、近红外（NIR）、短波红外1（SWIR1）和短波红外2（SWIR2）。",
+      "index": 19
+    },
+    {
+      "id": "S016",
+      "page": 6,
+      "type": "paragraph",
+      "original": "3.2.2 Climate reanalysis and topographic data\nClimate features are widely used in agricultural modeling as they capture environmental drivers of\nagroecosystem dynamics and complement remote sensing features. We chose the ERA5-Land Climate\nReanalysis dataset (Muñoz-Sabater et al., 2021), which provides daily global data at 10 km resolution by\n6",
+      "translation": "3.2.2 气候再分析和地形数据\n气候特征在农业建模中被广泛使用，因为它们捕获了农业生态系统动态的环境驱动因素，并补充了遥感特征。我们选择了ERA5-Land气候再分析数据集（Muñoz-Sabater et al., 2021），该数据集通过将全球陆地表面建模与地面观测相结合，提供10公里分辨率的每日全球数据。",
+      "index": 20
+    },
+    {
+      "id": "S017",
+      "page": 7,
+      "type": "paragraph",
+      "original": "integrating land surface modeling with in-situ observations worldwide. From this dataset, we extracted\nprecipitation (PPT), maximum temperature, and minimum temperature. They are used to calculate the\naccumulative PPT and the growing degree days (GDD) in each month of the growing season:\n#\nPPT = $ PPT (1)\n! \"\n\"$%\n# ,-\nGDD = $ $ (max(0,min (T −T ,T −T )))\n! & '() '*+ '() (2)\n\"$% &$%\nin which M denotes the number of days in the month j, PPT is the daily total precipitation (in mm) (Eq.\n\"\n(1)), 𝑇 is the hourly temperature (in °C) and calculated based on sinusoidal interpolation between the daily\n.\nminimum and maximum temperatures (Eq. (2)), and 𝑇 (𝑇 ) denotes the upper (lower) biological\n/01 /23\ntemperature threshold, beyond which crop development no longer respond to temperature variations, which\nis 30 °C (8 °C) for soybean and 26 °C (0 °C) for winter wheat (Ritchie, 1991; Swan et al., 1987).\nMoreover, topographic characteristics play a significant role in agricultural decision-making and have been\nwidely utilized in tillage classification. We extracted Elevation data from the USGS 3D Elevation Program\n10m National Map (Archuleta et al., 2017) to describe the topographic characteristics in the study area.\n3.3 Data cleaning and downloading\nWe used GEE to collect and download each dataset. Before downloading the data, noisy pixels in satellite\nimagery were first removed by applying the per-pixel quality mask (clouds, cloud shadows, snow/ice, and\nwater). Following that, we used the 30-meter U.S. cropland layer (CDL) (Boryan et al., 2011) to keep pixels\non specific crop types and mask out non-cropland pixels. Next, observations on the remaining pixels were\naggregated to the county (field) level by calculating the mean values within each county (field) boundary.\nFinally, the aggregated observations were downloaded from GEE, including AEF embeddings, time-series\nsatellite remote sensing data, monthly climate features, and Elevation.\n3.4 Remote sensing data processing\nThe frequency of time-series remote sensing observations varies spatially due to different satellite path\noverlap among adjacent tracks and cloud coverage. Therefore, it is challenging to use raw time-series\nobservations as predictors. Instead, we pre-processed the time-series remote sensing data and generated\npredictor variables tailored to each task.",
+      "translation": "从该数据集中，我们提取了降水量（PPT）、最高温度和最低温度。它们用于计算生长季各月的累积PPT和生长度日（GDD）：\nPPT_j = Σ_{d=1}^{M_j} PPT_d   (1)\nGDD_j = Σ_{d=1}^{M_j} max(0, min(T_max,d - T_base, T_ceil - T_base))   (2)\n其中 M_j 表示第j月的天数，PPT_d 为日总降水量（mm）（公式(1)），T 为基于日最低和最高温度正弦插值计算的小时温度（°C）（公式(2)），T_ceil（T_base）表示上（下）生物温度阈值，超过该阈值作物发育不再响应温度变化，大豆为30°C（8°C），冬小麦为26°C（0°C）（Ritchie, 1991; Swan et al., 1987）。\n此外，地形特征在农业决策中起重要作用，并已被广泛用于耕作分类。我们从USGS 3D高程计划10米国家地图（Archuleta et al., 2017）中提取了高程数据，以描述研究区域的地形特征。",
+      "index": 21
+    },
+    {
+      "id": "S018",
+      "page": 7,
+      "type": "paragraph",
+      "original": "3.4.1 Features for yield prediction\nIn yield prediction tasks, we downloaded the time-series satellite imagery across the whole growing season\nfor each crop. In addition to six spectral bands, two vegetation indices (VIs), Normalized Difference\nVegetation Index (NDVI) and Green Chlorophyll Vegetation Index (GCVI), were calculated (Eq. (3)-(4)).\nNDVI is a classic remote sensing index that measures vegetation vigor and greenness by contrasting NIR\nand Red reflectance. GCVI extends this approach by incorporating green reflectance, making it more\ndirectly sensitive to chlorophyll content and photosynthetic capacity while partially alleviating NDVI’s\nsaturation issues in high-biomass regions. (Gitelson et al., 2003).\nNIR−Red\nNDVI = (3)\nNIR+RED\n7",
+      "translation": "3.3 数据清理与下载\n我们使用GEE收集和下载每个数据集。下载数据前，首先通过逐像素质量掩膜（云、云阴影、雪/冰和水）去除卫星影像中的噪声像素。随后，我们使用30米美国耕地图层（CDL）（Boryan et al., 2011）保留特定作物类型的像素并掩膜非耕地像素。接下来，通过计算每个县（field）边界内的平均值，将剩余像素上的观测值聚合到县（field）级别。最后，从GEE下载了聚合后的观测值，包括AEF嵌入、时间序列卫星遥感数据、月度气候特征和高程。",
+      "index": 22
+    },
+    {
+      "id": "S019",
+      "page": 8,
+      "type": "paragraph",
+      "original": "NIR\nGCVI = (4)\nGreen\nWe fit a second-order harmonic regression (Wilson et al., 2018) to each spectral bands and VIs based on all\navailable observations during the growing season (Eq. (5)).\n𝑦(𝑡)= 𝑐+𝑎 cos(2𝜋𝑡)+𝑏 sin(2𝜋𝑡)+ 𝑎 cos(4𝜋𝑡)+𝑏 sin(4𝜋𝑡)\n% % , , (5)\nwhere t represents the date of the observation; c denotes the intercept coefficient; 𝑎 and 𝑏 (𝑎 and 𝑏 )\n% % , ,\nrepresent the first-order (second-order) cosine and sine coefficients, respectively.\nThe five harmonic coefficients (𝑎 , 𝑏 , 𝑎 , 𝑏 , c) for spectral bands and VIs, which summarize the time-\n% % , ,\nseries satellite data, were used as predictor variables. In addition, we extracted phenology-based metrics\nfrom the fitted harmonic curves. For each spectral and VI bands, the maximum value in the growing season\nwas picked and termed as Band_peak. In addition, band values were derived for the periods 30 days before\nand after the peak date, referred to as Band_b30 and Band_a30. Moreover, the partial integral approach was\nused to compute the area under the curve between these three time points (Deines et al., 2021). The area\nunder the curve between Band_peak and Band_b30 was termed as Band_b30_int. The area under the curve\nbetween Band_peak and VI_a30 was termed as VI_a30_int. These indicators capture vegetation status\nduring the phases leading up to and following the peak, offering information on growth trajectories. An\nexample of the time-series NDVI and the derived harmonic features is present in Figure 2.\nIn total, 80 harmonic features were generated for each county or field, comprising 10 features for each of\nthe 6 spectral bands and 2 VIs. Meanwhile, monthly GDD and PPT were used as predictor variables in the\nU.S., which added 10 additional predictors for corn and soybean (May to Sep) and 12 additional predictors\nfor winter wheat (Jan to Jun).",
+      "translation": "3.4 遥感数据处理\n时间序列遥感观测的频率因相邻轨道间的卫星路径重叠和云覆盖而在空间上有所变化。因此，使用原始时间序列观测作为预测变量具有挑战性。相反，我们对时间序列遥感数据进行了预处理，并为每个任务生成了定制的预测变量。\n3.4.1 产量预测特征\n在产量预测任务中，我们为每种作物下载了整个生长季的时间序列卫星影像。除六个光谱波段外，还计算了两个植被指数（VIs）：归一化差分植被指数（NDVI）和绿色叶绿素植被指数（GCVI）（公式(3)-(4)）。NDVI是经典的遥感指数，通过对比NIR和红光反射率来测量植被活力和绿度。GCVI扩展了这一方法，引入绿光反射率，使其对叶绿素含量和光合能力更直接敏感，同时部分缓解了NDVI在高生物量区域的饱和问题（Gitelson et al., 2003）。\nNDVI = (NIR - Red) / (NIR + Red)   (3)\nGCVI = NIR / Green   (4)",
+      "index": 23
+    },
+    {
+      "id": "F002",
+      "page": 8,
+      "type": "figure_caption",
+      "original": "Figure 2 An example of the 2023 time-series NDVI and the derived harmonic features for corn lands in\nAdams County, Illinois, USA.",
+      "translation": "图2 2023年美国伊利诺伊州亚当斯县玉米地时间序列NDVI及衍生谐波特征示例。\n地点：美国伊利诺伊州亚当斯县。",
+      "index": 24
+    },
+    {
+      "id": "H004",
+      "page": 8,
+      "type": "heading",
+      "original": "3.4.2 Features for tillage mapping\n8",
+      "translation": "3.4.2 耕作制图特征",
+      "index": 25
+    },
+    {
+      "id": "S020",
+      "page": 9,
+      "type": "paragraph",
+      "original": "For tillage mapping, we further calculated three tillage indices that quantify crop residue cover, including\nNDTI, Simple Tillage Index (STI), and Crop Residue Cover index (CRC) (Eq. (6)–(8)) (Eskandari et al.,\n2016; Sullivan et al., 2006; Van Deventer et al., 1997):\nSWIR1−SWIR2\nNDTI = (6)\nSWIR1+SWIR2\nSWIR1\nSTI = (7)\nSWIR2\nSWIR1−Blue\nCRC = (8)\nSWIR1+Blue\nThe tillage mapping experiments were conducted in the U.S. Corn Belt, where the cropping systems are\nmainly corn and soybean, and most tillage is implemented in spring (Lu et al., 2022). We organized monthly\nremote sensing features by extracting the monthly minimum and maximum values from times-series\nobservations in April to June for each band.\nA total of 66 monthly remote sensing features was used for each county or field, comprising 2 features for\neach of the 6 raw bands, 2 VIs (GCVI and NDVI), and 3 tillage indices (NDTI, STI, CRC) in each month.\nIn addition, elevation was included as a predictor variable to describe the terrain characteristics.",
+      "translation": "我们基于生长季内所有可用观测值，对每个光谱波段和植被指数拟合二阶谐波回归（Wilson et al., 2018）（公式(5)）。\ny(t) = c + a_1 cos(2πt) + b_1 sin(2πt) + a_2 cos(4πt) + b_2 sin(4πt)   (5)\n其中 t 表示观测日期；c 为截距系数；a_1 和 b_1（a_2 和 b_2）分别表示一阶（二阶）余弦和正弦系数。\n五个谐波系数（a_1, b_1, a_2, b_2, c）用于光谱波段和植被指数，总结了时间序列卫星数据，被用作预测变量。此外，我们从拟合的谐波曲线中提取了基于物候学的指标。对于每个光谱和植被指数波段，提取了生长季内的最大值，称为Band_peak。此外，在峰值日期前30天和后30天提取了波段值，分别称为Band_b30和Band_a30。而且，使用部分积分法计算了这三个时间点之间曲线下的面积（Deines et al., 2021）。Band_peak与Band_b30之间的曲线下面积称为Band_b30_int。Band_peak与VI_a30之间的曲线下面积称为VI_a30_int。这些指标捕获了峰值前后阶段的植被状况，提供了生长轨迹的信息。时间序列NDVI和衍生谐波特征的示例如图2所示。\n总共为每个县或field生成了80个谐波特征，包括6个光谱波段和2个植被指数各10个特征。同时，美国使用的月度GDD和PPT作为预测变量，为玉米和大豆增加了10个额外预测变量（5月至9月），为冬小麦增加了12个额外预测变量（1月至6月）。",
+      "index": 26
+    },
+    {
+      "id": "S021",
+      "page": 9,
+      "type": "paragraph",
+      "original": "3.4.3 Features for cover crop mapping\nCover crops can be planted and terminated at any point after the harvest and before planting in the next\nseason, a period that spans from October to May of the next year in the U.S. Corn Belt. For each field in\nthe Corteva cover crop dataset, we collected the time-series Landsat six raw bands and two VIs (NDVI and\nGCVI) during this period and fitted a second-order harmonic regression. Following that, we extracted the\nminimum and maximum values for each band from the fitted curves within each month from October to\nMay. Meanwhile, we calculated monthly average temperature and accumulative precipitation for each field.\nThe extracted predictors were paired with the corresponding cover crop labels (Class 0: no cover crop;\nClass 1: cover crop) for model training and evaluation. The total number of predictors is 144 for each field,\nincluding 18 monthly features across 8 months.\n3.5 Evaluation models and schemes\nTwo widely used ML models for tabular data were trained and evaluated for each task, including RF and\nXGBoosting (XGB) (Breiman, 2001). Both models were implemented using Scikit-learn with 200\nindividual trees (Pedregosa et al., 2011). We did not select DL models because the limited number of\ntraining samples in certain tasks would likely be insufficient to train reliable DL models. Moreover, RF and\nXGB have shown to outperform, or perform comparably to DL models on tabular data, while requiring\nsubstantially less computational resources (Hollmann et al., 2025). In addition, we also trained baseline\nmodels based on traditional remote sensing feature sets. Each downstream task required different predictor\nvariables (Section 3.4), which we collectively refer to as remote sensing (RS) features. Each RF and XGB\nmodel was trained separately using AEF embeddings and RS features for each task (Table 1).\nA standard scheme to evaluate ML model performance is random cross validation (CV), in which the dataset\nis randomly split to a training set and a test set. In geospatial tasks, random CV can lead to inflated model\nperformance due to spatial autocorrelation, as nearby counties/fields with similar properties may be split\nbetween the training and testing sets. Instead, we evaluated the model performance in each task using two\n9",
+      "translation": "对于耕作制图，我们进一步计算了三个量化作物残茬覆盖的耕作指数，包括NDTI、简单耕作指数（STI）和作物残茬覆盖指数（CRC）（公式(6)–(8)）（Eskandari et al., 2016; Sullivan et al., 2006; Van Deventer et al., 1997）：\nNDTI = (SWIR1 - SWIR2) / (SWIR1 + SWIR2)   (6)\nSTI = SWIR1 / SWIR2   (7)\nCRC = (SWIR1 - Blue) / (SWIR1 + Blue)   (8)\n耕作制图实验在美国玉米带进行，该地区的种植制度主要为玉米和大豆，大多数耕作在春季实施（Lu et al., 2022）。我们通过提取4月至6月各波段时间序列观测值的月度最小值和最大值来组织月度遥感特征。\n每个县或field共使用了66个月度遥感特征，包括6个原始波段、2个植被指数（GCVI和NDVI）和3个耕作指数（NDTI、STI、CRC）每月各2个特征。此外，高程作为描述地形特征的预测变量被纳入。",
+      "index": 27
+    },
+    {
+      "id": "S022",
+      "page": 10,
+      "type": "paragraph",
+      "original": "schemes: spatial-temporal CV and yearly CV. In spatial-temporal CV, samples from the same region and\nyears are grouped into either the training or the testing set, avoiding spatial autocorrelation. Specifically,\nwe implemented State-Year CV for county-level data, in which county samples from different state-year\ngroups are used for training and testing, separately. Similarly, for the field-level data, we implemented\nCounty-Year CV. In addition, yearly CV reflects a more practical scenario, when data from a single year\nserve as the test set and data from the remaining years are used for training.\nIn addition, we designed scale-transfer and space-transfer experiments to assess whether embeddings\nenhance accuracy and generalizability across scale and spatial domains. In scale-transfer experiments, ML\nmodels for yield prediction are trained using county-level yield data and applied to predict yield at the field\nlevel. In space-transfer experiments, ML models are trained and tested across two ecoregions in the U.S.\nCorn Belt. Specifically, the study counties were grouped into two ecoregions as defined by the United States\nEnvironmental Protection Agency (EPA): the Eastern Temperate Forests (ETF) and the Great Plains (GP).\nThe ETF is characterized by a warm, humid, temperate climate, with humid summers and mild to cold\nwinters. In contrast, the GP consists mainly of flat grasslands with limited forest cover, featuring very hot\nsummers and harsh winters (Ma et al., 2021). The ETF mainly includes five eastern states (",
+      "translation": "3.4.3 覆盖作物制图特征\n覆盖作物可在收获后至下一季播种前的任何时间点种植和终止，在美国玉米带这一时间段为10月至次年5月。对于Corteva覆盖作物数据集中的每个field，我们收集了这一时期Landsat六个原始波段和两个植被指数（NDVI和GCVI）的时间序列数据，并拟合二阶谐波回归。随后，我们从10月至5月各月拟合曲线中提取了每个波段的最小值和最大值。同时，我们计算了每个field的月均温和累积降水量。提取的预测变量与相应的覆盖作物标签配对（类别0：无覆盖作物；类别1：有覆盖作物）用于模型训练和评估。每个field的预测变量总数为144，包括8个月每月18个月度特征。",
+      "index": 28
+    },
+    {
+      "id": "S023",
+      "page": 10,
+      "type": "paragraph",
+      "original": "Figure 1 (a)),\nincluding Illinois, Indiana, Michigan, Ohio, and Wisconsin. The GP mainly covers seven states on the\nwestern side of the Corn Belt (",
+      "translation": "3.5 评估模型与方案\n两种广泛用于表格数据的ML模型被训练和评估用于每个任务，包括随机森林（RF）和XGBoosting（XGB）（Breiman, 2001）。两种模型均使用Scikit-learn实现，包含200棵个体树（Pedregosa et al., 2011）。我们没有选择DL模型，因为某些任务中训练样本数量有限，可能不足以训练可靠的DL模型。此外，RF和XGB已证明在表格数据上优于或与DL模型表现相当，同时需要显著更少的计算资源（Hollmann et al., 2025）。此外，我们还基于传统遥感特征集训练了基线模型。每个下游任务需要不同的预测变量（第3.4节），我们将其统称为遥感（RS）特征。每个RF和XGB模型分别使用AEF嵌入和RS特征针对每个任务进行训练（表1）。",
+      "index": 29
+    },
+    {
+      "id": "S024",
+      "page": 10,
+      "type": "paragraph",
+      "original": "Figure 1 (a)), including Iowa, Kansas, Minesota, Missouri, North Dakota,\nNebraska, and South Dakota. For simplicity, we termed ETF and GP as East and West, respectively.",
+      "translation": "评估ML模型性能的标准方案是随机交叉验证（CV），其中数据集被随机分为训练集和测试集。在地学任务中，由于空间自相关，随机CV可能导致模型性能虚高，因为附近具有相似属性的县/field可能被分到训练集和测试集中。相反，我们使用两种方案评估每个任务中的模型性能：空间-时间CV和年度CV。在空间-时间CV中，同一区域和年份的样本被归入训练集或测试集，避免空间自相关。具体而言，我们对县级数据实施了State-Year CV，其中来自不同州-年组的县样本分别用于训练和测试。类似地，对于field尺度数据，我们实施了County-Year CV。此外，年度CV反映了一种更实际的场景，即单一年份的数据作为测试集，其余年份的数据用于训练。\n此外，我们设计了尺度迁移和空间迁移实验，以评估嵌入是否提高了跨尺度和空间域的准确性和泛化能力。在尺度迁移实验中，产量预测的ML模型使用县级产量数据进行训练，并应用于field尺度的产量预测。在空间迁移实验中，ML模型在美国玉米带的两个生态区之间进行训练和测试。具体而言，研究县按美国环境保护署（EPA）的定义分为两个生态区：东部温带森林（ETF）和大平原（GP）。ETF以温暖、湿润的温带气候为特征，夏季湿润，冬季温和至寒冷。相比之下，GP主要由森林覆盖有限的平坦草原组成，夏季非常炎热，冬季严酷（Ma et al., 2021）。ETF主要包括五个东部州（图1（a）），包括伊利诺伊、印第安纳、密歇根、俄亥俄和威斯康星。GP主要覆盖玉米带西部的七个州（图1（a）），包括艾奥瓦、堪萨斯、明尼苏达、密苏里、北达科他、内布拉斯加和南达科他。为简洁起见，我们将ETF和GP分别称为东部和西部。",
+      "index": 30
+    },
+    {
+      "id": "T002",
+      "page": 10,
+      "type": "table_caption",
+      "original": "Table 2 An overview of the evaluation schemes in this study.",
+      "translation": "表2 本研究评估方案概述。",
+      "index": 31
+    },
+    {
+      "id": "S025",
+      "page": 10,
+      "type": "paragraph",
+      "original": "Scheme Training Set Test Set Objective\nData in the rest\nState (County)- Data in specific state Avoid spatial and temporal\nstate(county)-year\nYear CV (county)-year groups autocorrelation\ngroups\nData in all but one Data in the A practical scenario where training\nYearly CV\nyears remaining year data are available in certain years\nScale-Transfer County data Field data Evaluate the scale transferability\nData in the other\nSpace-Transfer Data in one ecoregion Evaluate the spatial transferability\necoregion\nWe have summarized the evaluation scheme used in this study in Table 2. Each experiment is repeated five\ntimes under different random seeds, and the mean evaluation results are presented. For regression tasks,\ncoefficient of determination (R2) and root mean squared error (RMSE) are calculated as the evaluation\nmetrics (Eq. (9) – (10)). For classification tasks, the evaluation metrics include the overall accuracy\n(Accuracy), F1 scores for each class (F1-0 and F1-1), and the average F1 score weighted by the number of\ntrue instances (F1-weighted) (Eq. (11) – (14)):\n∑4 (𝑦 −𝑦P ),\nR, = 1− 2$% 2 2 (9)\n∑4 (𝑦 −𝑦Q),\n2$% 2\n(10)\n1 4\nRMSE = S $ (𝑦 −𝑦P ),\n𝑁 2 2\n2$%\nTP+TN (11)\nAccuracy =\n𝑁\n10",
+      "translation": "Scheme | Training Set | Test Set | Objective\nState (County)-Year CV | 其余州（县）-年组数据 | 特定州（县）-年组数据 | 避免空间和时间自相关\nYearly CV | 除一年外所有年份数据 | 剩余年份数据 | 训练数据仅在特定年份可用的实际场景\nScale-Transfer | 县级数据 | field数据 | 评估尺度迁移能力\nSpace-Transfer | 一个生态区数据 | 另一生态区数据 | 评估空间迁移能力\n\n我们在表2中总结了本研究使用的评估方案。每个实验在不同随机种子下重复五次，并呈现平均评估结果。对于回归任务，计算决定系数（R²）和均方根误差（RMSE）作为评估指标（公式(9)–(10)）。对于分类任务，评估指标包括总体精度（Accuracy）、各类别的F1分数（F1-0和F1-1）以及按真实实例数量加权的平均F1分数（F1-weighted）（公式(11)–(14)）：\nR² = 1 - Σ(y_i - ŷ_i)² / Σ(y_i - ȳ)²   (9)\nRMSE = √(1/N Σ(y_i - ŷ_i)²)   (10)\nAccuracy = (TP + TN) / N   (11)\nPrecision = TP / (TP + FP)   (12)\nRecall = TP / (TP + FN)   (13)\nF1 = 2 · (Precision · Recall) / (Precision + Recall)   (14)\n其中 N 表示评估集中的样本总数；y_i 为 ground truth 数据，ȳ 为 ground truth 数据的平均值；ŷ_i 为模型的预测值。TP、TN、FP分别表示模型分类的真阳性、真阴性和假阳性数量。",
+      "index": 32
+    },
+    {
+      "id": "S026",
+      "page": 11,
+      "type": "paragraph",
+      "original": "TP (12)\nPrecision =\n𝑇𝑃+𝐹𝑃\nTP (13)\nRecall =\n𝑇𝑃+𝐹𝑁\nPrecision∙Recall (14)\nF1 = 2∙\nPrecision+Recall\nwhere 𝑁 denotes the total number of samples in the evaluation set; 𝑦 is the ground truth data and 𝑦Q is the\n2\naverage value of the ground truth data; 𝑦P is the predicted values by the models. TP, TN, and FP represent\n2\nthe number of True Positive, True Negative, and False Positive classifications by the models.\n4 Experiment Results",
+      "translation": "4.1.1 县级评估\n在美国，AEF基础模型在State-Year CV下与RS基础模型表现相当，玉米和大豆的R²约为0.80，冬小麦约为0.70（表3）。所有模型在年度CV方案下精度略有下降，但AEF基础模型始终优于RS基础模型，凸显了AEF嵌入更强的时间泛化能力。",
+      "index": 33
+    },
+    {
+      "id": "H005",
+      "page": 11,
+      "type": "heading",
+      "original": "4.1. Crop yield prediction",
+      "translation": "4. 实验结果\n4.1 作物产量预测",
+      "index": 34
+    },
+    {
+      "id": "S027",
+      "page": 11,
+      "type": "paragraph",
+      "original": "4.1.1 County-level evaluation\nIn the U.S., the AEF-based models had comparable performance as the RS-based models under the State-\nYear CV, achieving an R2 of around 0.80 for corn and soybean, and 0.70 for winter wheat (Table 3). All\nmodels showed a slight reduction in accuracy under the yearly CV scheme, yet AEF-based models\nconsistently outperformed RS-based models, highlighting the stronger temporal generalizability of AEF\nembeddings.",
+      "translation": "Crop | Scheme | AEF-RF R² | AEF-RF RMSE | AEF-XGB R² | AEF-XGB RMSE | RS-RF R² | RS-RF RMSE | RS-XGB R² | RS-XGB RMSE\nCorn | State-Year | 0.78 | 1.19 | 0.78 | 1.18 | 0.79 | 1.14 | 0.80 | 1.12\nCorn | Yearly | 0.77 | 1.15 | 0.77 | 1.16 | 0.76 | 1.20 | 0.74 | 1.25\nSoybean | State-Year | 0.75 | 0.38 | 0.78 | 0.36 | 0.78 | 0.37 | 0.79 | 0.36\nSoybean | Yearly | 0.74 | 0.39 | 0.77 | 0.36 | 0.71 | 0.41 | 0.70 | 0.42\nWinter Wheat | State-Year | 0.76 | 0.68 | 0.78 | 0.64 | 0.70 | 0.78 | 0.71 | 0.76\nWinter Wheat | Yearly | 0.77 | 0.68 | 0.78 | 0.67 | 0.69 | 0.79 | 0.69 | 0.78\n\nground truth与预测产量的散点图（图3）表明，AEF基础模型和RS基础模型均与USDA-NASS报告的产量高度一致。考虑到XGB模型在大多数情况下略优于RF模型，比较使用XGB模型的结果呈现。RS基础模型在高产范围内显著低估了冬小麦产量（图3(c2)），主要是由于训练集中高产样本数量有限。AEF基础模型部分缓解了高产范围内的偏差，实现了更高精度（图3(c1)）。",
+      "index": 35
+    },
+    {
+      "id": "T003",
+      "page": 11,
+      "type": "table_caption",
+      "original": "Table 3 Evaluation results of county-level crop yield prediction in the U.S. in 2017-2024. The best",
+      "translation": "表3 2017-2024年美国县级作物产量预测评估结果。每种情况的最佳表现者以粗体标出。",
+      "index": 36
+    },
+    {
+      "id": "S028",
+      "page": 11,
+      "type": "paragraph",
+      "original": "performer is highlighted in bold for each case.\nAEF RS\nCrop Scheme\nRF XGB RF XGB\nR2 RMSE R2 RMSE R2 RMSE R2 RMSE\nState-Year 0.78 1.19 0.78 1.18 0.79 1.14 0.80 1.12\nCorn\nYearly 0.77 1.15 0.77 1.16 0.76 1.20 0.74 1.25\nState-Year 0.75 0.38 0.78 0.36 0.78 0.37 0.79 0.36\nSoybean\nYearly 0.74 0.39 0.77 0.36 0.71 0.41 0.70 0.42\nState-Year 0.76 0.68 0.78 0.64 0.70 0.78 0.71 0.76\nWinter Wheat\nYearly 0.77 0.68 0.78 0.67 0.69 0.79 0.69 0.78\nScatter plots of the ground truth and predicted yields (Figure 3) indicate that both AEF-based and RS-based\nmodels align well with the reported yields from USDA-NASS. Considering that the XGB models slightly\noutperform the RF models in most cases, the comparison is presented using the results from the XGB\nmodels. RS-based models showed notable underestimation of winter wheat yields in high-yield ranges\n(Figure 3(c2)), primarily due to the limited number of high-yield samples in the training set. AEF-based\nmodels partially mitigated biases in high-yield ranges and achieved higher accuracy (Figure 3(c1)).\n11",
+      "translation": "4.1.2 field尺度评估\n基于超过180,000条产量记录的Corteva数据集，进一步评估了AEF嵌入在field尺度产量预测上的性能（表1）。预测field尺度产量通常比县级更具挑战性，主要由于产量记录噪声更大、卫星数据覆盖减少以及精细尺度field与气候变量粗空间分辨率之间的不匹配。因此，我们在field尺度评估结果中观察到更小的R²和更大的RMSE（表4）。与县级结果类似，AEF基础模型在County-Year CV和年度CV下与RS基础模型表现相当（表4）。\n我们进一步比较了尺度迁移方案下的模型性能，其中模型使用县级预测变量和产量记录进行训练，并应用于field尺度的产量预测（Ma et al., 2024b）。该方案评估预测变量跨空间尺度的迁移能力。AEF基础模型在此任务中显著低于RS基础模型（表4）。这可能源于嵌入表示固有的压缩性，当聚合到县级时，会降低模型对field尺度微妙产量驱动因素的敏感性。例如，单个嵌入可能捕获了县内不同位置的不同信号。通过平均所有AEF像素生成县级表示，与作物生长相关的field尺度信息可能被稀释或丢失，导致field尺度的预测能力较弱。相比之下，遥感特征保留了更直接的物理信号（如冠层结构、植被活力和土壤湿度），这些信号跨尺度具有普遍可解释性，从而实现更强的跨尺度泛化。",
+      "index": 37
+    },
+    {
+      "id": "F003",
+      "page": 12,
+      "type": "figure_caption",
+      "original": "Figure 3 The scatter plots of yield prediction results by XGB under the yearly CV in the U.S. for (a) Corn, (b) Soybean,",
+      "translation": "图3 XGB在美国年度CV下2017-2024年（a）玉米、（b）大豆和（c）冬小麦产量预测结果的散点图。",
+      "index": 38
+    },
+    {
+      "id": "S029",
+      "page": 12,
+      "type": "paragraph",
+      "original": "and (c) Winter Wheat in 2017-2024.",
+      "translation": "Crop | Scheme | AEF-RF R² | AEF-RF RMSE | AEF-XGB R² | AEF-XGB RMSE | RS-RF R² | RS-RF RMSE | RS-XGB R² | RS-XGB RMSE\nCorn | County-Year | 0.43 | 2.28 | 0.44 | 2.27 | 0.45 | 2.24 | 0.46 | 2.24\nCorn | Yearly | 0.31 | 2.54 | 0.30 | 2.55 | 0.33 | 2.50 | 0.33 | 2.49\nCorn | Scale-Transfer | 0.24 | 2.67 | 0.25 | 2.64 | 0.37 | 2.43 | 0.38 | 2.40\nSoybean | County-Year | 0.36 | 0.87 | 0.37 | 0.87 | 0.35 | 0.90 | 0.35 | 0.90\nSoybean | Yearly | 0.29 | 0.92 | 0.31 | 0.91 | 0.28 | 0.93 | 0.25 | 0.95\nSoybean | Scale-Transfer | 0.13 | 1.02 | 0.11 | 1.03 | 0.22 | 0.97 | 0.24 | 0.95\nWinter Wheat | County-Year | 0.43 | 1.32 | 0.43 | 1.31 | 0.42 | 1.30 | 0.41 | 1.31\nWinter Wheat | Yearly | 0.38 | 1.34 | 0.40 | 1.32 | 0.36 | 1.35 | 0.36 | 1.36\nWinter Wheat | Scale-Transfer | -0.18 | 1.85 | -0.04 | 1.73 | 0.20 | 1.52 | 0.22 | 1.50",
+      "index": 39
+    },
+    {
+      "id": "S030",
+      "page": 12,
+      "type": "paragraph",
+      "original": "4.1.2 Field-level evaluation\nThe performance of AEF embeddings was further evaluated for field-level yield prediction based on the\nCorteva dataset of over 180,000 yield records (Table 1). Predicting field-level yields is typically more\nchallenging than at the county level, primarily due to noisier yield records, reduced satellite data coverage,\nand the mismatch between fine-scale fields and the coarse spatial resolution of climate variables. Therefore,\nwe observed smaller R2 and larger RMSE in the field-level evaluation results (Table 4). Similar to the\ncounty-level results, AEF-based models achieved comparable performance as the RS-based models under\nthe county-year CV and the yearly CV (Table 4).\nWe further compared the model performance under the scale-transfer scheme, in which the models were\ntrained using predictors and yield records at the county level and implemented to predict yields at the field\nlevel (Ma et al., 2024b). This scheme evaluates predictors’ transferability across spatial scales. AEF-based\nmodels significantly underperformed the RS-based models in this task (Table 4). This is likely due to the\ncompression inherent in embedding representations, which, when aggregated to the county level, reduces\nthe model’s sensitivity to subtle yield-driving factors at the field scale. For instance, each single embedding\nmay capture different signals across locations within a county. By averaging all AEF pixels to generate\ncounty-level representations, field-level information relevant to crop growth can be diluted or lost, leading\nto weaker predictive power at the field level. In contrast, remote sensing features preserve more direct\nphysical signals (e.g., canopy structure, vegetation vigor, and soil moisture) that are universally\ninterpretable across scales, enabling stronger generalization across scales.\n12",
+      "translation": "4.2 耕作分类\n4.2.1 县级耕作制图\n对于县级耕作制图，ML模型被训练来估算每个县内低强度耕作耕地面积比例。在State-Year CV下评估时，AEF基础模型和RS基础模型提供了大致相当的预测能力，R²值约为0.48，RMSE接近12.20%（表5）。在年度CV下评估时，AEF基础RF模型在2017年表现最强（R² = 0.56, RMSE = 11.85%），而2022年的优势转向了RS基础RF模型（R² = 0.53, RMSE = 12.16%）。跨所有年份聚合时，这些差异趋于平滑，AEF基础模型的R²略高（0.52）于RS基础模型（0.50），尽管总体精度仍然相似（表5）。",
+      "index": 40
+    },
+    {
+      "id": "T004",
+      "page": 13,
+      "type": "table_caption",
+      "original": "Table 4 Evaluation results of field-level crop yield prediction in the U.S. The best performer is highlighted",
+      "translation": "表4 美国field尺度作物产量预测评估结果。每种情况的最佳表现者以粗体标出。",
+      "index": 41
+    },
+    {
+      "id": "S031",
+      "page": 13,
+      "type": "paragraph",
+      "original": "in bold for each case.\nAEF RS\nCrop Scheme\nRF XGB RF XGB\nR2 RMSE R2 RMSE R2 RMSE R2 RMSE\nCounty-Year 0.43 2.28 0.44 2.27 0.45 2.24 0.46 2.24\nCorn Yearly 0.31 2.54 0.30 2.55 0.33 2.50 0.33 2.49\nScale-Transfer 0.24 2.67 0.25 2.64 0.37 2.43 0.38 2.40\nCounty-Year 0.36 0.87 0.37 0.87 0.35 0.90 0.35 0.90\nSoybean Yearly 0.29 0.92 0.31 0.91 0.28 0.93 0.25 0.95\nScale-Transfer 0.13 1.02 0.11 1.03 0.22 0.97 0.24 0.95\nCounty-Year 0.43 1.32 0.43 1.31 0.42 1.30 0.41 1.31\nWinter Wheat Yearly 0.38 1.34 0.40 1.32 0.36 1.35 0.36 1.36\nScale-Transfer -0.18 1.85 -0.04 1.73 0.20 1.52 0.22 1.50\n4.2 Tillage classification",
+      "translation": "Scheme | Year | AEF-RF R² | AEF-RF RMSE | AEF-XGB R² | AEF-XGB RMSE | RS-RF R² | RS-RF RMSE | RS-XGB R² | RS-XGB RMSE\nState-Year | 2017&2022 | 0.47 | 12.22% | 0.47 | 12.22% | 0.48 | 12.18% | 0.47 | 12.32%\nYearly | 2017 | 0.56 | 11.85% | 0.54 | 12.04% | 0.46 | 13.00% | 0.48 | 12.79%\nYearly | 2022 | 0.47 | 12.91% | 0.42 | 13.59% | 0.53 | 12.16% | 0.48 | 12.84%\nYearly | All | 0.52 | 12.40% | 0.48 | 12.85% | 0.50 | 12.61% | 0.48 | 12.82%",
+      "index": 42
+    },
+    {
+      "id": "S032",
+      "page": 13,
+      "type": "paragraph",
+      "original": "4.2.1 County-level tillage mapping\nFor county-level tillage mapping, ML models were trained to estimate the ratio of cropland under low-\nintensity tillage in each county. When evaluated under the state-year CV, AEF-based and RS-based models\nprovided broadly comparable predictive skill, with R² values around 0.48 and RMSE near 12.20% (Table\n5). When assessed under yearly CV, the AEF-based RF model achieved the strongest performance in 2017\n(R² = 0.56, RMSE = 11.85%), whereas for 2022 the advantage shifted toward RS-based RF model (R² =\n0.53, RMSE = 12.16%). When aggregating across all years, these differences tend to smooth out, resulting\nin modestly higher R² for AEF-based models (0.52) compared to RS-based models (0.50), though overall\naccuracies remain similar (Table 5).",
+      "translation": "4.2.2 field尺度耕作制图\n对于field尺度耕作制图，ML模型被训练将每个field的耕作活动分类为高强度耕作（类别0）或低强度耕作（类别1）。在County-Year CV下，RS基础模型略优于AEF基础模型，而所有模型具有相当的预测能力，精度和加权F1分数约为0.75–0.80（图4）。高强度耕作（类别0）更难检测，因为它需要在作物残茬被清除和field发生重大扰动的短暂时期内的遥感观测。因此，RS基础模型相比F1-1获得了较低的F1-0分数，AEF基础模型也表现出相同的模式（图4）。\n特别是，在年度CV中观察到较大变异，因为耕作活动的时间和强度逐年变化。RS基础模型获得了约0.75的精度和加权F1分数，而AEF基础模型的分数下降至约0.70（图5）。AEF基础模型的F1-0分数较低，且具有相当大的变异性。这些结果表明，AEF嵌入在检测发生在短时间窗口内的变化方面并不本质上优于RF特征。",
+      "index": 43
+    },
+    {
+      "id": "T005",
+      "page": 13,
+      "type": "table_caption",
+      "original": "Table 5 Evaluation results of county-level low-intensity tillage mapping in the U.S. The best performer is",
+      "translation": "表5 美国县级低强度耕作制图评估结果。每种情况的最佳表现者以粗体标出。",
+      "index": 44
+    },
+    {
+      "id": "S033",
+      "page": 13,
+      "type": "paragraph",
+      "original": "highlighted in bold for each case.\nAEF RS\nScheme Year\nRF XGB RF XGB\nR2 RMSE R2 RMSE R2 RMSE R2 RMSE\nState-Year 2017&2022 0.47 12.22% 0.47 12.22% 0.48 12.18% 0.47 12.32%\n2017 0.56 11.85% 0.54 12.04% 0.46 13.00% 0.48 12.79%\nYearly 2022 0.47 12.91% 0.42 13.59% 0.53 12.16% 0.48 12.84%\nAll 0.52 12.40% 0.48 12.85% 0.50 12.61% 0.48 12.82%",
+      "translation": "County-Year CV方案下，每个实验重复五次，每个箱线图包含所有迭代的分数。",
+      "index": 45
+    },
+    {
+      "id": "S034",
+      "page": 13,
+      "type": "paragraph",
+      "original": "4.2.2 Field-level tillage mapping\nFor field-level tillage mapping, ML models were trained to classify the tillage activity of each field into\nhigh-intensity tillage (class 0) or low-intensity tillage (class 1). Under the county-year CV, RS-based models\nachieved slightly better performance than AEF-based models, while all models had comparable predictive\npower, with accuracy and weighted F1 scores around 0.75–0.80 (Figure 4). High-intensity tillage (class 0)\nis more difficult to detect because it requires remote sensing observations during the brief period when crop\nresidues are removed and major field disturbances occur. Consequently, RS-based models yielded lower\nF1-0 scores compared to F1-1, and AEF-based models exhibited the same pattern (Figure 4).\n13",
+      "translation": "年度CV方案下，每个实验重复五次，每个箱线图包含所有迭代的分数。\n4.3 覆盖作物制图\n对于field尺度覆盖作物制图，ML模型被训练将field分类为无覆盖作物（类别0）或有覆盖作物（类别1）。总体而言，RF模型优于XGB模型。XGB性能下降可能是由于输入特征集中的噪声，因为冬季和早春由于高云覆盖以及冰雪的存在，卫星观测较少（图S1），导致遥感预测变量中噪声更多。先前研究同样发现RF比XGB对噪声观测更稳健（Fawagreh et al., 2014）。",
+      "index": 46
+    },
+    {
+      "id": "S035",
+      "page": 14,
+      "type": "paragraph",
+      "original": "In particular, large variations were observed in the yearly CV since the timing and intensity of tillage\nactivities vary from year to year. RS-based models attained accuracy and weighted F1 scores around 0.75,\nwhile the scores of AEF-based models dropped to around 0.70 (Figure 5). AEF-based models had lower\nF1-0 scores with considerable variability. These results indicate that AEF embeddings are not inherently\nsuperior to RF features for detecting changes that occur within short time windows.",
+      "translation": "在两种方案下，RS基础RF模型具有最高的总体性能，精度和加权F1分数约为0.80–0.85（图6–7）。AEF基础模型在检测覆盖作物方面表现良好（较高的F1-1），但将更多负样本误分类。同样，在年度CV下（图7），所有模型表现出较大的性能变异，可能反映了覆盖作物种植时间逐年变化。AEF基础模型表现出最大的变异（图7），反映了AEF嵌入在时间上的不成比例表示。",
+      "index": 47
+    },
+    {
+      "id": "F004",
+      "page": 14,
+      "type": "figure_caption",
+      "original": "Figure 4 The field-level tillage mapping model performance (accuracy, F1-0, F1-1, and F1-weighted) under the",
+      "translation": "图4 County-Year CV方案下field尺度耕作制图模型性能（精度、F1-0、F1-1和F1-weighted）。每个实验重复五次，每个箱线图包含所有迭代的分数。",
+      "index": 48
+    },
+    {
+      "id": "S036",
+      "page": 14,
+      "type": "paragraph",
+      "original": "county-year CV scheme. Each experiment is repeated five times, and each box contains the scores of all iterations.",
+      "translation": "4.4 空间迁移评估\n遥感光谱特征和气候变量通常因不同地区作物种植和收获日期以及土壤类型的差异而表现出显著的地理偏移（Ma et al., 2024a; Tong and Wang, 2025）。AEF基于全球超过30亿张图像进行训练，有潜力学习空间不变特征。我们评估了AEF嵌入在美国玉米带内东部生态区ETF（东部）和西部生态区GP（西部）之间各下游任务的空间迁移能力。AEF基础ML模型在一个生态区训练以预测玉米和大豆产量，然后在另一生态区测试，反之亦然（第3.5节）。我们也训练并测试了RS基础模型作为对比。冬小麦产量预测任务被排除，因为小麦数据主要位于东部。在产量预测实验中，我们只呈现RF模型的结果，因为RF和XGB表现非常相似。在field尺度耕作和覆盖作物制图实验中，我们也只呈现RF模型的结果，因为其在先前实验中已被证明更稳健。",
+      "index": 49
+    },
+    {
+      "id": "F005",
+      "page": 14,
+      "type": "figure_caption",
+      "original": "Figure 5 The field-level tillage mapping model performance (accuracy, F1-0, F1-1, and F1-weighted) under the yearly",
+      "translation": "图5 年度CV方案下field尺度耕作制图模型性能（精度、F1-0、F1-1和F1-weighted）。每个实验重复五次，每个箱线图包含所有迭代的分数。",
+      "index": 50
+    },
+    {
+      "id": "S037",
+      "page": 14,
+      "type": "paragraph",
+      "original": "CV scheme. Each experiment is repeated five times, and each box contains the scores of all iterations.\n4.3 Cover crop mapping\n14",
+      "translation": "Task | Scale | Crop | Scheme | AEF-RF R² | AEF-RF RMSE | RS-RF R² | RS-RF RMSE\nYield Prediction (Corn) | County | East→West | 0.02 | 2.71 | 0.66 | 1.61\nYield Prediction (Corn) | County | West→East | 0.51 | 1.23 | 0.60 | 1.12\nYield Prediction (Soybean) | County | East→West | -0.28 | 0.94 | 0.53 | 0.56\nYield Prediction (Soybean) | County | West→East | 0.39 | 0.44 | 0.59 | 0.37\nYield Prediction (Corn) | Field | East→West | 0.25 | 2.65 | 0.38 | 2.41\nYield Prediction (Corn) | Field | West→East | 0.33 | 2.48 | 0.34 | 2.45\nYield Prediction (Soybean) | Field | East→West | 0.08 | 0.99 | 0.19 | 0.93\nYield Prediction (Soybean) | Field | West→East | 0.23 | 1.00 | 0.28 | 0.97\nTillage Mapping | County | East→West | -0.35 | 0.21 | 0.11 | 0.17\nTillage Mapping | County | West→East | 0.43 | 0.14 | 0.21 | 0.15\nTillage Mapping | Field | East→West | 0.64 | 0.64 | 0.67 | 0.68\nTillage Mapping | Field | West→East | 0.66 | 0.67 | 0.72 | 0.72\nCover Crop Mapping | Field | East→West | 0.88 | 0.87 | 0.84 | 0.85\nCover Crop Mapping | Field | West→East | 0.48 | 0.53 | 0.52 | 0.57",
+      "index": 51
+    },
+    {
+      "id": "S038",
+      "page": 15,
+      "type": "paragraph",
+      "original": "For field-level cover crop mapping, ML models were trained to classify fields as either without (class 0) or\nwith cover crops (class 1). Generally, RF models had better performance than XGB models. The degraded\nperformance by XGB is potentially due to the noise in the input feature sets, since there were fewer satellite\nobservations during winter and early spring because of high cloud coverage and the presence of snow and\nice. (Fig. S1), leading to more noise in the remote sensing predictors. Prior work has similarly found that\nRF is more robust to noisy observations than XGB (Fawagreh et al., 2014).",
+      "translation": "在产量预测任务中，AEF基础模型的空间迁移性能远差于RS基础模型。特别是，当在东部训练并在西部测试时（East→West），AEF基础模型未能对玉米或大豆在西部做出准确的产量预测，R²值约为-0.28至0.07（表6）。当在西部训练并在东部测试时（West→East），AEF基础模型在东部有所改善，R²值约为0.39–0.51，可能由于西部拥有更多州因而更具代表性的训练样本（表6）。同时，RS基础模型在两种空间迁移方案下表现稳定，始终优于AEF基础模型（表6）。在field尺度观察到类似的模式（表6）。\n我们在耕作制图和覆盖作物制图任务中观察到混合模式（表6）。特别是，在县级耕作制图中，AEF基础模型从西部迁移到东部时表现良好，但从东部迁移到西部时低于RS基础模型。在field尺度，RS基础RF在两种方案下均获得了更高精度，但差距较小。类似地，在field尺度覆盖作物制图中，AEF基础RF和RS基础RF表现出非常相似的空间迁移能力。一个可能的原因是农业实践受生态区间差异的影响小于作物产量。",
+      "index": 52
+    },
+    {
+      "id": "F006",
+      "page": 15,
+      "type": "figure_caption",
+      "original": "Figure 6 The field-level cover crop mapping model performance (accuracy, F1-0, F1-1, and F1-weighted) under the",
+      "translation": "图6 County-Year CV方案下field尺度覆盖作物制图模型性能（精度、F1-0、F1-1和F1-weighted）。每个实验重复五次，每个箱线图包含所有迭代的分数。",
+      "index": 53
+    },
+    {
+      "id": "S039",
+      "page": 15,
+      "type": "paragraph",
+      "original": "county-year CV scheme. Each experiment is repeated five times, and each box contains the scores of all iterations.\nUnder both schemes, RS-based RF models had the highest overall performance, with accuracy and\nweighted F1 scores around 0.80–0.85 (Figure 6–7). AEF-based models performed well in detecting cover\ncrops (higher F1-1) but misclassified more negative samples. Again, under the yearly CV (Figure 7), all\nmodels showed large variations in performance, likely reflecting the varying timing of cover cropping from\nyear to year. AEF-based models exhibited the largest variations (Figure 7), reflecting the disproportional\nrepresentation by AEF embeddings across time.\n15",
+      "translation": "5. 讨论\n5.1 AEF嵌入的优势\n我们的实验展示了AEF嵌入相比常用RS特征的若干优势：\n自动数据协调：AEF嵌入固有地协调来自多源的数据，包括光学、多光谱、雷达、激光雷达、重力场、气候、地形和文本来源。AEF将多个稀疏、非均匀观测记录（具有不同分辨率和格式）协调为10米空间分辨率的连续记录。AEF论文中的消融实验表明，每种模态都做出了正向贡献，提高了下游任务的精度（图4 in (Brown et al., 2025)）。因此，用户无需从每个单独来源收集数据或设计特征工程策略来协调它们。",
+      "index": 54
+    },
+    {
+      "id": "F007",
+      "page": 16,
+      "type": "figure_caption",
+      "original": "Figure 7 The field-level cover crop mapping model performance (accuracy, F1-0, F1-1, and F1-weighted) under the",
+      "translation": "图7 年度CV方案下field尺度覆盖作物制图模型性能（精度、F1-0、F1-1和F1-weighted）。每个实验重复五次，每个箱线图包含所有迭代的分数。",
+      "index": 55
+    },
+    {
+      "id": "S040",
+      "page": 16,
+      "type": "paragraph",
+      "original": "yearly CV scheme. Each experiment is repeated five times, and each box contains the scores of all iterations.\n4.4 Space-transfer evaluation\nRemote sensing spectral features and climate variables generally exhibit significant geographic shifts due\nto variations in factors such as crop planting and harvesting dates and soil types across different regions\n(Ma et al., 2024a; Tong and Wang, 2025). AEF was trained with more than 3 billion images worldwide,\nwith the potential to learn spatial-invariant features. We assessed the spatial transferability of AEF\nembeddings for each of the downstream tasks across an eastern ecoregion ETF (East) and a western\necoregion GP (West) within the U.S. Corn Belt at both the county and the field levels. AEF-based ML\nmodels were trained to predict yields for corn and soybean in one ecoregion and then were tested in the\nother, and vice versa (Section 3.5). We also trained and tested the RS-based models for comparison. Winter\nwheat yield prediction tasks were excluded since the wheat data were primarily located in the East. In the\nyield prediction experiments, we only present the results by RF models since RF and XGB had very similar\nperformance. In the field-level tillage and cover crop mapping experiments, we also only present the RF\nmodel’s results since it has proven more robust in the previous experiments.",
+      "translation": "快速数据下载和处理：年度AEF嵌入以影像数据集形式存储在GEE上，每年的数据组织为栅格影像。这种数据格式允许从GEE快速下载数据。此外，AEF嵌入无需预处理即可直接用于建模。相比之下，从GEE下载RS影像需要更多时间，因为涉及大量数据过滤、云掩膜和每个观测日期的空间聚合。下载的时间序列RS影像需要大量预处理和质量控制后才能用于模型训练和推理。",
+      "index": 56
+    },
+    {
+      "id": "T006",
+      "page": 16,
+      "type": "table_caption",
+      "original": "Table 6 Space-transfer evaluation results between the East and the West ecoregions in the U.S. Corn Belt",
+      "translation": "表6 美国玉米带东部和西部生态区之间各农业下游任务的空间迁移评估结果。每种情况的最佳表现者以粗体标出。",
+      "index": 57
+    },
+    {
+      "id": "S041",
+      "page": 16,
+      "type": "paragraph",
+      "original": "for each agricultural downstream task. The best performer is highlighted in bold for each case.\nTask Scale Crop Scheme AEF-based RF RS-based RF\nR2 RMSE R2 RMSE\nEast ® West 0.02 2.71 0.66 1.61\nCorn\nWest ® East 0.51 1.23 0.60 1.12\nCounty\nEast ® West -0.28 0.94 0.53 0.56\nSoybean\nYield Prediction West ® East 0.39 0.44 0.59 0.37\nEast ® West 0.25 2.65 0.38 2.41\nCorn\nWest ® East 0.33 2.48 0.34 2.45\nField\nEast ® West 0.08 0.99 0.19 0.93\nSoybean\nWest ® East 0.23 1.00 0.28 0.97\n16",
+      "translation": "本地实验中的竞争性能：AEF基础模型通常与RS基础模型具有竞争力，尤其在产量预测方面。例如，在作物产量预测的State-Year CV下，AEF基础XGB模型在玉米、大豆和冬小麦上均实现了0.78的R²值，相比之下RS基础XGB模型分别为0.80、0.79和0.71。\n更好的空间覆盖：我们还注意到AEF嵌入数据集比常用RS影像具有更好的空间覆盖，因为它提供了跨空间和时间的一致、无间隙表示，且不受云污染影响。例如，Corteva产量数据集中共有90,210条玉米产量记录。我们成功下载了除...之外的所有AEF嵌入，而为89,938条记录下载了RS特征。缺失的RS记录主要由于Landsat数据缺口或谐波拟合所需时间序列观测数量不足。",
+      "index": 58
+    },
+    {
+      "id": "S042",
+      "page": 17,
+      "type": "paragraph",
+      "original": "R2 RMSE R2 RMSE\nEast ® West -0.35 0.21 0.11 0.17\nCounty N/A\nWest ® East 0.43 0.14 0.21 0.15\nTillage Mapping\nAccuracy F1-weighted Accuracy F1-weighted\nEast ® West 0.64 0.64 0.67 0.68\nField N/A\nWest ® East 0.66 0.67 0.72 0.72\nAccuracy F1-weighted Accuracy F1-weighted\nCover Crop Mapping East ® West 0.88 0.87 0.84 0.85\nField N/A\nWest ® East 0.48 0.53 0.52 0.57\nIn the yield prediction tasks, the AEF-based models had substantially worse space-transfer performance\nthan the RS-based models. In particular, when trained in the East and tested in the West (East ® West),\nAEF-based models failed to make accurate yield prediction for either corn or soybean in the West, with R²\nvalues around -0.28–0.07 (Table 6). When trained in the West and tested in the East (West ® East), the\nAEF-based models had improved performance in the East, with R² values around 0.39–0.51, possibly due\nto having more states and thus more representative training samples in the West (Table 6). Meanwhile, RS-\nbased models had stable performance under both space-transfer schemes and consistently outperformed\nAEF-based models (Table 6). Similar patterns were observed at the field level (Table 6).\nWe observed mixed patterns in the tillage mapping and cover crop mapping tasks (Table 6). In particular,\nin county-level tillage mapping, AEF-based models performed well when transferring from West to East,\nbut underperformed RS-based models when transferring from East to West. At the field level, RS-based RF\nachieved higher accuracy under both schemes but with small margins. Similarly, in field-level cover crop\nmapping, AEF-based RF and RS-based RF exhibited very similar spatial transferability. One possible\nreason is that agricultural practices are less influenced by differences among ecoregions than crop yields.\n5 Discussion\n5.1 Advantages of AEF embeddings\nOur experiments demonstrated several advantages of AEF embeddings over commonly used RS features:\nAutomatic data harmonization: AEF embeddings inherently harmonize data from multiple sources,\nincluding optical, multispectral, radar, LiDAR, gravity fields, climate, topographic, and text sources. AEF\nreconciles multiple sparse, non-uniformly observation records with varying resolutions and formats into a\ncontinuous record with a 10-meter spatial resolution. Ablation experiments in the AEF paper showed that\neach modality has contributed positively and increased the accuracy in downstream tasks (",
+      "translation": "5.2 AEF嵌入的局限性\n5.2.1 有限的空间迁移能力\nAEF嵌入在某些任务中比遥感特征表现出更明显的地理偏移。我们的空间迁移实验表明，AEF基础模型在耕作和覆盖作物制图中具有竞争性的空间迁移能力，但在产量预测中始终低于RS基础模型（表6）。\n我们使用t-SNE对每个生态区中作物特异性AEF嵌入的分布进行了可视化，t-SNE是一种将高维空间投影到2D空间的ML数据可视化工具（Maaten and Hinton, 2008）。各生态区中AEF嵌入的分布彼此显著不同（图8），反映了特征空间中 substantial 的地理偏移。重叠样本有限，且对应于位于两个生态区边界沿线的县。因此，在一个区域训练的AEF基础模型学习了预测变量与产量数据之间的区域特定关联，这可能阻碍向另一区域的迁移。",
+      "index": 59
+    },
+    {
+      "id": "S043",
+      "page": 17,
+      "type": "paragraph",
+      "original": "Figure 4 in\n(Brown et al., 2025)). As such, users do not need to collect data from each individual source or design\nfeature engineering strategies to harmonize them.\nFast data downloading and processing: The annual AEF embeddings are stored as an image dataset on\nGEE, and each year’s data are organized as a raster image. This data format allows fast data downloading\nfrom GEE. Also, the AEF embeddings require no pre-processing and are ready for modeling. In contrast,\ndownloading RS imagery from GEE takes much more time, as it involves extensive data filtering, cloud\nmasking, and spatial aggregation on each observation date. The downloaded time-series RS images require\nintensive pre-processing and quality control before they can be used for model training and inference.\n17",
+      "translation": "这些地理偏移在跨国或跨大陆时可能更加显著。为证实这一点，我们进一步进行了从美国到阿根廷的县级大豆产量预测空间迁移实验，时间为2019–2024年。值得注意的是，在美国训练的AEF基础模型显著低于RS基础模型，且在所有年份未能对阿根廷做出准确的产量预测（表7）。",
+      "index": 60
+    },
+    {
+      "id": "S044",
+      "page": 18,
+      "type": "paragraph",
+      "original": "Competitive performance in local experiments: AEF-based models generally are competitive with RS-\nbased models, especially in yield prediction. For example, under the state-year CV for crop yield prediction,\nAEF-based XGB model achieved the R2 values of 0.78 for corn, soybean, and winter wheat, compared to\n0.80, 0.79, and 0.71 for the RS-based XGB model.\nBetter spatial coverage: We also noticed that AEF embedding dataset has better spatial coverage than\ncommonly used RS imagery, as it provides consistent, gap-free representations across space and time and\nis not subject to cloud contamination. For instance, there are a total number of 90,210 corn yield records in\nthe Corteva yield dataset. We successfully downloaded AEF embeddings for all but downloaded RS features\nfor 89,938 of them. The missing RS records are mostly due to data gap in Landsat or insufficient number\nof time-series observations for harmonic fitting.\n5.2 Limitations of AEF embeddings",
+      "translation": "Scheme | Year | AEF-RF R² | AEF-RF RMSE | AEF-XGB R² | AEF-XGB RMSE | RS-RF R² | RS-RF RMSE | RS-XGB R² | RS-XGB RMSE\nUS→Argentina | 2019 | -5.24 | 1.84 | -5.67 | 1.62 | 0.04 | 0.72 | 0.05 | 0.72\nUS→Argentina | 2020 | -3.09 | 1.54 | -3.53 | 1.43 | -0.16 | 0.81 | -0.14 | 0.81\nUS→Argentina | 2021 | -3.04 | 1.35 | -3.54 | 1.40 | -0.29 | 0.75 | -0.30 | 0.76\nUS→Argentina | 2022 | -3.08 | 1.33 | -3.58 | 0.67 | 0.01 | 0.65 | -0.02 | 0.66\nUS→Argentina | 2023 | -0.64 | 0.64 | -0.82 | 1.59 | -0.04 | 0.53 | -0.06 | 0.53\nUS→Argentina | 2024 | -3.84 | 1.51 | -4.35 | 1.49 | 0.30 | 0.58 | 0.27 | 0.59\nUS→Argentina | All | -2.13 | 1.42 | -2.45 | 1.90 | 0.27 | 0.68 | 0.26 | 0.69",
+      "index": 61
+    },
+    {
+      "id": "S045",
+      "page": 18,
+      "type": "paragraph",
+      "original": "5.2.1 Limited spatial transferability\nAEF embeddings exhibit more pronounced geographic shifts than remote sensing features in certain tasks.\nOur space-transfer experiments showed that AEF-based had competitive spatial transferability in tillage\nand cover crop mapping but consistently underperformed RS-based models in yield prediction (Table 6).\nWe visualized the distributions of the crop-specific AEF embeddings in each ecoregion using t-SNE, a ML-\nbased data visualization tool that projects high-dimensional space to a 2D space (Maaten and Hinton, 2008).\nThe distributions of AEF embeddings in each ecoregion differs markedly from each other (Figure 8),\nreflecting substantial geographic shifts in the feature space. The overlapping samples are limited and\ncorrespond to counties situated along the boundary between the two ecoregions. Consequently, AEF-based\nmodels trained in one region learn region-specific association between the predictors and the yield data,\nwhich can hinder transfer to the other region.",
+      "translation": "有限的空间迁移能力可能源于多个 contributing 因素。在模型训练期间，AEF嵌入被解码以不仅重建卫星影像，还重建DEM和重力场，这些是区域特定的且相对静态的，可能限制嵌入捕获局部化信息。另一个可能的原因是使用了来自Wikipedia的地理定位文章作为文本编码器的输入，这些文章通过与基于视觉的模型对比学习进行更新。此类文本信息可能是区域特定的，导致跨空间的不同嵌入，特别是在比较跨国或跨大陆的区域时。",
+      "index": 62
+    },
+    {
+      "id": "F008",
+      "page": 18,
+      "type": "figure_caption",
+      "original": "Figure 8 The t-SNE plots of the crop-specific AEF embeddings at the county level in the Eastern Temperate",
+      "translation": "图8 美国玉米带东部温带森林（ETF）和大平原（GP）县级作物特异性AEF嵌入的t-SNE图。",
+      "index": 63
+    },
+    {
+      "id": "S046",
+      "page": 18,
+      "type": "paragraph",
+      "original": "Forests (ETF) and the Great Plains (GP) in the U.S. Corn Belt.\nThese geographic shifts can be even more pronounced across countries or continents. To confirm this, we\nfurther conducted space-transfer experiments from the U.S. to Argentina for county-level soybean yield\nprediction in 2019–2024. Notably, AEF-based models trained in the U.S. significantly underperformed the\nRS-based models and failed to make accurate yield predictions in Argentina across all years (Table 7).",
+      "translation": "5.2.2 低可解释性\n实施AEF嵌入时的另一个局限性是低可解释性。64维年度嵌入的每个单独波段依次标记为A00至A63，没有明确的物理含义。图9展示了特征重要性分析示例，其中FM基础和RS基础RF模型中的特征重要性通过森林中所有树的平均不纯度下降来量化（Breiman, 2001）。基于RS基础RF模型识别的特征重要性（图9（b）），显然卫星衍生特征比气候变量贡献更大，GCVI比NDVI和原始光谱波段更具信息量。这一信息可指导特征选择和模型设计。同时，A05是FM基础RF模型中最重要的特征，并以较大优势超过第二重要的A17（图9（a））。然而，鉴于其含义未知，尚不确定为什么A05是玉米产量预测的首要贡献者。我们注意到，大豆产量最重要的特征与玉米差异很大，尽管RS基础模型对两种作物的特征重要性相似。",
+      "index": 64
+    },
+    {
+      "id": "T007",
+      "page": 18,
+      "type": "table_caption",
+      "original": "Table 7 Space-transfer evaluation results of county-level soybean yield prediction in Argentina.",
+      "translation": "表7 阿根廷县级大豆产量预测的空间迁移评估结果。",
+      "index": 65
+    },
+    {
+      "id": "S047",
+      "page": 18,
+      "type": "paragraph",
+      "original": "18",
+      "translation": "5.2.3 其他局限性\n此外，我们在AEF嵌入中观察到若干其他局限性。一是AEF基础模型在年度CV下表现出与RS基础模型相似的时间变异。这一发现表明，尽管AEF被训练以实现时间连续特征化，它仍然受EO可用性和质量的影响，导致不同年份的特征化性能有所变化。另一个局限性是AEF缺乏时间敏感性，因此无法支持时间关键任务，如季内产量预测。年度AEF嵌入源自全年地球观测时间序列，这限制了其在实时分析中的适用性。",
+      "index": 66
+    },
+    {
+      "id": "S048",
+      "page": 19,
+      "type": "paragraph",
+      "original": "AEF RS\nScheme Year\nRF XGB RF XGB\nR2 RMSE R2 RMSE R2 RMSE R2 RMSE\n2019 -5.24 1.84 -5.67 1.62 0.04 0.72 0.05 0.72\n2020 -3.09 1.54 -3.53 1.43 -0.16 0.81 -0.14 0.81\n2021 -3.04 1.35 -3.54 1.40 -0.29 0.75 -0.30 0.76\nUS ® Argentia 2022 -3.08 1.33 -3.58 0.67 0.01 0.65 -0.02 0.66\n2023 -0.64 0.64 -0.82 1.59 -0.04 0.53 -0.06 0.53\n2024 -3.84 1.51 -4.35 1.49 0.30 0.58 0.27 0.59\nAll -2.13 1.42 -2.45 1.90 0.27 0.68 0.26 0.69\nThe limited spatial transferability may arise from multiple contributing factors. During model training, AEF\nembeddings were decoded to not only reconstruct satellite images but also DEM and gravity fields, which\nare region-specific and relatively static, and may limit the embeddings to capturing localized information.\nAnother possible reason is that geolocated articles from Wikipedia were used to provide text-based\ninformation as inputs to a text encoder, which were updated via contrastive learning with vision-based\nmodels. Such text-based information might be region-specific, resulting in distinct embeddings across space,\nparticularly when comparing regions across countries or continents.",
+      "translation": "6. 结论\nGFMs的快速发展显示出克服EO长期局限性的前景。Google DeepMind的AEF是首个支持跨连续时间的多模态EO特征化的GFM，全球、年度且可直接分析的AEF嵌入在GEE上可从2017至2024年获取。内部评估表明AEF嵌入在多项EO任务中优于现有特征化方法。然而，这些任务主要涉及土地覆盖和土地利用分类，缺乏对其在农业任务中表现的系统评估。本研究在美国区域和field尺度上全面评估了AEF嵌入在三个关键农业下游任务中的表现，包括作物产量预测、耕作制图和覆盖作物制图。评估结果表明AEF基础模型具有强劲的预测能力，在若干场景中与RS基础模型具有竞争力。AEF还具有更好的空间覆盖，建模前需要最少的预处理。它有潜力改变当前基于EO的农业研究。",
+      "index": 67
+    },
+    {
+      "id": "S049",
+      "page": 19,
+      "type": "paragraph",
+      "original": "5.2.2 Low interpretability\nAnother limitation when implementing AEF embeddings is the low interpretability. Each individual band\nof the 64-dimentional annual embeddings is labeled sequentially from A00 to A63, without clear physical\nmeanings. An example of feature importance analysis is presented in Figure 9, in which the feature\nimportance in FM-based and RS-based RF models was quantified by the mean decrease in impurity across\nall trees in the forest (Breiman, 2001). Based on feature importance identified by RS-based RF models\n(",
+      "translation": "然而，我们也发现了AEF的若干局限性，包括有限的空间迁移能力和低可解释性。特别是，AEF基础模型表现出显著的地理偏移，未能跨区域和国家生成合理的产量预测。我们还发现解释AEF基础模型中的特征重要性具有挑战性，因为嵌入的每个波段没有明确的物理含义。除此之外，AEF嵌入的其他局限性还包括时间变异性和有限的时间敏感性。总体而言，这些局限性在将AEF嵌入应用于农业时引发了担忧，因为农业领域对时间敏感性、泛化能力和可解释性至关重要。未来的AEF版本或其他GFM开发可以通过生成月度/季节嵌入、平衡训练站点选择以及结合特征归因技术来增强可解释性，从而解决这些局限性。",
+      "index": 68
+    },
+    {
+      "id": "S050",
+      "page": 19,
+      "type": "paragraph",
+      "original": "Figure 9 (b)), it is evident that satellite-derived features contribute more than climate variables, with GCVI\nproving more informative than NDVI and raw spectral bands. This information can guide feature selection\nand model design. Meanwhile, A05 is the most important feature in FM-based RF models and surpasses\nthe second A17 by a large margin (",
+      "translation": "致谢\n我们感谢Corteva的Sang-Zi Liang帮助收集和整理field产量数据。资金由NASA Acres提供（NASA应用科学资助号80NSSC23M0034，子合同124245-Z6512205给D.B.L.）。资金也由Google的Satellite Embeddings Dataset Small Grants Program提供，授予Y.M.和D.B.L.。本研究中表达的任何观点、发现、结论或建议均为作者个人意见，不一定反映NASA或Google的观点。",
+      "index": 69
+    },
+    {
+      "id": "S051",
+      "page": 19,
+      "type": "paragraph",
+      "original": "Figure 9 (a)). However, it is uncertain why A05 is the top contributor to\ncorn yield prediction, given that its meaning is unknown. We note that the most important features for\nsoybean yields differed greatly from those for corn, even though the RS-based models had similar feature\nimportance for the two crops.\n19",
+      "translation": "参考文献列表（保留原文）\n[1] Abdalla, M., Hastings, A., Cheng, K., Yue, Q., Chadwick, D., Espenberg, M., Truu, J., Rees, R.M., Smith, P., 2019. A critical review of the impacts of cover crops on nitrogen leaching, net greenhouse gas balance and crop productivity. Global Change Biology 25, 2530–2543.\n[2] Alonso-Ayuso, M., Gabriel, J.L., García-González, I., Del Monte, J.P., Quemada, M., 2018. Weed density and diversity in a long-term cover crop experiment background. Crop Protection 112, 103–111.\n[3] Archuleta, C.-A.M., Constance, E.W., Arundel, S.T., Lowe, A.J., Mantey, K.S., Phillips, L.A., 2017. The National Map seamless digital elevation model specifications. US Geological Survey.\n[4] Becker-Reshef, I., Barker, B., Humber, M., Puricelli, E., Sanchez, A., Sahajpal, R., McGaughey, K., Justice, C., Baruth, B., Wu, B., Prakash, A., Abdolreza, A., Jarvis, I., 2019. The GEOGLAM crop monitor for AMIS: Assessing crop conditions in the context of global markets. Global Food Security 23, 173–181.\n[5] Boryan, C., Yang, Z., Mueller, R., Craig, M., 2011. Monitoring US agriculture: the US Department of Agriculture, National Agricultural Statistics Service, Cropland Data Layer Program. Geocarto International 26, 341–358.\n[6] Breiman, L., 2001. Random Forests. Machine Learning 45, 5–32.\n[7] Brown, C.F., Kazmierski, M.R., Pasquarella, V.J., Rucklidge, W.J., Zhang, C., Shelhamer, E., Lahera, E., Wiles, O., Ilyushchenko, S., Zhang, L.L., Alj, S., Schechter, E., Askay, S., Guinan, O., Moore, R., Boukouvalas, A., Kohli, P., 2025. AlphaEarth Foundations: An embedding field model for accurate and efficient global mapping from sparse label data.\n[8] Claassen, R., Langpap, C., Wu, J., 2017. Impacts of Federal Crop Insurance on Land Use and Environmental Quality. American Journal of Agricultural Economics 99, 592–613.\n[9] Cong, Y., Khanna, S., Meng, C., Liu, P., Rozi, E., He, Y., Burke, M., Lobell, D., Ermon, S., 2022. SatMAE: Pre-training Transformers for Temporal and Multi-Spectral Satellite Imagery. Advances in Neural Information Processing Systems 35, 197–211.\n[10] Deering, D.W., 1978. RANGELAND REFLECTANCE CHARACTERISTICS MEASURED BY AIRCRAFT AND SPACECRAFT SENSORS. Texas A&M University.\n[11] Deines, J.M., Patel, R., Liang, S.-Z., Dado, W., Lobell, D.B., 2021. A million kernels of truth: Insights into scalable satellite maize yield mapping and yield gap analysis from an extensive ground dataset in the US Corn Belt. Remote Sensing of Environment 253, 112174.\n[12] Eskandari, I., Navid, H., Rangzan, K., 2016. Evaluating spectral indices for determining conservation and conventional tillage systems in a vetch-wheat rotation. International Soil and Water Conservation Research 4, 93–98.\n[13] Fawagreh, K., Gaber, M.M., Elyan, E., 2014. Random forests: from early developments to recent advancements. Systems Science & Control Engineering 2, 602–609.\n[14] Fendrich, A.N., Matthews, F., Van Eynde, E., Carozzi, M., Li, Z., d’Andrimont, R., Lugato, E., Martin, P., Ciais, P., Panagos, P., 2023. From regional to parcel scale: A high-resolution map of cover crops across Europe combining satellite data with statistical surveys. Science of The Total Environment 873, 162300.\n[15] Gitelson, A.A., Viña, A., Arkebauer, T.J., Rundquist, D.C., Keydan, G., Leavitt, B., 2003. Remote estimation of leaf area index and green leaf biomass in maize canopies. Geophysical research letters 30.\n[16] Guan, K., Jin, Z., Peng, B., Tang, J., DeLucia, E.H., West, P.C., Jiang, C., Wang, S., Kim, T., Zhou, W., Grihis, T., Liu, L., Yang, W.H., Qin, Z., Yang, Q., Margenot, A., Stuchiner, E.R., Kumar, V., Bernacchi, C., Coppess, J., Novick, K.A., Gerber, J., Jahn, M., Khanna, M., Lee, D., Chen, Z., Yang, S.-J., 2023. A scalable framework for quantifying field-level agricultural carbon outcomes. Earth-Science Reviews 243, 104462.\n[17] He, K., Chen, X., Xie, S., Li, Y., Dollar, P., Girshick, R., 2022. Masked Autoencoders Are Scalable Vision Learners, in: 2022 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR). IEEE, New Orleans, LA, USA, pp. 15979–15988.\n[18] Hollmann, N., Müller, S., Purucker, L., Krishnakumar, A., Körfer, M., Hoo, S.B., Schirrmeister, R.T., Hutter, F., 2025. Accurate predictions on small data with a tabular foundation model. Nature 637, 319–326.\n[19] Kauth, R.J., Thomas, G.S., 1976. The tasselled cap--a graphic description of the spectral-temporal development of agricultural crops as seen by Landsat, in: LARS Symposia. p. 159.\n[20] Kogan, F., Kussul, N., Adamenko, T., Skakun, S., Kravchenko, O., Kryvobok, O., Shelestov, A., Kolotii, A., Kussul, O., Lavrenyuk, A., 2013. Winter wheat yield forecasting in Ukraine based on Earth observation, meteorological data and biophysical models. International Journal of Applied Earth Observation and Geoinformation 23, 192–203.",
+      "index": 70
+    },
+    {
+      "id": "F009",
+      "page": 20,
+      "type": "figure_caption",
+      "original": "Figure 9 The Top 10 important features in (a) FM-based RF models and (b) RS-based RF models for county-level",
+      "translation": "图9 （a）FM基础RF模型和（b）RS基础RF模型中县级玉米产量预测的前10个重要特征。",
+      "index": 71
+    },
+    {
+      "id": "S052",
+      "page": 20,
+      "type": "paragraph",
+      "original": "corn yield predication.",
+      "translation": "[21] Koudahe, K., Allen, S.C., Djaman, K., 2022. Critical review of the impact of cover crops on soil properties. International Soil and Water Conservation Research 10, 343–354.\n[22] Lobell, D.B., Di Tommaso, S., Zhou, Q., Ma, Y., Specht, J., Guan, K., 2025. The mixed effects of recent cover crop adoption on US cropland productivity. Nat Sustain 1–9.\n[23] Lu, C., Yu, Z., Hennessy, D.A., Feng, H., Tian, H., Hui, D., 2022. Emerging weed resistance increases tillage intensity and greenhouse gas emissions in the US corn–soybean cropping system. Nat Food 3, 266–274.\n[24] Luo, D., Zhang, H.K., Houborg, R., Ndekelu, L.M.N., Maimaitijiang, M., Tran, K.H., McMaine, J., 2023. Utility of daily 3 m Planet Fusion Surface Reflectance data for tillage practice mapping with deep learning. Science of Remote Sensing 7, 100085.\n[25] Ma, Y., Chen, S., Ermon, S., Lobell, D.B., 2024a. Transfer learning in environmental remote sensing. Remote Sensing of Environment 301, 113924.\n[26] Ma, Y., Liang, S.-Z., Myers, D.B., Swatantran, A., Lobell, D.B., 2024b. Subfield-level crop yield mapping without ground truth data: A scale transfer framework. Remote Sensing of Environment 315, 114427.\n[27] Ma, Y., Zhang, Z., Yang, H.L., Yang, Z., 2021. An adaptive adversarial domain adaptation approach for corn yield prediction. Computers and Electronics in Agriculture 187, 106314.\n[28] Maaten, L. van der, Hinton, G., 2008. Visualizing data using t-SNE. Journal of machine learning research 9, 2579–2605.\n[29] Muñoz-Sabater, J., Dutra, E., Agustí-Panareda, A., Albergel, C., Arduini, G., Balsamo, G., Boussetta, S., Choulga, M., Harrigan, S., Hersbach, H., Martens, B., Miralles, D.G., Piles, M., Rodríguez-Fernández, N.J., Zsoter, E., Buontempo, C., Thépaut, J.-N., 2021. ERA5-Land: a state-of-the-art global reanalysis dataset for land applications. Earth System Science Data 13, 4349–4383.\n[30] Nakalembe, C., Becker-Reshef, I., Bonifacio, R., Hu, G., Humber, M.L., Justice, C.J., Keniston, J., Mwangi, K., Rembold, F., Shukla, S., Urbano, F., Whitcraft, A.K., Li, Y., Zappacosta, M., Jarvis, I., Sanchez, A., 2021. A review of satellite-based global agricultural monitoring systems available for Africa. Global Food Security 29, 100543.",
+      "index": 72
+    },
+    {
+      "id": "S053",
+      "page": 20,
+      "type": "paragraph",
+      "original": "5.2.3 Other limitations\nIn addition, we observed several other limitations in AEF embeddings. One is that AEF-based models\nshowed temporal variations under yearly CV similar to RS-based models. This finding suggests that\nalthough AEF was trained to realize time-continuous featurization, it is still subject to the availability and\nquality of EO, leading to featurization with varying performance across different years. Another limitation\nis that AEF lacks temporal sensitivity and therefore cannot support time-critical tasks such as in-season\nyield prediction. The annual AEF embeddings are derived from year-long time series of Earth observations,\nwhich constrains their applicability for real-time analyses.\n6 Conclusion\nThe rapid development of GFMs shows promises to overcome the long-standing limitations in EO. Google\nDeepMind’s AEF is the first GFM that supports multi-modal EO featurization across continuous time, and\nthe global, annual, and analysis-ready AEF embeddings are available from 2017 to 2024 on GEE. Internal\nevaluations show that AEF embeddings outperform existing featurization approaches in multiple EO tasks.\nHowever, those tasks are mainly about land cover and land use classification, with no systematic evaluation\non its performance in agricultural tasks. This study comprehensively evaluated AEF embeddings on three\ncritical agricultural downstream tasks at both regional and field levels in the U.S., including crop yield\nprediction, tillage mapping, and cover crop mapping. Evaluation results show that AEF-based models have\nstrong predictive power and are competitive with RS-based models in several scenarios. AEF also has better\nspatial coverage and requires minimal pre-processing before modeling. It has the potential to transform the\ncurrent EO-based agricultural research.\nHowever, we also identified several limitations in AEF, including limited spatial transferability and low\ninterpretability. In particular, AEF-based models exhibited significant geographic shifts and failed to\ngenerate reasonable yield predictions across regions and countries. We also found it is challenging to\ninterpret feature importance in AEF-based models, since there is no clear physical meaning in each band of\nthe embeddings. Beyond that, other limitations in AEF embeddings include temporal variability and limited\ntime sensitivity. Collectively, these limitations raise concerns when applying AEF embeddings in\nagriculture, where time sensitivity, generalizability, and interpretability is critical. Future AEF versions or\nother GFM development can tackle these limitations through generating monthly/seasonal embeddings,\nbalancing training site selection, and incorporating feature attribution techniques to enhance interpretability.\nAcknowledgements\nWe appreciate Sang-Zi Liang from Corteva for helping to collect and organize the field yield data. Funding\nwas provided by NASA Acres (NASA Applied Sciences Grant No. 80NSSC23M0034, sub-award 124245-\nZ6512205 to D.B.L.). Funding was also provided by Google’s Satellite Embeddings Dataset Small Grants\nProgram, awarded to Y.M. and D.B.L. Any opinions, findings, and conclusions or recommendations\nexpressed in this study are those of the authors and do not necessarily reflect the views of NASA or Google.\n20",
+      "translation": "[31] Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., Blondel, M., Prettenhofer, P., Weiss, R., Dubourg, V., Vanderplas, J., Passos, A., Cournapeau, D., Brucher, M., Perrot, M., Duchesnay, É., 2011. Scikit-learn: Machine Learning in Python. Journal of Machine Learning Research 12, 2825–2830.\n[32] Plastina, A., Liu, F., Miguez, F., Carlson, S., 2020. Cover crops use in Midwestern US agriculture: perceived benefits and net returns. Renewable Agriculture and Food Systems 35, 38–48.\n[33] Reed, C.J., Gupta, R., Li, S., Brockman, S., Funk, C., Clipp, B., Keutzer, K., Candido, S., Uyttendaele, M., Darrell, T., 2023. Scale-MAE: A Scale-Aware Masked Autoencoder for Multiscale Geospatial Representation Learning, in: 2023 IEEE/CVF International Conference on Computer Vision (ICCV). IEEE, Paris, France, pp. 4065–4076.\n[34] Ritchie, J.T., 1991. Wheat Phasic Development, in: Modeling Plant and Soil Systems. John Wiley & Sons, Ltd, pp. 31–54.\n[35] Sullivan, D.G., Truman, C.C., Schomberg, H.H., Endale, D.M., Strickland, T.C., 2006. Evaluating techniques for determining tillage regime in the Southeastern Coastal Plain and Piedmont. Agronomy journal 98, 1236–1246.\n[36] Swan, J.B., Schneider, E.C., Moncrief, J.F., Paulson, W.H., Peterson, A.E., 1987. Estimating Corn Growth, Yield, and Grain Moisture from Air Growing Degree Days and Residue Cover1. Agronomy Journal 79, 53–60.\n[37] Szwarcman, D., Roy, S., Fraccaro, P., Gíslason, Þ.E., Blumenstiel, B., Ghosal, R., Oliveira, P.H. de, Almeida, J.L. de S., Sedona, R., Kang, Y., Chakraborty, S., Wang, S., Kumar, A., Truong, M., Godwin, D., Lee, H., Hsu, C.-Y., Asanjan, A.A., Mujeci, B., Keenan, T., Arevalo, P., Li, W., Alemohammad, H., Olofsson, P., Hain, C., Kennedy, R., Zadrozny, B., Cavallaro, G., Watson, C., Maskey, M., Ramachandran, R., Moreno, J.B., 2024. Prithvi-EO-2.0: A Versatile Multi-Temporal Foundation Model for Earth Observation Applications.\n[38] Tong, X.-Y., Wang, S., 2025. Invariant Features for Global Crop Type Classification.\n[39] USDA-NASS, 2024. Census of Agriculture Methodology. USDA.\n[40] Van Deventer, A.P., Ward, A.D., Gowda, P.H., Lyon, J.G., 1997. Using thematic mapper data to identify contrasting soil plains and tillage practices. Photogrammetric engineering and remote sensing 63, 87–93.",
+      "index": 73
+    },
+    {
+      "id": "H006",
+      "page": 21,
+      "type": "heading",
+      "original": "Reference",
+      "translation": "参考文献",
+      "index": 74
+    },
+    {
+      "id": "S054",
+      "page": 21,
+      "type": "paragraph",
+      "original": "Abdalla, M., Hastings, A., Cheng, K., Yue, Q., Chadwick, D., Espenberg, M., Truu, J., Rees,\nR.M., Smith, P., 2019. A critical review of the impacts of cover crops on nitrogen\nleaching, net greenhouse gas balance and crop productivity. Global Change Biology\n25, 2530–2543. https://doi.org/10.1111/gcb.14644\nAlonso-Ayuso, M., Gabriel, J.L., García-González, I., Del Monte, J.P., Quemada, M., 2018.\nWeed density and diversity in a long-term cover crop experiment background. Crop\nProtection 112, 103–111. https://doi.org/10.1016/j.cropro.2018.04.012\nArchuleta, C.-A.M., Constance, E.W., Arundel, S.T., Lowe, A.J., Mantey, K.S., Phillips, L.A.,",
+      "translation": "[41] Wang, Y., Albrecht, C.M., Braham, N.A.A., Mou, L., Zhu, X.X., 2022. Self-Supervised Learning in Remote Sensing: A review. IEEE Geoscience and Remote Sensing Magazine 10, 213–247.\n[42] Wilson, B.T., Knight, J.F., McRoberts, R.E., 2018. Harmonic regression of Landsat time series for modeling attributes from national forest inventory data. ISPRS Journal of Photogrammetry and Remote Sensing 137, 29–46.\n[43] Wu, K., Zhang, Yingying, Ru, L., Dang, B., Lao, J., Yu, L., Luo, J., Zhu, Z., Sun, Y., Zhang, J., Zhu, Q., Wang, J., Yang, M., Chen, J., Zhang, Yongjun, Li, Y., 2025. A semantic-enhanced multi-modal remote sensing foundation model for Earth observation. Nat Mach Intell 7, 1235–1249.\n[44] Xiong, X., Zhong, R., Jiang, H., Athanasiadis, I., Yang, Y., Zhu, L., Lin, T., 2026. Corn yield estimation under extreme climate stress with knowledge-encoded deep learning. ISPRS Journal of Photogrammetry and Remote Sensing 231, 101–118.\n[45] Xiong, Z., Wang, Y., Zhang, F., Stewart, A.J., Hanna, J., Borth, D., Papoutsis, I., Saux, B.L., Camps-Valls, G., Zhu, X.X., 2024. Neural Plasticity-Inspired Multimodal Foundation Model for Earth Observation.\n[46] Zhang, C., Kerner, H., Wang, S., Hao, P., Li, Z., Hunt, K.A., Abernethy, J., Zhao, H., Gao, F., Di, L., Guo, C., Liu, Z., Yang, Z., Mueller, R., Boryan, C., Chen, Q., Beeson, P.C., Zhang, H.K., Shen, Y., 2025. Remote sensing for crop mapping: A perspective on current and future crop-specific land cover data products. Remote Sensing of Environment 330, 114995.\n[47] Zhou, Q., Guan, K., Wang, Sheng, Jiang, C., Huang, Y., Peng, B., Chen, Z., Wang, Sibo, Hipple, J., Schaefer, D., Qin, Z., Stroebel, S., Coppess, J., Khanna, M., Cai, Y., 2022. Recent Rapid Increase of Cover Crop Adoption Across the U.S. Midwest Detected by Fusing Multi-Source Satellite Data. Geophysical Research Letters 49, e2022GL100249.\n[48] Zulauf, C., Schnitkey, G., Paulson, N., Coppess, and J., 2024. Cover Crops and Covered Cropland, 2022 US Census of Agriculture. farmdoc daily 14.",
+      "index": 75
+    },
+    {
+      "id": "S055",
+      "page": 21,
+      "type": "paragraph",
+      "original": "2017. The National Map seamless digital elevation model specifications. US\nGeological Survey.\nBecker-Reshef, I., Barker, B., Humber, M., Puricelli, E., Sanchez, A., Sahajpal, R.,\nMcGaughey, K., Justice, C., Baruth, B., Wu, B., Prakash, A., Abdolreza, A., Jarvis, I.,",
+      "translation": "[参考文献延续 - 保留原文]\nArchuleta, C.-A.M., Constance, E.W., Arundel, S.T., Lowe, A.J., Mantey, K.S., Phillips, L.A., 2017. The National Map seamless digital elevation model specifications. US Geological Survey.\nBecker-Reshef, I., Barker, B., Humber, M., Puricelli, E., Sanchez, A., Sahajpal, R., McGaughey, K., Justice, C., Baruth, B., Wu, B., Prakash, A., Abdolreza, A., Jarvis, I., 2019. The GEOGLAM crop monitor for AMIS: Assessing crop conditions in the context of global markets. Global Food Security 23, 173–181.",
+      "index": 76
+    },
+    {
+      "id": "S056",
+      "page": 21,
+      "type": "paragraph",
+      "original": "2019. The GEOGLAM crop monitor for AMIS: Assessing crop conditions in the\ncontext of global markets. Global Food Security 23, 173–181.\nhttps://doi.org/10.1016/j.gfs.2019.04.010\nBoryan, C., Yang, Z., Mueller, R., Craig, M., 2011. Monitoring US agriculture: the US\nDepartment of Agriculture, National Agricultural Statistics Service, Cropland Data\nLayer Program. Geocarto International 26, 341–358.\nhttps://doi.org/10.1080/10106049.2011.562309\nBreiman, L., 2001. Random Forests. Machine Learning 45, 5–32.\nhttps://doi.org/10.1023/A:1010933404324\nBrown, C.F., Kazmierski, M.R., Pasquarella, V.J., Rucklidge, W.J., Zhang, C., Shelhamer, E.,\nLahera, E., Wiles, O., Ilyushchenko, S., Zhang, L.L., Alj, S., Schechter, E., Askay, S.,\nGuinan, O., Moore, R., Boukouvalas, A., Kohli, P., 2025. AlphaEarth Foundations: An\nembedding field model for accurate and ehicient global mapping from sparse label\ndata.\nClaassen, R., Langpap, C., Wu, J., 2017. Impacts of Federal Crop Insurance on Land Use\nand Environmental Quality. American Journal of Agricultural Economics 99, 592–\n613. https://doi.org/10.1093/ajae/aaw075\nCong, Y., Khanna, S., Meng, C., Liu, P., Rozi, E., He, Y., Burke, M., Lobell, D., Ermon, S.,",
+      "translation": "[参考文献延续 - 保留原文]\nBoryan, C., Yang, Z., Mueller, R., Craig, M., 2011. Monitoring US agriculture: the US Department of Agriculture, National Agricultural Statistics Service, Cropland Data Layer Program. Geocarto International 26, 341–358.\nBreiman, L., 2001. Random Forests. Machine Learning 45, 5–32.\nBrown, C.F., Kazmierski, M.R., Pasquarella, V.J., Rucklidge, W.J., Zhang, C., Shelhamer, E., Lahera, E., Wiles, O., Ilyushchenko, S., Zhang, L.L., Alj, S., Schechter, E., Askay, S., Guinan, O., Moore, R., Boukouvalas, A., Kohli, P., 2025. AlphaEarth Foundations: An embedding field model for accurate and efficient global mapping from sparse label data.\nClaassen, R., Langpap, C., Wu, J., 2017. Impacts of Federal Crop Insurance on Land Use and Environmental Quality. American Journal of Agricultural Economics 99, 592–613.\nCong, Y., Khanna, S., Meng, C., Liu, P., Rozi, E., He, Y., Burke, M., Lobell, D., Ermon, S., 2022. SatMAE: Pre-training Transformers for Temporal and Multi-Spectral Satellite Imagery. Advances in Neural Information Processing Systems 35, 197–211.",
+      "index": 77
+    },
+    {
+      "id": "S057",
+      "page": 21,
+      "type": "paragraph",
+      "original": "2022. SatMAE: Pre-training Transformers for Temporal and Multi-Spectral Satellite\nImagery. Advances in Neural Information Processing Systems 35, 197–211.\nDeering, D.W., 1978. RANGELAND REFLECTANCE CHARACTERISTICS MEASURED BY\nAIRCRAFT AND SPACECRAFTSENSORS. Texas A&M University.\nDeines, J.M., Patel, R., Liang, S.-Z., Dado, W., Lobell, D.B., 2021. A million kernels of truth:\nInsights into scalable satellite maize yield mapping and yield gap analysis from an\nextensive ground dataset in the US Corn Belt. Remote Sensing of Environment 253,\n112174. https://doi.org/10.1016/j.rse.2020.112174\nEskandari, I., Navid, H., Rangzan, K., 2016. Evaluating spectral indices for determining\nconservation and conventional tillage systems in a vetch-wheat rotation.\nInternational Soil and Water Conservation Research 4, 93–98.\nhttps://doi.org/10.1016/j.iswcr.2016.04.002\n21",
+      "translation": "[参考文献延续 - 保留原文]\nDeines, J.M., Patel, R., Liang, S.-Z., Dado, W., Lobell, D.B., 2021. A million kernels of truth: Insights into scalable satellite maize yield mapping and yield gap analysis from an extensive ground dataset in the US Corn Belt. Remote Sensing of Environment 253, 112174.\nEskandari, I., Navid, H., Rangzan, K., 2016. Evaluating spectral indices for determining conservation and conventional tillage systems in a vetch-wheat rotation. International Soil and Water Conservation Research 4, 93–98.",
+      "index": 78
+    },
+    {
+      "id": "S058",
+      "page": 22,
+      "type": "paragraph",
+      "original": "Fawagreh, K., Gaber, M.M., Elyan, E., 2014. Random forests: from early developments to\nrecent advancements. Systems Science & Control Engineering 2, 602–609.\nhttps://doi.org/10.1080/21642583.2014.956265\nFendrich, A.N., Matthews, F., Van Eynde, E., Carozzi, M., Li, Z., d’Andrimont, R., Lugato, E.,\nMartin, P., Ciais, P., Panagos, P., 2023. From regional to parcel scale: A high-\nresolution map of cover crops across Europe combining satellite data with\nstatistical surveys. Science of The Total Environment 873, 162300.\nhttps://doi.org/10.1016/j.scitotenv.2023.162300\nGitelson, A.A., Viña, A., Arkebauer, T.J., Rundquist, D.C., Keydan, G., Leavitt, B., 2003.\nRemote estimation of leaf area index and green leaf biomass in maize canopies.\nGeophysical research letters 30.\nGuan, K., Jin, Z., Peng, B., Tang, J., DeLucia, E.H., West, P.C., Jiang, C., Wang, S., Kim, T.,\nZhou, W., Grihis, T., Liu, L., Yang, W.H., Qin, Z., Yang, Q., Margenot, A., Stuchiner,\nE.R., Kumar, V., Bernacchi, C., Coppess, J., Novick, K.A., Gerber, J., Jahn, M.,\nKhanna, M., Lee, D., Chen, Z., Yang, S.-J., 2023. A scalable framework for quantifying\nfield-level agricultural carbon outcomes. Earth-Science Reviews 243, 104462.\nhttps://doi.org/10.1016/j.earscirev.2023.104462\nHe, K., Chen, X., Xie, S., Li, Y., Dollar, P., Girshick, R., 2022. Masked Autoencoders Are\nScalable Vision Learners, in: 2022 IEEE/CVF Conference on Computer Vision and\nPattern Recognition (CVPR). Presented at the 2022 IEEE/CVF Conference on\nComputer Vision and Pattern Recognition (CVPR), IEEE, New Orleans, LA, USA, pp.\n15979–15988. https://doi.org/10.1109/CVPR52688.2022.01553\nHollmann, N., Müller, S., Purucker, L., Krishnakumar, A., Körfer, M., Hoo, S.B.,\nSchirrmeister, R.T., Hutter, F., 2025. Accurate predictions on small data with a\ntabular foundation model. Nature 637, 319–326. https://doi.org/10.1038/s41586-\n024-08328-6\nKauth, R.J., Thomas, G.S., 1976. The tasselled cap--a graphic description of the spectral-\ntemporal development of agricultural crops as seen by Landsat, in: LARS Symposia.\np. 159.\nKogan, F., Kussul, N., Adamenko, T., Skakun, S., Kravchenko, O., Kryvobok, O., Shelestov,\nA., Kolotii, A., Kussul, O., Lavrenyuk, A., 2013. Winter wheat yield forecasting in\nUkraine based on Earth observation, meteorological data and biophysical models.\nInternational Journal of Applied Earth Observation and Geoinformation 23, 192–203.\nhttps://doi.org/10.1016/j.jag.2013.01.002\nKoudahe, K., Allen, S.C., Djaman, K., 2022. Critical review of the impact of cover crops on\nsoil properties. International Soil and Water Conservation Research 10, 343–354.\nhttps://doi.org/10.1016/j.iswcr.2022.03.003\nLobell, D.B., Di Tommaso, S., Zhou, Q., Ma, Y., Specht, J., Guan, K., 2025. The mixed ehects\nof recent cover crop adoption on US cropland productivity. Nat Sustain 1–9.\nhttps://doi.org/10.1038/s41893-025-01599-5\nLu, C., Yu, Z., Hennessy, D.A., Feng, H., Tian, H., Hui, D., 2022. Emerging weed resistance\nincreases tillage intensity and greenhouse gas emissions in the US corn–soybean\ncropping system. Nat Food 3, 266–274. https://doi.org/10.1038/s43016-022-00488-\nw\n22",
+      "translation": "[参考文献延续 - 保留原文]\nFawagreh, K., Gaber, M.M., Elyan, E., 2014. Random forests: from early developments to recent advancements. Systems Science & Control Engineering 2, 602–609.\nFendrich, A.N., Matthews, F., Van Eynde, E., Carozzi, M., Li, Z., d'Andrimont, R., Lugato, E., Martin, P., Ciais, P., Panagos, P., 2023. From regional to parcel scale: A high-resolution map of cover crops across Europe combining satellite data with statistical surveys. Science of The Total Environment 873, 162300.\nGitelson, A.A., Vina, A., Arkebauer, T.J., Rundquist, D.C., Keydan, G., Leavitt, B., 2003. Remote estimation of leaf area index and green leaf biomass in maize canopies. Geophysical research letters 30.\nGuan, K., Jin, Z., Peng, B., Tang, J., DeLucia, E.H., West, P.C., Jiang, C., Wang, S., Kim, T., Zhou, W., Grihis, T., Liu, L., Yang, W.H., Qin, Z., Yang, Q., Margenot, A., Stuchiner, E.R., Kumar, V., Bernacchi, C., Coppess, J., Novick, K.A., Gerber, J., Jahn, M., Khanna, M., Lee, D., Chen, Z., Yang, S.-J., 2023. A scalable framework for quantifying field-level agricultural carbon outcomes. Earth-Science Reviews 243, 104462.\nHe, K., Chen, X., Xie, S., Li, Y., Dollar, P., Girshick, R., 2022. Masked Autoencoders Are Scalable Vision Learners. CVPR, pp. 15979–15988.\nHollmann, N., Müller, S., Purucker, L., Krishnakumar, A., Körfer, M., Hoo, S.B., Schirrmeister, R.T., Hutter, F., 2025. Accurate predictions on small data with a tabular foundation model. Nature 637, 319–326.",
+      "index": 79
+    },
+    {
+      "id": "S059",
+      "page": 23,
+      "type": "paragraph",
+      "original": "Luo, D., Zhang, H.K., Houborg, R., Ndekelu, L.M.N., Maimaitijiang, M., Tran, K.H., McMaine,\nJ., 2023. Utility of daily 3 m Planet Fusion Surface Reflectance data for tillage\npractice mapping with deep learning. Science of Remote Sensing 7, 100085.\nhttps://doi.org/10.1016/j.srs.2023.100085\nMa, Y., Chen, S., Ermon, S., Lobell, D.B., 2024a. Transfer learning in environmental remote\nsensing. Remote Sensing of Environment 301, 113924.\nhttps://doi.org/10.1016/j.rse.2023.113924\nMa, Y., Liang, S.-Z., Myers, D.B., Swatantran, A., Lobell, D.B., 2024b. Subfield-level crop\nyield mapping without ground truth data: A scale transfer framework. Remote\nSensing of Environment 315, 114427. https://doi.org/10.1016/j.rse.2024.114427\nMa, Y., Zhang, Z., Yang, H.L., Yang, Z., 2021. An adaptive adversarial domain adaptation\napproach for corn yield prediction. Computers and Electronics in Agriculture 187,",
+      "translation": "[参考文献延续 - 保留原文]\nKauth, R.J., Thomas, G.S., 1976. The tasselled cap--a graphic description of the spectral-temporal development of agricultural crops as seen by Landsat. LARS Symposia. p. 159.\nKogan, F., Kussul, N., Adamenko, T., Skakun, S., Kravchenko, O., Kryvobok, O., Shelestov, A., Kolotii, A., Kussul, O., Lavrenyuk, A., 2013. Winter wheat yield forecasting in Ukraine based on Earth observation, meteorological data and biophysical models. International Journal of Applied Earth Observation and Geoinformation 23, 192–203.\nKoudahe, K., Allen, S.C., Djaman, K., 2022. Critical review of the impact of cover crops on soil properties. International Soil and Water Conservation Research 10, 343–354.\nLobell, D.B., Di Tommaso, S., Zhou, Q., Ma, Y., Specht, J., Guan, K., 2025. The mixed effects of recent cover crop adoption on US cropland productivity. Nat Sustain 1–9.\nLu, C., Yu, Z., Hennessy, D.A., Feng, H., Tian, H., Hui, D., 2022. Emerging weed resistance increases tillage intensity and greenhouse gas emissions in the US corn–soybean cropping system. Nat Food 3, 266–274.\nLuo, D., Zhang, H.K., Houborg, R., Ndekelu, L.M.N., Maimaitijiang, M., Tran, K.H., McMaine, J., 2023. Utility of daily 3 m Planet Fusion Surface Reflectance data for tillage practice mapping with deep learning. Science of Remote Sensing 7, 100085.",
+      "index": 80
+    },
+    {
+      "id": "S060",
+      "page": 23,
+      "type": "paragraph",
+      "original": "106314.\nMaaten, L. van der, Hinton, G., 2008. Visualizing data using t-SNE. Journal of machine\nlearning research 9, 2579–2605.\nMuñoz-Sabater, J., Dutra, E., Agustí-Panareda, A., Albergel, C., Arduini, G., Balsamo, G.,\nBoussetta, S., Choulga, M., Harrigan, S., Hersbach, H., Martens, B., Miralles, D.G.,\nPiles, M., Rodríguez-Fernández, N.J., Zsoter, E., Buontempo, C., Thépaut, J.-N.,\n2021. ERA5-Land: a state-of-the-art global reanalysis dataset for land applications.\nEarth System Science Data 13, 4349–4383. https://doi.org/10.5194/essd-13-4349-\n2021\nNakalembe, C., Becker-Reshef, I., Bonifacio, R., Hu, G., Humber, M.L., Justice, C.J.,\nKeniston, J., Mwangi, K., Rembold, F., Shukla, S., Urbano, F., Whitcraft, A.K., Li, Y.,\nZappacosta, M., Jarvis, I., Sanchez, A., 2021. A review of satellite-based global\nagricultural monitoring systems available for Africa. Global Food Security 29,\n100543. https://doi.org/10.1016/j.gfs.2021.100543\nPedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., Blondel, M.,\nPrettenhofer, P., Weiss, R., Dubourg, V., Vanderplas, J., Passos, A., Cournapeau, D.,\nBrucher, M., Perrot, M., Duchesnay, É., 2011. Scikit-learn: Machine Learning in\nPython. Journal of Machine Learning Research 12, 2825–2830.\nPlastina, A., Liu, F., Miguez, F., Carlson, S., 2020. Cover crops use in Midwestern US\nagriculture: perceived benefits and net returns. Renewable Agriculture and Food\nSystems 35, 38–48. https://doi.org/10.1017/S1742170518000194\nReed, C.J., Gupta, R., Li, S., Brockman, S., Funk, C., Clipp, B., Keutzer, K., Candido, S.,\nUyttendaele, M., Darrell, T., 2023. Scale-MAE: A Scale-Aware Masked Autoencoder\nfor Multiscale Geospatial Representation Learning, in: 2023 IEEE/CVF International\nConference on Computer Vision (ICCV). Presented at the 2023 IEEE/CVF\nInternational Conference on Computer Vision (ICCV), IEEE, Paris, France, pp. 4065–\n4076. https://doi.org/10.1109/ICCV51070.2023.00378\nRitchie, J.T., 1991. Wheat Phasic Development, in: Modeling Plant and Soil Systems. John\nWiley & Sons, Ltd, pp. 31–54. https://doi.org/10.2134/agronmonogr31.c3\nSullivan, D.G., Truman, C.C., Schomberg, H.H., Endale, D.M., Strickland, T.C., 2006.\nEvaluating techniques for determining tillage regime in the Southeastern Coastal\nPlain and Piedmont. Agronomy journal 98, 1236–1246.\n23",
+      "translation": "[参考文献延续 - 保留原文]\nMa, Y., Chen, S., Ermon, S., Lobell, D.B., 2024a. Transfer learning in environmental remote sensing. Remote Sensing of Environment 301, 113924.\nMa, Y., Liang, S.-Z., Myers, D.B., Swatantran, A., Lobell, D.B., 2024b. Subfield-level crop yield mapping without ground truth data: A scale transfer framework. Remote Sensing of Environment 315, 114427.\nMa, Y., Zhang, Z., Yang, H.L., Yang, Z., 2021. An adaptive adversarial domain adaptation approach for corn yield prediction. Computers and Electronics in Agriculture 187, 106314.\nMaaten, L. van der, Hinton, G., 2008. Visualizing data using t-SNE. Journal of machine learning research 9, 2579–2605.\nMuñoz-Sabater, J., Dutra, E., Agustí-Panareda, A., Albergel, C., Arduini, G., Balsamo, G., Boussetta, S., Choulga, M., Harrigan, S., Hersbach, H., Martens, B., Miralles, D.G., Piles, M., Rodríguez-Fernández, N.J., Zsoter, E., Buontempo, C., Thépaut, J.-N., 2021. ERA5-Land: a state-of-the-art global reanalysis dataset for land applications. Earth System Science Data 13, 4349–4383.",
+      "index": 81
+    },
+    {
+      "id": "S061",
+      "page": 24,
+      "type": "paragraph",
+      "original": "Swan, J.B., Schneider, E.C., Moncrief, J.F., Paulson, W.H., Peterson, A.E., 1987. Estimating\nCorn Growth, Yield, and Grain Moisture from Air Growing Degree Days and Residue\nCover1. Agronomy Journal 79, 53–60.\nhttps://doi.org/10.2134/agronj1987.00021962007900010012x\nSzwarcman, D., Roy, S., Fraccaro, P., Gíslason, Þ.E., Blumenstiel, B., Ghosal, R., Oliveira,\nP.H. de, Almeida, J.L. de S., Sedona, R., Kang, Y., Chakraborty, S., Wang, S., Kumar,\nA., Truong, M., Godwin, D., Lee, H., Hsu, C.-Y., Asanjan, A.A., Mujeci, B., Keenan, T.,\nArevalo, P., Li, W., Alemohammad, H., Olofsson, P., Hain, C., Kennedy, R., Zadrozny,\nB., Cavallaro, G., Watson, C., Maskey, M., Ramachandran, R., Moreno, J.B., 2024.\nPrithvi-EO-2.0: A Versatile Multi-Temporal Foundation Model for Earth Observation\nApplications. https://doi.org/10.48550/arXiv.2412.02732\nTong, X.-Y., Wang, S., 2025. Invariant Features for Global Crop Type Classification.\nhttps://doi.org/10.48550/arXiv.2509.03497\nUSDA-NASS, 2024. Census of Agriculture Methodology. USDA.\nVan Deventer, A.P., Ward, A.D., Gowda, P.H., Lyon, J.G., 1997. Using thematic mapper data\nto identify contrasting soil plains and tillage practices. Photogrammetric\nengineering and remote sensing 63, 87–93.\nWang, Y., Albrecht, C.M., Braham, N.A.A., Mou, L., Zhu, X.X., 2022. Self-Supervised\nLearning in Remote Sensing: A review. IEEE Geoscience and Remote Sensing\nMagazine 10, 213–247. https://doi.org/10.1109/MGRS.2022.3198244\nWilson, B.T., Knight, J.F., McRoberts, R.E., 2018. Harmonic regression of Landsat time\nseries for modeling attributes from national forest inventory data. ISPRS Journal of\nPhotogrammetry and Remote Sensing 137, 29–46.\nhttps://doi.org/10.1016/j.isprsjprs.2018.01.006\nWu, K., Zhang, Yingying, Ru, L., Dang, B., Lao, J., Yu, L., Luo, J., Zhu, Z., Sun, Y., Zhang, J.,\nZhu, Q., Wang, J., Yang, M., Chen, J., Zhang, Yongjun, Li, Y., 2025. A semantic-\nenhanced multi-modal remote sensing foundation model for Earth observation. Nat\nMach Intell 7, 1235–1249. https://doi.org/10.1038/s42256-025-01078-8\nXiong, X., Zhong, R., Jiang, H., Athanasiadis, I., Yang, Y., Zhu, L., Lin, T., 2026. Corn yield\nestimation under extreme climate stress with knowledge-encoded deep learning.\nISPRS Journal of Photogrammetry and Remote Sensing 231, 101–118.\nhttps://doi.org/10.1016/j.isprsjprs.2025.10.020\nXiong, Z., Wang, Y., Zhang, F., Stewart, A.J., Hanna, J., Borth, D., Papoutsis, I., Saux, B.L.,\nCamps-Valls, G., Zhu, X.X., 2024. Neural Plasticity-Inspired Multimodal Foundation\nModel for Earth Observation. https://doi.org/10.48550/arXiv.2403.15356\nZhang, C., Kerner, H., Wang, S., Hao, P., Li, Z., Hunt, K.A., Abernethy, J., Zhao, H., Gao, F.,\nDi, L., Guo, C., Liu, Z., Yang, Z., Mueller, R., Boryan, C., Chen, Q., Beeson, P.C.,\nZhang, H.K., Shen, Y., 2025. Remote sensing for crop mapping: A perspective on\ncurrent and future crop-specific land cover data products. Remote Sensing of\nEnvironment 330, 114995. https://doi.org/10.1016/j.rse.2025.114995\nZhou, Q., Guan, K., Wang, Sheng, Jiang, C., Huang, Y., Peng, B., Chen, Z., Wang, Sibo,\nHipple, J., Schaefer, D., Qin, Z., Stroebel, S., Coppess, J., Khanna, M., Cai, Y., 2022.\nRecent Rapid Increase of Cover Crop Adoption Across the U.S. Midwest Detected by\n24",
+      "translation": "[参考文献延续 - 保留原文]\nNakalembe, C., Becker-Reshef, I., Bonifacio, R., Hu, G., Humber, M.L., Justice, C.J., Keniston, J., Mwangi, K., Rembold, F., Shukla, S., Urbano, F., Whitcraft, A.K., Li, Y., Zappacosta, M., Jarvis, I., Sanchez, A., 2021. A review of satellite-based global agricultural monitoring systems available for Africa. Global Food Security 29, 100543.\nPedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., Blondel, M., Prettenhofer, P., Weiss, R., Dubourg, V., Vanderplas, J., Passos, A., Cournapeau, D., Brucher, M., Perrot, M., Duchesnay, É., 2011. Scikit-learn: Machine Learning in Python. Journal of Machine Learning Research 12, 2825–2830.\nPlastina, A., Liu, F., Miguez, F., Carlson, S., 2020. Cover crops use in Midwestern US agriculture: perceived benefits and net returns. Renewable Agriculture and Food Systems 35, 38–48.\nReed, C.J., Gupta, R., Li, S., Brockman, S., Funk, C., Clipp, B., Keutzer, K., Candido, S., Uyttendaele, M., Darrell, T., 2023. Scale-MAE: A Scale-Aware Masked Autoencoder for Multiscale Geospatial Representation Learning. ICCV, pp. 4065–4076.\nRitchie, J.T., 1991. Wheat Phasic Development, in: Modeling Plant and Soil Systems. John Wiley & Sons, Ltd, pp. 31–54.\nSullivan, D.G., Truman, C.C., Schomberg, H.H., Endale, D.M., Strickland, T.C., 2006. Evaluating techniques for determining tillage regime in the Southeastern Coastal Plain and Piedmont. Agronomy journal 98, 1236–1246.",
+      "index": 82
+    },
+    {
+      "id": "S062",
+      "page": 25,
+      "type": "paragraph",
+      "original": "Fusing Multi-Source Satellite Data. Geophysical Research Letters 49,\ne2022GL100249. https://doi.org/10.1029/2022GL100249\nZulauf, C., Schnitkey, G., Paulson, N., Coppess, and J., 2024. Cover Crops and Covered\nCropland, 2022 US Census of Agriculture. farmdoc daily 14.",
+      "translation": "[参考文献延续 - 保留原文]\nSwan, J.B., Schneider, E.C., Moncrief, J.F., Paulson, W.H., Peterson, A.E., 1987. Estimating Corn Growth, Yield, and Grain Moisture from Air Growing Degree Days and Residue Cover1. Agronomy Journal 79, 53–60.\nSzwarcman, D., Roy, S., Fraccaro, P., Gíslason, Þ.E., Blumenstiel, B., Ghosal, R., Oliveira, P.H. de, Almeida, J.L. de S., Sedona, R., Kang, Y., Chakraborty, S., Wang, S., Kumar, A., Truong, M., Godwin, D., Lee, H., Hsu, C.-Y., Asanjan, A.A., Mujeci, B., Keenan, T., Arevalo, P., Li, W., Alemohammad, H., Olofsson, P., Hain, C., Kennedy, R., Zadrozny, B., Cavallaro, G., Watson, C., Maskey, M., Ramachandran, R., Moreno, J.B., 2024. Prithvi-EO-2.0: A Versatile Multi-Temporal Foundation Model for Earth Observation Applications.\nTong, X.-Y., Wang, S., 2025. Invariant Features for Global Crop Type Classification.\nUSDA-NASS, 2024. Census of Agriculture Methodology. USDA.\nVan Deventer, A.P., Ward, A.D., Gowda, P.H., Lyon, J.G., 1997. Using thematic mapper data to identify contrasting soil plains and tillage practices. Photogrammetric engineering and remote sensing 63, 87–93.\nWang, Y., Albrecht, C.M., Braham, N.A.A., Mou, L., Zhu, X.X., 2022. Self-Supervised Learning in Remote Sensing: A review. IEEE Geoscience and Remote Sensing Magazine 10, 213–247.\nWilson, B.T., Knight, J.F., McRoberts, R.E., 2018. Harmonic regression of Landsat time series for modeling attributes from national forest inventory data. ISPRS Journal of Photogrammetry and Remote Sensing 137, 29–46.\nWu, K., Zhang, Yingying, Ru, L., Dang, B., Lao, J., Yu, L., Luo, J., Zhu, Z., Sun, Y., Zhang, J., Zhu, Q., Wang, J., Yang, M., Chen, J., Zhang, Yongjun, Li, Y., 2025. A semantic-enhanced multi-modal remote sensing foundation model for Earth observation. Nat Mach Intell 7, 1235–1249.\nXiong, X., Zhong, R., Jiang, H., Athanasiadis, I., Yang, Y., Zhu, L., Lin, T., 2026. Corn yield estimation under extreme climate stress with knowledge-encoded deep learning. ISPRS Journal of Photogrammetry and Remote Sensing 231, 101–118.\nXiong, Z., Wang, Y., Zhang, F., Stewart, A.J., Hanna, J., Borth, D., Papoutsis, I., Saux, B.L., Camps-Valls, G., Zhu, X.X., 2024. Neural Plasticity-Inspired Multimodal Foundation Model for Earth Observation.\nZhang, C., Kerner, H., Wang, S., Hao, P., Li, Z., Hunt, K.A., Abernethy, J., Zhao, H., Gao, F., Di, L., Guo, C., Liu, Z., Yang, Z., Mueller, R., Boryan, C., Chen, Q., Beeson, P.C., Zhang, H.K., Shen, Y., 2025. Remote sensing for crop mapping: A perspective on current and future crop-specific land cover data products. Remote Sensing of Environment 330, 114995.\nZhou, Q., Guan, K., Wang, Sheng, Jiang, C., Huang, Y., Peng, B., Chen, Z., Wang, Sibo, Hipple, J., Schaefer, D., Qin, Z., Stroebel, S., Coppess, J., Khanna, M., Cai, Y., 2022. Recent Rapid Increase of Cover Crop Adoption Across the U.S. Midwest Detected by Fusing Multi-Source Satellite Data. Geophysical Research Letters 49, e2022GL100249.\nZulauf, C., Schnitkey, G., Paulson, N., Coppess, and J., 2024. Cover Crops and Covered Cropland, 2022 US Census of Agriculture. farmdoc daily 14.",
+      "index": 83
+    },
+    {
+      "id": "H007",
+      "page": 25,
+      "type": "heading",
+      "original": "Appendix:",
+      "translation": "附录",
+      "index": 84
+    },
+    {
+      "id": "F010",
+      "page": 25,
+      "type": "figure_caption",
+      "original": "Figure S1. The average number of Landsat observation per month for fields in the Corteva cover crop\ndataset. There are fewer observations during winter and early spring, leading to more noise in the feature\nset for cover crop mapping.\n25",
+      "translation": "图S1 Corteva覆盖作物数据集中field的Landsat月均观测数量。冬季和早春观测较少，导致覆盖作物制图特征集中的噪声更多。",
+      "index": 85
+    }
+  ],
+  "figures": [
+    {
+      "id": "F001",
+      "page": 4,
+      "caption_id": "F001",
+      "asset": "assets/fig_p4_1.png"
+    },
+    {
+      "id": "F002",
+      "page": 8,
+      "caption_id": "F002",
+      "asset": "assets/fig_p8_1.png"
+    },
+    {
+      "id": "F003",
+      "page": 12,
+      "caption_id": "F003",
+      "asset": "assets/fig_p12_1.png"
+    },
+    {
+      "id": "F004",
+      "page": 14,
+      "caption_id": "F004",
+      "asset": "assets/fig_p14_1.png"
+    },
+    {
+      "id": "F005",
+      "page": 14,
+      "caption_id": "F005",
+      "asset": "assets/fig_p14_2.png"
+    },
+    {
+      "id": "F006",
+      "page": 15,
+      "caption_id": "F006",
+      "asset": "assets/fig_p15_1.png"
+    },
+    {
+      "id": "F007",
+      "page": 16,
+      "caption_id": "F007",
+      "asset": "assets/fig_p16_1.png"
+    },
+    {
+      "id": "F008",
+      "page": 18,
+      "caption_id": "F008",
+      "asset": "assets/fig_p18_1.png"
+    },
+    {
+      "id": "F009",
+      "page": 20,
+      "caption_id": "F009",
+      "asset": "assets/fig_p18_2.png"
+    },
+    {
+      "id": "F010",
+      "page": 25,
+      "caption_id": "F010",
+      "asset": "assets/fig_p25_1.png"
+    },
+    {
+      "id": "F009a",
+      "page": 19,
+      "caption_id": "F009",
+      "asset": "assets/fig_p19_1.png",
+      "note": "Figure 9(a) FM-based Models' Top 10 Features"
+    },
+    {
+      "id": "F009b",
+      "page": 19,
+      "caption_id": "F009",
+      "asset": "assets/fig_p19_2.png",
+      "note": "Figure 9(b) RS-based Models' Top 10 Features"
+    }
+  ],
+  "tables": [
+    {
+      "id": "T001",
+      "page": 6,
+      "caption_id": "T001"
+    },
+    {
+      "id": "T002",
+      "page": 10,
+      "caption_id": "T002"
+    },
+    {
+      "id": "T003",
+      "page": 11,
+      "caption_id": "T003"
+    },
+    {
+      "id": "T004",
+      "page": 13,
+      "caption_id": "T004"
+    },
+    {
+      "id": "T005",
+      "page": 13,
+      "caption_id": "T005"
+    },
+    {
+      "id": "T006",
+      "page": 16,
+      "caption_id": "T006"
+    },
+    {
+      "id": "T007",
+      "page": 18,
+      "caption_id": "T007"
+    }
+  ]
+}

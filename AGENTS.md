@@ -4,7 +4,9 @@
 
 **xuannv_embdding** (包名 `xuannv`) 是 **AlphaEarth Foundations (AEF)** 的独立改进版，从零实现于 `/workspace/xuannv/`。
 
-- **核心使命**: 解决嵌入坍缩 (embedding collapse) 与提升时间敏感性 (temporal sensitivity)，使模型能够执行变化检测 (change detection)。
+- **核心使命**: 生成高质量的地理嵌入数据。做到生成一次嵌入数据能满足多个下游任务的能力。
+
+解决嵌入坍缩 (embedding collapse) 与提升时间敏感性 (temporal sensitivity)，使模型能够执行变化检测 (change detection)。
 - **与原版关系**: 完全独立实现，仅参考 AEF 接口设计。
 - **语言**: 项目内代码注释、文档、配置均以中文为主。
 

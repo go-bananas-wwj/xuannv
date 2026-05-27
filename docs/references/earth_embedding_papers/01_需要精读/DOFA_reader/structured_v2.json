@@ -1,0 +1,5255 @@
+{
+  "figures": [
+    {
+      "fid": "F001",
+      "page": 2,
+      "filename": "fig001.png",
+      "width": 609,
+      "height": 603
+    },
+    {
+      "fid": "F002",
+      "page": 2,
+      "filename": "fig002.png",
+      "width": 355,
+      "height": 322
+    },
+    {
+      "fid": "F003",
+      "page": 2,
+      "filename": "fig003.png",
+      "width": 353,
+      "height": 336
+    },
+    {
+      "fid": "F004",
+      "page": 2,
+      "filename": "fig004.png",
+      "width": 797,
+      "height": 821
+    },
+    {
+      "fid": "F005",
+      "page": 3,
+      "filename": "fig005.png",
+      "width": 343,
+      "height": 343
+    },
+    {
+      "fid": "F006",
+      "page": 5,
+      "filename": "fig006.png",
+      "width": 872,
+      "height": 715
+    },
+    {
+      "fid": "F007",
+      "page": 12,
+      "filename": "fig007.png",
+      "width": 2972,
+      "height": 1979
+    },
+    {
+      "fid": "F008",
+      "page": 14,
+      "filename": "fig008.png",
+      "width": 1501,
+      "height": 1347
+    },
+    {
+      "fid": "F009",
+      "page": 14,
+      "filename": "fig009.png",
+      "width": 1483,
+      "height": 1347
+    },
+    {
+      "fid": "F010",
+      "page": 14,
+      "filename": "fig010.png",
+      "width": 1503,
+      "height": 1346
+    },
+    {
+      "fid": "F011",
+      "page": 14,
+      "filename": "fig011.png",
+      "width": 1480,
+      "height": 1346
+    },
+    {
+      "fid": "F012",
+      "page": 14,
+      "filename": "fig012.png",
+      "width": 1492,
+      "height": 1346
+    },
+    {
+      "fid": "F013",
+      "page": 14,
+      "filename": "fig013.png",
+      "width": 1517,
+      "height": 1346
+    },
+    {
+      "fid": "F014",
+      "page": 14,
+      "filename": "fig014.png",
+      "width": 1486,
+      "height": 1347
+    },
+    {
+      "fid": "F015",
+      "page": 14,
+      "filename": "fig015.png",
+      "width": 1500,
+      "height": 1346
+    },
+    {
+      "fid": "F016",
+      "page": 14,
+      "filename": "fig016.png",
+      "width": 1504,
+      "height": 1346
+    },
+    {
+      "fid": "F017",
+      "page": 14,
+      "filename": "fig017.png",
+      "width": 1481,
+      "height": 1346
+    },
+    {
+      "fid": "F018",
+      "page": 14,
+      "filename": "fig018.png",
+      "width": 1493,
+      "height": 1346
+    },
+    {
+      "fid": "F019",
+      "page": 14,
+      "filename": "fig019.png",
+      "width": 1481,
+      "height": 1346
+    },
+    {
+      "fid": "F020",
+      "page": 14,
+      "filename": "fig020.png",
+      "width": 1470,
+      "height": 1346
+    },
+    {
+      "fid": "F021",
+      "page": 14,
+      "filename": "fig021.png",
+      "width": 1467,
+      "height": 1347
+    },
+    {
+      "fid": "F022",
+      "page": 14,
+      "filename": "fig022.png",
+      "width": 1465,
+      "height": 1347
+    },
+    {
+      "fid": "F023",
+      "page": 14,
+      "filename": "fig023.png",
+      "width": 1460,
+      "height": 1346
+    },
+    {
+      "fid": "F024",
+      "page": 14,
+      "filename": "fig024.png",
+      "width": 1473,
+      "height": 1347
+    },
+    {
+      "fid": "F025",
+      "page": 14,
+      "filename": "fig025.png",
+      "width": 1506,
+      "height": 1347
+    },
+    {
+      "fid": "F026",
+      "page": 14,
+      "filename": "fig026.png",
+      "width": 1496,
+      "height": 1346
+    },
+    {
+      "fid": "F027",
+      "page": 14,
+      "filename": "fig027.png",
+      "width": 1453,
+      "height": 1347
+    },
+    {
+      "fid": "F028",
+      "page": 14,
+      "filename": "fig028.png",
+      "width": 771,
+      "height": 186
+    },
+    {
+      "fid": "F029",
+      "page": 14,
+      "filename": "fig029.png",
+      "width": 317,
+      "height": 233
+    },
+    {
+      "fid": "F030",
+      "page": 14,
+      "filename": "fig030.png",
+      "width": 319,
+      "height": 238
+    },
+    {
+      "fid": "F031",
+      "page": 14,
+      "filename": "fig031.png",
+      "width": 317,
+      "height": 236
+    },
+    {
+      "fid": "F032",
+      "page": 14,
+      "filename": "fig032.png",
+      "width": 317,
+      "height": 233
+    },
+    {
+      "fid": "F033",
+      "page": 14,
+      "filename": "fig033.png",
+      "width": 317,
+      "height": 232
+    },
+    {
+      "fid": "F034",
+      "page": 14,
+      "filename": "fig034.png",
+      "width": 778,
+      "height": 186
+    },
+    {
+      "fid": "F035",
+      "page": 14,
+      "filename": "fig035.png",
+      "width": 778,
+      "height": 186
+    },
+    {
+      "fid": "F036",
+      "page": 14,
+      "filename": "fig036.png",
+      "width": 778,
+      "height": 186
+    },
+    {
+      "fid": "F037",
+      "page": 14,
+      "filename": "fig037.png",
+      "width": 778,
+      "height": 186
+    },
+    {
+      "fid": "F038",
+      "page": 14,
+      "filename": "fig038.png",
+      "width": 1431,
+      "height": 1299
+    },
+    {
+      "fid": "F039",
+      "page": 14,
+      "filename": "fig039.png",
+      "width": 1461,
+      "height": 1299
+    },
+    {
+      "fid": "F040",
+      "page": 14,
+      "filename": "fig040.png",
+      "width": 1438,
+      "height": 1299
+    },
+    {
+      "fid": "F041",
+      "page": 14,
+      "filename": "fig041.png",
+      "width": 1434,
+      "height": 1299
+    },
+    {
+      "fid": "F042",
+      "page": 14,
+      "filename": "fig042.png",
+      "width": 1447,
+      "height": 1299
+    },
+    {
+      "fid": "F043",
+      "page": 14,
+      "filename": "fig043.png",
+      "width": 1474,
+      "height": 1300
+    },
+    {
+      "fid": "F044",
+      "page": 14,
+      "filename": "fig044.png",
+      "width": 1461,
+      "height": 1299
+    },
+    {
+      "fid": "F045",
+      "page": 14,
+      "filename": "fig045.png",
+      "width": 1471,
+      "height": 1300
+    },
+    {
+      "fid": "F046",
+      "page": 14,
+      "filename": "fig046.png",
+      "width": 1456,
+      "height": 1300
+    },
+    {
+      "fid": "F047",
+      "page": 14,
+      "filename": "fig047.png",
+      "width": 1398,
+      "height": 1297
+    }
+  ],
+  "segments": [
+    {
+      "id": "S001",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        45.5,
+        53.1,
+        179.9,
+        73.7
+      ],
+      "text": "Noname manuscript No.\n(will be inserted by the editor)"
+    },
+    {
+      "id": "S002",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        42.1,
+        137.3,
+        522.6,
+        171.1
+      ],
+      "text": "Neural Plasticity-Inspired Multimodal Foundation Model for\nEarth Observation"
+    },
+    {
+      "id": "S003",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        42.1,
+        189.1,
+        403.1,
+        224.1
+      ],
+      "text": "Zhitong Xiong · Yi Wang · Fahong Zhang · Adam J. Stewart · Jo¨elle\nHanna · Damian Borth · Ioannis Papoutsis · Bertrand Le Saux ·\nGustau Camps-Valls · Xiao Xiang Zhu*"
+    },
+    {
+      "id": "S004",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        42.1,
+        275.6,
+        168.4,
+        284.1
+      ],
+      "text": "Received: date / Accepted: date"
+    },
+    {
+      "id": "S005",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        42.1,
+        306.9,
+        283.8,
+        491.2
+      ],
+      "text": "Abstract Earth observation (EO) in open-world set-\ntings presents a unique challenge: different applications\nrely on diverse sensor modalities, each with varying\nground sampling distances, spectral ranges, and num-\nbers of spectral bands. However, existing EO founda-\ntion models are typically tailored to specific sensor types,\nmaking them inflexible when generalizing across the\nheterogeneous landscape of EO data. To address this,\nwe propose the Dynamic One-For-All (DOFA) model, a\nunified, multimodal foundation framework designed for\ndiverse vision tasks in EO. Inspired by neural plastic-\nity, DOFA utilizes a wavelength-conditioned dynamic\nhypernetwork to process inputs from five distinct satel-\nlite sensors flexibly. By continually pretraining on five\nEO modalities, DOFA achieves state-of-the-art perfor-"
+    },
+    {
+      "id": "S006",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        42.1,
+        508.9,
+        280.1,
+        547.4
+      ],
+      "text": "Z. Xiong · Y. Wang · F. Zhang · A. J. Stewart · X. X. Zhu\nChair of Data Science in Earth Observation, Technical Uni-\nversity of Munich (TUM), Arcisstraße 21, 80333 Munich, Ger-\nmany"
+    },
+    {
+      "id": "S007",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        42.1,
+        553.9,
+        280.1,
+        592.2
+      ],
+      "text": "X. X. Zhu (Corresponding Author)\nMunich Center for Machine Learning, 80333 Munich, Ger-\nmany\nE-mail: xiaoxiang.zhu@tum.de"
+    },
+    {
+      "id": "S008",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        42.1,
+        598.6,
+        280.1,
+        627.1
+      ],
+      "text": "J. Hanna · D. Borth\nAIML Lab, School of Computer Science, University of St.\nGallen, Rosenbergstrasse 30, 9000 St. Gallen, Switzerland"
+    },
+    {
+      "id": "S009",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        42.1,
+        633.6,
+        280.1,
+        671.9
+      ],
+      "text": "I. Papoutsis\nSchool of Rural, Surveying and Geoinformatics Engineering,\nNational Technical University of Athens, 157 73 Zografou,\nGreece"
+    },
+    {
+      "id": "S010",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        42.1,
+        678.4,
+        280.1,
+        706.8
+      ],
+      "text": "B. Le Saux\nESRIN, Φ-lab, European Space Agency (ESA), 00044 Fras-\ncati, Italy"
+    },
+    {
+      "id": "S011",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        42.1,
+        713.3,
+        280.1,
+        751.6
+      ],
+      "text": "G. Camps-Valls\nImage Processing Laboratory (IPL), Universitat de Val`encia,\nCat. Agust´ın Escardino Benlloch 9, 46980 Paterna, Val`encia,\nSpain"
+    },
+    {
+      "id": "S012",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        297.2,
+        306.9,
+        547.5,
+        429.5
+      ],
+      "text": "mance across multiple downstream tasks and general-\nizes well to unseen modalities. Enhanced with hybrid\ncontinual pretraining, DOFA+ requires significantly fewer\ncomputational resources while outperforming counter-\nparts trained with extensive GPU budgets. Experiments\non diverse datasets highlight DOFA’s potential as a\nfoundation for general-purpose vision models in the sensor-\ndiverse EO domain. The code and pre-trained weights\nare publicly available at https://github.com/zhu-xlab/\nDOFA."
+    },
+    {
+      "id": "S013",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        297.2,
+        437.3,
+        513.8,
+        459.8
+      ],
+      "text": "Keywords Dynamic foundation models · Earth\nobservation · Multimodal learning"
+    },
+    {
+      "id": "S014",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        297.2,
+        484.7,
+        369.4,
+        494.7
+      ],
+      "text": "1 Introduction"
+    },
+    {
+      "id": "S015",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        297.2,
+        508.4,
+        537.2,
+        754.9
+      ],
+      "text": "Earth observation (EO) through satellite remote sens-\ning provides unparalleled opportunities for modeling\nEarth’s surface dynamics, addressing global challenges\nsuch as climate change, urbanization, and biodiversity\nloss [6, 5, 37]. Core vision tasks like classification, de-\ntection, and segmentation support critical applications\nfrom disaster response to resource management. Achiev-\ning this requires integrating data from diverse sensors\nwith varying spectral and spatial characteristics, mak-\ning EO an open-world visual understanding problem.\nFoundation models (FMs) offer a scalable solution by\nenabling generalization across modalities, reducing task-\nspecific supervision, and serving as a unified backbone\nfor downstream EO tasks, as illustrated in Fig. 1.\nExisting FMs, though promising, remain rigid and\ninflexible, typically pretrained using fixed spectral band\nconfigurations or specialized for individual EO modal-\nities. For instance, models such as GFM [32], Scale-\nMAE [36], SatMAE [10], CROMA [14], and Spectral-\nGPT [20] illustrate these limitations. This severely re-"
+    },
+    {
+      "id": "S016",
+      "type": "paragraph",
+      "page": 1,
+      "bbox": [
+        10.9,
+        247.1,
+        37.6,
+        594.8
+      ],
+      "text": "arXiv:2403.15356v3  [cs.CV]  15 Oct 2025"
+    },
+    {
+      "id": "S017",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        42.1,
+        91.6,
+        280.2,
+        201.2
+      ],
+      "text": "stricts their adaptability in dynamic real-world EO sce-\nnarios, where new sensors and spectral band configu-\nrations continuously emerge. Consequently, extensive\ncomputational and human resources are required to\nadapt them to unseen sensors and spectral combina-\ntions. In summary, existing approaches that develop\nseparate foundation models or use isolated visual en-\ncoders for multi-sensor data fail to capture inter-sensor\nrelationships, resulting in key limitations:"
+    },
+    {
+      "id": "S018",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        44.3,
+        206.6,
+        280.2,
+        303.7
+      ],
+      "text": "1. The learned representation may not effectively cap-\nture such an intersensor relationship.\n2. The performance of FMs will degrade when down-\nstream tasks utilize data from unseen sensors with\nvarying numbers of spectral bands.\n3. The development of individual FMs requires consid-\nerably more computing resources and is not flexible\nin real-world applications."
+    },
+    {
+      "id": "S019",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        42.1,
+        309.1,
+        291.9,
+        754.9
+      ],
+      "text": "Addressing this critical limitation aligns with a central\ntheme of open-world EO visual understanding: develop-\ning FMs capable of dynamically and efficiently adapt-\ning to downstream applications with flexible input data\nmodalities.\nIn response to this challenge, we propose the Dy-\nnamic One-For-All (DOFA) model, a versatile, adap-\ntive multimodal foundation model explicitly designed\nfor the EO domain. Inspired by neuroplasticity, the\nbrain’s dynamic reorganization capacity in response to\nnovel stimuli [12, 27], DOFA integrates a wavelength-\nconditioned dynamic hypernetwork within a unified Trans-\nformer architecture, as shown in Fig. 2. This enables\nDOFA to flexibly accommodate varying spectral bands\nand sensor modalities, including those unseen during\ninitial pre-training. Specifically, DOFA utilizes wave-\nlength as a unifying parameter across various EO modal-\nities to achieve a more cohesive multimodal represen-\ntation. At its core, the model integrates a hypernet-\nwork [17] that dynamically generates network weights\nbased on the central wavelengths of each spectral band.\nThis dynamic weight generator adjusts network weights\nto align with the specific modality of the input data, fa-\ncilitating a customized network for each modality. Ad-\nditionally, DOFA integrates a shared vision backbone,\nacting as a universal feature learning module for all\nheterogeneous data modalities.\nPretraining unified FMs across diverse EO modali-\nties presents a significant challenge due to the need for\nsubstantial computational resources. To address this,\nDOFA adopts continuous pretraining via masked im-\nage modeling (MIM) and knowledge distillation, signif-\nicantly reducing computational cost. Building on this,\nwe further propose DOFA+, which is initialized from\na powerful open-source pre-trained vision model (DI-\nNOv2 [35]) and applies the MIM objective to enable"
+    },
+    {
+      "id": "S020",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        395.6,
+        188.5,
+        412.3,
+        192.5
+      ],
+      "text": "SAR Images"
+    },
+    {
+      "id": "S021",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        431.4,
+        173.6,
+        484.3,
+        179.0
+      ],
+      "text": "Unified Multimodal Earth"
+    },
+    {
+      "id": "S022",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        438.7,
+        178.6,
+        475.9,
+        183.9
+      ],
+      "text": "Foundation Model"
+    },
+    {
+      "id": "S023",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        372.8,
+        108.6,
+        383.8,
+        111.2
+      ],
+      "text": "NAIP RGB"
+    },
+    {
+      "id": "S024",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        373.6,
+        197.6,
+        530.6,
+        203.7
+      ],
+      "text": "Downstream Tasks\nSentinel 1"
+    },
+    {
+      "id": "S025",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        393.7,
+        153.4,
+        405.0,
+        156.2
+      ],
+      "text": "Sentinel 2"
+    },
+    {
+      "id": "S026",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        392.7,
+        178.1,
+        401.1,
+        180.7
+      ],
+      "text": "EnMAP"
+    },
+    {
+      "id": "S027",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        389.7,
+        129.4,
+        399.4,
+        131.9
+      ],
+      "text": "RGB-NIR"
+    },
+    {
+      "id": "S028",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        302.7,
+        182.8,
+        344.8,
+        188.9
+      ],
+      "text": "Earth Observation"
+    },
+    {
+      "id": "S029",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        518.7,
+        98.7,
+        528.8,
+        101.1
+      ],
+      "text": "potassium"
+    },
+    {
+      "id": "S030",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        518.2,
+        93.6,
+        529.7,
+        96.0
+      ],
+      "text": "magnesium"
+    },
+    {
+      "id": "S031",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        521.8,
+        101.4,
+        524.7,
+        103.8
+      ],
+      "text": "PH"
+    },
+    {
+      "id": "S032",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        483.4,
+        96.0,
+        529.6,
+        100.9
+      ],
+      "text": "phosphorus\nSoil Parameter"
+    },
+    {
+      "id": "S033",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        489.9,
+        118.9,
+        500.9,
+        123.0
+      ],
+      "text": "Wildfire"
+    },
+    {
+      "id": "S034",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        484.0,
+        142.2,
+        505.4,
+        146.2
+      ],
+      "text": "Flood mapping"
+    },
+    {
+      "id": "S035",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        487.6,
+        166.4,
+        503.2,
+        170.4
+      ],
+      "text": "Land cover"
+    },
+    {
+      "id": "S036",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        489.8,
+        188.7,
+        505.6,
+        196.5
+      ],
+      "text": "Forest\nMonitoring"
+    },
+    {
+      "id": "S037",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        393.0,
+        97.4,
+        414.9,
+        105.1
+      ],
+      "text": "High resolution\nOptical Images"
+    },
+    {
+      "id": "S038",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        405.6,
+        118.8,
+        424.2,
+        122.8
+      ],
+      "text": "Multispectral"
+    },
+    {
+      "id": "S039",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        406.7,
+        170.9,
+        426.7,
+        175.0
+      ],
+      "text": "Hyperspectral"
+    },
+    {
+      "id": "S040",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        409.5,
+        142.5,
+        428.1,
+        146.6
+      ],
+      "text": "Multispectral"
+    },
+    {
+      "id": "S041",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        303.1,
+        104.5,
+        343.1,
+        110.6
+      ],
+      "text": "Different Sensors"
+    },
+    {
+      "id": "C001",
+      "type": "caption",
+      "page": 2,
+      "bbox": [
+        297.2,
+        216.1,
+        535.3,
+        251.0
+      ],
+      "text": "Fig. 1: Motivation of DOFA. Our primary purpose is\nto develop versatile foundation models capable of adap-\ntively processing various EO data modalities."
+    },
+    {
+      "id": "S042",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        297.2,
+        280.0,
+        541.9,
+        402.0
+      ],
+      "text": "efficient domain adaptation, without altering the un-\nderlying architecture. Through a hierarchical distilla-\ntion strategy, it preserves strong semantic priors from\nthe source model while guiding the learning of EO-\nspecific visual patterns through local reconstruction.\nWith parameter-efficient fine-tuning, DOFA and DOFA+\nenable rapid, label-efficient adaptation to a wide range\nof multimodal EO tasks, including image classification,\nsemantic segmentation, object detection, and environ-\nmental change detection."
+    },
+    {
+      "id": "S043",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        312.1,
+        407.2,
+        525.0,
+        417.2
+      ],
+      "text": "Our contributions can be summarized as follows:"
+    },
+    {
+      "id": "S044",
+      "type": "paragraph",
+      "page": 2,
+      "bbox": [
+        299.4,
+        433.6,
+        535.3,
+        754.9
+      ],
+      "text": "1. We introduce DOFA, a neuroplasticity-inspired ar-\nchitecture that uses wavelength as a unifying input\nacross EO modalities. A wavelength-conditioned dy-\nnamic hypernetwork enables flexible adaptation to\nvarying and unseen spectral bands within a single\nunified Transformer framework.\n2. The proposed hypernetwork-based architecture en-\nables efficient continual pretraining across diverse\nEO modalities by interpolating in weight space ac-\ncording to wavelength configurations. Together with\nwavelength-aware MIM and feature distillation, this\nenables efficient EO domain adaptation with mini-\nmal data and compute.\n3. We further introduce DOFA+. DOFA+ seeds itself\nwith a strong vision prior and then employs a dual\ntraining strategy: (i) wavelength-aware MIM to cap-\nture EO-specific spatial patterns, and (ii) hierarchi-\ncal feature distillation to align and refine the inher-\nited semantic representations from the vision prior.\n4. Extensive experiments demonstrate that DOFA and\nDOFA+ achieve state-of-the-art performance across\na wide range of EO tasks and modalities. Our mod-\nels generalize well to unseen sensors and diverse\nspectral configurations without retraining, offering\ngreater flexibility in open-world settings with re-\nduced computational costs."
+    },
+    {
+      "id": "S045",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        42.1,
+        91.6,
+        285.8,
+        176.3
+      ],
+      "text": "Extensive experiments across 20+ EO tasks validate\nDOFA’s robust adaptability, efficiency, and scalability.\nOur approach represents a meaningful advancement to-\nward open-world EO visual understanding, emphasiz-\ning continual multimodal learning and sustainable adapt-\nability within dynamic and heterogeneous real-world\nEO environments."
+    },
+    {
+      "id": "S046",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        42.1,
+        198.3,
+        121.0,
+        208.2
+      ],
+      "text": "2 Related Work"
+    },
+    {
+      "id": "S047",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        42.1,
+        221.9,
+        280.6,
+        754.9
+      ],
+      "text": "Early efforts to develop EO foundation models were de-\nvoted to generating effective embeddings for data from\na single modality. For example, SeCo [30] and CACo [29]\nleverage temporal information from acquired images to\nlearn temporal-sensitive and temporal-invariant feature\nrepresentations. GFM [32] devises a continual pretrain-\ning paradigm that leverages ImageNet pretrained fea-\ntures to accelerate model convergence on EO data. Cha\net al. [8] explore the impact of scaling up the number of\nparameters in foundation models, specifically on Google\nEarth images. Another line of research addresses the\nadaptability of feature representations across EO data\nwith different ground sample distances (GSD).\nRingMo [53] introduces a patch-incomplete mask\nstrategy during the masked image modeling phase, pre-\nventing the oversight of small objects within a single\npatch. Scale-MAE [36] takes a different approach by\nsubstituting the positional encoding within ViT [13]\nwith a GSD positional encoding, incorporating GSD\ninformation into the representation learning process.\nUSat [21] adopts a strategy of encoding a higher num-\nber of patches for bands with lower GSD and a lower\nnumber of patches for bands with higher GSD. Another\nsignificant research question is how to achieve a unified\nrepresentation for different modalities, such as RGB,\nmultispectral, hyperspectral, and radar data. In this\nregard, SSL4EO-S12 [49] integrates the features from\nmultispectral and SAR modalities using an early fu-\nsion strategy. SatMAE [10] suggests grouping subsets\nof spectral bands and adding a spectral encoding to\neach spectral group.\nReal-world data are characterized by diverse modal-\nities, including but not limited to images, videos, text,\naudio, depth information, and point clouds. The ca-\npacity of foundation models to effectively handle this\nvariety of downstream tasks hinges on their ability to\nprocess multimodal data. In this context, OFA-Net [52]\nproposes using modality-specific patch embedding lay-\ners to learn unified representations across diverse EO\nmodalities. It further demonstrates that a single shared\nTransformer backbone is both sufficient and effective for\ncapturing generalizable representations spanning mul-\ntiple types of EO data. CROMA [14] first develops two"
+    },
+    {
+      "id": "S048",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        321.8,
+        167.4,
+        518.9,
+        176.3
+      ],
+      "text": "Before Change\nAfter Change\nMulti-modal Dynamic Transformer"
+    },
+    {
+      "id": "S049",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        308.8,
+        201.3,
+        323.8,
+        204.8
+      ],
+      "text": "NAIP RGB"
+    },
+    {
+      "id": "S050",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        432.4,
+        208.6,
+        467.8,
+        213.2
+      ],
+      "text": "Shared Transformer"
+    },
+    {
+      "id": "S051",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        523.2,
+        237.6,
+        526.4,
+        246.7
+      ],
+      "text": "Linear"
+    },
+    {
+      "id": "S052",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        420.9,
+        190.3,
+        423.8,
+        198.4
+      ],
+      "text": "Linear"
+    },
+    {
+      "id": "S053",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        436.1,
+        193.5,
+        438.5,
+        200.1
+      ],
+      "text": "Norm"
+    },
+    {
+      "id": "S054",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        443.2,
+        190.8,
+        445.4,
+        202.3
+      ],
+      "text": "Multi-Head"
+    },
+    {
+      "id": "S055",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        445.9,
+        192.4,
+        448.0,
+        201.2
+      ],
+      "text": "Attention"
+    },
+    {
+      "id": "S056",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        452.6,
+        193.5,
+        455.0,
+        200.1
+      ],
+      "text": "Norm"
+    },
+    {
+      "id": "S057",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        458.8,
+        194.1,
+        461.2,
+        199.5
+      ],
+      "text": "MLP"
+    },
+    {
+      "id": "S058",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        330.0,
+        208.7,
+        423.6,
+        216.9
+      ],
+      "text": "Dynamic Projection\noutput\nInput (x)"
+    },
+    {
+      "id": "S059",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        348.7,
+        178.6,
+        355.2,
+        182.5
+      ],
+      "text": "Wbi,j"
+    },
+    {
+      "id": "S060",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        347.5,
+        194.9,
+        355.5,
+        197.8
+      ],
+      "text": "Linear"
+    },
+    {
+      "id": "S061",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        482.7,
+        215.2,
+        494.5,
+        218.7
+      ],
+      "text": "Input (x)"
+    },
+    {
+      "id": "S062",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        503.0,
+        175.7,
+        509.4,
+        179.6
+      ],
+      "text": "Wai,j"
+    },
+    {
+      "id": "S063",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        515.8,
+        210.7,
+        524.5,
+        214.3
+      ],
+      "text": "output"
+    },
+    {
+      "id": "S064",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        500.6,
+        193.2,
+        509.8,
+        196.5
+      ],
+      "text": "Linear"
+    },
+    {
+      "id": "S065",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        395.8,
+        241.9,
+        431.1,
+        252.7
+      ],
+      "text": "Dynamic\nWeight Generator"
+    },
+    {
+      "id": "S066",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        305.0,
+        257.5,
+        331.9,
+        263.3
+      ],
+      "text": "New Modality"
+    },
+    {
+      "id": "S067",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        309.6,
+        250.6,
+        325.2,
+        254.5
+      ],
+      "text": "Sentinel 2"
+    },
+    {
+      "id": "S068",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        411.4,
+        224.9,
+        415.2,
+        231.3
+      ],
+      "text": "Wai,j"
+    },
+    {
+      "id": "S069",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        379.6,
+        224.7,
+        401.5,
+        230.1
+      ],
+      "text": "Weights for"
+    },
+    {
+      "id": "S070",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        381.9,
+        230.1,
+        399.2,
+        234.5
+      ],
+      "text": "Sentinel 2"
+    },
+    {
+      "id": "S071",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        407.7,
+        129.6,
+        413.4,
+        132.9
+      ],
+      "text": "VTA"
+    },
+    {
+      "id": "S072",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        325.3,
+        92.5,
+        506.6,
+        101.7
+      ],
+      "text": "Before Change\nAfter Change"
+    },
+    {
+      "id": "S073",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        303.7,
+        142.0,
+        378.9,
+        152.7
+      ],
+      "text": "Environment, emotions, learning, and \nother surrounding factors"
+    },
+    {
+      "id": "S074",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        303.8,
+        90.5,
+        442.0,
+        99.2
+      ],
+      "text": "Neural plasticity \na"
+    },
+    {
+      "id": "S075",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        341.6,
+        257.3,
+        357.9,
+        261.6
+      ],
+      "text": "#bands: 13"
+    },
+    {
+      "id": "S076",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        312.6,
+        216.4,
+        322.9,
+        218.9
+      ],
+      "text": "wave le ngth"
+    },
+    {
+      "id": "S077",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        342.8,
+        251.4,
+        358.0,
+        255.3
+      ],
+      "text": "wavelength"
+    },
+    {
+      "id": "S078",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        509.5,
+        255.0,
+        525.8,
+        259.3
+      ],
+      "text": "#bands: 13"
+    },
+    {
+      "id": "S079",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        406.6,
+        202.7,
+        421.3,
+        207.0
+      ],
+      "text": "#bands: 3"
+    },
+    {
+      "id": "S080",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        456.7,
+        142.3,
+        525.6,
+        151.8
+      ],
+      "text": "Neural connections adaptively rewire\nin response to change."
+    },
+    {
+      "id": "C002",
+      "type": "caption",
+      "page": 3,
+      "bbox": [
+        297.2,
+        278.2,
+        535.3,
+        375.4
+      ],
+      "text": "Fig. 2: Motivation\nand\nmain\narchitecture\nof\nDOFA. We design DOFA to emulate the Neuroplas-\nticity [19, 55, 11] mechanism for processing multimodal\nEO data. (1) Illustration of the brain’s capability to\nadapt its structure and function to learned informa-\ntion, experience, or injury. (2) Illustration of the core\nidea: DOFA is designed to adaptively alter its network\nweights in response to novel data modalities."
+    },
+    {
+      "id": "S081",
+      "type": "paragraph",
+      "page": 3,
+      "bbox": [
+        297.2,
+        403.9,
+        540.5,
+        754.9
+      ],
+      "text": "unimodal encoders to encode multispectral and SAR\ndata individually. Subsequently, it utilizes a cross-modal\nradar-optical Transformer that leverages cross-attention\nto extract the unified representation. DeCUR [48] is a\nbi-modal self-supervised foundation model that decou-\nples the unique and common representations between\nthe two modalities.\nSpectralGPT [20] is a foundation model meticulously\ntailored for hyperspectral remote sensing data. It de-\nsigns a 3D masking strategy, an encoder for learning\nrepresentations from spatial-spectral mixed tokens, and\na decoder with multi-target reconstruction to preserve\nspectral characteristics. Beyond these, efforts have also\nbeen directed towards encoding geo-locational informa-\ntion into the feature representation. Notable examples\ninclude GASSL [3], GeoCLIP [7], SatCLIP [23], Sky-\nSense [16] and Tile2Vec [22].\nRecent efforts aim to handle the full diversity of EO\ndata in a single backbone. SkySense V2 [54] unifies op-\ntical, SAR, and elevation inputs with modality-prompt\ntokens and adaptive patch merging, while AnySat [2] is\na multimodal model based on joint embedding predic-\ntive architecture and scale-adaptive spatial encoders.\nPanopticon [45] treats co-located multi-sensor images\nas natural augmentations, adding cross-channel atten-\ntion to remain sensor-agnostic. Galileo [42] couples global\nmasked modeling with local contrastive objectives, yield-\ning a generalist model that outperforms task-specific"
+    },
+    {
+      "id": "S082",
+      "type": "paragraph",
+      "page": 4,
+      "bbox": [
+        42.1,
+        91.6,
+        282.3,
+        163.9
+      ],
+      "text": "baselines. However, for existing models, it is tricky to\nhandle situations where the number of spectral bands\nchanges in downstream tasks without retraining the\nmodels. DOFA and DOFA+ overcome this by employ-\ning a dynamic weight generator to encode spectral bands\ninto dynamic weights for deep representation learning."
+    },
+    {
+      "id": "S083",
+      "type": "paragraph",
+      "page": 4,
+      "bbox": [
+        42.1,
+        198.5,
+        116.9,
+        208.5
+      ],
+      "text": "3 Methodology"
+    },
+    {
+      "id": "S084",
+      "type": "paragraph",
+      "page": 4,
+      "bbox": [
+        42.1,
+        223.2,
+        280.2,
+        258.1
+      ],
+      "text": "Here, we provide detailed information about the pro-\nposed DOFA and DOFA+ models, along with a more\ndetailed presentation of the training method."
+    },
+    {
+      "id": "S085",
+      "type": "paragraph",
+      "page": 4,
+      "bbox": [
+        42.1,
+        292.8,
+        109.6,
+        302.7
+      ],
+      "text": "3.1 Preliminary"
+    },
+    {
+      "id": "S086",
+      "type": "paragraph",
+      "page": 4,
+      "bbox": [
+        42.1,
+        313.9,
+        280.2,
+        389.7
+      ],
+      "text": "Given an input image X ∈RC×H×W , where H, W,\nand C represent the height, width, and number of chan-\nnels, respectively, the image is first divided into a patch\nsequence. Each patch has a fixed spatial size P × P\nwith C channels, and thus the image is converted into\nN = HW"
+    },
+    {
+      "id": "S087",
+      "type": "paragraph",
+      "page": 4,
+      "bbox": [
+        42.1,
+        379.8,
+        280.2,
+        440.6
+      ],
+      "text": "P 2 patches. Each patch is flattened into a vector\nand linearly transformed into a D-dimensional embed-\nding. This transformation is represented by a trainable\nembedding matrix E ∈RP 2C×D.\nFormally, the patch embedding can be described as"
+    },
+    {
+      "id": "S088",
+      "type": "paragraph",
+      "page": 4,
+      "bbox": [
+        42.1,
+        467.4,
+        280.2,
+        483.1
+      ],
+      "text": "X = [Xp1; Xp2; . . . ; XpN ],\nXpi ∈RP 2C,\n(1)"
+    },
+    {
+      "id": "S089",
+      "type": "paragraph",
+      "page": 4,
+      "bbox": [
+        42.1,
+        498.1,
+        280.2,
+        545.4
+      ],
+      "text": "where Xpi is the flattened vector of the i-th patch.\nNext, the flattened vectors are linearly projected into\nD−dimensional embeddings with a learnable embed-\nding matrix:"
+    },
+    {
+      "id": "S090",
+      "type": "paragraph",
+      "page": 4,
+      "bbox": [
+        42.1,
+        560.7,
+        280.2,
+        575.4
+      ],
+      "text": "Z0 = [Xp1E; Xp2E; . . . ; XpN E],\nZ0 ∈RN×D,\n(2)"
+    },
+    {
+      "id": "S091",
+      "type": "paragraph",
+      "page": 4,
+      "bbox": [
+        42.1,
+        590.4,
+        280.2,
+        675.1
+      ],
+      "text": "where Z0 represents the sequence of patch embeddings.\nNote that this process can be implemented utilizing a\nsingle convolution layer with a P × P kernel, C input\nchannels, and D output channels. Class token Xcls, an\nadditional learnable embedding, is prepended to the se-\nquence. Finally, position embeddings are added to re-\ntain positional information."
+    },
+    {
+      "id": "S092",
+      "type": "paragraph",
+      "page": 4,
+      "bbox": [
+        42.1,
+        688.3,
+        280.2,
+        703.4
+      ],
+      "text": "Z′ = [Xcls; Z0] + Epos,\nZ′ ∈R(N+1)×D.\n(3)"
+    },
+    {
+      "id": "S093",
+      "type": "paragraph",
+      "page": 4,
+      "bbox": [
+        42.1,
+        720.1,
+        280.2,
+        754.9
+      ],
+      "text": "Here, Epos denotes the position embeddings, and the\nresulting Z′ serves as the input to the subsequent layers\nof the ViT architecture."
+    },
+    {
+      "id": "S094",
+      "type": "subsection_header",
+      "page": 4,
+      "bbox": [
+        297.2,
+        91.6,
+        408.5,
+        101.6
+      ],
+      "text": "3.2 Architecture overview"
+    },
+    {
+      "id": "S095",
+      "type": "paragraph",
+      "page": 4,
+      "bbox": [
+        297.2,
+        117.6,
+        535.3,
+        214.8
+      ],
+      "text": "The patch embedding layer transforms the input image\ninto a sequence of embeddings that the self-attention\nmechanism of the Transformer can process. A straight-\nforward way to handle the input data from different\nmodalities is to utilize multiple patch embedding lay-\ners to convert data with different spectral wavelengths\ninto embeddings with the same dimension [52]. Sup-\npose that the input image X of dimensions RC×H×W"
+    },
+    {
+      "id": "S096",
+      "type": "paragraph",
+      "page": 4,
+      "bbox": [
+        297.2,
+        217.2,
+        536.5,
+        754.9
+      ],
+      "text": "can originate from various data modalities. Initially, im-\nages from different sources are standardized to height\nH and width W. Specifically, we consider five distinct\nmodalities: Sentinel-1 data (Xs1) with two SAR chan-\nnels (R2×H×W ), Sentinel 2 data (Xs2) with nine mul-\ntispectral channels (R9×H×W ), Gaofen data (Xg) with\nfour multispectral channels (R4×H×W ), NAIP imagery\n(Xrgb) with three RGB channels (R3×H×W ), and En-\nMAP data (Xe) with 202 available hyperspectral chan-\nnels (R202×H×W ). Note that, for the sake of simplicity,\nwe omit the batch size from the notation of tensors.\nAs illustrated in Fig. 3, the whole architecture fol-\nlows the design of masked image modeling (MIM) [18].\nThe main difference from traditional masked autoen-\ncoders (MAE) lies in DOFA’s capacity to process in-\nput images with various channels. This flexibility is\nachieved through a hypernetwork-based dynamic weight\ngenerator. The dynamic weight generator takes inputs\nfrom the spectral wavelength associated with each im-\nage channel, and dynamically predicts the patch em-\nbedding matrix E for different data modalities. As pre-\nsented in Fig. 4, the dynamic weight generator maps\nspectral band configurations to a weight space. In open-\nworld tasks with new spectral ranges or sensors, it in-\nterpolates this space to produce appropriate weights\nfor the given input. The latent representations are then\npassed through a series of shared Transformer blocks\nfor learning generalizable multimodal representations.\nParallel to the dynamic weight generation for the\nencoder part of the network, the dynamic decoder is re-\nsponsible for reconstructing the output image from the\nencoded latent space. Similarly, the dynamic decoder\nutilizes another set of dynamically generated weights\nto ensure that the reconstructed image matches the\nnumber of spectral bands of the target modality. We\nemploy a MIM strategy to train this self-supervised ar-\nchitecture. The input images are masked randomly, and\nthe model learns to reconstruct these missing parts. As\nthe parameters in DOFA are learned across different\nmodalities, this process helps the model to learn ro-\nbust multimodal representations beneficial for various\nEO tasks. After the pre-training process, the model can\nbe transferred to various EO applications without ex-"
+    },
+    {
+      "id": "S097",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        180.1,
+        182.8,
+        247.2,
+        203.1
+      ],
+      "text": "Dynamic\nWeight Generator"
+    },
+    {
+      "id": "S098",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        243.7,
+        111.2,
+        250.9,
+        131.6
+      ],
+      "text": "Linear"
+    },
+    {
+      "id": "S099",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        273.2,
+        119.8,
+        278.0,
+        132.3
+      ],
+      "text": "Norm"
+    },
+    {
+      "id": "S100",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        287.4,
+        114.8,
+        291.6,
+        136.7
+      ],
+      "text": "Multi-Head"
+    },
+    {
+      "id": "S101",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        292.3,
+        117.5,
+        296.4,
+        134.8
+      ],
+      "text": "Attention"
+    },
+    {
+      "id": "S102",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        304.9,
+        119.8,
+        309.7,
+        132.3
+      ],
+      "text": "Norm"
+    },
+    {
+      "id": "S103",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        316.7,
+        121.1,
+        321.5,
+        131.2
+      ],
+      "text": "MLP"
+    },
+    {
+      "id": "S104",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        184.0,
+        148.5,
+        334.6,
+        157.4
+      ],
+      "text": "Shared Transformer\nDynamic Projection"
+    },
+    {
+      "id": "S105",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        288.4,
+        186.1,
+        318.4,
+        194.9
+      ],
+      "text": "Finetune"
+    },
+    {
+      "id": "S106",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        63.3,
+        266.0,
+        96.5,
+        275.7
+      ],
+      "text": "Meta Info"
+    },
+    {
+      "id": "S107",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        75.3,
+        278.3,
+        118.7,
+        288.9
+      ],
+      "text": "Input Data"
+    },
+    {
+      "id": "S108",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        167.4,
+        269.0,
+        266.5,
+        279.7
+      ],
+      "text": "Wavelength-conditioned"
+    },
+    {
+      "id": "S109",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        179.0,
+        278.8,
+        254.9,
+        289.4
+      ],
+      "text": "Weight Generation"
+    },
+    {
+      "id": "S110",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        109.1,
+        265.1,
+        513.6,
+        280.1
+      ],
+      "text": "Images\nMasked Image"
+    },
+    {
+      "id": "S111",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        465.6,
+        279.2,
+        503.1,
+        289.9
+      ],
+      "text": "Modeling"
+    },
+    {
+      "id": "S112",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        69.1,
+        126.5,
+        90.8,
+        131.8
+      ],
+      "text": "wavelength"
+    },
+    {
+      "id": "S113",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        69.6,
+        175.0,
+        91.3,
+        180.3
+      ],
+      "text": "wavelength"
+    },
+    {
+      "id": "S114",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        71.1,
+        249.1,
+        92.8,
+        254.4
+      ],
+      "text": "wavelength"
+    },
+    {
+      "id": "S115",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        168.6,
+        257.0,
+        265.7,
+        262.5
+      ],
+      "text": "wavelength\nwavelength\nwavelength"
+    },
+    {
+      "id": "S116",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        358.3,
+        181.5,
+        425.4,
+        201.9
+      ],
+      "text": "Dynamic\nWeight Generator"
+    },
+    {
+      "id": "S117",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        346.8,
+        255.7,
+        443.9,
+        261.2
+      ],
+      "text": "wavelength\nwavelength\nwavelength"
+    },
+    {
+      "id": "S118",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        351.5,
+        148.8,
+        404.6,
+        157.6
+      ],
+      "text": "Shared Decoder"
+    },
+    {
+      "id": "S119",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        352.9,
+        116.8,
+        357.6,
+        129.3
+      ],
+      "text": "Norm"
+    },
+    {
+      "id": "S120",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        367.1,
+        111.8,
+        371.2,
+        133.7
+      ],
+      "text": "Multi-Head"
+    },
+    {
+      "id": "S121",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        371.9,
+        114.6,
+        376.0,
+        131.8
+      ],
+      "text": "Attention"
+    },
+    {
+      "id": "S122",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        384.5,
+        116.8,
+        389.3,
+        129.3
+      ],
+      "text": "Norm"
+    },
+    {
+      "id": "S123",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        396.3,
+        118.1,
+        401.1,
+        128.2
+      ],
+      "text": "MLP"
+    },
+    {
+      "id": "S124",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        411.8,
+        109.0,
+        420.6,
+        138.4
+      ],
+      "text": "Dynamic"
+    },
+    {
+      "id": "S125",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        419.9,
+        109.8,
+        428.7,
+        137.6
+      ],
+      "text": "Decoder"
+    },
+    {
+      "id": "S126",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        107.9,
+        129.3,
+        128.0,
+        134.2
+      ],
+      "text": "NAIP RGB"
+    },
+    {
+      "id": "S127",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        107.5,
+        176.1,
+        130.3,
+        181.8
+      ],
+      "text": "Sentinel 2"
+    },
+    {
+      "id": "S128",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        102.1,
+        247.9,
+        134.0,
+        253.6
+      ],
+      "text": "Hyperspectral"
+    },
+    {
+      "id": "S129",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        473.7,
+        129.3,
+        493.8,
+        134.2
+      ],
+      "text": "NAIP RGB"
+    },
+    {
+      "id": "S130",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        473.1,
+        176.1,
+        495.8,
+        181.8
+      ],
+      "text": "Sentinel 2"
+    },
+    {
+      "id": "S131",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        469.1,
+        247.7,
+        501.0,
+        253.4
+      ],
+      "text": "Hyperspectral"
+    },
+    {
+      "id": "S132",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        343.6,
+        269.0,
+        442.7,
+        279.7
+      ],
+      "text": "Wavelength-conditioned"
+    },
+    {
+      "id": "S133",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        355.2,
+        278.8,
+        431.1,
+        289.4
+      ],
+      "text": "Weight Generation"
+    },
+    {
+      "id": "S134",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        285.4,
+        228.9,
+        324.4,
+        236.9
+      ],
+      "text": "Downstream"
+    },
+    {
+      "id": "S135",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        296.4,
+        236.2,
+        313.4,
+        244.2
+      ],
+      "text": "Tasks"
+    },
+    {
+      "id": "C003",
+      "type": "caption",
+      "page": 5,
+      "bbox": [
+        42.1,
+        308.1,
+        535.3,
+        330.5
+      ],
+      "text": "Fig. 3: Architecture and training details. DOFA builds on masked image modeling, introducing a significant\nadvancement by processing input images with any number of channels within a single framework."
+    },
+    {
+      "id": "S136",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        54.5,
+        396.1,
+        71.7,
+        400.6
+      ],
+      "text": "wavelength"
+    },
+    {
+      "id": "S137",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        78.7,
+        386.2,
+        113.9,
+        391.2
+      ],
+      "text": "[0.665, 0.56, 0.49,"
+    },
+    {
+      "id": "S138",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        79.8,
+        391.6,
+        117.5,
+        401.7
+      ],
+      "text": "0.705, 0.74, 0.783, \n0.842, 1.61, 2.19]"
+    },
+    {
+      "id": "S139",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        212.3,
+        448.2,
+        272.0,
+        455.9
+      ],
+      "text": "wavelength\n[0.665, 0.56, 0.49]"
+    },
+    {
+      "id": "S140",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        213.4,
+        393.2,
+        267.1,
+        400.6
+      ],
+      "text": "[5.405, 5.405]\nwavelength"
+    },
+    {
+      "id": "S141",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        54.0,
+        451.6,
+        71.2,
+        456.1
+      ],
+      "text": "wavelength"
+    },
+    {
+      "id": "S142",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        80.3,
+        443.2,
+        104.7,
+        448.2
+      ],
+      "text": "[0.665, 0.49,"
+    },
+    {
+      "id": "S143",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        81.5,
+        448.6,
+        104.7,
+        453.6
+      ],
+      "text": "0.705, 2.19]"
+    },
+    {
+      "id": "S144",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        62.0,
+        459.2,
+        257.5,
+        465.0
+      ],
+      "text": "New Spectral Range\nOptical (RGB)"
+    },
+    {
+      "id": "S145",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        165.9,
+        403.4,
+        245.7,
+        417.4
+      ],
+      "text": "SAR\nDynamic\nWeight Space"
+    },
+    {
+      "id": "S146",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        152.9,
+        450.5,
+        179.1,
+        461.3
+      ],
+      "text": "Weight Space\nInterpolation"
+    },
+    {
+      "id": "S147",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        72.2,
+        403.4,
+        93.3,
+        408.7
+      ],
+      "text": "Sentinel 2"
+    },
+    {
+      "id": "S148",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        148.2,
+        381.5,
+        174.1,
+        386.9
+      ],
+      "text": "New Sensor"
+    },
+    {
+      "id": "S149",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        136.9,
+        375.0,
+        154.1,
+        379.5
+      ],
+      "text": "wavelength"
+    },
+    {
+      "id": "S150",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        162.0,
+        362.3,
+        185.1,
+        367.3
+      ],
+      "text": "100+ bands"
+    },
+    {
+      "id": "S151",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        162.8,
+        369.5,
+        182.1,
+        374.5
+      ],
+      "text": "GSD: 4 m"
+    },
+    {
+      "id": "S152",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        122.7,
+        435.2,
+        202.1,
+        441.1
+      ],
+      "text": "GSD: 1 m\nGSD: 10 m"
+    },
+    {
+      "id": "S153",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        183.3,
+        389.4,
+        205.0,
+        394.4
+      ],
+      "text": "GSD: 10 m"
+    },
+    {
+      "id": "S154",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        116.6,
+        415.3,
+        127.5,
+        420.3
+      ],
+      "text": "DWG"
+    },
+    {
+      "id": "S155",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        198.6,
+        354.0,
+        232.6,
+        365.5
+      ],
+      "text": "DWG: Dynamic\nWeight Generator"
+    },
+    {
+      "id": "S156",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        128.2,
+        455.1,
+        139.1,
+        460.1
+      ],
+      "text": "DWG"
+    },
+    {
+      "id": "S157",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        155.0,
+        398.8,
+        166.0,
+        403.8
+      ],
+      "text": "DWG"
+    },
+    {
+      "id": "S158",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        202.6,
+        404.8,
+        213.5,
+        409.8
+      ],
+      "text": "DWG"
+    },
+    {
+      "id": "S159",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        186.8,
+        452.8,
+        197.8,
+        457.8
+      ],
+      "text": "DWG"
+    },
+    {
+      "id": "C004",
+      "type": "caption",
+      "page": 5,
+      "bbox": [
+        42.1,
+        479.2,
+        280.2,
+        501.6
+      ],
+      "text": "Fig. 4: Illustration of weight space interpolation for new\nsensors or a combination of spectral bands."
+    },
+    {
+      "id": "S160",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        42.1,
+        524.9,
+        280.2,
+        559.8
+      ],
+      "text": "tensive retraining thanks to the dynamic weight gen-\neration, from high-resolution optical imaging to multi-\nspectral and hyperspectral sensing."
+    },
+    {
+      "id": "S161",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        42.1,
+        584.3,
+        280.2,
+        594.3
+      ],
+      "text": "3.3 Wavelength-conditioned dynamic patch embedding"
+    },
+    {
+      "id": "S162",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        42.1,
+        608.0,
+        280.2,
+        754.9
+      ],
+      "text": "To manage the diversity of spectral bands across differ-\nent modalities, we project the data into a latent space\nwith uniform feature dimensionality using the dynamic\npatch embedding layer Fdpe. As described before, we\ndenote the input image as X ∈RC×H×W . Fig. 5 (1)\nillustrates the detailed steps used to compute the dy-\nnamic weights given the wavelength information of each\nchannel. Each channel of the input image has a corre-\nsponding central wavelength. The wavelengths of an in-\nput image with C channels can be represented by λ ∈\nRC. To convert the wavelengths to a higher-dimensional\nfeature space, we encode the wavelengths λ using a 1D"
+    },
+    {
+      "id": "S163",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        297.2,
+        354.1,
+        433.5,
+        364.1
+      ],
+      "text": "sine-cosine positional encoding:"
+    },
+    {
+      "id": "S164",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        297.2,
+        373.3,
+        535.3,
+        386.9
+      ],
+      "text": "Vλ = PE(λ) ∈RC×Dλ,\n(4)"
+    },
+    {
+      "id": "S165",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        297.2,
+        396.8,
+        535.3,
+        433.2
+      ],
+      "text": "where Dλ is the dimension of the converted wavelength\nfeature. The positional encoding PE(λi) for wavelength\nλi in channel i is given by:"
+    },
+    {
+      "id": "S166",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        314.3,
+        441.1,
+        443.5,
+        465.0
+      ],
+      "text": "PE(λi, 2k) = sin\n\u0012\nλi\n100002k/Dλ"
+    },
+    {
+      "id": "S167",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        445.7,
+        441.1,
+        457.4,
+        457.9
+      ],
+      "text": "\u0013\n,"
+    },
+    {
+      "id": "S168",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        297.2,
+        469.0,
+        444.6,
+        492.9
+      ],
+      "text": "PE(λi, 2k + 1) = cos\n\u0012\nλi\n100002k/Dλ"
+    },
+    {
+      "id": "S169",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        446.8,
+        461.9,
+        535.3,
+        485.8
+      ],
+      "text": "\u0013\n,\n(5)"
+    },
+    {
+      "id": "S170",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        297.2,
+        502.3,
+        392.4,
+        514.1
+      ],
+      "text": "where k = 0, . . . , Dλ"
+    },
+    {
+      "id": "S171",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        297.2,
+        504.0,
+        535.3,
+        539.0
+      ],
+      "text": "2\n−1. The positionally encoded\nwavelengths Vλ are further transformed through two\nfully-connected layers with residual connections:"
+    },
+    {
+      "id": "S172",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        297.2,
+        548.5,
+        535.3,
+        561.8
+      ],
+      "text": "V′\nλ = ReLU(F2(ReLU(F1(Vλ)))) + Vλ,\n(6)"
+    },
+    {
+      "id": "S173",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        297.2,
+        571.6,
+        544.0,
+        681.4
+      ],
+      "text": "where F1 and F2 represent the fully-connected layers,\nand ReLU denotes the Rectified Linear Unit activation\nfunction [1].\nNext, we employ a Transformer encoder [44] layer\nwith four attention heads to generate the dynamic weights\nand bias for each wavelength. Specifically, the embed-\nding V′\nλ, Nw learnable query tokens Qw, and one learn-\nable bias query token Qb are concatenated together to\nform the input to the Transformer encoder:"
+    },
+    {
+      "id": "S174",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        297.2,
+        691.6,
+        518.3,
+        706.5
+      ],
+      "text": "V′′ = TransformerEncoder(Concat(Qw, V′\nλ, Qb))."
+    },
+    {
+      "id": "S175",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        522.5,
+        711.2,
+        535.3,
+        721.1
+      ],
+      "text": "(7)"
+    },
+    {
+      "id": "S176",
+      "type": "paragraph",
+      "page": 5,
+      "bbox": [
+        297.2,
+        731.1,
+        535.3,
+        756.4
+      ],
+      "text": "We subsequently extract the embeddings V′′w that cor-\nrespond to the weight query tokens Qw from V′′, as well"
+    },
+    {
+      "id": "S177",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        268.6,
+        328.5,
+        277.0,
+        418.6
+      ],
+      "text": "Linear\nLinear"
+    },
+    {
+      "id": "S178",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        300.1,
+        400.7,
+        305.5,
+        414.9
+      ],
+      "text": "Norm"
+    },
+    {
+      "id": "S179",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        316.2,
+        395.1,
+        320.9,
+        419.9
+      ],
+      "text": "Multi-Head"
+    },
+    {
+      "id": "S180",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        321.7,
+        398.2,
+        326.4,
+        417.8
+      ],
+      "text": "Attention"
+    },
+    {
+      "id": "S181",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        336.0,
+        400.7,
+        341.5,
+        414.9
+      ],
+      "text": "Norm"
+    },
+    {
+      "id": "S182",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        349.5,
+        402.2,
+        354.9,
+        413.7
+      ],
+      "text": "MLP"
+    },
+    {
+      "id": "S183",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        434.6,
+        275.2,
+        441.6,
+        298.7
+      ],
+      "text": "Pooling"
+    },
+    {
+      "id": "S184",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        299.9,
+        334.3,
+        305.3,
+        348.5
+      ],
+      "text": "Norm"
+    },
+    {
+      "id": "S185",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        316.1,
+        328.7,
+        320.8,
+        353.6
+      ],
+      "text": "Multi-Head"
+    },
+    {
+      "id": "S186",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        321.6,
+        331.8,
+        326.3,
+        351.4
+      ],
+      "text": "Attention"
+    },
+    {
+      "id": "S187",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        335.9,
+        334.3,
+        341.3,
+        348.5
+      ],
+      "text": "Norm"
+    },
+    {
+      "id": "S188",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        349.3,
+        335.8,
+        354.8,
+        347.3
+      ],
+      "text": "MLP"
+    },
+    {
+      "id": "S189",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        434.6,
+        330.2,
+        441.6,
+        353.7
+      ],
+      "text": "Pooling"
+    },
+    {
+      "id": "S190",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        394.0,
+        394.8,
+        401.1,
+        420.5
+      ],
+      "text": "Decoder"
+    },
+    {
+      "id": "S191",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        103.3,
+        428.2,
+        202.3,
+        437.3
+      ],
+      "text": "Masked Multi-spectral Image"
+    },
+    {
+      "id": "S192",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        104.0,
+        363.5,
+        217.5,
+        372.5
+      ],
+      "text": "Unmasked Selected RGB Channels"
+    },
+    {
+      "id": "S193",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        106.2,
+        300.1,
+        219.8,
+        309.2
+      ],
+      "text": "Unmasked Selected RGB Channels"
+    },
+    {
+      "id": "S194",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        383.9,
+        428.6,
+        467.7,
+        437.7
+      ],
+      "text": "Masked Image Modeling"
+    },
+    {
+      "id": "S195",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        249.6,
+        278.5,
+        292.1,
+        287.1
+      ],
+      "text": "Pre-trained"
+    },
+    {
+      "id": "S196",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        258.6,
+        288.6,
+        283.0,
+        297.3
+      ],
+      "text": "Model"
+    },
+    {
+      "id": "S197",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        419.2,
+        303.1,
+        457.4,
+        320.4
+      ],
+      "text": "Feature\nDistillation"
+    },
+    {
+      "id": "S198",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        239.8,
+        368.7,
+        317.3,
+        379.3
+      ],
+      "text": "Shared Parameters"
+    },
+    {
+      "id": "S199",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        167.6,
+        276.2,
+        227.1,
+        286.9
+      ],
+      "text": "Teacher Model"
+    },
+    {
+      "id": "S200",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        315.6,
+        293.9,
+        360.3,
+        302.9
+      ],
+      "text": "Stop Gradient"
+    },
+    {
+      "id": "S201",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        211.1,
+        117.0,
+        228.8,
+        122.9
+      ],
+      "text": "Patchify"
+    },
+    {
+      "id": "S202",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        227.2,
+        228.8,
+        255.4,
+        236.0
+      ],
+      "text": "FC Layers"
+    },
+    {
+      "id": "S203",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        408.2,
+        110.9,
+        416.4,
+        134.2
+      ],
+      "text": "Linear"
+    },
+    {
+      "id": "S204",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        115.3,
+        195.8,
+        126.4,
+        217.0
+      ],
+      "text": "0.49\n0.56\n0.65"
+    },
+    {
+      "id": "S205",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        115.3,
+        217.9,
+        306.1,
+        240.2
+      ],
+      "text": "…\n0.85\n1.28\n…\n…"
+    },
+    {
+      "id": "S206",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        343.1,
+        177.8,
+        352.5,
+        230.6
+      ],
+      "text": "Transformer"
+    },
+    {
+      "id": "S207",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        354.2,
+        194.1,
+        363.6,
+        216.7
+      ],
+      "text": "Block"
+    },
+    {
+      "id": "S208",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        204.9,
+        155.4,
+        235.4,
+        171.4
+      ],
+      "text": "Learnable \nBias token"
+    },
+    {
+      "id": "S209",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        215.9,
+        182.2,
+        257.2,
+        198.2
+      ],
+      "text": "Learnable \nWeight tokens"
+    },
+    {
+      "id": "S210",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        283.3,
+        234.5,
+        318.9,
+        250.5
+      ],
+      "text": "wavelength\nquery tokens"
+    },
+    {
+      "id": "S211",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        377.8,
+        181.8,
+        384.8,
+        243.2
+      ],
+      "text": "Linear\nLinear"
+    },
+    {
+      "id": "S212",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        116.7,
+        143.3,
+        142.5,
+        149.2
+      ],
+      "text": "wavelength"
+    },
+    {
+      "id": "S213",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        107.7,
+        245.7,
+        141.2,
+        253.4
+      ],
+      "text": "wavelength"
+    },
+    {
+      "id": "S214",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        434.4,
+        176.7,
+        464.5,
+        184.4
+      ],
+      "text": "Generated"
+    },
+    {
+      "id": "S215",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        442.2,
+        185.0,
+        454.9,
+        192.7
+      ],
+      "text": "Bias"
+    },
+    {
+      "id": "S216",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        435.3,
+        224.0,
+        465.3,
+        231.6
+      ],
+      "text": "Generated"
+    },
+    {
+      "id": "S217",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        437.4,
+        232.3,
+        461.5,
+        239.9
+      ],
+      "text": "Weights"
+    },
+    {
+      "id": "S218",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        165.6,
+        137.4,
+        373.1,
+        149.8
+      ],
+      "text": "Image\nTokens\nTokens"
+    },
+    {
+      "id": "S219",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        311.4,
+        118.5,
+        329.6,
+        124.4
+      ],
+      "text": "Reshape"
+    },
+    {
+      "id": "S220",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        439.1,
+        142.3,
+        469.4,
+        148.3
+      ],
+      "text": "Output tokens"
+    },
+    {
+      "id": "S221",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        99.3,
+        93.5,
+        110.5,
+        106.3
+      ],
+      "text": "(1)"
+    },
+    {
+      "id": "S222",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        101.5,
+        266.0,
+        112.6,
+        278.8
+      ],
+      "text": "(2)"
+    },
+    {
+      "id": "C005",
+      "type": "caption",
+      "page": 6,
+      "bbox": [
+        42.1,
+        455.7,
+        535.3,
+        490.5
+      ],
+      "text": "Fig. 5: Dynamic weight generator and continual training framework. (1) The central wavelengths of each\nband are utilized to derive weights tailored to each wavelength. (2) Continual pretraining process. There is a\ndistillation and a reconstruction loss."
+    },
+    {
+      "id": "S223",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        42.1,
+        512.8,
+        280.2,
+        549.1
+      ],
+      "text": "as the embeddings V′′b associated with the bias query\ntokens Qb from V′′. Then, two fully-connected layers\nare utilized to generate the dynamic weights and biases:"
+    },
+    {
+      "id": "S224",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        42.1,
+        565.5,
+        196.0,
+        580.2
+      ],
+      "text": "Mw = Fw(V′′\nw + V′\nλ) ∈RC×P 2D,"
+    },
+    {
+      "id": "S225",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        43.7,
+        576.2,
+        280.2,
+        596.8
+      ],
+      "text": "Mb = Fb(V′′\nb) ∈RC×D,\n(8)"
+    },
+    {
+      "id": "S226",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        42.1,
+        602.7,
+        288.4,
+        675.1
+      ],
+      "text": "where Fw and Fb denote the fully-connected layers for\nweight and bias generation, respectively. As introduced\nin the Mathematical formalism section, the patch em-\nbedding layer can be implemented efficiently using a\nconvolution layer. Thus, we reshape the generated weights\ninto the convolution kernel as:"
+    },
+    {
+      "id": "S227",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        42.1,
+        683.4,
+        280.2,
+        694.9
+      ],
+      "text": "Kconv = Reshape(Mw, [D, C, P, P]),\n(9)"
+    },
+    {
+      "id": "S228",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        42.1,
+        701.8,
+        288.0,
+        737.5
+      ],
+      "text": "The convolution operation for patch embedding is then\nperformed using the dynamically generated weights Kconv\nand biases Mb:"
+    },
+    {
+      "id": "S229",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        42.1,
+        745.0,
+        280.2,
+        755.8
+      ],
+      "text": "PatchEmbedding := Conv(X, Kconv, Mb).\n(10)"
+    },
+    {
+      "id": "S230",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        297.2,
+        514.2,
+        535.3,
+        623.8
+      ],
+      "text": "where Conv denotes the convolution operation. Utiliz-\ning this approach, the patch embedding layer achieves\nindependence from the number of spectral bands of the\ninput images. The weights for these layers are dynami-\ncally generated based on the central wavelength of each\nchannel in a compositional manner. This mechanism\nenables the model to learn modality-specific represen-\ntations dynamically, thereby enhancing its adaptability\nand performance across various data domains."
+    },
+    {
+      "id": "S231",
+      "type": "paragraph",
+      "page": 6,
+      "bbox": [
+        297.2,
+        632.9,
+        536.6,
+        754.9
+      ],
+      "text": "For the wavelength-conditioned dynamic decoder,\nwe use different parameters to generate dynamic weights\nand biases. The computation process is similar to the\ndynamic patch embedding layer described before. In the\nvanilla masked autoencoder, the final layer of the de-\ncoder is usually implemented as a fully-connected layer\nto convert features from latent space into pixel space.\nFor the dynamic decoder layer, we follow the same pro-\ncess used in the dynamic patch embedding to generate\nthe dynamic weights. The only difference is that a fully-"
+    },
+    {
+      "id": "S232",
+      "type": "paragraph",
+      "page": 7,
+      "bbox": [
+        42.1,
+        91.6,
+        280.2,
+        114.0
+      ],
+      "text": "connected layer is used in the decoder rather than the\nconvolution layer in the patch embedding layer."
+    },
+    {
+      "id": "S233",
+      "type": "subsection_header",
+      "page": 7,
+      "bbox": [
+        42.1,
+        144.5,
+        203.8,
+        154.5
+      ],
+      "text": "3.4 Multimodal continual pretraining"
+    },
+    {
+      "id": "S234",
+      "type": "paragraph",
+      "page": 7,
+      "bbox": [
+        42.1,
+        168.8,
+        284.9,
+        678.1
+      ],
+      "text": "The self-supervised loss formulation is pivotal for train-\ning our multimodal EO foundation model. The model\nleverages the MIM paradigm to avoid the requirement\nfor spatially aligned multimodal datasets. To reduce the\ncomputational cost of training on extensive datasets, we\npropose a continual pretraining strategy in the multi-\nmodal setting, incorporating a distillation loss inspired\nby GFM [32] and a weight initialization strategy.\nConsidering the varying number of channels in dif-\nferent EO modalities, directly using ImageNet pretrained\nweights for continual pretraining is impossible. Instead,\nwe design a proxy-based distillation method that ex-\ntracts optical data as a proxy to ensure representation\nsimilarity between the teacher and student networks. As\nillustrated in Fig. 5 (2), for multi-channel input data\nwith more than three channels, we extract the RGB\nchannels to form a three-channel input Xp ∈R3×H×W .\nWe randomly select one channel for Sentinel-1 data\nwith only two bands and duplicate it to a synthetic\nthree-channel image. This input Xp is then fed into an\nImageNet-pretrained teacher model to get teacher fea-\ntures Ft. Concurrently, the dynamic encoder in DOFA\nis also used to encode Xp into student features Fs.\nThroughout this procedure, the teacher model’s weights\nremain frozen to preserve structured representations\nand reduce the computational load during optimization.\nWe also follow a continual pretraining strategy for\ninitializing the dynamic weight generator. First, we pre-\ntrain the weight generator to mimic the teacher model’s\npatch embedding layer weights. We then use the pre-\ntrained weights to initialize the dynamic embedding\nlayer. The training loss comprises two distinct compo-\nnents. One is the MIM reconstruction loss, which forces\nthe model to predict X′ ∈RC×H×W for reconstruct-\ning various data modalities from the full-channel inputs\nX. The other is the feature distillation loss, which em-\nploys the cosine similarity between the teacher and stu-\ndent feature representations to guide the student model.\nSuppose that the encoded feature of the full channel\ninput is F; then the composite loss function can be for-\nmulated as follows:"
+    },
+    {
+      "id": "S235",
+      "type": "paragraph",
+      "page": 7,
+      "bbox": [
+        42.1,
+        692.9,
+        70.5,
+        709.6
+      ],
+      "text": "L = 1"
+    },
+    {
+      "id": "S236",
+      "type": "paragraph",
+      "page": 7,
+      "bbox": [
+        75.4,
+        689.5,
+        89.8,
+        707.3
+      ],
+      "text": "N\nX"
+    },
+    {
+      "id": "S237",
+      "type": "paragraph",
+      "page": 7,
+      "bbox": [
+        76.2,
+        691.6,
+        280.2,
+        720.7
+      ],
+      "text": "i=1\n∥Xi −X′\ni∥2 −\nFP (Fi\ns) · Fi\nt\n∥FP (Fis)∥2 · ∥Fi\nt∥2\n,\n(11)"
+    },
+    {
+      "id": "S238",
+      "type": "paragraph",
+      "page": 7,
+      "bbox": [
+        42.1,
+        732.4,
+        280.2,
+        754.9
+      ],
+      "text": "where FP is a linear projection layer, and N is the\nnumber of data samples."
+    },
+    {
+      "id": "S239",
+      "type": "paragraph",
+      "page": 7,
+      "bbox": [
+        297.2,
+        91.6,
+        535.8,
+        188.8
+      ],
+      "text": "The model training is supervised from two distinct\nperspectives. First, it leverages the complete spectral\ninformation present in the input to learn cross-modal\nfeatures via image reconstruction. Second, it distills\nknowledge from extensively pretrained models into di-\nverse data modalities using a single dynamic model.\nThis approach enables efficient and robust feature learn-\ning across various modalities."
+    },
+    {
+      "id": "S240",
+      "type": "paragraph",
+      "page": 7,
+      "bbox": [
+        297.2,
+        218.2,
+        487.9,
+        228.1
+      ],
+      "text": "3.5 DOFA+: Hybrid Continual Pre-training"
+    },
+    {
+      "id": "S241",
+      "type": "paragraph",
+      "page": 7,
+      "bbox": [
+        297.2,
+        242.3,
+        542.9,
+        565.6
+      ],
+      "text": "To further enhance both performance and efficiency, we\nextend DOFA with three key improvements:\nAdaptation from Strong Priors Starting from\nDINOv2 [35] weights, we apply the MIM objective to\nenable efficient adaptation to multiple EO modalities.\nThis preserves the strong semantic priors of DINOv2\nwhile guiding the model to learn EO-specific visual pat-\nterns through local reconstruction.\nHierarchical Feature Distillation To complement\nthe MIM objective, we introduce a hierarchical distilla-\ntion strategy that aligns the student’s intermediate rep-\nresentations with those of the DINOv2 teacher across\nmultiple layers.\nCompact Pre-training Regime We demonstrate\nthat high-quality adaptation does not require billion-scale\ncorpora: DOFA+ attains state-of-the-art performance\nafter seeing only 410k EO image tiles, much fewer sam-\nples to reduce both cost and carbon footprint.\nBuilding on these refinements, we present DOFA+,\na lightweight, universal Earth-observation encoder that\ncombines the reconstruction pressure of MAE with the\nsemantic guidance of a vision foundation model. Dur-\ning training, the student reconstructs randomly masked\npatches while simultaneously distilling hierarchical su-\npervision signals from DINOv2. This recipe offers two\npractical benefits:"
+    },
+    {
+      "id": "S242",
+      "type": "paragraph",
+      "page": 7,
+      "bbox": [
+        299.4,
+        575.6,
+        535.3,
+        685.2
+      ],
+      "text": "1. Simplicity DOFA+ maintains a single-branch ar-\nchitecture with a minimal training objective, avoid-\ning the need for complex multi-task losses or auxil-\niary network modules.\n2. Complementary Learning DOFA+ combines lo-\ncal detail learning and global semantic alignment in\na lightweight continual pretraining setup, enabling\nefficient adaptation to diverse EO tasks without re-\ntraining the model."
+    },
+    {
+      "id": "S243",
+      "type": "paragraph",
+      "page": 7,
+      "bbox": [
+        297.2,
+        695.2,
+        535.3,
+        754.9
+      ],
+      "text": "The training objective of DOFA+ combines a recon-\nstruction loss from masked image modeling and a multi-\nlevel feature distillation loss based on cosine similarity.\nLet X ∈RC×H×W denote the full-spectrum input, and\nX′ the reconstructed output. Let Fsi,l and Fti,l rep-"
+    },
+    {
+      "id": "S244",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        42.1,
+        91.6,
+        280.2,
+        126.5
+      ],
+      "text": "resent the student and teacher features from the l-th\nlayer, respectively, for sample i.\nThe total training loss is defined as:"
+    },
+    {
+      "id": "S245",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        42.1,
+        141.9,
+        77.0,
+        162.7
+      ],
+      "text": "L =\n1\nN"
+    },
+    {
+      "id": "S246",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        81.0,
+        139.2,
+        93.5,
+        154.3
+      ],
+      "text": "N\nX"
+    },
+    {
+      "id": "S247",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        80.6,
+        146.2,
+        145.5,
+        165.8
+      ],
+      "text": "i=1\n∥Xi −X′i∥2"
+    },
+    {
+      "id": "S248",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        62.3,
+        168.9,
+        152.4,
+        179.6
+      ],
+      "text": "|\n{z\n}\nMIM Reconstruction Loss"
+    },
+    {
+      "id": "S249",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        154.0,
+        141.9,
+        176.9,
+        156.6
+      ],
+      "text": "−λ· 1"
+    },
+    {
+      "id": "S250",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        180.6,
+        139.2,
+        193.1,
+        154.3
+      ],
+      "text": "L\nX"
+    },
+    {
+      "id": "S251",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        180.4,
+        160.0,
+        193.3,
+        165.9
+      ],
+      "text": "l=1"
+    },
+    {
+      "id": "S252",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        170.4,
+        139.9,
+        282.4,
+        194.3
+      ],
+      "text": "Fl\nP (Fi,l\ns ) · Fi,l\nt\n∥Fl\nP (Fi,l\ns )∥2 · ∥Fi,l\nt ∥2\n|\n{z\n}\nMulti-layer Feature Distillation\n(12)"
+    },
+    {
+      "id": "S253",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        42.1,
+        204.1,
+        280.2,
+        315.0
+      ],
+      "text": "Here, Fl\nP (·) is a linear projection aligning student fea-\ntures to the teacher’s dimension, L is the number of\ndistillation layers, N is the batch size, and λ is a bal-\nancing coefficient.\nThis training procedure enables DOFA+ to learn se-\nmantically rich, transferable representations, support-\ning scalable and general-purpose EO foundation models\nwith strong cross-modal generalization and low resource\ndemands."
+    },
+    {
+      "id": "S254",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        42.1,
+        340.1,
+        114.4,
+        350.0
+      ],
+      "text": "4 Experiments"
+    },
+    {
+      "id": "S255",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        42.1,
+        363.7,
+        281.2,
+        498.2
+      ],
+      "text": "We conduct extensive experiments across 22 datasets\nencompassing various Earth Observation (EO) tasks,\nincluding image classification, semantic segmentation,\nobject detection, and change detection. We assess model\nperformance under several settings: linear probing, de-\ncoder fine-tuning, and full fine-tuning. To demonstrate\ngeneralizability, we use diverse datasets with varying\nresolutions, spectral modalities, and geospatial regions.\nWe emphasize energy-efficient training protocols by lim-\niting training epochs and freezing pre-trained backbones\nwherever possible."
+    },
+    {
+      "id": "S256",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        42.1,
+        523.3,
+        168.6,
+        533.2
+      ],
+      "text": "4.1 GEO-Bench Experiments"
+    },
+    {
+      "id": "S257",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        42.1,
+        546.9,
+        237.8,
+        556.9
+      ],
+      "text": "4.1.1 GEO-Bench Classification Experiments"
+    },
+    {
+      "id": "S258",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        42.1,
+        570.6,
+        283.5,
+        754.9
+      ],
+      "text": "There are six image classification datasets provided in\nGEO-Bench [24]: m-bigearthnet, m-so2sat, m-brick-kiln,\nm-forestnet, m-eurosat, and m-pv4ger. These datasets\nspan diverse domains and applications, including for-\nest monitoring, land use classification, and infrastruc-\nture detection. They are sourced from multiple satellite\nplatforms, covering different spectral ranges and spatial\nresolutions.\nOn the classification datasets, we follow the com-\nmon practice of using RandomResizedCrop (scale 0.8 to\n1.0) and RandomHorizontalFlip as data augmentations.\nThe default crop size is 224×224 for all datasets and\nbaseline models except SatMAE [10] and CROMA [14],\nof which the crop size is 96×96 for SatMAE and 120×120\nfor CROMA, following the official setup to match their"
+    },
+    {
+      "id": "S259",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        297.2,
+        91.6,
+        535.3,
+        400.9
+      ],
+      "text": "smaller patch size of 8. We optimize cross-entropy loss\nfor most datasets, except for m-bigearthnet, for which\nthe multi-label soft margin loss is used. The LARS op-\ntimizer is utilized with cosine decay to train the last\nlinear layer of each foundation model for 50 epochs.\nConsidering the wide range of diversity among existing\nfoundation models, we employ dataset-specific learn-\ning rates and batch sizes tailored to enhance the per-\nformance of classification tasks. We sweep over a grid\nsearch to pick the best learning rate from [0.5, 1.0, 10,\n20] for each dataset.\nTable 1 presents the classification results. Our pro-\nposed DOFA and DOFA+ demonstrate superior perfor-\nmance across multiple datasets, validating their strong\ngeneralization capability with minimal training cost.\nRegarding the flexibility, DOFA and DOFA+ can be\nadapted to diverse EO modalities without changing the\nmodel architectures or retraining any part of the model.\nUnlike other models that often require modality-specific\nadaptation, DOFA adapts seamlessly to unseen sensors.\nFor instance, DOFA achieves strong performance on\nm-forestnet, despite never seeing the Landsat-8 data\nduring pretraining. This cross-modal adaptability veri-\nfies DOFA’s utility as a general-purpose EO foundation\nmodel."
+    },
+    {
+      "id": "S260",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        297.2,
+        421.5,
+        493.1,
+        431.5
+      ],
+      "text": "4.1.2 GEO-Bench Segmentation Experiments"
+    },
+    {
+      "id": "S261",
+      "type": "paragraph",
+      "page": 8,
+      "bbox": [
+        297.2,
+        445.6,
+        542.2,
+        754.9
+      ],
+      "text": "The six segmentation datasets include m-pv4ger-seg,\nm-chesapeake-landcover, m-cashew-plantation, m-SA-\ncrop-type, m-nz-cattle, and m-NeonTree. These datasets\ncover tasks like solar panel mapping, land cover seg-\nmentation, crop classification, and canopy delineation,\nacross RGB, multispectral, and hyperspectral modali-\nties. We freeze the encoder and train a UPerNet [51]\ndecoder for segmentation tasks. For all the models ex-\ncept the GFM with Swin Transformer, we transform\nthe features into a feature pyramid with channels 512\nand four different scales: 4, 2, 1, 0.5. The UPerNet seg-\nmentation head is then used to output the segmenta-\ntion results. We use the AdamW optimizer, batch size\n64, and an initial learning rate of 0.005 with cosine de-\ncay for 20 epochs for segmentation tasks. The learning\nrate is relatively stable across datasets for segmentation\ntasks.\nWe use center crop, random rotation, and random\nhorizontal and vertical flips for segmentation tasks. Im-\nages of each dataset are normalized based on the dataset’s\nmean and standard deviation. Table 2 shows that DOFA\nand DOFA+ consistently outperform other foundation\nmodels across all datasets. Specifically, DOFA with ViT-\nBase and ViT-Large backbones achieves particularly\nhigh accuracy on both the m-NeonTree and m-nz-cattle"
+    },
+    {
+      "id": "T001",
+      "type": "table_caption",
+      "page": 9,
+      "bbox": [
+        42.1,
+        90.4,
+        535.3,
+        125.3
+      ],
+      "text": "Table 1: Linear probing results on six classification tasks. All models are trained for 50 epochs. The reported\nnumbers are top-1 overall accuracy (OA). The m-bigearthnet dataset is evaluated using micro-averaged multilabel\naverage precision. Missing values are due to the inability of the model to adapt to this domain."
+    },
+    {
+      "id": "S262",
+      "type": "paragraph",
+      "page": 9,
+      "bbox": [
+        66.0,
+        139.7,
+        511.4,
+        147.2
+      ],
+      "text": "Method\nBackbone\nm-bigearthnet\nm-forestnet\nm-brick-kiln\nm-pv4ger\nm-so2sat\nm-eurosat"
+    },
+    {
+      "id": "S263",
+      "type": "paragraph",
+      "page": 9,
+      "bbox": [
+        66.0,
+        152.6,
+        500.5,
+        230.7
+      ],
+      "text": "MAE Single [18]\nViT-B\n63.6\n-\n88.9\n92.2\n50.0\n89.0\nOFA-Net [52]\nViT-B\n65.0\n-\n94.7\n93.2\n49.4\n91.9\nSatMAE [10]\nViT-B\n62.1\n-\n93.9\n-\n46.9\n86.4\nScale-MAE [36]\nViT-L\n-\n-\n-\n96.9\n-\n-\nGFM [32]\nSwin-B\n-\n-\n-\n96.8\n-\n-\nCross-Scale MAE [40]\nViT-B\n-\n-\n-\n93.1\n-\n-\nFG-MAE [50]\nViT-B\n63.0\n-\n94.7\n-\n51.4\n87.0\nCROMA [14]\nViT-B\n67.4\n-\n91.0\n-\n49.2\n90.1\nAnySat [2]\nViT-B\n63.8\n50.9\n90.3\n92.8\n42.5\n87.6\nGalileo [42]\nViT-B\n65.1\n-\n93.1\n-\n54.2\n88.6"
+    },
+    {
+      "id": "S264",
+      "type": "paragraph",
+      "page": 9,
+      "bbox": [
+        66.0,
+        235.7,
+        501.5,
+        250.6
+      ],
+      "text": "DOFA\nViT-B\n65.7\n50.9\n95.8\n96.9\n55.1\n93.9\nDOFA\nViT-L\n67.5\n54.6\n96.9\n97.3\n60.1\n97.1"
+    },
+    {
+      "id": "S265",
+      "type": "paragraph",
+      "page": 9,
+      "bbox": [
+        66.0,
+        255.6,
+        500.5,
+        270.6
+      ],
+      "text": "DOFA+\nViT-B\n64.8\n49.8\n94.9\n96.9\n57.5\n93.0\nDOFA+\nViT-L\n68.3\n55.1\n96.9\n97.9\n61.3\n95.3"
+    },
+    {
+      "id": "T002",
+      "type": "table_caption",
+      "page": 9,
+      "bbox": [
+        42.1,
+        286.6,
+        535.3,
+        321.4
+      ],
+      "text": "Table 2: Partial fine-tuning results on six segmentation tasks. All models are trained with a frozen backbone\nfor 20 epochs. Reported numbers are mean intersection over union (mIoU). Missing values are due to the inability\nof the model to readily adapt to this domain."
+    },
+    {
+      "id": "S266",
+      "type": "paragraph",
+      "page": 9,
+      "bbox": [
+        48.1,
+        335.9,
+        533.8,
+        343.4
+      ],
+      "text": "Method\nBackbone\nm-pv4ger-seg\nm-nz-cattle\nm-NeonTree\nm-cashew-plant\nm-SA-crop\nm-chesapeake"
+    },
+    {
+      "id": "S267",
+      "type": "paragraph",
+      "page": 9,
+      "bbox": [
+        48.1,
+        348.8,
+        516.0,
+        411.2
+      ],
+      "text": "MAE Single [18]\nViT-B\n88.4\n76.4\n53.0\n40.7\n30.7\n51.9\nOFA-Net [52]\nViT-B\n89.4\n77.6\n53.3\n47.9\n31.9\n54.5\nScale-MAE [36]\nViT-L\n83.5\n76.5\n51.0\n-\n-\n61.0\nGFM [32]\nSwin-B\n92.0\n75.0\n51.1\n-\n-\n63.8\nCross-Scale MAE [40]\nViT-B\n83.2\n77.9\n52.1\n-\n-\n52.3\nCROMA [14]\nViT-B\n-\n-\n-\n30.1\n31.4\n-\nFG-MAE [50]\nViT-B\n-\n-\n-\n40.8\n30.6\n-\nAnySat [2]\nViT-B\n89.9\n76.7\n52.2\n27.2\n26.8\n54.0"
+    },
+    {
+      "id": "S268",
+      "type": "paragraph",
+      "page": 9,
+      "bbox": [
+        48.1,
+        416.2,
+        517.0,
+        431.1
+      ],
+      "text": "DOFA\nViT-B\n94.5\n81.4\n58.8\n51.5\n33.0\n65.3\nDOFA\nViT-L\n95.0\n81.8\n59.4\n56.9\n32.1\n66.3"
+    },
+    {
+      "id": "S269",
+      "type": "paragraph",
+      "page": 9,
+      "bbox": [
+        48.1,
+        436.1,
+        517.0,
+        451.1
+      ],
+      "text": "DOFA+\nViT-B\n95.1\n82.7\n61.1\n55.1\n30.2\n70.8\nDOFA+\nViT-L\n95.7\n83.5\n63.8\n60.2\n33.2\n71.6"
+    },
+    {
+      "id": "S270",
+      "type": "paragraph",
+      "page": 9,
+      "bbox": [
+        42.1,
+        476.3,
+        284.4,
+        573.4
+      ],
+      "text": "datasets, highlighting the strength of its high-capacity\narchitecture. On the segmentation datasets, DOFA+\nshows a significant performance improvement compared\nwith DOFA. We attribute this improvement to the multi-\nlayer distillation method, which ensures the model learns\nfine-grained spatial patterns. These results further con-\nfirm DOFA’s robustness, adaptability, and efficiency\nacross segmentation tasks."
+    },
+    {
+      "id": "S271",
+      "type": "paragraph",
+      "page": 9,
+      "bbox": [
+        42.1,
+        596.8,
+        211.7,
+        606.8
+      ],
+      "text": "4.2 PANGEA Benchmark Experiments"
+    },
+    {
+      "id": "S272",
+      "type": "paragraph",
+      "page": 9,
+      "bbox": [
+        42.1,
+        620.4,
+        280.2,
+        754.9
+      ],
+      "text": "We further evaluate DOFA+ on the PANGEA bench-\nmark, which covers a diverse range of EO downstream\ntasks. In this setting, we perform decoder fine-tuning\nonly, while freezing the pretrained DOFA and DOFA+\nbackbones. All models are trained for 100 epochs with\nfixed optimization hyperparameters to ensure fairness.\nTo maintain consistency, we restrict our experiments\nto the datasets for which the original benchmark pro-\nvides direct download links, ensuring that comparisons\nare conducted under the same conditions. Training hy-\nperparameters are kept identical to those specified in"
+    },
+    {
+      "id": "S273",
+      "type": "paragraph",
+      "page": 9,
+      "bbox": [
+        297.2,
+        476.3,
+        535.3,
+        561.0
+      ],
+      "text": "the original PANGEA paper. The indices used for com-\nbining intermediate layers may be tuned for different\ndatasets. For input resolution, if the original image size\nis smaller than 224, we upscale it to 224 for DOFA+\nsince DOFA+ is pretrained with an image size of 224.\nIf it is larger, we retain the original size, following the\nUNet baseline setting."
+    },
+    {
+      "id": "T003",
+      "type": "table_caption",
+      "page": 9,
+      "bbox": [
+        297.2,
+        583.1,
+        539.0,
+        754.9
+      ],
+      "text": "Table 3 summarizes the results across eight repre-\nsentative downstream tasks. For the results of DOFA,\nwe include the results from the PANGEA [31] bench-\nmark. DOFA with ViT-Base already achieves compet-\nitive performance against existing foundation models,\noutperforming RemoteCLIP and SatlasNet by a clear\nmargin, and reaching a comparable average mIoU to\nCROMA with fewer computational costs. More impor-\ntantly, DOFA exhibits consistent performance across\ntasks of different types, including burned area mapping\n(BurnSr), flood mapping (Sen1Floods11), and crop mon-\nitoring (AI4Farms). This demonstrates that DOFA ef-\nfectively learns transferable EO-specific spectral-spatial\nrepresentations."
+    },
+    {
+      "id": "S274",
+      "type": "paragraph",
+      "page": 10,
+      "bbox": [
+        42.1,
+        67.4,
+        51.1,
+        75.8
+      ],
+      "text": "10"
+    },
+    {
+      "id": "S275",
+      "type": "paragraph",
+      "page": 10,
+      "bbox": [
+        42.1,
+        91.6,
+        288.2,
+        363.1
+      ],
+      "text": "When scaling to DOFA+ (ViT-Large), we observe\nsubstantial improvements across nearly all tasks, set-\nting new state-of-the-art (SOTA) results on the PANGEA\nbenchmark. Overall, DOFA+ attains the highest aver-\nage mIoU of 59.81, outperforming TerraMindv1-L, de-\nspite being trained with substantially fewer pretrain-\ning images and significantly lower computational re-\nsources. It also achieves the best or second-best scores in\n6 out of 8 tasks, with particularly strong performance in\nBurnSr (86.53), CTM-SS (57.47), and SN7 (63.06).\nThese tasks involve heterogeneous data sources, indi-\ncating the robustness of DOFA+ in handling diverse\nEO modalities. Although TerraMindv1-L achieves the\nbest score on the MADOS dataset, DOFA+ still de-\nlivers the second-best performance. Importantly, unlike\nthe TerraMind models, DOFA+ does not rely on LULC\nmaps during pretraining, even though such maps can\nprovide a strong advantage for Sentinel-2–based seg-\nmentation tasks. Overall, DOFA+ attains a superior\naverage rank (2.25) across all benchmarks, highlighting\nboth its strong accuracy and its stability across diverse\ndownstream tasks."
+    },
+    {
+      "id": "S276",
+      "type": "paragraph",
+      "page": 10,
+      "bbox": [
+        42.1,
+        394.3,
+        218.6,
+        404.2
+      ],
+      "text": "4.2.1 Image Classification on RESISC45"
+    },
+    {
+      "id": "S277",
+      "type": "paragraph",
+      "page": 10,
+      "bbox": [
+        42.1,
+        419.5,
+        287.2,
+        754.9
+      ],
+      "text": "In addition to the datasets in GEO-Bench, we com-\npare DOFA and DOFA+ with existing foundation mod-\nels on the widely-used RESISC-45 dataset [9], which\ncontains 31,500 remote sensing images across 45 scene\ncategories. Table 4 presents the classification results\nunder both frozen backbone evaluation (linear prob-\ning) and full finetuning. With the ViT-Base backbone,\nDOFA achieves 91.3% (frozen) and 97.3% (finetuned),\nalready surpassing existing methods. When scaling to\nViT-Large, DOFA reaches 91.9% (frozen) and 97.8%\n(finetuned), outperforming other models in both set-\ntings.\nThe performance gains become even more pronounced\nwith DOFA+. Using ViT-Base, DOFA+ improves frozen\naccuracy to 93.7%, while finetuning yields 97.5%. With\nViT-Large, DOFA+ achieves the best overall results of\n95.3% (frozen) and 98.1% (finetuned), significantly\noutperforming all prior methods. For the RESISC45 ex-\nperiments, we apply global mean pooling to the penul-\ntimate layer of DOFA and DOFA+, and use the pooled\nfeatures as input to a linear classification layer. We\nchoose the penultimate layer rather than the final layer\nbecause the latter is more directly influenced by the re-\nconstruction objective during pretraining, whereas the\npenultimate representations tend to capture more gen-\neralizable semantic features, leading to better transfer\nperformance on classification tasks."
+    },
+    {
+      "id": "S278",
+      "type": "subsection_header",
+      "page": 10,
+      "bbox": [
+        297.2,
+        91.6,
+        446.2,
+        101.6
+      ],
+      "text": "4.3 Object Detection Experiments"
+    },
+    {
+      "id": "S279",
+      "type": "paragraph",
+      "page": 10,
+      "bbox": [
+        297.2,
+        129.5,
+        544.6,
+        326.2
+      ],
+      "text": "We evaluate object detection performance on the DIOR\ndataset using the Faster R-CNN detector with DOFA\nand DOFA+ backbones. The DIOR dataset is a large-\nscale benchmark for remote sensing object detection,\ncontaining 23,463 images and 192,472 annotated in-\nstances across 20 object categories, covering diverse scenes\nwith significant variation in scale, orientation, and back-\nground complexity. Following the existing experimen-\ntal setting, Faster R-CNN is adopted as the detection\nhead, and all models are fully finetuned. For DOFA and\nDOFA+, we train the models for 15 epochs with a learn-\ning rate of 1e-4 and batch size 16. For the evaluation\nmetric, mAP50 is used, which refers to the mean Aver-\nage Precision computed at an Intersection-over-Union\nthreshold of 0.5, which is a standard metric for evalu-\nating object detection performance."
+    },
+    {
+      "id": "T004",
+      "type": "table_caption",
+      "page": 10,
+      "bbox": [
+        297.2,
+        342.9,
+        535.3,
+        477.4
+      ],
+      "text": "Table 5 reports the detection performance in terms\nof mAP50. DOFA already achieves competitive results\nwith an mAP50 of 76.21, while DOFA+ establishes a\nnew SOTA with 79.73, surpassing strong baselines such\nas RingMo (75.90), CMID (75.11), SkySense (78.73),\nand even the high-capacity SkySense V2 (79.50). Note\nthat, compared with SkySense V2, our model uses ViT-\nL, which is considerably more computationally efficient\nthan Swin-Huge. Furthermore, our pretraining dataset\nand GPU hours are significantly smaller, highlighting\nthe efficiency of our approach."
+    },
+    {
+      "id": "S280",
+      "type": "paragraph",
+      "page": 10,
+      "bbox": [
+        297.2,
+        494.1,
+        538.5,
+        666.0
+      ],
+      "text": "Unlike SkySense models, which use separate back-\nbones for optical RGB and multispectral data, DOFA\nand DOFA+ employ a single set of model parameters\nacross all tasks. Despite this unified design, they adapt\neffectively to the high-resolution characteristics of the\nDIOR dataset, while also delivering strong performance\non Sentinel-1 and Sentinel-2 benchmarks that involve\nmuch lower-resolution imagery. This highlights the flex-\nibility of DOFA+ in handling diverse input conditions,\nincluding different sensors, GSD, and spectral band com-\nbinations. The ability to seamlessly adapt to varying\ndata modalities while maintaining state-of-the-art per-\nformance underscores the robustness and universality\nof the DOFA framework."
+    },
+    {
+      "id": "S281",
+      "type": "paragraph",
+      "page": 10,
+      "bbox": [
+        297.2,
+        682.7,
+        540.6,
+        754.9
+      ],
+      "text": "From these experiments, we conclude that DOFA+\nprovides both flexibility and scalability: it can effec-\ntively exploit spectral-spatial information across datasets\nwith widely differing properties, and it achieves superior\nperformance on high-resolution detection tasks without\nrequiring task-specific architectural modifications."
+    },
+    {
+      "id": "S282",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        526.3,
+        67.4,
+        535.3,
+        75.8
+      ],
+      "text": "11"
+    },
+    {
+      "id": "T005",
+      "type": "table_caption",
+      "page": 11,
+      "bbox": [
+        42.1,
+        89.0,
+        535.3,
+        112.8
+      ],
+      "text": "Table 3: Benchmark results across 8 EO downstream tasks. An asterisk (∗) marks tasks that use only single-scene\ninputs. Best scores in each column are bold; second–best are underlined."
+    },
+    {
+      "id": "S283",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        71.5,
+        127.0,
+        505.7,
+        135.9
+      ],
+      "text": "Model\nBurnSr∗\nMADOS∗\nPASTIS\nSen1Fl11\nDEN∗\nCTM-SS\nSN7∗\nAI4Farms∗\nAvg. mIoU"
+    },
+    {
+      "id": "S284",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        71.5,
+        141.9,
+        495.0,
+        261.0
+      ],
+      "text": "CROMA\n82.42\n67.55\n32.32\n90.89\n38.29\n49.38\n59.28\n25.65\n55.72\nDOFA (Base)\n80.63\n59.58\n30.02\n89.37\n39.29\n51.33\n61.84\n27.07\n54.89\nGFM-Swin\n76.90\n64.71\n21.24\n72.60\n34.09\n46.98\n60.89\n27.19\n50.58\nPrithvi 1.0 100M\n83.62\n49.98\n33.93\n90.37\n27.86\n43.07\n56.54\n26.86\n51.53\nRemoteCLIP\n76.59\n60.00\n18.23\n74.26\n31.78\n52.05\n57.76\n25.12\n49.47\nSatlasNet\n79.96\n55.86\n17.51\n90.30\n36.31\n46.97\n61.88\n25.13\n51.74\nScale-MAE\n76.68\n57.32\n24.55\n74.13\n35.11\n25.42\n62.96\n21.47\n47.20\nSpectralGPT\n80.47\n57.99\n35.44\n89.07\n37.85\n46.95\n58.86\n26.75\n54.17\nS.-S12-MoCo\n81.58\n51.76\n34.49\n89.26\n35.44\n48.58\n57.64\n25.38\n53.02\nS.-S12-DINO\n81.72\n49.37\n36.18\n88.61\n34.81\n48.66\n56.47\n25.62\n52.68\nS.-S12-MAE\n81.91\n49.90\n32.03\n87.79\n34.08\n45.80\n57.13\n24.69\n51.67\nS.-S12-Data2Vec\n81.91\n44.36\n34.32\n88.15\n35.90\n54.03\n58.23\n24.23\n52.64\nSMARTIES-B\n82.80\n—\n—\n—\n38.50\n—\n62.20\n—\n—"
+    },
+    {
+      "id": "S285",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        71.5,
+        267.0,
+        495.0,
+        284.1
+      ],
+      "text": "UNet Baseline\n84.51\n54.79\n31.60\n91.42\n39.46\n47.57\n62.09\n46.34\n57.22\nViT Baseline\n81.58\n48.19\n38.53\n87.66\n36.83\n44.08\n52.57\n38.37\n53.48"
+    },
+    {
+      "id": "S286",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        71.5,
+        290.2,
+        495.0,
+        316.6
+      ],
+      "text": "TerraMindv1-B-single\n84.00\n65.01\n40.80\n90.32\n–\n52.66\n59.71\n27.71\n52.53\nTerraMindv1-B\n82.42\n69.52\n40.51\n90.62\n37.87\n55.80\n60.61\n28.12\n58.18\nTerraMindv1-L\n82.93\n75.57\n43.13\n90.78\n37.89\n55.04\n59.98\n27.47\n59.10"
+    },
+    {
+      "id": "S287",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        71.5,
+        322.6,
+        496.5,
+        330.5
+      ],
+      "text": "DOFA+ (Large)\n86.53\n69.77\n40.26\n90.38\n41.12\n57.47\n63.06\n29.93\n59.81"
+    },
+    {
+      "id": "T006",
+      "type": "table_caption",
+      "page": 11,
+      "bbox": [
+        42.1,
+        354.8,
+        280.2,
+        377.2
+      ],
+      "text": "Table 4: Classification results on the RESISC-45\ndataset. The best results are shown in bold."
+    },
+    {
+      "id": "S288",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        49.5,
+        391.9,
+        283.5,
+        398.9
+      ],
+      "text": "Methods\nVenue\nBackbone\nFrozen\nFinetune"
+    },
+    {
+      "id": "S289",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        49.5,
+        404.2,
+        273.6,
+        452.0
+      ],
+      "text": "SatMAE [10]\nNeurIPS 2022\nViT-L\n88.3\n94.8\nConvMAE [15]\nNeurIPS 2022\nConvVit-L\n81.2\n95.0\nScale-MAE [36]\nICCV 2023\nViT-L\n89.6\n95.7\nVanilla MAE [18]\nCVPR 2022\nViT-L\n88.9\n93.3\nSMARTIES [39]\nICCV 2025\nViT-L\n–\n95.8\nSatMAE++ [34]\nCVPR 2024\nViT-L\n–\n97.5"
+    },
+    {
+      "id": "S290",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        49.5,
+        457.3,
+        273.6,
+        472.4
+      ],
+      "text": "DOFA\n–\nViT-B\n91.3\n97.3\nDOFA\n–\nViT-L\n91.9\n97.8"
+    },
+    {
+      "id": "S291",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        49.5,
+        477.8,
+        274.6,
+        492.9
+      ],
+      "text": "DOFA+\n–\nViT-B\n93.7\n97.5\nDOFA+\n–\nViT-L\n95.3\n98.1"
+    },
+    {
+      "id": "T007",
+      "type": "table_caption",
+      "page": 11,
+      "bbox": [
+        42.1,
+        508.8,
+        280.2,
+        531.2
+      ],
+      "text": "Table 5: Detection performance on the DIOR horizontal\ndataset. Faster R-CNN is used as the object detector."
+    },
+    {
+      "id": "S292",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        61.1,
+        546.6,
+        261.2,
+        555.6
+      ],
+      "text": "Models\nBackbone\nDIOR (mAP50)"
+    },
+    {
+      "id": "S293",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        61.1,
+        561.6,
+        238.0,
+        709.5
+      ],
+      "text": "GASSL [3]\nViT-B\n67.40\nSatMAE [10]\nViT-B\n70.89\nRingMo [53]\nViT-B\n75.90\nRVSA [46]\nViT-B\n73.22\nBFM [8]\nViT-B\n–\nTOV [41]\nViT-B\n70.16\nSSL4EO [47]\nViT-B\n64.82\nCMID [33]\nViT-B\n75.11\nCACo [29]\nViT-B\n66.91\nSatLas [4]\nViT-B\n74.10\nGFM [32]\nViT-B\n72.84\nScale-MAE [36]\nViT-B\n73.81\nMA3E [26]\nViT-B\n–\nSkySense [16]\nViT-B\n78.73\nSkySense V2 [54]\nSwin-H\n79.50"
+    },
+    {
+      "id": "S294",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        61.1,
+        716.0,
+        239.6,
+        734.5
+      ],
+      "text": "DOFA\nViT-L\n76.21\nDOFA+\nViT-L\n79.73"
+    },
+    {
+      "id": "S295",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        297.2,
+        356.0,
+        386.1,
+        366.0
+      ],
+      "text": "4.4 Ablation Studies"
+    },
+    {
+      "id": "S296",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        297.2,
+        383.8,
+        535.3,
+        456.0
+      ],
+      "text": "We conduct ablation studies to investigate the con-\ntributions of key components in DOFA’s pretraining\npipeline and to better understand the robustness of the\nlearned representations. Unless otherwise specified, ex-\nperiments are performed with DOFA (ViT-Base) and\nDOFA+ (ViT-Base)."
+    },
+    {
+      "id": "S297",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        297.2,
+        462.7,
+        535.7,
+        597.2
+      ],
+      "text": "First, we examine the impact of the number of spec-\ntral bands used during pretraining. A central question is\nwhether the pretrained DOFA+ encoder can effectively\nlearn and preserve representations for spectral modal-\nities beyond RGB. To this end, we evaluate DOFA+\n(ViT-Base) on the Sen1Floods11 dataset using Sentinel-\n2 imagery with 13 spectral bands. This experiment pro-\nvides insights into the model’s capacity to generalize\nacross different spectral combinations and its ability\nto leverage richer spectral information for downstream\ntasks."
+    },
+    {
+      "id": "S298",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        297.2,
+        603.8,
+        535.3,
+        701.0
+      ],
+      "text": "Second, we analyze the influence of pretraining du-\nration. Specifically, we vary the number of pretraining\nepochs and evaluate the resulting representations via\nlinear probing on the RESISC45 dataset. This allows us\nto assess how the length of pretraining affects represen-\ntation quality and transfer performance, and whether\nlonger pretraining yields diminishing or consistent re-\nturns."
+    },
+    {
+      "id": "S299",
+      "type": "paragraph",
+      "page": 11,
+      "bbox": [
+        297.2,
+        707.6,
+        549.8,
+        754.9
+      ],
+      "text": "Together, these ablations shed light on how spec-\ntral diversity and pretraining duration contribute to\nDOFA’s effectiveness, providing guidance for scaling\nthe model to different data modalities and training regimes."
+    },
+    {
+      "id": "S300",
+      "type": "paragraph",
+      "page": 12,
+      "bbox": [
+        42.1,
+        67.4,
+        51.1,
+        75.8
+      ],
+      "text": "12"
+    },
+    {
+      "id": "T008",
+      "type": "table_caption",
+      "page": 12,
+      "bbox": [
+        42.1,
+        90.4,
+        535.3,
+        112.8
+      ],
+      "text": "Table 6: Ablation Studies on the performance of DOFA+ (ViT-B) using different numbers of spectral channels.\nComparison of band combinations is conducted on the Sen1Floods11 dataset."
+    },
+    {
+      "id": "S301",
+      "type": "paragraph",
+      "page": 12,
+      "bbox": [
+        49.7,
+        128.8,
+        530.9,
+        135.9
+      ],
+      "text": "Bands\nF1\nmIoU\nWater IoU"
+    },
+    {
+      "id": "S302",
+      "type": "paragraph",
+      "page": 12,
+      "bbox": [
+        49.7,
+        141.4,
+        519.1,
+        148.5
+      ],
+      "text": "RGB\n81.03\n70.66\n49.77"
+    },
+    {
+      "id": "S303",
+      "type": "paragraph",
+      "page": 12,
+      "bbox": [
+        49.7,
+        154.0,
+        520.4,
+        236.4
+      ],
+      "text": "RGB + Coastal Aerosol (CA)\n80.48\n70.02\n48.63\nRGB + CA + RED EDGE 1 (RE1)\n84.71\n75.27\n57.51\nRGB + CA + RE1 + RE2\n86.49\n77.67\n61.51\nRGB + CA + RE1 + RE2 + RE3\n87.45\n78.98\n63.77\nRGB + CA + RE1 + RE2 + RE3 + NIR Broad\n88.83\n80.90\n67.49\nRGB + CA + RE1 + RE2 + RE3 + NIR Broad + NIR Narrow\n89.31\n81.60\n68.67\nRGB + CA + RE1 + RE2 + RE3 + NIR Broad + NIR Narrow + Water Vapor\n90.12\n82.84\n70.58\nRGB + CA + RE1 + RE2 + RE3 + NIR Broad + NIR Narrow + Water Vapor + Cirrus\n89.62\n82.09\n69.38\nRGB + CA + RE1 + RE2 + RE3 + NIR Broad + NIR Narrow + Water Vapor + Cirrus + SWIR1\n91.85\n85.53\n75.03\nRGB + CA + RE1 + RE2 + RE3 + NIR Broad + NIR Narrow + Water Vapor + Cirrus + SWIR1 + SWIR2\n92.51\n86.58\n76.83"
+    },
+    {
+      "id": "S304",
+      "type": "paragraph",
+      "page": 12,
+      "bbox": [
+        42.1,
+        261.6,
+        179.8,
+        271.5
+      ],
+      "text": "4.4.1 Number of Spectral Bands"
+    },
+    {
+      "id": "S305",
+      "type": "paragraph",
+      "page": 12,
+      "bbox": [
+        42.1,
+        286.2,
+        286.5,
+        445.6
+      ],
+      "text": "On the Sen1Floods11 dataset, we evaluate DOFA+ (ViT-\nB) with different combinations of spectral bands to as-\nsess how spectral diversity influences segmentation per-\nformance. The results are presented in Table 6. It is\nworth noting that in this ablation study, we do not tune\nhyperparameters, but focus solely on analyzing the ef-\nfect of different spectral bands. Starting from the RGB\nsetting, the model achieves an F1 score of 81.03. As\nadditional bands are incrementally introduced, perfor-\nmance consistently improves across all metrics, indi-\ncating that the pretrained DOFA+ backbone is capa-\nble of effectively exploiting richer spectral information.\nAdding the Coastal Aerosol (CA) band doesn’t improve"
+    },
+    {
+      "id": "C006",
+      "type": "caption",
+      "page": 12,
+      "bbox": [
+        42.1,
+        634.7,
+        280.2,
+        682.0
+      ],
+      "text": "Fig. 6: Trend of segmentation performance as addi-\ntional spectral bands are incrementally included. Start-\ning from RGB, performance improves significantly with\nthe addition of more bands."
+    },
+    {
+      "id": "S306",
+      "type": "paragraph",
+      "page": 12,
+      "bbox": [
+        42.1,
+        707.6,
+        280.2,
+        754.9
+      ],
+      "text": "the performance compared to RGB, but subsequent in-\nclusion of Red Edge (RE) bands leads to substantial\nimprovements. With RGB + CA + RE1, the Water\nIoU increases from 49.77 to 57.51, demonstrating the"
+    },
+    {
+      "id": "T009",
+      "type": "table_caption",
+      "page": 12,
+      "bbox": [
+        297.2,
+        260.3,
+        535.3,
+        282.7
+      ],
+      "text": "Table 7: Ablation Studies on the performance of DOFA\nwith different training epochs."
+    },
+    {
+      "id": "S307",
+      "type": "paragraph",
+      "page": 12,
+      "bbox": [
+        327.2,
+        298.2,
+        505.2,
+        306.7
+      ],
+      "text": "Epochs\nBackbone\nRESISC-45 (Acc@1)"
+    },
+    {
+      "id": "S308",
+      "type": "paragraph",
+      "page": 12,
+      "bbox": [
+        333.8,
+        313.2,
+        473.7,
+        351.5
+      ],
+      "text": "E20\nViT-B\n86.22\nE40\nViT-B\n87.41\nE60\nViT-B\n89.36\nE80\nViT-B\n91.12"
+    },
+    {
+      "id": "S309",
+      "type": "paragraph",
+      "page": 12,
+      "bbox": [
+        331.6,
+        358.0,
+        473.7,
+        366.5
+      ],
+      "text": "E100\nViT-B\n91.30"
+    },
+    {
+      "id": "S310",
+      "type": "paragraph",
+      "page": 12,
+      "bbox": [
+        297.2,
+        392.8,
+        535.3,
+        677.1
+      ],
+      "text": "importance of vegetation-sensitive bands for flood map-\nping. As shown in Fig. 6, performance continues to rise\nsteadily as more RE and NIR bands are introduced,\nwith the model benefiting from complementary spec-\ntral responses across vegetation, soil, and water sur-\nfaces. For an intuitive visualization, Fig. 7 shows that\nthe segmentation maps become progressively finer and\nmore accurate as additional spectral bands are incor-\nporated.\nThe most significant gains are observed when SWIR\nbands are included. With the full combination of spec-\ntral bands, DOFA+ achieves the best overall perfor-\nmance, with an F1 score of 92.51, mIoU of 86.58, and\nWater IoU of 76.83. These results confirm that the pre-\ntrained backbone is not only robust to varying spectral\ninputs but also capable of leveraging additional modali-\nties without requiring architecture changes or retraining\nthe model. Overall, the ablation results validate that\nDOFA+ learns powerful and flexible spectral–spatial\nrepresentations during pretraining. Even with a frozen\nbackbone, it adapts effectively to different band combi-\nnations and consistently benefits from the inclusion of\nadditional spectral information."
+    },
+    {
+      "id": "S311",
+      "type": "paragraph",
+      "page": 12,
+      "bbox": [
+        297.2,
+        696.1,
+        392.2,
+        706.1
+      ],
+      "text": "4.4.2 Training Epochs"
+    },
+    {
+      "id": "S312",
+      "type": "paragraph",
+      "page": 12,
+      "bbox": [
+        297.2,
+        720.1,
+        535.3,
+        754.9
+      ],
+      "text": "The results in Table 7 show a clear trend of improve-\nment as the number of pretraining epochs increases. Ac-\ncuracy steadily rises from 20 to 80 epochs, indicating"
+    },
+    {
+      "id": "S313",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        526.3,
+        67.4,
+        535.3,
+        75.8
+      ],
+      "text": "13"
+    },
+    {
+      "id": "S314",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        191.8,
+        143.4,
+        226.7,
+        150.8
+      ],
+      "text": "Ground truth"
+    },
+    {
+      "id": "S315",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        100.1,
+        204.6,
+        499.1,
+        212.8
+      ],
+      "text": "All bands\nS2 Image RGB Bands"
+    },
+    {
+      "id": "S316",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        257.0,
+        144.2,
+        501.8,
+        151.6
+      ],
+      "text": "RGB\n+COASTAL_AEROSOL\n+RED_EDGE_1\n+RED_EDGE_2\n+RED_EDGE_3"
+    },
+    {
+      "id": "S317",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        193.7,
+        205.4,
+        438.6,
+        211.7
+      ],
+      "text": "+NIR_BROAD\n+NIR_NARROW\n+WATER_VAPOR\n+CIRRUS\n+SWIR1"
+    },
+    {
+      "id": "S318",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        94.8,
+        333.6,
+        148.8,
+        341.1
+      ],
+      "text": "S2 Image RGB Bands"
+    },
+    {
+      "id": "S319",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        191.0,
+        271.3,
+        225.8,
+        278.7
+      ],
+      "text": "Ground truth"
+    },
+    {
+      "id": "S320",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        473.9,
+        333.1,
+        499.1,
+        340.5
+      ],
+      "text": "All bands"
+    },
+    {
+      "id": "S321",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        257.0,
+        271.9,
+        501.8,
+        279.3
+      ],
+      "text": "RGB\n+COASTAL_AEROSOL\n+RED_EDGE_1\n+RED_EDGE_2\n+RED_EDGE_3"
+    },
+    {
+      "id": "S322",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        193.7,
+        333.1,
+        438.6,
+        339.4
+      ],
+      "text": "+NIR_BROAD\n+NIR_NARROW\n+WATER_VAPOR\n+CIRRUS\n+SWIR1"
+    },
+    {
+      "id": "C007",
+      "type": "caption",
+      "page": 13,
+      "bbox": [
+        42.1,
+        353.5,
+        535.3,
+        388.3
+      ],
+      "text": "Fig. 7: Segmentation maps with progressively added spectral bands (from RGB to full set). As more bands are\nincluded, boundaries become sharper and errors decrease, with F1, mIoU, and Water IoU consistently improving\nand reaching their peak in the full-band configuration."
+    },
+    {
+      "id": "S323",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        42.1,
+        412.0,
+        288.2,
+        509.1
+      ],
+      "text": "that longer pretraining enables DOFA to learn richer\nand more transferable representations. Beyond 80 epochs,\nthe gains become marginal. This suggests that while\nsufficient pretraining is important for representation qual-\nity, excessively long training may yield diminishing re-\nturns. Overall, these results confirm the benefit of ex-\ntended pretraining while also highlighting a tradeoff be-\ntween efficiency and performance."
+    },
+    {
+      "id": "S324",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        42.1,
+        534.4,
+        206.5,
+        544.4
+      ],
+      "text": "4.5 Pre-training efficiency comparison"
+    },
+    {
+      "id": "T010",
+      "type": "table_caption",
+      "page": 13,
+      "bbox": [
+        42.1,
+        558.1,
+        292.6,
+        754.9
+      ],
+      "text": "Table 8 highlights the efficiency advantages of our pro-\nposed models, DOFA and DOFA+, in comparison to\nrecent EO foundation models. Unlike prior works that\nrequire massive datasets, hundreds of training epochs,\nand large computational budgets, DOFA and DOFA+\nachieve competitive or superior performance with sig-\nnificantly lower resource requirements.\nDOFA is pretrained on a large-scale multimodal EO\ndataset comprising approximately 11.5 million images\nfrom five different modalities: Sentinel-1, Sentinel-2, NAIP,\nGaofen, and EnMAP. Pretraining is conducted with a\n75% masking ratio, a batch size of 128, the AdamW op-\ntimizer [28] (weight decay 0.05), and an initial learning\nrate of 1.5e-4. The learning rate is warmed up for 20\nepochs and then decayed using a cosine schedule. The\ntraining follows a progressive scheme:"
+    },
+    {
+      "id": "T011",
+      "type": "table_caption",
+      "page": 13,
+      "bbox": [
+        297.2,
+        410.8,
+        535.3,
+        470.5
+      ],
+      "text": "Table 8: Pre-training efficiency comparison of recent EO\nfoundation models (mAP column removed). N/A indi-\ncates not applicable due to missing public checkpoints\nor sensor mismatches that would lead to unfair com-\nparisons."
+    },
+    {
+      "id": "S325",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        299.2,
+        484.7,
+        537.5,
+        500.5
+      ],
+      "text": "Model\nBackbone\nPT Epochs\nPT Data Size\nRESISC-45\nS2\nRGB"
+    },
+    {
+      "id": "S326",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        299.2,
+        504.9,
+        528.5,
+        585.2
+      ],
+      "text": "SatMAE (S2) [10]\nViT-L\n50\n713K\n–\nN/A\nSatMAE (S2) [10]\nViT-L\n200\n713K\n–\nN/A\nSatMAE (RGB) [10]\nViT-L\n800\n–\n364K\n94.8\nScale-MAE [36]\nViT-L\n800\n–\n364K\n95.7\nCROMA [14]\nViT-B (×2)\n300\n1M\n–\nN/A\nSpectralGPT [20]\nViT-L\n200\n713K\n–\nN/A\nSpectralGPT+ [20]\nViT-L\n300\n1M\n–\nN/A\nS2MAE [25]\nViT-L\n200\n713K\n–\nN/A\nS2MAE∗[25]\nViT-L\n300\n1M\n–\nN/A\nSatMAE++ (RGB) [34]\nViT-L\n800\n–\n364K\n97.5\nSatMAE++ (S2) [34]\nViT-L\n50\n713K\n–\nN/A\nSMARTIES [39]\nViT-L\n300\n248K\n60K\n95.8"
+    },
+    {
+      "id": "S327",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        299.2,
+        589.6,
+        529.1,
+        629.3
+      ],
+      "text": "CROMA [14]\nViT-L (×2)\n600\n1M\n–\nN/A\nSpectralGPT [20]\nViT-H\n200\n713K\n–\nN/A\nSpectralGPT+ [20]\nViT-H\n300\n1M\n–\nN/A\nS2MAE [25]\nViT-H\n200\n713K\n–\nN/A\nS2MAE∗[25]\nViT-H\n300\n1M\n–\nN/A\nSkySense [16]\nViT-L+Swin-H\n780\n21.5M\n21.5M\n96.3∗"
+    },
+    {
+      "id": "S328",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        299.2,
+        629.6,
+        529.1,
+        636.0
+      ],
+      "text": "SkySenseV2 [54]\nViT-L+Swin-H\n–\n21.5M\n21.5M\n97.2∗"
+    },
+    {
+      "id": "S329",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        299.2,
+        640.5,
+        528.6,
+        653.0
+      ],
+      "text": "DOFA\nViT-L\n–\n3.5M\n4.5M\n97.8\nDOFA+\nViT-L\n150\n100K\n100K\n98.1"
+    },
+    {
+      "id": "S330",
+      "type": "paragraph",
+      "page": 13,
+      "bbox": [
+        301.4,
+        695.2,
+        535.3,
+        754.9
+      ],
+      "text": "– Initially, the model is trained on a 50K-image subset\nfor 100 epochs.\n– Then, it is further trained on a 410K-image sub-\nset (100K from each of Sentinel-1, Sentinel-2, NAIP,\nGaofen, and 10K from EnMAP) for 20 epochs."
+    },
+    {
+      "id": "S331",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        42.1,
+        67.4,
+        51.1,
+        75.8
+      ],
+      "text": "14"
+    },
+    {
+      "id": "S332",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        108.0,
+        302.1,
+        162.0,
+        307.8
+      ],
+      "text": "Sentinel-2, 9 channels"
+    },
+    {
+      "id": "S333",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        112.7,
+        247.1,
+        159.9,
+        252.8
+      ],
+      "text": "Gaofen, 4 channels"
+    },
+    {
+      "id": "S334",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        105.3,
+        357.7,
+        162.1,
+        363.5
+      ],
+      "text": "Sentinel-2, 13 channels"
+    },
+    {
+      "id": "S335",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        104.8,
+        192.7,
+        165.0,
+        198.4
+      ],
+      "text": "NAIP (RGB), 3 channels"
+    },
+    {
+      "id": "S336",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        107.4,
+        137.6,
+        304.7,
+        143.3
+      ],
+      "text": "Sentinel-1, 2 channels\nDensities (Sentinel-1, 2 channels)"
+    },
+    {
+      "id": "S337",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        222.6,
+        192.7,
+        310.8,
+        198.5
+      ],
+      "text": "Densities (NAIP (RGB), 3 channels)"
+    },
+    {
+      "id": "S338",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        222.6,
+        247.8,
+        298.0,
+        253.6
+      ],
+      "text": "Densities (Gaofen, 4 channels)"
+    },
+    {
+      "id": "S339",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        222.6,
+        303.2,
+        304.7,
+        309.0
+      ],
+      "text": "Densities (Sentinel-2, 9 channels)"
+    },
+    {
+      "id": "S340",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        222.6,
+        357.5,
+        307.5,
+        363.3
+      ],
+      "text": "Densities (Sentinel-2, 13 channels)"
+    },
+    {
+      "id": "S341",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        387.2,
+        137.6,
+        491.9,
+        143.3
+      ],
+      "text": "Generated kernels (Sentinel-1, 2 channels)"
+    },
+    {
+      "id": "S342",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        387.2,
+        194.4,
+        498.2,
+        200.2
+      ],
+      "text": "Generated kernels (NAIP (RGB), 3 channels)"
+    },
+    {
+      "id": "S343",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        387.2,
+        248.3,
+        485.2,
+        254.1
+      ],
+      "text": "Generated kernels (Gaofen, 4 channels)"
+    },
+    {
+      "id": "S344",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        387.2,
+        305.7,
+        491.9,
+        311.5
+      ],
+      "text": "Generated kernels (Sentinel-2, 9 channels)"
+    },
+    {
+      "id": "S345",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        387.2,
+        357.5,
+        494.7,
+        363.3
+      ],
+      "text": "Generated kernels (Sentinel-2, 13 channels)"
+    },
+    {
+      "id": "S346",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        372.5,
+        131.3,
+        509.5,
+        136.0
+      ],
+      "text": "Channel #1\nChannel #2\nChannel #2"
+    },
+    {
+      "id": "S347",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        372.5,
+        189.2,
+        509.5,
+        193.9
+      ],
+      "text": "Channel #1\nChannel #2\nChannel #3"
+    },
+    {
+      "id": "S348",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        372.5,
+        242.2,
+        509.5,
+        246.9
+      ],
+      "text": "Channel #1\nChannel #3\nChannel #4"
+    },
+    {
+      "id": "S349",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        372.5,
+        296.8,
+        509.5,
+        301.5
+      ],
+      "text": "Channel #1\nChannel #4\nChannel #8"
+    },
+    {
+      "id": "S350",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        372.5,
+        351.3,
+        511.8,
+        356.7
+      ],
+      "text": "Channel #1\nChannel #8\nChannel #13"
+    },
+    {
+      "id": "S351",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        58.5,
+        191.6,
+        85.7,
+        197.4
+      ],
+      "text": "NAIP RGB"
+    },
+    {
+      "id": "S352",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        59.1,
+        136.4,
+        83.4,
+        142.2
+      ],
+      "text": "Sentinel 1"
+    },
+    {
+      "id": "S353",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        58.9,
+        299.1,
+        83.2,
+        305.4
+      ],
+      "text": "Sentinel 2"
+    },
+    {
+      "id": "S354",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        49.9,
+        246.1,
+        93.2,
+        251.9
+      ],
+      "text": "Gaofen RGB-NIR"
+    },
+    {
+      "id": "S355",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        56.2,
+        356.0,
+        80.5,
+        362.2
+      ],
+      "text": "Sentinel 2"
+    },
+    {
+      "id": "S356",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        42.1,
+        373.2,
+        535.2,
+        401.6
+      ],
+      "text": "(a) Visualization of the dynamic weight generator. From left to right: examples of input images, learned embeddings\nfor different central wavelengths, the histogram distributions of the generated weights, and some examples of the generated\nkernel weights."
+    },
+    {
+      "id": "S357",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        64.9,
+        483.8,
+        517.4,
+        492.6
+      ],
+      "text": "Scale-MAE\nCross-scale-MAE\nGFM-MAE\nDOFA(base)-MAE\nDOFA(large)-MAE"
+    },
+    {
+      "id": "S358",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        73.1,
+        577.1,
+        518.1,
+        586.3
+      ],
+      "text": "SatMAE\nCROMA\nDOFA(base)-MAE\nDOFA(large)-MAE\nFG-MAE"
+    },
+    {
+      "id": "S359",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        67.7,
+        673.4,
+        517.9,
+        682.8
+      ],
+      "text": "SatMAE\nCROMA\nDOFA(base)-MAE\nDOFA(large)-MAE\nFG-MAE"
+    },
+    {
+      "id": "S360",
+      "type": "paragraph",
+      "page": 14,
+      "bbox": [
+        42.1,
+        690.8,
+        535.3,
+        719.2
+      ],
+      "text": "(b) t-SNE plots of the feature representations from various foundation models across multiple datasets. From\ntop to bottom row: the m-pv4ger dataset, the m-so2sat dataset, and the m-eurosat dataset. Enhanced separability signifies\nmore effective representations."
+    },
+    {
+      "id": "C008",
+      "type": "caption",
+      "page": 14,
+      "bbox": [
+        42.1,
+        731.2,
+        535.3,
+        753.6
+      ],
+      "text": "Fig. 8: Visualization of learned embeddings. (a) Visualization of the generated weights for different input\nmodalities. (b) t-SNE plots of the feature representations from various foundation models across multiple datasets."
+    },
+    {
+      "id": "S361",
+      "type": "paragraph",
+      "page": 15,
+      "bbox": [
+        526.3,
+        67.4,
+        535.3,
+        75.8
+      ],
+      "text": "15"
+    },
+    {
+      "id": "S362",
+      "type": "paragraph",
+      "page": 15,
+      "bbox": [
+        46.3,
+        91.6,
+        280.2,
+        126.5
+      ],
+      "text": "– Finally, we conduct a single epoch of training on\nthe full 11.5M dataset to consolidate representation\nlearning."
+    },
+    {
+      "id": "S363",
+      "type": "paragraph",
+      "page": 15,
+      "bbox": [
+        42.1,
+        135.5,
+        293.6,
+        532.1
+      ],
+      "text": "All images are resized to 224 × 224 and normalized\nusing modality-specific statistics. ViT-Base and ViT-\nLarge teacher models pretrained on ImageNet-21K [38]\nare used for distillation.\nDOFA+ represents a more lightweight variant, de-\nsigned to validate the efficiency of our distillation strat-\negy under constrained data and compute. It is pre-\ntrained for only 150 epochs on a compact dataset of\n410K EO images, including 100K samples each from\nSentinel-1, Sentinel-2, NAIP, Gaofen, and 10K from En-\nMAP. All training is conducted using just 8 NVIDIA\nL40 GPUs (48GB memory each), completing within\nthree days. Despite its lightweight setup, DOFA+ achieves\nSOTA performance on the RESISC-45 classification bench-\nmark with 98.1% accuracy. This result is particularly\nnotable when compared to large-scale models such as\nSatMAE, Scale-MAE, and SatMAE++, which use mil-\nlions of images and up to 800 training epochs. Training\nTerraMindv1-B took 12 days on 32 A100 GPUs, total-\ning 9,216 GPU hours, representing a substantial com-\nputational cost. Even more resource-intensive models\nlike SkySenseV2 [54] require 21.5M images, heavy back-\nbones (e.g., Swin-H), and over 44,500 hours of H20 GPU\ntime.\nIn contrast, DOFA+ employs a single ViT-L back-\nbone with much lower computational cost, yet achieves\ncompetitive or even superior performance compared to\ntask-specific counterparts. This demonstrates the strength\nof our distillation-based pretraining pipeline in extract-\ning rich spectral–spatial representations efficiently, mak-\ning it suitable for real-world deployment where compu-\ntational resources are limited."
+    },
+    {
+      "id": "S364",
+      "type": "paragraph",
+      "page": 15,
+      "bbox": [
+        42.1,
+        559.0,
+        118.9,
+        568.9
+      ],
+      "text": "4.6 Visualizations"
+    },
+    {
+      "id": "S365",
+      "type": "paragraph",
+      "page": 15,
+      "bbox": [
+        42.1,
+        582.9,
+        280.2,
+        754.9
+      ],
+      "text": "DOFA generates diverse weights dynamically.\nWe visualize the learned embeddings of various wave-\nlengths and the generated kernels for different sensors\nin Fig. 8a for a better understanding of DOFA. We\nrandomly select and plot six 16 × 16 kernel weights for\ninput images with more than four channels. The figures\nindicate that DOFA can generate weights for different\nsensors dynamically and effectively.\nDOFA optimizes separability in latent space.\nWe visualize the pretrained representations of differ-\nent models using the dimensionality reduction tech-\nnique t-SNE [43] to represent high-dimensional data.\nSpecifically, the extracted features of the pretrained\nmodels on downstream datasets m-pv4ger, m-so2sat,"
+    },
+    {
+      "id": "S366",
+      "type": "paragraph",
+      "page": 15,
+      "bbox": [
+        297.2,
+        91.6,
+        535.3,
+        163.9
+      ],
+      "text": "and m-eurosat are shown in Fig. 8b. Different colors\nrepresent different semantic categories. On these three\ndatasets, the learned features of both versions of DOFA\nare clustered better than those of other compared mod-\nels. These figures further validate the effectiveness of\nthe proposed DOFA as a unified EO foundation model."
+    },
+    {
+      "id": "S367",
+      "type": "paragraph",
+      "page": 15,
+      "bbox": [
+        297.2,
+        191.0,
+        361.0,
+        201.0
+      ],
+      "text": "5 Conclusion"
+    },
+    {
+      "id": "S368",
+      "type": "paragraph",
+      "page": 15,
+      "bbox": [
+        297.2,
+        214.9,
+        542.7,
+        486.4
+      ],
+      "text": "In this work, we introduced DOFA and DOFA+, two\nfoundation models for Earth observation (EO) designed\nto operate flexibly across a wide range of sensors, spec-\ntral bands, and spatial resolutions. Unlike prior ap-\nproaches that are often limited to specific modalities\nor require excessive compute, our models are built to\ngeneralize across tasks and modalities in an efficient and\nscalable manner. We proposed a wavelength-conditioned\ndynamic hypernetwork architecture that enables a sin-\ngle model to process multimodal satellite inputs. Through\ncontinual and hybrid pretraining across five EO modal-\nities, DOFA learns rich spectral–spatial representations\nthat transfer effectively to downstream tasks. DOFA+\nextends this capability further with a lightweight dis-\ntillation pipeline, offering strong performance even un-\nder constrained computational budgets. Comprehensive\nexperiments across multiple benchmarks demonstrate\nthat DOFA and DOFA+ achieve state-of-the-art re-\nsults. Notably, the models generalize well to unseen sen-\nsors and spectral configurations without the need for\nretraining, highlighting their flexibility and robustness\nin open-world EO scenarios."
+    },
+    {
+      "id": "S369",
+      "type": "paragraph",
+      "page": 15,
+      "bbox": [
+        297.2,
+        513.5,
+        446.6,
+        523.5
+      ],
+      "text": "6 Data availability statements"
+    },
+    {
+      "id": "S370",
+      "type": "paragraph",
+      "page": 15,
+      "bbox": [
+        297.2,
+        537.4,
+        535.3,
+        597.2
+      ],
+      "text": "In this work, we have constructed an extensive multi-\nmodal dataset that is composed of five distinct modali-\nties, each offering unique spectral and spatial data char-\nacteristics. In this section, we provide the download\nlinks to ensure data availability."
+    },
+    {
+      "id": "S371",
+      "type": "paragraph",
+      "page": 15,
+      "bbox": [
+        297.2,
+        614.9,
+        550.9,
+        650.3
+      ],
+      "text": "Sentinel-1 The Sentinel-1 subset of the dataset can be\ndownloaded from https://github.com/allenai/satlas/\nblob/main/SatlasPretrain.md#download."
+    },
+    {
+      "id": "S372",
+      "type": "paragraph",
+      "page": 15,
+      "bbox": [
+        297.2,
+        667.5,
+        550.9,
+        702.8
+      ],
+      "text": "Sentinel-2 The Sentinel-2 subset of the dataset can be\ndownloaded from https://github.com/allenai/satlas/\nblob/main/SatlasPretrain.md#download."
+    },
+    {
+      "id": "S373",
+      "type": "paragraph",
+      "page": 15,
+      "bbox": [
+        297.2,
+        720.1,
+        554.1,
+        755.4
+      ],
+      "text": "Gaofen The Gaofen part of the dataset can be down-\nloaded from https://drive.google.com/drive/folders/\n1924VnO08Gqo3Nv7Y4KirgJ9kqqCup7f0."
+    },
+    {
+      "id": "S374",
+      "type": "paragraph",
+      "page": 16,
+      "bbox": [
+        42.1,
+        67.4,
+        51.1,
+        75.8
+      ],
+      "text": "16"
+    },
+    {
+      "id": "S375",
+      "type": "paragraph",
+      "page": 16,
+      "bbox": [
+        42.1,
+        91.6,
+        299.0,
+        127.0
+      ],
+      "text": "NAIP This NAIP part of the dataset can be down-\nloaded from https://github.com/allenai/satlas/blob/\nmain/SatlasPretrain.md#download."
+    },
+    {
+      "id": "S376",
+      "type": "paragraph",
+      "page": 16,
+      "bbox": [
+        42.1,
+        139.5,
+        292.2,
+        174.9
+      ],
+      "text": "EnMAP This hyperspectral data from EnMAP used in\nour dataset can be downloaded from https://hyspecnet.\nrsim.berlin/."
+    },
+    {
+      "id": "S377",
+      "type": "paragraph",
+      "page": 16,
+      "bbox": [
+        42.1,
+        187.5,
+        300.3,
+        334.9
+      ],
+      "text": "Evaluation datasets The resisc45 dataset can be down-\nloaded from https://huggingface.co/datasets/timm/\nresisc45.\nWe evaluate the pretrained models on 12 down-\nstream tasks organized in GEO-Bench [24]. These datasets\ncover various applications and data modalities in EO,\nincluding six classification tasks and six segmentation\ntasks. The full guidance for the dataset downloading is\navailable at https://github.com/ServiceNow/geo-bench.\nAll the datasets for evaluation on PANGEA bench-\nmark can be found at https://github.com/VMarsocci/\npangaea-bench."
+    },
+    {
+      "id": "S378",
+      "type": "paragraph",
+      "page": 16,
+      "bbox": [
+        42.1,
+        356.9,
+        135.2,
+        366.9
+      ],
+      "text": "7 Code availability"
+    },
+    {
+      "id": "S379",
+      "type": "paragraph",
+      "page": 16,
+      "bbox": [
+        42.1,
+        380.5,
+        290.6,
+        428.3
+      ],
+      "text": "The training script and inference script have been pub-\nlicly available at https://github.com/zhu-xlab/DOFA.\nThe trained models have been publicly available at https:\n//huggingface.co/earthflow/DOFA."
+    },
+    {
+      "id": "S380",
+      "type": "paragraph",
+      "page": 16,
+      "bbox": [
+        42.1,
+        446.0,
+        280.2,
+        673.6
+      ],
+      "text": "Acknowledgements The work of Z.X., F.Z., Y.W., F.Z.,\nA.J.S., and X.X.Z is jointly supported by the German Federal\nMinistry of Education and Research (BMBF) in the frame-\nwork of the international future AI lab “AI4EO – Artifi-\ncial Intelligence for Earth Observation: Reasoning, Uncer-\ntainties, Ethics and Beyond” (grant number: 01DD20001),\nby German Federal Ministry for Economic Affairs and Cli-\nmate Action in the framework of the “national center of\nexcellence ML4Earth” (grant number: 50EE2201C), by the\nGerman Federal Ministry for the Environment, Nature Con-\nservation, Nuclear Safety and Consumer Protection (BMUV)\nbased on a resolution of the German Bundestag (grant num-\nber: 67KI32002B; Acronym: EKAPEx) and by Munich Cen-\nter for Machine Learning. The work of Z. X., I.P., G.C.V., and\nX. X. Z is also funded by the European Commission through\nthe project “ThinkingEarth—Copernicus Foundation Models\nfor a Thinking Earth” under the Horizon 2020 Research and\nInnovation program (Grant Agreement No. 101130544). GCV\nwas partly funded by the European Research Council (ERC)\nSynergy Grant “Understanding and Modeling the Earth Sys-\ntem with Machine Learning” (USMILE) under the Horizon\n2020 Research and Innovation program (Grant Agreement\nNo. 855187)."
+    },
+    {
+      "id": "S381",
+      "type": "paragraph",
+      "page": 16,
+      "bbox": [
+        42.1,
+        696.4,
+        95.9,
+        706.4
+      ],
+      "text": "References"
+    },
+    {
+      "id": "S382",
+      "type": "paragraph",
+      "page": 16,
+      "bbox": [
+        47.1,
+        720.1,
+        280.2,
+        754.9
+      ],
+      "text": "1. Abien Fred Agarap.\nDeep learning using rec-\ntified\nlinear\nunits\n(ReLU).\narXiv\npreprint\narXiv:1803.08375, 2018."
+    },
+    {
+      "id": "S383",
+      "type": "paragraph",
+      "page": 16,
+      "bbox": [
+        297.2,
+        91.6,
+        535.3,
+        749.2
+      ],
+      "text": "2. Guillaume Astruc, Nicolas Gonthier, Cl´ement Mal-\nlet, and Loic Landrieu.\nAnysat: One earth ob-\nservation model for many resolutions, scales, and\nmodalities. In Proceedings of the IEEE/CVF Con-\nference on Computer Vision and Pattern Recogni-\ntion (CVPR), 2025.\n3. Kumar Ayush, Burak Uzkent, Chenlin Meng, Ku-\nmar Tanmay, Marshall Burke, David Lobell, and\nStefano Ermon.\nGeography-aware self-supervised\nlearning.\nIn Proceedings of the IEEE/CVF In-\nternational Conference on Computer Vision, pages\n10181–10190, 2021.\n4. Favyen Bastani, Piper Wolters, Ritwik Gupta,\nJoe Ferdinando, and Aniruddha Kembhavi.\nSat-\nlasPretrain: A large-scale dataset for remote sens-\ning image understanding.\nIn Proceedings of the\nIEEE/CVF International Conference on Computer\nVision, pages 16772–16782, 2023.\n5. Gustau Camps-Valls, Devis Tuia, Xiao Xiang Zhu,\nand Markus Reichstein. Deep learning for the Earth\nsciences: A comprehensive approach to remote sens-\ning, climate science and geosciences. 2021.\n6. Gustavo Camps-Valls, Devis Tuia, Luis G´omez-\nChova, Sandra Jim´enez, and Jes´us Malo. Remote\nsensing image processing. 2011.\n7. Vicente Vivanco Cepeda, Gaurav Kumar Nayak,\nand Mubarak Shah. GeoCLIP: Clip-inspired align-\nment between locations and images for effec-\ntive worldwide geo-localization.\narXiv preprint\narXiv:2309.16020, 2023.\n8. Keumgang Cha, Junghoon Seo, and Taekyung Lee.\nA billion-scale foundation model for remote sensing\nimages. arXiv preprint arXiv:2304.05215, 2023.\n9. Gong Cheng, Junwei Han, and Xiaoqiang Lu. Re-\nmote sensing image scene classification: Benchmark\nand state of the art. Proceedings of the IEEE, 105\n(10):1865–1883, 2017.\n10. Yezhen Cong, Samar Khanna, Chenlin Meng,\nPatrick Liu, Erik Rozi, Yutong He, Marshall Burke,\nDavid Lobell, and Stefano Ermon.\nSatMAE:\nPre-training transformers for temporal and multi-\nspectral satellite imagery. Advances in Neural In-\nformation Processing Systems, 35:197–211, 2022.\n11. Yang Dan and Mu-ming Poo.\nSpike timing-\ndependent plasticity of neural circuits. Neuron, 44\n(1):23–30, 2004.\n12. Eran Dayan and Leonardo G Cohen. Neuroplastic-\nity subserving motor skill learning. Neuron, 72(3):\n443–454, 2011.\n13. Alexey\nDosovitskiy,\nLucas\nBeyer,\nAlexander\nKolesnikov,\nDirk\nWeissenborn,\nXiaohua\nZhai,\nThomas Unterthiner, Mostafa Dehghani, Matthias\nMinderer, Georg Heigold, Sylvain Gelly, et al."
+    },
+    {
+      "id": "S384",
+      "type": "paragraph",
+      "page": 17,
+      "bbox": [
+        526.3,
+        67.4,
+        535.3,
+        75.8
+      ],
+      "text": "17"
+    },
+    {
+      "id": "S385",
+      "type": "paragraph",
+      "page": 17,
+      "bbox": [
+        42.1,
+        91.6,
+        280.2,
+        749.2
+      ],
+      "text": "An image is worth 16x16 words: Transformers\nfor image recognition at scale.\narXiv preprint\narXiv:2010.11929, 2020.\n14. Anthony Fuller, Koreen Millard, and James R\nGreen.\nCROMA: Remote sensing representa-\ntions with contrastive radar-optical masked autoen-\ncoders. arXiv preprint arXiv:2311.00566, 2023.\n15. Peng Gao, Teli Ma, Hongsheng Li, Ziyi Lin, Jifeng\nDai, and Yu Qiao.\nConvmae: Masked convolu-\ntion meets masked autoencoders.\narXiv preprint\narXiv:2205.03892, 2022.\n16. Xin Guo, Jiangwei Lao, Bo Dang, Yingying Zhang,\nLei Yu, Lixiang Ru, Liheng Zhong, Ziyuan Huang,\nKang Wu, Dingxiang Hu, et al. SkySense: A multi-\nmodal remote sensing foundation model towards\nuniversal interpretation for Earth observation im-\nagery. arXiv preprint arXiv:2312.10115, 2023.\n17. David Ha, Andrew M. Dai, and Quoc V. Le. Hy-\npernetworks. In ICLR 2017, 2017.\n18. Kaiming He, Xinlei Chen, Saining Xie, Yanghao Li,\nPiotr Doll´ar, and Ross Girshick. Masked autoen-\ncoders are scalable vision learners. In Proceedings\nof the IEEE/CVF Conference on Computer Vision\nand Pattern Recognition, pages 16000–16009, 2022.\n19. Donald Olding Hebb. The organization of behavior:\nA neuropsychological theory. 2005.\n20. D Hong, B Zhang, X Li, Y Li, C Li, J Yao,\nN Yokoya, H Li, P Ghamisi, X Jia, et al. Spectral-\nGPT: Spectral remote sensing foundation model.\nIEEE Transactions on Pattern Analysis and Ma-\nchine Intelligence, 2024.\n21. Jeremy Irvin, Lucas Tao, Joanne Zhou, Yuntao\nMa, Langston Nashold, Benjamin Liu, and An-\ndrew Y Ng. USat: A unified self-supervised encoder\nfor multi-sensor satellite imagery. arXiv preprint\narXiv:2312.02199, 2023.\n22. Neal Jean, Sherrie Wang, Anshul Samar, George\nAzzari,\nDavid\nLobell,\nand\nStefano\nErmon.\nTile2Vec:\nUnsupervised\nrepresentation\nlearning\nfor spatially distributed data.\nIn Proceedings of\nthe AAAI Conference on Artificial Intelligence,\nvolume 33, pages 3967–3974, 2019.\n23. Konstantin Klemmer, Esther Rolf, Caleb Robin-\nson, Lester Mackey, and Marc Rußwurm. SatCLIP:\nGlobal, general-purpose location embeddings with\nsatellite imagery. arXiv preprint arXiv:2311.17179,\n2023.\n24. Alexandre Lacoste, Nils Lehmann, Pau Rodriguez,\nEvan\nDavid\nSherwin,\nHannah\nKerner,\nBj¨orn\nL¨utjens, Jeremy Andrew Irvin, David Dao, Hamed\nAlemohammad, Alexandre Drouin, et al.\nGEO-\nBench: Toward foundation models for Earth moni-\ntoring. arXiv preprint arXiv:2306.03831, 2023."
+    },
+    {
+      "id": "S386",
+      "type": "paragraph",
+      "page": 17,
+      "bbox": [
+        297.2,
+        91.6,
+        535.3,
+        749.2
+      ],
+      "text": "25. Xuyang Li, Danfeng Hong, and Jocelyn Chanussot.\nS2mae: A spatial-spectral pretraining foundation\nmodel for spectral remote sensing data. In Proceed-\nings of the IEEE/CVF Conference on Computer\nVision and Pattern Recognition (CVPR), 2024.\n26. Zhihao Li, Biao Hou, Siteng Ma, Zitong Wu, Xi-\nanpeng Guo, Bo Ren, and Licheng Jiao. Masked\nangle-aware autoencoder for remote sensing im-\nages. In European Conference on Computer Vision,\npages 260–278. Springer, 2024.\n27. Timothy P Lillicrap, Adam Santoro, Luke Marris,\nColin J Akerman, and Geoffrey Hinton. Backpropa-\ngation and the brain. Nature Reviews Neuroscience,\n21(6):335–346, 2020.\n28. Ilya\nLoshchilov\nand\nFrank\nHutter.\nDecou-\npled weight decay regularization.\narXiv preprint\narXiv:1711.05101, 2017.\n29. Utkarsh Mall, Bharath Hariharan, and Kavita\nBala.\nChange-aware sampling and contrastive\nlearning for satellite images. In Proceedings of the\nIEEE/CVF Conference on Computer Vision and\nPattern Recognition, pages 5261–5270, 2023.\n30. Oscar Manas, Alexandre Lacoste, Xavier Gir´o-i Ni-\neto, David Vazquez, and Pau Rodriguez.\nSea-\nsonal contrast: Unsupervised pre-training from un-\ncurated remote sensing data. In Proceedings of the\nIEEE/CVF International Conference on Computer\nVision, pages 9414–9423, 2021.\n31. Valerio Marsocci, Yuru Jia, Georges Le Bellier,\nDavid Kerekes, Liang Zeng, Sebastian Hafner, Se-\nbastian Gerard, Eric Brune, Ritu Yadav, Ali Shibli,\net al. Pangaea: A global and inclusive benchmark\nfor geospatial foundation models.\narXiv preprint\narXiv:2412.04204, 2024.\n32. Mat´ıas Mendieta, Boran Han, Xingjian Shi, Yi Zhu,\nand Chen Chen.\nTowards geospatial foundation\nmodels via continual pretraining. In Proceedings of\nthe IEEE/CVF International Conference on Com-\nputer Vision, pages 16806–16816, 2023.\n33. Dilxat Muhtar, Xueliang Zhang, Pengfeng Xiao,\nZhenshi Li, and Feng Gu. CMID: A unified self-\nsupervised learning framework for remote sensing\nimage understanding. IEEE Transactions on Geo-\nscience and Remote Sensing, 2023.\n34. Mubashir Noman, Muzammal Naseer, Hisham\nCholakkal, Rao Muhammad Anwer, Salman Khan,\nand Fahad Shahbaz Khan. Rethinking transform-\ners pre-training for multi-spectral satellite imagery.\nIn Proceedings of the IEEE/CVF Conference on\nComputer Vision and Pattern Recognition, pages\n27811–27819, 2024.\n35. Maxime\nOquab,\nTimoth´ee\nDarcet,\nTh´eo\nMoutakanni,\nHuy\nVo,\nMarc\nSzafraniec,\nVasil"
+    },
+    {
+      "id": "S387",
+      "type": "paragraph",
+      "page": 18,
+      "bbox": [
+        42.1,
+        67.4,
+        51.1,
+        75.8
+      ],
+      "text": "18"
+    },
+    {
+      "id": "S388",
+      "type": "paragraph",
+      "page": 18,
+      "bbox": [
+        42.1,
+        91.6,
+        280.2,
+        736.7
+      ],
+      "text": "Khalidov,\nPierre\nFernandez,\nDaniel\nHaziza,\nFrancisco Massa, Alaaeldin El-Nouby, et al.\nDi-\nnov2: Learning robust visual features without\nsupervision.\narXiv preprint arXiv:2304.07193,\n2023.\n36. Colorado\nJ\nReed,\nRitwik\nGupta,\nShufan\nLi,\nSarah Brockman, Christopher Funk, Brian Clipp,\nKurt Keutzer, Salvatore Candido, Matt Uytten-\ndaele, and Trevor Darrell.\nScale-MAE: A scale-\naware masked autoencoder for multiscale geospa-\ntial representation learning. In Proceedings of the\nIEEE/CVF International Conference on Computer\nVision, pages 4088–4099, 2023.\n37. Markus Reichstein, Gustau Camps-Valls, Bjorn\nStevens, Martin Jung, Joachim Denzler, Nuno Car-\nvalhais, and Prabhat. Deep learning and process\nunderstanding for data-driven Earth system sci-\nence. Nature, 566(7743):195–204, 2019.\n38. Andreas Steiner, Alexander Kolesnikov, Xiaohua\nZhai, Ross Wightman, Jakob Uszkoreit, and Lu-\ncas Beyer. How to train your ViT? data, augmen-\ntation, and regularization in vision transformers.\narXiv preprint arXiv:2106.10270, 2021.\n39. Gencer Sumbul, Chang Xu, Emanuele Dalsasso,\nand Devis Tuia. Smarties: Spectrum-aware multi-\nsensor auto-encoder for remote sensing images.\narXiv preprint arXiv:2506.19585, 2025.\n40. Maofeng Tang, Andrei Cozma, Konstantinos Geor-\ngiou, and Hairong Qi.\nCross-Scale MAE: A tale\nof multiscale exploitation in remote sensing. Ad-\nvances in Neural Information Processing Systems,\n36, 2024.\n41. Chao Tao, Ji Qi, Guo Zhang, Qing Zhu, Weipeng\nLu, and Haifeng Li. Tov: The original vision model\nfor optical remote sensing image understanding via\nself-supervised learning. IEEE Journal of Selected\nTopics in Applied Earth Observations and Remote\nSensing, 16:4916–4930, 2023.\n42. Gabriel Tseng, Anthony Fuller, Marlena Reil,\nHenry Herzog, Patrick Beukema, Favyen Bastani,\nJames R. Green, Evan Shelhamer, Hannah Kerner,\nand David Rolnick. Galileo: Learning global & local\nfeatures of many remote sensing modalities. arXiv\npreprint arXiv:2502.09356, 2025.\n43. Laurens Van der Maaten and Geoffrey Hinton. Vi-\nsualizing data using t-SNE.\nJournal of Machine\nLearning Research, 9(11), 2008.\n44. Ashish Vaswani, Noam Shazeer, Niki Parmar,\nJakob Uszkoreit, Llion Jones, Aidan N Gomez,\n Lukasz Kaiser, and Illia Polosukhin. Attention is\nall you need. Advances in Neural Information Pro-\ncessing Systems, 30, 2017."
+    },
+    {
+      "id": "S389",
+      "type": "paragraph",
+      "page": 18,
+      "bbox": [
+        297.2,
+        91.6,
+        535.3,
+        749.2
+      ],
+      "text": "45. Leonard Waldmann, Ando Shah, Yi Wang, Nils\nLehmann,\nAdam\nJ.\nStewart,\nZhitong\nXiong,\nXiao Xiang Zhu, Stefan Bauer, and John Chuang.\nPanopticon:\nAdvancing\nany-sensor\nfoundation\nmodels for earth observation.\narXiv preprint\narXiv:2503.10845, 2025.\n46. Di Wang, Qiming Zhang, Yufei Xu, Jing Zhang,\nBo Du, Dacheng Tao, and Liangpei Zhang. Advanc-\ning plain vision transformer toward remote sens-\ning foundation model. IEEE Transactions on Geo-\nscience and Remote Sensing, 61:1–15, 2022.\n47. Yi Wang, Nassim Ait Ali Braham, Zhitong Xiong,\nChenying Liu, Conrad M Albrecht, and Xiao Xi-\nang Zhu.\nSSL4EO-S12: A large-scale multi-\nmodal, multi-temporal dataset for self-supervised\nlearning in Earth observation.\narXiv preprint\narXiv:2211.07044, 2022.\n48. Yi Wang, Conrad M Albrecht, Nassim Ait Ali Bra-\nham, Chenying Liu, Zhitong Xiong, and Xiao Xiang\nZhu. DeCUR: decoupling common & unique rep-\nresentations for multimodal self-supervision. arXiv\npreprint arXiv:2309.05300, 2023.\n49. Yi Wang, Nassim Ait Ali Braham, Zhitong Xiong,\nChenying Liu, Conrad M Albrecht, and Xiao Xi-\nang Zhu. SSL4EO-S12: A large-scale multimodal,\nmultitemporal dataset for self-supervised learning\nin Earth observation.\nIEEE Geoscience and Re-\nmote Sensing Magazine, 11(3):98–106, 2023.\n50. Yi Wang, Hugo Hern´andez Hern´andez, Conrad M\nAlbrecht, and Xiao Xiang Zhu.\nFeature guided\nmasked autoencoder for self-supervised learning in\nremote sensing. arXiv preprint arXiv:2310.18653,\n2023.\n51. Tete Xiao, Yingcheng Liu, Bolei Zhou, Yuning\nJiang, and Jian Sun.\nUnified perceptual parsing\nfor scene understanding. In Proceedings of the Eu-\nropean Conference on Computer Vision (ECCV),\npages 418–434, 2018.\n52. Zhitong Xiong, Yi Wang, Fahong Zhang, and\nXiao Xiang Zhu. One for all: Toward unified foun-\ndation models for Earth vision.\narXiv preprint\narXiv:2401.07527, 2024.\n53. Fanglong\nYao,\nWanxuan\nLu,\nHeming\nYang,\nLiangyu Xu, Chenglong Liu, Leiyi Hu, Hongfeng\nYu, Nayu Liu, Chubo Deng, Deke Tang, et al.\nRingMo-sense: Remote sensing foundation model\nfor spatiotemporal prediction via spatiotemporal\nevolution disentangling.\nIEEE Transactions on\nGeoscience and Remote Sensing, 2023.\n54. Yingying Zhang, Lixiang Ru, Kang Wu, Lei Yu, Lei\nLiang, Yansheng Li, and Jingdong Chen. Skysense\nv2: A unified foundation model for multi-modal\nremote sensing. arXiv preprint arXiv:2507.13812,"
+    },
+    {
+      "id": "S390",
+      "type": "paragraph",
+      "page": 19,
+      "bbox": [
+        526.3,
+        67.4,
+        535.3,
+        75.8
+      ],
+      "text": "19"
+    },
+    {
+      "id": "S391",
+      "type": "paragraph",
+      "page": 19,
+      "bbox": [
+        42.1,
+        91.6,
+        280.2,
+        138.9
+      ],
+      "text": "2025.\n55. Robert S Zucker and Wade G Regehr. Short-term\nsynaptic plasticity. Annual Review of Physiology,\n64(1):355–405, 2002."
+    }
+  ]
+}

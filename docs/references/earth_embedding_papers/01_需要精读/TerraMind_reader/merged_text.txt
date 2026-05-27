@@ -1,0 +1,1394 @@
+
+
+--- PAGE 1 ---
+
+TerraMind: Large-Scale Generative Multimodality for Earth Observation
+JohannesJakubik1,∗ FelixYang1,2∗ BenediktBlumenstiel1,∗ ErikScheurer3
+RoccoSedona3 StefanoMaurogiovanni3,6 JenteBosmans4 NikolaosDionelis4
+ValerioMarsocci4 NiklasKopp1 RahulRamachandran5 PaoloFraccaro1,†
+ThomasBrunschwiler1,† GabrieleCavallaro3,6,† JuanBernabe-Moreno1,† NicolasLonge´pe´4,†
+1IBMResearch–Europe 2ETHZurich 3ForschungszentrumJu¨lich
+4EuropeanSpaceAgencyΦ-Lab 5NASAIMPACT 6UniversityofIceland
+johannes.jakubik1@ibm.com
+Modalities Modality-wise Tokenization Correlation Learning Downstream Applications
+Sentinel-2 L2A Pixel-level input Sampled target tokens Multimodal Generation
+Sentinel-2 L1C
+Sentinel-2 RGB … S-2 L2A
+… S-2 L1C
+Sentinel-1 GRD … S-2 RGB Patch Cross Entropy Loss
+Sentinel-1 RTC … S-1 GRD Embed. Generate data based on
+… S-1 RTC learned correlations
+… DEM
+Digital Elevation TerraMind
+Model (DEM) Fine-tuning
+Token-level input Decoder
+… S-2 L2A
+V in e d g e e x t a (N tio D n V I ) Image … S-1 GRD Encoder de T c a o s d k e r
+… S-1 RTC Mask tokens
+Token-
+… DEM
+Land-use/ ization Native support for multi-modal inputs
+land-cover … NDVI
+maps (LULC) … LULC
+Thinking in Modalitites (TiM)
+A satellite TerraMind
+Image caption im co a a g s e tl o in f e a Text Sequence input Encoder
+with … … Caption Model
+Token-
+Coords
+ization
+Coordinates at 0°30′N
+0.25 x 0.25 deg 122°45′E Sampled input tokens TiM tuning with generated modalities
+Figure1.TerraMindrepresentsthefirstany-to-anygenerative,andlarge-scalemultimodalmodelforEarthobservationpre-trainedon500
+billiontokensfromglobalgeospatialdata.Themodeldigestsmulti-scalerepresentationsatpixel-levelandtoken-levelsimultaneously.
+TerraMindv1unlocks(i)generation,(ii)zero-shotandfinetuningapplications,and(iii)”Thinking-in-Modalities”finetuningandinference.
+Abstract agesfine-grainedrepresentationstocapturecriticalspatial
+nuances.Inthispaper,wedemonstratethat(i)TerraMind
+WepresentTerraMind,thefirstany-to-anygenerative,mul- achievesbeyondstate-of-the-artperformanceincommunity-
+timodal deep learning model for Earth observation (EO). standardbenchmarks,(ii)TerraMindcanleverage“thinking
+Unlikeotherapproaches,TerraMindispretrainedondual- in modalities” (TiM)—the capability of generating addi-
+scalerepresentationscombiningbothtoken-levelandpixel- tionalartificialdataduringfinetuningandinferencetoim-
+leveldataacrossmodalities.Onatokenlevel,TerraMind prove the model output—and (iii) TerraMind’s dual-scale
+encodes high-level contextual information to learn cross- earlyfusionapproachresultsinwell-structuredembedding
+modalrelationships,whileonapixellevel,TerraMindlever- spaces.Modelsandcodehavebeenopen-sourcedathttps:
+//huggingface.co/ibm-esa-geospatialandhttps:
+//github.com/ibm/terramind.
+∗Equalcontribution
+†Equalsupervision
+5202
+peS
+01
+]VC.sc[
+4v17111.4052:viXra
+
+--- PAGE 2 ---
+
+1.Introduction 2.RelatedWork
+ComputervisioninEarthobservation.Computervision
+Earth observation (EO) increasingly benefits from multi-
+(CV) has significantly advanced EO [76]. Many CV tech-
+modalitybecauseoftheimportantintegrationofcomplemen-
+niques,originallydevelopedfornaturalimageprocessing,
+taryinformationfromdifferentdatasources.Thisbecomes
+havebeenadaptedtoEO[62],oftenwithminimalmodifica-
+particularlyrelevantasEOisspatiotemporallysparsedueto
+tions.Awiderangeoftasksbenefitfromthesemethods,in-
+lowrevisitingtimesorweatherphenomenalikecloudcover-
+cludingclassification[16],semanticsegmentation[72](e.g.,
+age.Viceversa,forcomputervision,EOdataisanimportant
+landcovermapping[20,21]),changedetection[59](e.g.,
+playgroundforthedevelopmentofnewapproachesasthere
+disaster response [19]), object detection [39] (e.g., vessel
+is significant publicly available data of very high quality
+identification[55]),andregression(e.g.,biomassestimation
+and complexity. The available modalities range from sen-
+[53]).DeeplearningarchitectureslikeCNNs[75]andVi-
+sorsofdifferentsatellitemissionstorelevantcomplementary
+sionTransformers(ViTs)[17]havedemonstratedstrongper-
+informationlikedigitalelevation.
+formance,oftensurpassingtraditionalremotesensing(RS)
+In this work, we introduce TerraMind as the first any-
+methods.However,EOpresentsuniquechallenges,including
+to-any generative multimodal model for EO. With Terra-
+diversesensormodalities[4]andgeospatialheterogeneity
+Mind,weintroduceadual-scalepretrainingonpixel-level
+[46].AnemergingparadigminEOisself-supervisedlearn-
+andtoken-levelanddemonstratebenefitsovertrainingpri-
+ing(SSL)[64]andgeospatialfoundationmodels(GFMs)
+marilyontokens.TerraMindencodeshigh-levelcontextual
+[45],whichaimtoleveragevastamountsofunlabeledRS
+information in tokens to enable correlation learning and
+data to develop general purpose task models [32]. While
+scaling,while,additionallycapturingimportantfine-grained
+off-the-shelfCVmodelshaveshownpromisingresults[36],
+representationsusingpixel-levelinputs.Duringpretraining,
+theydonotfullyexploittheuniquecharacteristicsofgeospa-
+TerraMindpredictsmaskedtargettokenssothatourpretrain-
+tialdata.ManyGFMsstillrelyongenericCVarchitectures
+ingobjectiveboilsdowntoacross-modalpatchclassification
+[50],whichwerenotexplicitlydesignedtohandlethecom-
+problemthatresultsinhigh-qualitylatentspaces.TerraMind
+plexitiesofEO,suchasheterogeneoussensorsources(e.g.,
+is pretrained on a custom global-scale geospatial dataset
+optical, radar, DEM) [29], integrated with auxiliary data
+namedTerraMeshwithninemillionsamplesthathavebeen
+(e.g., text) [42, 47], and expert knowledge (e.g., prioritiz-
+alignedspatiotemporallyandacrossmodalities[7].Inaddi-
+ingspecificbandsorindexes).Inthisdirection,TerraMind
+tiontoradarandopticalsatelliteimagesoftheCopernicus
+better integrates domain-specific properties, developing a
+Sentinel-1(S-1)andSentinel-2(S-2)missions,ourdataset
+customizedandexpandablemultimodallearningstrategy.
+containstask-specificmodalitiessuchaslanduse/landcover
+MultimodalityinCV.MultimodalCVisdrivenbythe
+(LULC)andnormalizeddifferencevegetationindex(NDVI)
+integrationofdiversedatastreams[69],suchasnaturalim-
+maps, metadata like digital elevation models (DEM) and
+ages[74], naturallanguagetext[10],temporal videodata
+geographiccoordinates,andnaturallanguageintheformof
+[58],andweather[70],withinlargefoundationmodels[8].
+captions.Tothebestofourknowledge,TerraMindrepresents
+thefirsttrulygenerative,multimodaldeeplearningmodel
+forEO.Additionally,incontrasttootherrecentmodelsthat AI4Farms
+utilizemaskedautoencoderslike[54],contrastivelearning, BurnScars (28.1%) CROMA
+(83.6%) DOFA
+ordiffusiontechniques,TerraMinduniquelydemonstrates GFM-Swin
+SpaceNet7
+benefitsofleveragingtoken-basedpretrainingforEO. (63.0%) Prithvi 1.0 100M
+SpectralGPT
+WeprovideanoverviewofTerraMind’sperformanceina MADOS SSL4EO-S12-MoCo
+(75.6%) TerraMindv1-B
+community-standardbenchmark[49]inFigure2andhigh- TerraMindv1-L
+light the any-to-any generative capabilities of TerraMind
+CTM-SS
+in Figure 3. Our key contributions are as follows: (i) We (55.8%)
+introduceadual-scaleapproachforgenerativemultimodal
+PASTIS
+pre-trainingleveragingdataonpixel-levelandtoken-level, (43.1%)
+which outperforms other fusion approaches and enhances
+Dynamic
+embedding space structures. (ii) We introduce thinking in EarthNet
+(39.3%)
+modalities–similartochain-of-thoughtapproachesinLLMs Sen1Floods11
+(90.9%)
+–formulti-modalmodelsinEO,demonstratingthatinfus- FiveBillionPixels
+(69.2%)
+ing generated data during finetuning improves the perfor-
+mance. (iii) We demonstrate that TerraMind outperforms Figure2.TerraMindoutperformsothergeospatialfoundationmod-
+other geospatial foundation models both in unimodal and elsonPANGAEAbenchmark[49]infinetuning.Performanceis
+multimodalsettings. measuredinmIoUandmin-maxscaledperdataset.
+
+--- PAGE 3 ---
+
+Raw Input Sentinel-2 L2A Sentinel-1 RTC DEM LULC NDVI Coordinates Ground Truth Tokenizer Reconstructions
+0°30′N
+122°30′E
+Generation
+1°30′S
+123°00′E
+Generation
+13°00′N 0°30′N
+124°00′E 122°45′E
+Generation
+Figure3.ChainedgenerationexampleofTerraMindv1-Bstartingfromeitheroptical,radar,ordigitalelevationdata.Leftisinput,middleis
+artificiallygenerateddatabyTerraMind,rightrepresentsgroundtruthsandtokenizerreconstructions,respectively.
+Startingfromthealignmentofimagesandtexts[57],these
+Any-to-Any Multi-Scale
+models moved beyond simple feature extraction, towards Model Modalities Generation Features
+nuancedcontextualunderstanding.Theabilitytocombine
+RemoteCLIP optical,text ✗ ✗
+severalmodalitiesallowsforunprecedentedcapabilitiesin
+complextasks[30],evidencedbytherapidadvancementof CROMA optical,radar ✗ ✗
+multimodalLargeLanguageModels(MLLMs)[30],thatex- AnySat aerial,optical,radar, ✗ ✗
+celintaskssuchassceneunderstanding[12],visualquestion NAIP
+answering[18],andvideoanalysis[24].Recentadvancesin DeCUR optical,radar ✗ ✗
+architectures[31]andlargescalepre-training[11]haveen- optical,radar,
+DOFA ✗ ✗
+abledthedevelopmentofmodelsthatlearnhighlyeffective hyperspectral,NAIP
+cross-modalrepresentations[41],whichcanthenbeadapted MetaEarth optical(unimodal) ✗ ✓
+toawidevarietyofdownstreamtasks[66]. optical,radar,elevation,
+MultimodalityinEO.MultimodalityinEOoriginates Galileo weather,location, ✗ ✓
+fromdatafusionandistypicallyunderstoodastheintegra- population,...
+tion of SAR and optical data [13, 25, 28, 38] or the com-
+optical,radar,landuse,
+binationofopticaldatawithvectordata[5].Somestudies
+TerraMind elevation,vegetation ✓ ✓
+haveexploredalternativecombinationsofdata.In[15],the
+index,location,text
+authorsintroduceacontrastiveframeworkforcomparingRS
+imagesandstreetviews.Evendifferentopticalsensorscan
+Table1.ComparisonofTerraMindtoothermodelarchitectures.Ter-
+beconsidereddifferentmodalities[48,61].Similarly,several
+raMindrepresentsafirst-of-its-kindgenerative,multimodalmodel.
+multi-viewimages(i.e.multimodal)datasets[26,44,54]are
+introduced.Morerecentapproachescombinedtextandim-
+ages[40],bothfordiscriminative[42]andgenerative[34]
+be open-sourced to the community. TerraMesh builds on
+purposes.Lately,differentGFMsaretrainedinamultimodal
+existing datasets, which we expand by adding modalities
+way [4, 54, 68], still focusing either on a specific set of
+fromexternaldatasourcesorbyapplyingpseudo-labeling.
+modalities(e.g.,vision[68],[3])ortasks(e.g.,generative
+Weprovideanoverviewofthealignedimagemodalitiesand
+[34]).Comparedtomulti-scalehigh-qualitygenerationmod-
+adetaileddatasetdescriptioninthesupplementarymaterial.
+elsforopticaldata,likeMetaEarth[71],ourapproachallows
+Base datasets. TerraMesh is based on SSL4EO-S12
+togenerateanymodalityfromanyotherpretrainingmodal-
+[6, 65] and MajorTOM-Core [23], two unlabeled remote
+ity. To the best of our knowledge, no existing model has
+sensingdatasetscontainingco-alignedradarandopticalim-
+combinedawideanddiverseamountofmodalitiesbothfor
+agery from Sentinel-1 and Sentinel-2 satellites. SSL4EO-
+discriminativeandgenerativepurposes,asTerraMinddoes.
+S12 has lower geographic coverage but is multi-seasonal.
+WeprovideacomparisoninTable1.
+MajorTOM-CorecoversmostoftheEarth’slandsurfaceat
+asingletimestamp.ForMajorTOM-Core,weapplyasub-
+3.Dataset
+sampling scheme based on LULC classes and ecoregions.
+ForthepretrainingofTerraMindanditstokenizers,wecre- TerraMeshincludesatotalofapproximately9millionglob-
+ateamultimodaldatasetcalledTerraMesh[7],whichwill allydistributedsamplesfrombothSentinel-1andSentinel-2,
+
+--- PAGE 4 ---
+
+eachmeasuring264×264pixelsat10mresolution. heavilyinfluencedbyideasofneuralcompression[27].For
+Additional modalities. We obtain co-aligned yearly example,on12-bandS-2images,weachievecompression
+LULCmapsbyESRIwithninelanduseclasses.Addition- ratesofover3000xbyapplyingquantization.Wesumma-
+ally,weleverageSEnSeIv2[22]asacloudandiceanno- rizethearchitectureofourtokenizersinFigure4.Themain
+tationmodelandupdatetheESRILULCclassesforbetter objectiveoftheoveralltokenizeristoencodeimagepatches
+spatiotemporalalignment.NDVImapsarecomputedusing consistentlyintodiscretetokensbasedonsemanticsimilarity
+thecorrespondingspectralbandsfromSentinel-2.DEMis toenablecross-modalcorrelationlearning.Therefore,the
+extractedfromtheCopernicusDEM30mdataset[2],which lossofsomedetailsisanexpectedtrade-off,sincethefocus
+providesglobalcoverageoftheEarth’selevationata30m isongroupingsimilarpatchesratherthanpreservingallfine-
+resolution.Captionsaregeneratedsyntheticallybyconstruct- grainedfeatures.Naturally,moreaccuratereconstructions
+ing RGB images from Sentinel-2 patches using the corre- facilitatecross-modalgeneration,howeverthemainfocus
+spondingspectralbandsandprocessingthemwithLLaVA- ofthepretrainingliesonconsistentcross-modalcorrelation
+Next[37].Atailoredpromptguidesthemodeltodescribe learning.Weprovidedfurtherdetailsonthepretrainingof
+thecontentofeachimageasdescribedin[47].Forgeolo- thetokenizersinthesupplementarymaterial.
+cations, we round latitude and longitude from the center
+of each patch to the nearest quarter degree and store the Raw Input Finite Scalar Reconstruction
+discretizedcoordinatesasstringsinapre-definedformat. Quantization (FSQ)
+ViT-B Diffusion
+4.Methods Encoder Decoder
+…
+TerraMindpretrainingistwo-stagedfollowing[52].Wefirst
+…
+pretrainunimodaltokenizermodels,tokenizethemodalities, Codebook
+andthenleveragetoken-levelandpixel-levelinputtopretrain
+the TerraMind encoder-decoder architecture. We describe Figure 4. Tokenizer for image-like modalities combining finite-
+thoseindividualstagesinthefollowing. scalarquantization[51]withdiffusiondecoding.
+4.1.Tokenization Sequence-likemodalities.Wetreatbothcaptionsandge-
+olocationsastextanduseasingletexttokenizertoprocess
+We develop modality-specific tokenizers to encode each
+bothmodalities.Bydiscretizingthegeographiccoordinates
+modalityintoasequenceofdiscretetokensforpretraining
+andrepresentingthemasstrings,weintroducespecialcoor-
+and decode token sequences back to images. Thus, Terra-
+dinatetokensintothevocabulary.Thisallowsustoencode
+Mindisinprinciplecompatiblewithanymodality,aslong
+geolocationsasasequenceofdiscretetokens,beginningwith
+asitcanbetokenizedandalignedwithothermodalities.For
+alatitudetokenfollowedbyalongitudetoken.Fortextual
+reasonsofspace,wedelegatemostexperimentsrelatedto
+data,wemodifytheexistingWordPiecetokenizer[33].
+thetokenizerperformancestothesupplementarymaterial.
+Image-likemodalities.Wetrainautoencoder-basedar- 4.2.Pre-training
+chitectures with a quantization step in the bottleneck for
+Architecture. TerraMind uses a symmetric Transformer-
+image-likemodalitiessuchasS-1,S-2,LULC,NDVI,and
+basedencoder-decoderarchitectureproposedin[52],which
+DEM.Tokenizerencodersprocessaninputimageandgen-
+isdesignedtoprocesssequencesofmultimodaltokens.In
+eratealatentrepresentationforeach16×16patch,whichis
+addition to discrete tokens, TerraMind accepts pixel-level
+thendiscretizedwithfinite-scalar-quantization(FSQ)[51]
+inputs, specifically satellite imagery and digital elevation
+intooneofN codewords.Alltokenizersuseavocabulary
+maps.Forpixel-levelinputs,weapplylearnablepatch-wise
+sizeof16KbesidesthesimplerLULCmodalityforwhich
+linear projections to generate patch embeddings for each
+weuse4K.Thesecodewordsarethenusedbythediffusion
+16×16patch,similartotheapproachusedinViT[17].
+decoder to reconstruct the original image. The benefit of
+Dual-scaleearlyfusion.Incontrastto[52],wenotonly
+leveragingdiffusiondecodersliesinfacilitatingcross-modal
+embedtoken-leveldatabutadditionallyleveragepixel-level
+generationinTerraMindbytransformingtokensbackinto
+dataacrossarangeofinputmodalitiestointroduceadual-
+images.Bymappingeachcodewordtoauniqueintegerin
+scalefeaturerepresentationtosupportthestructuringofthe
+{0,1,...,N −1},weobtaindiscretetokensforeachimage
+embeddingspace.Bothtokensandpatchesrepresenta16x16
+patch. We pretrain the tokenizers in a self-supervised set-
+pixelarea.Tokensrepresentthisareaviaasinglediscrete
+ting.FSQasquantizationmethodenhancestrainingstability
+integer value, while the image patches describe the same
+[51] compared to vector quantization [63] by eliminating
+areawiththeactualfloatingpointsensordata.Thus,during
+theneedforcodebook-relatedlossterms.Notably,FSQis
+pretraining,themodelnotonlylearnsacorrelationbetween
+modalities(i.e.,cross-modallearning)butalsobetweendif-
+https://planetarycomputer.microsoft.com/dataset/io-lulc-annual-v02
+
+--- PAGE 5 ---
+
+ferentlevelsofabstractionwithinthesamemodality.The Scaling.WetrainedthreeversionsofTerraMindscaling
+low-leveltokeninformationenablescross-modalcorrelation acrossmodelsize,compute,anddata.Inaddition,wepre-
+learning, while adding pixel level input accounts for spa- traindifferentversionsofTerraMindwithrespecttothenum-
+tialnuances.Basedondual-scalefeaturesthemodelfurther berofdual-scalefeatures.TerraMindv1-Bispre-trainedon
+learnstobetterstructurepixel-leveldataintheembedding 500B tokens for 6 days on 32 NVIDIA A100 GPUs. The
+spaceviathecorrespondinginformationfromthediscreteto- model uses dual-scale features from both token-level and
+ken.WeillustratethepretrainingparadigminFigure5.The pixel-level.Duringinitialexperiments,weobservedsignifi-
+modelisagnostictoprocessingtokensorpatchesintheinput cantimprovementsfromscalingmodelsizewhenswitching
+space,whilethetargetisgenerallytoken-leveldata.Weuse fromatinybackbonetoasmallbackbonetoabaseback-
+sixpixel-levelmodalitiesandeighttoken-levelmodalities. bone.Therefore,wepre-trainedTerraMindv1-Lonalarge
+backbone with 500B tokens on 32 NVIDIA A100GPUs
+Inputs Sampled target tokens trainedfor10days.Finally,tobetterunderstandtheeffect
+ofscalingacrossthedual-scalefeaturerepresentation,we
+pre-trainTerraMindv1-B-singleasasingle-scalemodelon
+TerraMind TerraMind primarilytoken-leveldatawithopticalS-2L2Adataasonly
+Encoder Decoder
+0°30′N pixel-levelinput(comparedtopixel-levelS-2L1C,S-2RGB,
+122°45′E
+S-1GRD,S-1RTC,andDEMinTerraMindv1-Band-L).
+TerraMindv1-B-single is pretrained on 500B tokens from
+Sampled input tokens Mask tokens
+overonemillionsamplesfor6dayson32NVIDIAA100
+GPUs. We summarize the scaling behavior in model size,
+Figure5.Illustrationofthepre-trainingtask.Givenanencoded
+multimodalsampleofrandomsubsetsofpatchesandinputtokens, compute,anddatainFigure9ofthesupplementarymaterial.
+thedecoderpredictstargettokensforthemaskedinput. We additionally provide final validation losses in Table 9
+comparingv1-Bandv1-Lwiththetheoreticalrandomloss.
+Maskingstrategy.TerraMindappliesamaskedmodel-
+4.3.Generation
+ingapproachinthetokenspacefollowing[52].Themodel
+leveragesasetofrandomlyselectedtargettokensthathave Once pretrained, TerraMind can generate tokens for any
+to be reconstructed from a randomly selected set of input modality,conditionedonanysubsetofinputmodalities.The
+tokensandpixel-leveldata.Duringpre-training,wesample generativecapabilitiesunlockvariouszero-shottasks,such
+inputandtargetdatafromaDirichletdistribution. aswaterbodysegmentation.Forthegenerationofimage-like
+We opt for masked token reconstruction to familiarize modalities,thedecoderreceivesmasktokensforthemodal-
+the model with the absence of entire modalities, which is ity to be generated and predicts the corresponding tokens
+crucialforahighusabilityofamultimodalmodelinEarth basedontheencodedinput.Forsequence-likemodalities,
+observation.Duringpre-training,themodellearnsaninter- thedecodergeneratestheoutputautoregressively.Aftergen-
+nalrepresentationofunseenmodalitieswhichisexpected eratingtokensfromthetargetmodality,thecorresponding
+tobenefitarangeofdownstreamapplications.Inaddition, tokenizerdecoderallowstomapfromtoken-spacetoimage
+samplinginputandtargettokensimprovesthecomputational or text space. TerraMind further supports chained genera-
+efficiencyofthepre-training,aseachtokenisacompressed tionwhichensuresconsistencyacrossgeneratedmodalities.
+representation of a patch with compression factors of be- The chained generation represents a conditional probabil-
+tween250xand3000xdependingonthemodality.Finally, ity distribution where the prior probability distribution is
+withouttokenizedrepresentationsoftheimage-likemodali- determinedbytheinputmodality,andallsubsequentmodal-
+ties,itischallengingtolearnthecorrelationtosequence-like ities are generated conditioned on the input modality and
+modalities.TheoveralltrainingobjectiveofTerraMindboils potentiallyothergeneratedmodalities.
+down to a cross-modal patch-level classification problem
+optimizedviaacrossentropyloss:
+4.4.Thinking-in-Modalities
+N
+(cid:88)
+L =− y log(p ), (1)
+CE i i ThinkinginModalities(TiM)isarecursivefine-tuningand
+i=1 inferencetechniquedesignedtoenhancemultimodallearn-
+wherey istheone-hotencodedtrueclassoftokeni,p is ingbyleveragingthegenerativecapabilitiesofthemodel
+i i
+the predicted probability for token i, N is the total num- itself. Given an input x ∈ X (e.g., an optical satellite im-
+berofpossibletokens.Interestingly,wecaninferanupper age),themodelfirstgeneratesadditionalsyntheticmodalities
+boundlossforarandommodelwherethecrossentropyloss x˜=f (x)onatoken-levelusingalearnedgenerativefunc-
+gen
+willcollapsetothenaturallogarithmofthevocabularysize tionf .Thesegeneratedtokensarethenconcatenatedwith
+gen
+L =−
+(cid:80)N
+y log
+(cid:0)1(cid:1)
+=log(N). theoriginalinputandjointlyprocessedbythedownstream
+CE,random i=1 i N
+
+--- PAGE 6 ---
+
+modelf (e.g.,TerraMindencoderwithasegmentationhead), throughmaskedtokenreconstruction.Weobservethattoken-
+yieldingthefinaloutputy =f(x,f (x)).Thisformulation levelfusionoutperformslatefusion.Theperformancegains
+gen
+allowsthemodeltoreasonoverbothobservedandinferred areparticularlyhighwhenLULCdataisnotavailable.This
+modalities,effectivelyenrichingtheinputspace.TiMcan suggeststhatearlyfusioncapturesaninternalrepresentation
+leveragemultiplegeneratedmodalitieswhicharethengen- ofthemultimodalstate—especiallypronouncedforLULC—
+eratedinachainedapproach.Forexample,forkmodalities, that benefits fine-tuning. With those findings in mind, we
+theinputisaugmentedwithnewlygeneratedmodalities: willexploretheeffectsofusingadditionalmulti-modalpixel-
+levelinputinadual-scalepretraininginSection5.5.
+x˜(k+1) =x˜(k)∪f (x˜(k)), (2)
+gen
+andthefinalmodeloutputisdescribedby: 5.2.Generationexperiments
+y =f(x˜(K)). (3) TerraMindsupportsany-to-anygeneration.Inthefollowing,
+weprovideexamplesofthegenerationperformancestarting
+Thisrecursiveaugmentationmimicsachain-of-thoughtpro-
+from:(i)aninformation-richmodality,likeopticalS-2L2A
+cess,enablingthemodeltoiterativelyrefineitsinternalrep-
+data,and(ii)minimalinformationbasedonthegeolocation.
+resentation,particularlyinscenarioswithmissingmodalities.
+InFigure3,weobservethatTerraMindperformsstrongly
+in generating image-like modalities like S-1, LULC, and
+5.Experiments
+DEM from optical S-2 L2A data. We provide a quantita-
+tive overview on the quality of the generations on unseen
+Inthissection,wedescribetheperformancegainsresulting
+validationdatainTable3.Overall,weobserveaninterest-
+fromTerraMindandexperimentwiththeunlockedcapabili-
+ingasymmetryinthegenerativeperformanceofTerraMind
+tiesofany-to-anygenerationandThinking-in-Modalities.
+where (a) radar-to-optical generation achieves reasonable
+5.1.Foundationalexperiments qualityintermsofSSIMandPSNR–indicatingstructural
+andvisualfidelitywithsomeperceptualdegradation–and
+Multimodalityvs.unimodality.Asafirstmotivationalex-
+(b)optical-to-radargenerationyieldshigherPSNRvalues
+periment,weoutlinethebenefitofusingmultimodaldata
+butlowerSSIM,suggestingvisuallyplausibleoutputsthat
+in Earth observation at the example of water body map-
+lackstrongstructuralalignment.Thequalityofgenerated
+ping.Specifically,weleveragetheViT-Bencodersfromthe
+DEMsuggeststobestructurallyverystrong,butnoisy.The
+unimodal tokenizer models for S-1, S-2, and LULC, con-
+errors for DEM generations suggest that the level of alti-
+catenate their embeddings, and train a segmentation head
+tude is difficult to infer for the model. We compare these
+withfourConvNeXt[43]blocksasalatefusionapproach.
+scoreswiththereconstructionqualityoftheauto-encoding
+TheresultsinTable2(left)suggestthatregardlessofwhich
+tokenizersinthesupplementarymaterialthatcanserveas
+modalitieswecombine,thecombinationoftwomodalities
+upperbounds.Additionally,weprovideexperimentsonthe
+alwaysoutperformseachunimodalmodel.Combiningall
+generationqualityusingtoken-levelinsteadofpixel-level
+threemodalitiesachievesthebestoverallperformance.
+inputs.Finally,wedemonstratethequalityofgenerationsat
+kilometerscaleinFigures19and20.
+Input Latefusion Token-levelfusion
+S-1 61.01 63.94(2.93pp↑)
+S-2 72.70 76.32(3.62pp↑) Modalities MAE↓ RMSE↓ SSIM↑ PSNR↑
+LULC 71.77 70.96(0.81pp↓)
+S-1+S-2 73.83 76.74(2.91pp↑) S-1GRD→S-2L2A 0.074 0.116 0.750 26.210
+S-1+LULC 73.86 73.76(0.10pp↓) S-1GRD→DEM 163.0 320.8 0.878 20.694
+S-2+LULC 75.65 77.04(1.39pp↑) S-1GRD→NDVI 0.180 0.225 0.438 18.990
+S-1+S-2+LULC 76.00 76.88(0.88pp↑) S-1RTC→S-2L2A 0.113 0.194 0.695 24.251
+S-1RTC→DEM 298.8 799.2 0.873 20.009
+S-1RTC→NDVI 0.172 0.211 0.465 19.529
+Table2.WaterbodymappingonSen1Floods11[9]measuredin
+IoUonwaterclass.Modelsizesandarchitecturesarecomparable. S-2L2A→S-1GRD 2.942 3.877 0.531 28.678
+S-2L2A→S-1RTC 2.636 3.391 0.430 28.993
+Leftcolumn:Latefusionoftokenizers.Theaverageimprovement
+S-2L2A→DEM 215.8 745.5 0.942 20.616
+offullmultimodalityovertheindividualunimodalperformance
+is7.5ppIoU.Rightcolumn:FinetuningresultsofTerraMindv1-
+Table3.Quantitativeevaluationofgenerationsonunseenglobal
+B-singleasamidfusionapproachbasedonmaskedcorrelation
+validationdatasetusing10diffusionsteps.MAEandRMSEmetrics
+learning.Gainsoverlatefusioninpercentagepointsinparentheses.
+areinphysicalunits:meter(DEM),reflectance(S-2),anddb(S-1).
+Token-levelfusionvs.latefusion.InTable2(right),we
+investigatetheeffectsoffusingtheinputsonatokenlevel
+
+--- PAGE 7 ---
+
+likely locations of the land use class “bare land” (deserts
+etc.)inaMonte-Carlo-samplinginFigure7.Theprobability
+distributionofthemodelfitstheexpectationofwheretofind
+bareland,highlightingtheSahararegionandmiddle-east,as
+wellasMexicoandSouthernCalifornia.
+(a)Input:S-2L2Adatacapturing (b)Generation:S-1RTCcomposi-
+SingaporeinJanuary2025. tiongeneratedbyTerraMind.
+(c)Input:S-2L2Adatacapturing (d)Generation:S-1GRDcomposi-
+Figure7.Predictiondistributionofthelanduseclass“bareland”
+NorthernSpaininJanuary2025. tiongeneratedbyTerraMind.
+withasamplingtemperatureofT = 1.0usingTerraMindv1-B-
+Figure 6. Generated S-1 imagery using TerraMind. We provide single.TerraMindhasanaccurateinternalrepresentationofthe
+large-scalevisualizationsinthesupplementarymaterial. geolocationofspecificcontexts,likelanduseclasses.
+5.3.Zero-shotexperiments 5.4.Few-shotexperiments
+Basedonitsgenerativecapabilities,TerraMindunlockssev- TerraMindistrainedviaacross-modalpatchclassification
+eralzero-shotapplications,likeland-usesegmentation,water objective. Thus, we expect a well-structured latent space
+bodymapping,geo-localization,andvegetationmapping.In thatclustersdifferentconceptsaccurately.Toinvestigateour
+the following, we focus on water body mapping and geo- hypothesis,weapply1-Nearest-Neighbor(1-NN)classifi-
+localizationasimage-andsequence-levelzero-shottasks. cation experiments in the community-standard setting of
+Waterbodymapping.InTable4,wecomparethezero- 1-shot5-wayontwodatasets:EuroSATandMETER-ML.In
+shotperformanceofTerraMindwithitsfine-tunedperfor- thoseexperiments,therearenoweightupdatesofanykind,
+manceandotherfinetunedbenchmarksforwaterbodymap- so that we can assess the quality of the embedding space
+ping.Overall,TerraMindv1-Bachievesazero-shotIoUof structure.InTable5,weobservethatTerraMindoutperforms
+45.4%comparedtoSOTA-levelfine-tuningperformanceof severalotherbenchmarksfromboththeCVandEOdomain
+82.2%ofDeCUR.InablationswithTerraMindv1-B-single ontheEuroSATdatasetbyatleast10ppinaccuracy.Our
+trainedonDynamicWorldLULCdata,weboostthistoupto resultsfurthershowthatformethanesourceclassification
+69.8%suggestingthatTerraMindharnessesuptoover80% onMETER-ML,TerraMindoutperformsbenchmarkmodels
+oftheSOTAperformanceinzero-shotsetting.Additionally, andgeneralizestohigh-resolutionNAIPdatawithoneorder
+it’s notable that none of the benchmarking model can be ofmagnitudehigherresolutionthanthepre-trainingdata.We
+appliedinazero-shotcontext,highlightingtherelevanceof presentadditionalexperimentswithotherfew-shotsettings
+TerraMind’scapabilities. inthesupplementarymaterial.
+Model Input Type IoU Water Model Input EuroSAT METER-ML
+TerraMindv1-B S-2 zero-shot 45.40 CLIP-ViT-B/16 S-2RGB 57.00 29.15
+TerraMindv1-B-single S-2 zero-shot 69.75 CLIP-ViT-B/16 NAIP – 32.01
+Prithvi2.0/DeCUR/... zero-shot N/A DeCUR S-2L1C 50.54 27.87
+Prithvi1.0100M S-2L1C 60.11 26.08
+Baseline[9] S-2 finetune 31.25
+Prithvi2.0300M S-2L1C 61.06 28.26
+Prithvi2.0300M S-2 finetune 80.97
+DeCUR S-2 finetune 82.17 TerraMindv1-B S-2L1C 70.83 33.90
+TerraMindv1-B NAIP – 32.23
+Table4.Zero-shotresultsofTerraMindonwaterbodymapping
+comparedtofine-tunedperformanceofbenchmarks. Table 5. 1-shot 5-way classification results on EuroSAT and
+METER-ML measured in mean accuracy ↑, averaged over 200
+Geo-localization.TerraMindisabletopredictthegeolo- runs.TerraMindoutperformsbenchmarksfromCVandEOdo-
+cationofaspecificdatainstance.Tobettervisualizethegeo- main,suggestingawell-structuredlatentspace.
+localizationcapabilities,wepromptthemodelforthemost
+
+--- PAGE 8 ---
+
+Model BurnSr∗ MADOS∗ PASTIS Sen1Fl11 FBP∗ DEN∗ CTM-SS SN7∗ AI4Farms∗ Avg.mIoU Avg.Rank
+CROMA 82.42 67.55 32.32 90.89 51.83 38.29 49.38 59.28 25.65 55.29 6.61
+DOFA 80.63 59.58 30.02 89.37 43.18 39.29 51.33 61.84 27.07 53.59 8.22
+GFM-Swin 76.90 64.71 21.24 72.60 67.18 34.09 46.98 60.89 27.19 52.42 10.00
+Prithvi1.0100M 83.62 49.98 33.93 90.37 46.81 27.86 43.07 56.54 26.86 51.00 11.00
+RemoteCLIP 76.59 60.00 18.23 74.26 69.19 31.78 52.05 57.76 25.12 51.66 11.22
+SatlasNet 79.96 55.86 17.51 90.30 50.97 36.31 46.97 61.88 25.13 51.65 10.67
+Scale-MAE 76.68 57.32 24.55 74.13 67.19 35.11 25.42 62.96 21.47 49.43 11.44
+SpectralGPT 80.47 57.99 35.44 89.07 33.42 37.85 46.95 58.86 26.75 51.87 10.11
+S.-S12-MoCo 81.58 51.76 34.49 89.26 53.02 35.44 48.58 57.64 25.38 53.02 10.06
+S.-S12-DINO 81.72 49.37 36.18 88.61 51.15 34.81 48.66 56.47 25.62 52.51 10.89
+S.-S12-MAE 81.91 49.90 32.03 87.79 51.92 34.08 45.80 57.13 24.69 51.69 12.39
+S.-S12-Data2Vec 81.91 44.36 34.32 88.15 48.82 35.90 54.03 58.23 24.23 52.22 10.72
+UNetBaseline 84.51 54.79 31.60 91.42 60.47 39.46 47.57 62.09 46.34 57.58 4.89
+ViTBaseline 81.58 48.19 38.53 87.66 59.32 36.83 44.08 52.57 38.37 54.13 10.28
+TerraMindv1-B 82.42 69.52 40.51 90.62 59.72 37.87 55.80 60.61 28.12 58.35 3.94
+TerraMindv1-L 82.93 75.57 43.13 90.78 63.38 37.89 55.04 59.98 27.47 59.57 3.44
+Table6.PerformanceevaluationofTerraMindusingthePANGAEAevaluationprotocolindicateshighermIoUvalues(↑)andlowerrank
+values(↓).Thebestmodelpercolumnishighlightedinbold,thesecondbestisunderscored.Weindicateunimodaldatasetswith∗.Encoders
+arefrozenforpretrainedmodels,whileU-NetandViTbaselinesaretrainedfromscratchforeachspecifictask.
+5.5.Fine-tuningexperiments 5.6.Thinkinginmodalities
+BesidesthenovelcapabilitiesthatTerraMindintroduces,we WeadditionallyevaluatethevalueofTiMtuningonwater
+benchmarkthefine-tuningperformanceofTerraMindinboth bodymapping.WeuseS-1orS-2togenerateartificialLULC
+unimodalandmultimodalsettingsfollowingthecommunity- data as additional input. Our results in Table 8 indicate a
+standard PANGAEA benchmark [49]. We summarize the superiorperformanceofTiMtuningcomparedtoleveraging
+resultsinTable6.Overall,TerraMindv1-Boutperformsall uni-modaldatabyupto2ppmIoU.Thisfindingpointsus
+otherGeoFMsbyatleast3ppavg.mIoU.Importantly,weob- in the direction of TerraMind being able to generate data
+servethatTerraMindistheonlyfoundationmodelapproach that improve downstream task performance. We provide
+inEOthatacrossthePANGAEAbenchmarkoutperforms additionalresultsintheappendix.
+task-specificU-Netmodels.Performanceincreasesbyap-
+proximately2ppavg.mIoUforTerraMindv1-L,withapeak Fine-Tuning Input IoU mIoU
+Water
+of5ppinmultimodaldatasets.Furthermore,TerraMindv1-
+TerraMindv1-B S-1 68.00 81.06
+L outperforms also specialised ViT baselines by 5pp avg.
+TerraMindv1-B S-2 82.26 89.70
+mIoU.NotethatpersuggestionofthePANGAEAauthors,
+TerraMindv1-BTiM S-1+gen.LULC 72.25 83.65
+weexcludethexView2andBioMassterstaskaswecould
+TerraMindv1-BTiM S-2+gen.LULC 84.75 91.14
+not reproduce the reported performances. Finally, we as-
+sess the impact of leveraging multimodal data as input to
+Table8.Thinking-in-modalities(TiM)tuningcomparedwithstan-
+TerraMindv1-Bcomparedtoutilizingeitheropticalorradar
+dardfullfine-tuningapproachesontheSen1Floods11dataset.
+data as unimodal input to better understand the effect of
+leveragingmultimodaldatainfinetuning.Weobservethat
+acrossallthreemultimodaltasks,TerraMindv1-Bperforms
+6.Conclusion
+bestwithaccesstobothopticalandradardata.
+TerraMind’sapproachofcombiningtoken-levelandpixel-
+PASTIS Sen1Fl11 CTM-SS leveldatahasunlockedarangeofnewmodelcapabilitiesin
+EO.TerraMinddemonstratesnotonlybeyondstate-of-the-
+S-1 20.04 80.39 24.45
+artperformanceincommunity-standardbenchmarks,italso
+S-2 40.20 89.57 50.90
+representsthefirstfullygenerativemultimodalmodelinthe
+S-1+S-2 40.51 90.62 55.80 domain.Becauseoftheabilityofintegratingheterogeneous
+datasources,weexpectthatTerraMind-likemodelswillex-
+Table7.BenefitofusingmultimodalinputinthePANGAEAbench- pandtomulti-temporal,multi-resolution,andhyperspectral
+markreportedinmIoU(%)↑.
+datatofullyleveragethedatarichecosystemavailablein
+theEarthObservationdomain.
+
+--- PAGE 9 ---
+
+References [13] YuxingChenandLorenzoBruzzone. Self-supervisedchange
+detectioninmulti-viewremotesensingimages.arXivpreprint
+[1] A.HoreandD.Ziou. Imagequalitymetrics:PSNRvs.SSIM.
+arXiv:2103.05969,2021. 3
+InProc.20thInternationalConferenceonPatternRecogni-
+[14] ChenweiWang,etal. SARTargetImageGenerationMethod
+tion(ICPR),pp.2366-2369,2010. 16
+UsingAzimuth-ControllableGenerativeAdversarialNetwork.
+[2] EuropeanSpaceAgency. Copernicusdem. http://dx.
+IEEEJournalofSelectedTopicsinAppliedEarthObserva-
+doi.org/10.5270/ESA-c5d3d65,2022. 4
+tionsandRemoteSensing(JSTARS),Vol.15,2022.Online:
+[3] Guillaume Astruc, Nicolas Gonthier, Clement Mallet, and
+http://ieeexplore.ieee.org/stamp/stamp.
+Loic Landrieu. Anysat: An earth observation model for
+jsp?tp=&arnumber=9933645&tag=1. 16
+any resolutions, scales, and modalities. arXiv preprint
+[15] FabianDeuser,KonradHabel,andNorbertOswald. Sam-
+arXiv:2412.14123,2024. 3
+ple4geo: Hard negative sampling for cross-view geo-
+[4] Guillaume Astruc, Nicolas Gonthier, Clement Mallet, and
+localisation. arXivpreprintarXiv:2303.11851,2023. 3
+LoicLandrieu. Omnisat:Self-supervisedmodalityfusionfor
+[16] IvicaDimitrovski,IvanKitanovski,DragiKocev,andNikola
+earthobservation,2024. 2,3
+Simidjievski. Currenttrendsindeeplearningforearthobser-
+[5] NicolasAudebert,BertrandLeSaux,andSe´bastienLefe`vre.
+vation:Anopen-sourcebenchmarkarenaforimageclassifica-
+JointLearningfromEarthObservationandOpenStreetMap
+tion. ISPRSJournalofPhotogrammetryandRemoteSensing,
+DatatoGetFasterBetterSemanticMaps. InProceedings
+197:18–35,2023. 2
+of the IEEE Conference on Computer Vision and Pattern
+RecognitionWorkshops(CVPRW),pages1552–1560,2017. [17] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov,
+3 Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner,
+[6] BenediktBlumenstiel,NassimAitAliBraham,ConradM MostafaDehghani,MatthiasMinderer,GeorgHeigold,Syl-
+Albrecht, Stefano Maurogiovanni, and Paolo Fraccaro. vainGelly,JakobUszkoreit,andNeilHoulsby. Animageis
+SSL4EOS12 v1.1 – A Multimodal, Multiseasonal Dataset worth16x16words:Transformersforimagerecognitionat
+forPretraining. arXivpreprintarXiv:2503.00168,2025. 3, scale,2021. 2,4
+13 [18] Danny Driess, Fei Xia, Mehdi SM Sajjadi, Corey Lynch,
+[7] BenediktBlumenstiel,PaoloFraccaro,ValerioMarsocci,Jo- AakankshaChowdhery,AyzaanWahid,JonathanTompson,
+hannesJakubik,StefanoMaurogiovanni,MikolajCzerkawski, QuanVuong,TianheYu,WenlongHuang,etal. Palm-e:An
+Rocco Sedona, Gabriele Cavallaro, Thomas Brunschwiler, embodiedmultimodallanguagemodel. 2023. 3
+JuanBernabe-Moreno,andNicolasLonge´pe´. Terramesh:A [19] VictorDurnov. xview21stplacesolution. 2
+planetarymosaicofmultimodalearthobservationdata. arXiv [20] AdamVanEtten,DaveLindenbaum,andToddM.Bacastow.
+preprintarXiv:2504.11172,2025. 2,3 Spacenet:Aremotesensingdatasetandchallengeseries,2019.
+[8] RishiBommasani,DrewAHudson,EhsanAdeli,RussAlt- 2
+man,SimranArora,SydneyvonArx,MichaelSBernstein,
+[21] Casper Fibaek, Luke Camilleri, Andreas Luyts, Nikolaos
+Jeannette Bohg, Antoine Bosselut, Emma Brunskill, et al.
+Dionelis, and Bertrand Le Saux. PhilEO Bench: Evaluat-
+Ontheopportunitiesandrisksoffoundationmodels. arXiv
+ingGeo-SpatialFoundationModels,InProc.IntGeoscience
+preprintarXiv:2108.07258,2021. 2
+andRemoteSensingSymposium(IGARSS),2024. 2
+[9] DerrickBonafilia,BethTellman,TylerAnderson,andErica
+[22] AlistairFrancis. Sensorindependentcloudandshadowmask-
+Issenberg. Sen1floods11:Ageoreferenceddatasettotrain
+ingwithpartiallabelsandmultimodalinputs. IEEETransac-
+andtestdeeplearningfloodalgorithmsforsentinel-1. InPro-
+tionsonGeoscienceandRemoteSensing,2024. 4,13
+ceedingsoftheIEEE/CVFConferenceonComputerVision
+[23] Alistair Francisand Mikolaj Czerkawski. Major tom: Ex-
+andPatternRecognition(CVPR)Workshops,2020. 6,7
+pandable datasets for earth observation. arXiv preprint
+[10] FlorianBordes,RichardYuanzhePang,AnuragAjay,Alexan-
+arXiv:2402.12095,2024. 3,13
+der C Li, Adrien Bardes, Suzanne Petryk, Oscar Man˜as,
+ZhiqiuLin,AnasMahmoud,BargavJayaraman,etal. An [24] Chaoyou Fu, Yuhan Dai, Yongdong Luo, Lei Li, Shuhuai
+introduction to vision-language modeling. arXiv preprint Ren, Renrui Zhang, Zihan Wang, Chenyu Zhou, Yunhang
+arXiv:2405.17247,2024. 2 Shen, Mengdan Zhang, et al. Video-mme: The first-ever
+comprehensiveevaluationbenchmarkofmulti-modalllmsin
+[11] JizeCao,ZheGan,YuCheng,LichengYu,Yen-ChunChen,
+videoanalysis. arXivpreprintarXiv:2405.21075,2024. 3
+andJingjingLiu. Behindthescene:Revealingthesecrets
+of pre-trained vision-and-language models. In Computer [25] AnthonyFuller,KoreenMillard,andJamesR.Green.Croma:
+Vision–ECCV 2020: 16th European Conference, Glasgow, Remotesensingrepresentationswithcontrastiveradar-optical
+UK, August 23–28, 2020, Proceedings, Part VI 16, pages maskedautoencoders,2023. 3
+565–580.Springer,2020. 3 [26] Anatol Garioud, Nicolas Gonthier, Loic Landrieu,
+[12] Xu Cao, Tong Zhou, Yunsheng Ma, Wenqian Ye, Can ApollineDeWit,MarionValette,MarcPoupe´e,Sebastien
+Cui,KunTang,ZhipengCao,KaizhaoLiang,ZiranWang, Giordano, and Boris Wattrelos. FLAIR : a country-scale
+JamesMRehg,etal.Maplm:Areal-worldlarge-scalevision- landcoversemanticsegmentationdatasetfrommulti-source
+languagebenchmarkformapandtrafficsceneunderstanding. optical imagery. In Thirty-seventh Conference on Neural
+InProceedingsoftheIEEE/CVFConferenceonComputer InformationProcessingSystemsDatasetsandBenchmarks
+VisionandPatternRecognition,pages21819–21830,2024. 3 Track,2023. 3
+
+--- PAGE 10 ---
+
+[27] CarlosGomes,IsabelleWittmann,DamienRobert,Johannes timodal remote sensing data fusion: A comprehensive re-
+Jakubik,TimReichelt,MicheleMartone,StefanoMaurogio- view. InternationalJournalofAppliedEarthObservation
+vanni,RikardVinge,JonasHurst,ErikScheurer,etal. Lossy andGeoinformation,112:102926,2022. 3
+neuralcompressionforgeospatialanalytics:Areview. arXiv [39] KeLi,GangWan,GongCheng,LiqiuMeng,andJunweiHan.
+preprintarXiv:2503.01505,2025. 4 Objectdetectioninopticalremotesensingimages:Asurvey
+[28] SebastianHafner,YifangBan,andAndreaNascetti. Unsu- andanewbenchmark.ISPRSjournalofphotogrammetryand
+perviseddomainadaptationforglobalurbanextractionusing remotesensing,159:296–307,2020. 2
+sentinel-1sarandsentinel-2msidata. RemoteSensingof
+[40] XiangLi,CongcongWen,YuanHu,ZhenghangYuan,and
+Environment,280:113192,2022. 3
+XiaoXiangZhu. Vision-languagemodelsinremotesensing:
+[29] BoranHan,ShuaiZhang,XingjianShi,andMarkusReich-
+Currentprogressandfuturetrends,2024. 3
+stein. Bridgingremotesensorswithmultisensorgeospatial
+[41] ZhiqiuLin,SamuelYu,ZhiyiKuang,DeepakPathak,and
+foundationmodels,2024. 2
+Deva Ramanan. Multimodality helps unimodality: Cross-
+[30] Soyeon Caren Han, Feiqi Cao, Josiah Poon, and Roberto
+modalfew-shotlearningwithmultimodalmodels. InPro-
+Navigli. Multimodal large language models and tunings:
+ceedingsoftheIEEE/CVFConferenceonComputerVision
+Vision,language,sensors,audio,andbeyond. InProceedings
+andPatternRecognition,pages19325–19337,2023. 3
+ofthe32ndACMInternationalConferenceonMultimedia,
+[42] FanLiu,DelongChen,ZhangqingyunGuan,XiaocongZhou,
+pages11294–11295,2024. 3
+JialeZhu,QiaolinYe,LiyongFu,andJunZhou. Remoteclip:
+[31] JiteshJain,JianweiYang,andHumphreyShi. Vcoder:Ver-
+Avisionlanguagefoundationmodelforremotesensing,2024.
+satilevisionencodersformultimodallargelanguagemodels.
+2,3
+InProceedingsoftheIEEE/CVFConferenceonComputer
+VisionandPatternRecognition,pages27992–28002,2024. 3 [43] ZhuangLiu,HanziMao,Chao-YuanWu,ChristophFeicht-
+[32] Johannes Jakubik, Sujit Roy, C. E. Phillips, Paolo Frac- enhofer,TrevorDarrell,andSainingXie. Aconvnetforthe
+caro, Denys Godwin, Bianca Zadrozny, Daniela Szwarc- 2020s,2022. 6
+man,CarlosGomes,GabbyNyirjesy,BlairEdwards,Daiki [44] GabrielMachado,EdemirFerreira,KeillerNogueira,Hugo
+Kimura,NaomiSimumba,LinsongChu,S.KarthikMukkav- Oliveira,MatheusBrito,PedroHenriqueTarginoGama,and
+illi,DevyaniLambhate,KamalDas,RanjiniBangalore,Dario JeferssonAlexdosSantos. Airoundandcv-brct:Novelmul-
+Oliveira,MichalMuszynski,KumarAnkur,Muthukumaran tiview datasets for scene classification. IEEE Journal of
+Ramasubramanian,IkshaGurung,SamKhallaghi,Hanxi,Li, SelectedTopicsinAppliedEarthObservationsandRemote
+Michael Cecil, Maryam Ahmadi, Fatemeh Kordi, Hamed Sensing,14:488–503,2020. 3
+Alemohammad,ManilMaskey,RaghuGanti,KommyWelde- [45] GengchenMai,ChrisCundy,KristyChoi,YingjieHu,Ni
+mariam,andRahulRamachandran. Foundationmodelsfor Lao,andStefanoErmon. Towardsafoundationmodelfor
+generalistgeospatialartificialintelligence,2023. 2 geospatialartificialintelligence(visionpaper). InProceed-
+[33] Jacob Devlin Ming-Wei Chang Kenton and Lee Kristina ings of the 30th International Conference on Advances in
+Toutanova. Bert:Pre-trainingofdeepbidirectionaltransform- GeographicInformationSystems,NewYork,NY,USA,2022.
+ersforlanguageunderstanding.InProceedingsofnaacL-HLT, AssociationforComputingMachinery. 2
+page2.Minneapolis,Minnesota,2019. 4
+[46] OscarManas,AlexandreLacoste,XavierGiro´-iNieto,David
+[34] Samar Khanna, Patrick Liu, Linqi Zhou, Chenlin Meng,
+Vazquez,andPauRodriguez. Seasonalcontrast:Unsuper-
+Robin Rombach, Marshall Burke, David Lobell, and Ste-
+visedpre-trainingfromuncuratedremotesensingdata. In
+fanoErmon. Diffusionsat:Agenerativefoundationmodelfor
+ProceedingsoftheIEEE/CVFInternationalConferenceon
+satelliteimagery,2023. 3
+ComputerVision,pages9414–9423,2021. 2
+[35] Kohei Arai, Michihiro Mikamo, and Shunsuke Onishi.
+[47] CliveTinasheMarimo,BenediktBlumenstiel,Maximilian
+Method for Image Quality Evaluation of Satellite-based
+Nitsche,JohannesJakubik,andThomasBrunschwiler. Be-
+SAR Data. International Journal of Advanced Com-
+yondthevisible:Multispectralvision-languagelearningfor
+puter Science and Applications (IJACSA), Vol. 14, No. 7,
+earthobservation. arXivpreprintarXiv:2503.15969,2025. 2,
+2023. Online: http://thesai.org/Downloads/
+4,13
+Volume14No7/Paper_13-Method_for_Image_
+Quality_Evaluation_of_Satellite_based_ [48] ValerioMarsocciandNicolasAudebert. Cross-sensorself-
+SAR_Data.pdf. 16 supervisedtrainingandalignmentforremotesensing,2024.
+3
+[36] SaadLahrichi,ZionSheng,ShufanXia,KyleBradbury,and
+JordanMalof. Isself-supervisedpre-trainingonsatelliteim- [49] Valerio Marsocci, Yuru Jia, Georges Le Bellier, David
+agerybetterthanimagenet?asystematicstudywithsentinel-2. Kerekes,LiangZeng,SebastianHafner,SebastianGerard,
+arXivpreprintarXiv:2502.10669,2025. 2 EricBrune,RituYadav,AliShibli,etal. Pangaea:Aglobal
+[37] BoLi,KaichenZhang,HaoZhang,DongGuo,RenruiZhang, andinclusivebenchmarkforgeospatialfoundationmodels.
+FengLi,YuanhanZhang,ZiweiLiu,andChunyuanLi.Llava- arXivpreprintarXiv:2412.04204,2024. 2,8,18
+next:Strongerllmssuperchargemultimodalcapabilitiesin [50] MatiasMendieta,BoranHan,XingjianShi,YiZhu,Chen
+thewild,2024. 4,13 Chen, and Mu Li. Gfm: Building geospatial founda-
+[38] JiaxinLi,DanfengHong,LianruGao,JingYao,KeZheng, tion models via continual pretraining. arXiv preprint
+BingZhang,andJocelynChanussot. Deeplearninginmul- arXiv:2302.04476,2023. 2
+
+--- PAGE 11 ---
+
+[51] Fabian Mentzer, David Minnen, Eirikur Agustsson, and [64] YiWang,ConradMAlbrecht,NassimAitAliBraham,Lichao
+MichaelTschannen. Finitescalarquantization:Vq-vaemade Mou,andXiaoXiangZhu.Self-supervisedlearninginremote
+simple. arXivpreprintarXiv:2309.15505,2023. 4,15 sensing:Areview. arXivpreprintarXiv:2206.13188,2022. 2
+[52] DavidMizrahi,RomanBachmann,Og˘uzhanFatihKar,Teresa [65] YiWang,NassimAitAliBraham,ZhitongXiong,Cheny-
+Yeo,MingfeiGao,AfshinDehghan,andAmirZamir. 4m: ingLiu,ConradMAlbrecht,andXiaoXiangZhu. Ssl4eo-
+Massivelymultimodalmaskedmodeling,2023. 4,5 s12:Alarge-scalemultimodal,multitemporaldatasetforself-
+[53] Andrea Nascetti, RITU YADAV, Kirill Brodt, Qixun Qu, supervisedlearninginearthobservation[softwareanddata
+HongweiFan,YuriShendryk,IshaShah,andChristineChung. sets]. IEEEGeoscienceandRemoteSensingMagazine,11
+Biomassters:Abenchmarkdatasetforforestbiomassesti- (3):98–106,2023. 3
+mation using multi-modal satellite time-series. In Thirty- [66] JiannanWu,MuyanZhong,SenXing,ZeqiangLai,Zhaoyang
+seventhConferenceonNeuralInformationProcessingSys- Liu,ZheChen,WenhaiWang,XizhouZhu,LeweiLu,Tong
+temsDatasetsandBenchmarksTrack,2023. 2 Lu, et al. Visionllm v2: An end-to-end generalist multi-
+modallargelanguagemodelforhundredsofvision-language
+[54] VishalNedungadi,AnkitKariryaa,StefanOehmcke,Serge
+tasks. AdvancesinNeuralInformationProcessingSystems,
+Belongie,ChristianIgel,andNicoLang. Mmearth:Explor-
+37:69925–69975,2025. 3
+ingmulti-modalpretexttasksforgeospatialrepresentation
+learning. arXivpreprintarXiv:2405.02771,2024. 2,3 [67] XinyuBaiandFengXu. AcceleratingDiffusionforSAR-
+to-Optical Image Translation via Adversarial Consistency
+[55] FernandoPaolo,TsutingTimLin,RitwikGupta,BryceGood-
+Distillation, 2024. Online: http://arxiv.org/pdf/
+man,NiravPatel,DanielKuster,DavidKroodsma,andJared
+2407.06095. 16
+Dunnmon. xview3-sar:Detectingdarkfishingactivityusing
+[68] ZhitongXiong,YiWang,FahongZhang,AdamJ.Stewart,
+syntheticapertureradarimagery,2022. 2
+Joe¨lleHanna,DamianBorth,IoannisPapoutsis,BertrandLe
+[56] Prabhishek Singh and Raj Shree. Analysis and effects
+Saux, Gustau Camps-Valls, and Xiao Xiang Zhu. Neural
+of speckle noise in SAR images. In Proc. Interna-
+plasticity-inspiredfoundationmodelforobservingtheearth
+tionalConferenceonAdvancesinComputing,Communica-
+crossingmodalities,2024. 3
+tion,&Automation(ICACCA),2016.DOI:10.1109/ICAC-
+[69] LingxiaoYang,Ru-YuanZhang,YanchenWang,andXiaohua
+CAF.2016.7748978. Online: http://ieeexplore.
+Xie. Mma:Multi-modaladapterforvision-languagemodels.
+ieee.org/document/7748978. 16
+InProceedingsoftheIEEE/CVFConferenceonComputer
+[57] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+VisionandPatternRecognition,pages23826–23837,2024. 2
+Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+[70] Qidong Yang, Jonathan Giezendanner, Daniel Salles Civ-
+AmandaAskell,PamelaMishkin,JackClark,etal. Learning
+itarese,JohannesJakubik,EricSchmitt,AnirbanChandra,
+transferablevisualmodelsfromnaturallanguagesupervision.
+JeremyVila,DetlefHohl,ChrisHill,CampbellWatson,etal.
+In International Conference on Machine Learning, pages
+Multi-modal graph neural networks for localized off-grid
+8748–8763.PmLR,2021. 3,17
+weatherforecasting. arXivpreprintarXiv:2410.12938,2024.
+[58] Shuhuai Ren, Linli Yao, Shicheng Li, Xu Sun, and Lu
+2
+Hou. Timechat:Atime-sensitivemultimodallargelanguage
+[71] Zhiping Yu, Chenyang Liu, Liqin Liu, Zhenwei Shi, and
+model for long video understanding. In Proceedings of
+ZhengxiaZou. Metaearth:Agenerativefoundationmodelfor
+theIEEE/CVFConferenceonComputerVisionandPattern
+global-scaleremotesensingimagegeneration. IEEETrans-
+Recognition,pages14313–14323,2024. 2
+actionsonPatternAnalysisandMachineIntelligence,2024.
+[59] AyeshaShafique,GuoCao,ZiaKhan,MuhammadAsad,and
+3
+MuhammadAslam. Deeplearning-basedchangedetection
+[72] XiaohuiYuan,JianfangShi,andLichuanGu. Areviewof
+inremotesensingimages:Areview. RemoteSensing,14(4):
+deeplearningmethodsforsemanticsegmentationofremote
+871,2022. 2
+sensing imagery. Expert Systems with Applications, 169:
+[60] JakeSnell,KevinSwersky,andRichardZemel. Prototypical 114417,2021. 2
+networksforfew-shotlearning. Advancesinneuralinforma- [73] Z.Wang,A.C.Bovik,H.R.Sheikh,andE.P.Simoncelli.
+tionprocessingsystems,30,2017. 17 Imagequalityassessment:Fromerrorvisibilitytostructural
+[61] AidanMSwope,XanderHRudelis,andKyleTStory.Repre- similarity. IEEETransactionsonImageProcessing,vol.13,
+sentationlearningforremotesensing:Anunsupervisedsensor no.4,pp.600-612,2004. 16
+fusionapproach. arXivpreprintarXiv:2108.05094,2021. 3 [74] Jingyi Zhang, Jiaxing Huang, Sheng Jin, and Shijian Lu.
+[62] Devis Tuia, Konrad Schindler, Begu¨m Demir, Gustau Vision-language models for vision tasks: A survey. IEEE
+Camps-Valls,XiaoXiangZhu,MrinaliniKochupillai,Sasˇo TransactionsonPatternAnalysisandMachineIntelligence,
+Dzˇeroski,JanN.vanRijn,HolgerH.Hoos,FabioDelFrate, 2024. 2
+Mihai Datcu, Jorge-Arnulfo Quiane´-Ruiz, Volker Markl, [75] LinyingZhaoandShunpingJi.Cnn,rnn,orvit?anevaluation
+Bertrand Le Saux, and Rochelle Schneider. Artificial in- ofdifferentdeeplearningarchitecturesforspatio-temporal
+telligencetoadvanceearthobservation:aperspective,2023. representationofsentineltimeseries. IEEEJournalofSe-
+2 lected Topics in Applied Earth Observations and Remote
+[63] AaronVanDenOord,OriolVinyals,etal. Neuraldiscrete Sensing,16:44–56,2022. 2
+representationlearning. Advancesinneuralinformationpro- [76] Xiao Xiang Zhu, Devis Tuia, Lichao Mou, Gui-Song Xia,
+cessingsystems,30,2017. 4 LiangpeiZhang,FengXu,andFriedrichFraundorfer. Deep
+
+--- PAGE 12 ---
+
+learninginremotesensing:Acomprehensivereviewandlist
+ofresources. IEEEgeoscienceandremotesensingmagazine,
+5(4):8–36,2017. 2
+
+--- PAGE 13 ---
+
+TerraMind: Large-Scale Generative Multimodality for Earth Observation
+Supplementary Material
+Inthefollowing,weprovideadditionalinformationon imagelater.WeusetheS-2RGBbandsandOverturebase
+ourdata,thepretrainingofTerraMindanditstokenizers,the layertagsasinputs.Domainexpertsevaluatedasubsetof
+qualityofthetokenization,any-to-anygenerationmatrices, 1.3kcaptions,resultingin69%ofthecaptionswithoutany
+andcomparisonsofTerraMindinunimodalandmultimodal hallucinationswhiletheaveragecompletenessscoreswere
+finetuningagainstspecializedU-NetandViTmodels. 3.87onascalefrom0to5.
+7.TerraMeshDataset 8.Pretrainingdetails
+All versions of TerraMind have been pretrained on Ter- Inthissection,wegiveadditionaldetailsonthepretraining
+raMesh or a subset of it. TerraMesh is a comprehensive ofbothTerraMindanditstokenizers.
+multimodal Earth observation dataset designed for large-
+8.1.Tokenizermodels
+scalemodelpre-training.Itwillbemadepubliclyavailable
+underapermissivelicenseinapreprintduringthereview ThetokenizermodelsarepretrainedusingaVisionTrans-
+processofthispaper.Thedatasetincludesninemodalities former (ViT) encoder and a patched UNet decoder, with
+andwevisualizeexamplesofthedatasetinFigure8. inputimagesrangingfrom224x224to256x256insize.The
+Thedatasetcontainsover9milliongloballydistributed, model was trained with patch sizes of 16x16 for the ViT
+spatiotemporallyalignedsamplesacrossninecoremodali- encoder and 4x4 for the UNet decoder. A tanh MLP was
+ties.Eachmodalityispreciselyco-registeredata10-meter usedbeforethequantizer,asoutlinedintheViT-VQGAN
+resolution,primarilybasedonSentinel-2grids.TheS-1and paper,toenhancetokenizationquality.
+S-2 samples are sourced from MajorTOM-Core [23] and The model utilized a Finite-Scalar Quantization (FSQ)
+SSL4EO-S12v1.1 [6]. It integrates Sentinel-1 SAR data approachwithacodebooksizeof8-8-8-6-5,aimingtolearn
+with Sentinel-2 optical data (L1C top-of-atmosphere and consistentandabstractrepresentationsacrossimagepatches.
+L2Abottom-of-atmospherereflectance),ensuringversatility Thelatentdimensionwassetto5.Weleveragethenormal-
+forvariousdownstreamtasks.Becausethesourcedatasets izationofcodebookentriestotheunitsphereduringtraining.
+contain only one S-1 product, each sample has either S-1 ThisconceptisborrowedfromtheViT-VQGANapproach,
+GRDorS-1RTCdata.Additionally,TerraMeshincludesnor- whichappliesaspecificformofnormalizationtoimprove
+malizeddifferencevegetationindex(NDVI)mapsderived thequalityandefficiencyoflearnedrepresentations.Addi-
+fromSentinel-2,Copernicusdigitalelevationmodel(DEM) tionally,anEMA-basedquantizerwasusedwithadecayrate
+dataprovidingtopographiccontext,andland-use/land-cover of0.99totrackandimprovequantizationovertime.
+(LULC) maps from ESRI, enhanced with accurate cloud Duringdiffusion-basedpretraining,themodelwastrained
+masksgeneratedbytheSEnSeIv2model[22]. for1000timestepsusingalinearbetaschedule,withMSE
+Toensurebroadgeographicandthematicdiversity,Ter- lossastheobjective.Thetrainingleveragedhalf-precision
+raMeshemployssubsamplingtechniques,selectivelyinclud- (fp16)andusedanAdamWoptimizerwithspecificlearning
+ingrepresentativesamplesfromeachglobalecoregionand rateschedulingandwarmupstrategies.Themodelalsoin-
+land-coverclass,whiledownsamplinghighlyhomogeneous corporatedmodelEMAforstabletrainingandsetabatch
+regionssuchasdesertsandtundra.Anothercriticalaspectis sizeof1perGPUwithvariousregularizationtechniqueslike
+thedatapreprocessingpipeline,whichincludesreprojection, gradclippingandrandomhorizontalflips.
+temporalalignment,andfilteringtominimizemissingdata WepretrainedtheTerraMindtokenizersforimage-like
+andartifacts,ensuringhigh-quality,analysis-readysamples. modalitieswithDDPon4GPUsforatotalof100epochs
+TerraMind.v1-B-single was pre-trained on a subset on the respective modality of TerraMesh. We use a base
+of TerraMesh with one million samples, specifically the learningrateof1e-4,aneffectivebatchsizeof64samples
+SSL4EOS12v1.1locations,usingonlyfourimagemodal- perGPU,i.e.theglobalbatchsizeis256.WereachaGPU
+ities:S-2L2A,S-1GRD,DEM,andLULC.Additionally, utilizationof99%forsinglechannelmodalitieslikeLULC
+weperformedcontinuouspre-trainingwithimagecaptions. andNDVI,andover80%forallmulti-channelmodalities.
+These captions were created using LLaVA-Next [37] and
+8.2.TerraMind
+OvertureMapsdata[47].Theautomatedcaptioningpipeline
+includesapromptwithachain-of-thoughtprocesstogen- WepretrainedbothTerraMindv1-BandTerraMindv1-Lwith
+erate diverse captions. The captioning model is asked to DDPon32GPUs.Wedeterminetheglobalbatchsizebased
+generatethreequestion-answerpairsanddescribethefull oninitialexperimentalrunscomparingaglobalbatchsizeof
+
+--- PAGE 14 ---
+
+Coordinates
+7°45′S
+38°00′E
+48°45′N
+24°45′E
+45°30′N
+131°30′E
+Figure8.Visualizationofthespatial-temporalalignmentacrossmodalitiesinTerraMesh.S-2L2AusesIRRGpseudo-coloringandS-1RTC
+isvisualizedindbscaleasVH-VV-VV/VH.CopernicusDEMisscaledbasedontheimagevaluerange.
+2K,4K,and8K.Inaddition,wedeterminethebaselearning
+rate starting from 1e-4 and iteratively experimented with
+halfanddoublelearningrates.Ultimately,weendupwith 6.8
+a base learning rate of 2e-4 for a cosine annealing sched-
+6.6
+uler set to run for 500B tokens. For the v1-L model, we
+reach a GPU utilization of 85+%. Overall, the training of 6.4
+TerraMindv1-Btook12dayson32A100GPUs,i.e.,9’216
+6.2
+GPUhours.Overthecourseofthepretraining,wealsoexper-
+imentwithdifferentconfigurationsoftheDirichletsampling
+6.0
+distribution.Intotal,thepretrainingexperimentshavebeen
+approximatelythreetimeslargerthanthefinalrunsresulting 5.8
+inapproximately30KGPUhoursallocatedforpretraining.
+5.6
+Weprovideanoverviewonthescalingdynamicswhen
+5.4
+goingfromTerraMindv1-BtoTerraMindv1-LinFigure9
+0 100 200 300
+with identical hyperparameters and compute. Overall, as Tokens [in billions]
+expected, we observe a significant gap in the validation
+lossesacrossmodalities.Wefinallyprovidethevalidation
+lossespermodalityafterpretrainingofTerraMindv1-Band
+TerraMindv1-LinTable9.
+Model S-2L2A S-1GRD S-1RTC DEM NDVI
+Random 9.68 9.68 9.68 9.68 9.68
+V1-B 5.67 7.84 7.64 2.19 6.42
+V1-L 5.34 7.69 7.53 2.14 6.25
+Table9.Validationlossesoffullpre-trainingofTerraMindv1-B
+andv1-L.
+ssoL
+TerraMindv1-B
+TerraMindv1-L
+Figure9.ExampleofthescalingbehaviorofTerraMindcomparing
+v1-Bandv1-Lmodelsforthefirst350Btokensonthevalidation
+lossofopticalS-2L2Adata.Overall,TerraMind-Loutperforms
+TerraMind-Bafterapproximately10%ofthetrainingscheduleof
+thelargemodel.
+9.Tokenizerperformanceandgenerallearnings
+In the following, we provide details on the tokenizations
+of TerraMind. At least for image-like modalities, the tok-
+enizationsrepresentanimportantandcomputationallyheavy
+phaseofthepretraining,whichiswhywehighlightimpor-
+tantlearningsinthefollowing.
+Learnings. Overall, we learned that the tokenizer per-
+formancecanbequitesensitive,whichisespeciallyrelated
+
+--- PAGE 15 ---
+
+to the significant bottleneck compression of up to 3000x
+aftertheencoder.Whenleveragingfinite-scalarquantization
+(FSQ)insteadofvectorquantization(VQ),weobservedex-
+1.75
+actlywhattheoriginalFSQpaper[51]claims:FSQmakes
+quantizationeasier–yetinourexperimentsitdidnotim- 1.50
+provethereconstructionperformanceintermsofMSElosses.
+1.25
+WeleverageFSQasthetrainingwasmorestableandless
+1.00
+sensitivetothelearningrate,whichislikelyrelatedtothe
+fact that, unlike VQ, FSQ does not require an additional 0.75
+codebookloss.Westillobservedthatalltokenizermodels
+0.50
+weresensitivetothelearningrate,withhigherlearningrates
+resultinginnon-differentiability(NaNlosses),andlowlearn- 0.25
+ingratescausedblurryresults.
+0.00
+Inaddition,weexperimentedwiththecodebooksize.In
+0 20000 40000 60000 80000 100000
+ourexperiments,weobservedthatthelevelofdetailinthe Training steps
+reconstructionswassignificantlyhigherforsinglechannel
+input compared to multi channel input (e.g., 12 band S2-
+L2Adata).Naturally,withlesschannels,thecompression
+bottleneck for equal-sized codebooks is lower. Therefore,
+wehypothesizedwhethermulti-spectraldatarequireslarger
+codebooksizestoobtainhigherlevelofdetailintherecon-
+structions.Incontrasttoourexpectation,whenincreasingthe
+codebooksizeover16Kformodalitieswithmorethanthree
+inputchannels,thereconstructionshadsignificantartefacts.
+Thissuggeststhateventhoughthecompressionbottleneckis
+lower,highercodebooksizesaremoredifficultforthemodel
+touse,whichisinlinewithpreviousliterature.However,we
+weresurprisedtoseemoreartefactsinthereconstructions
+ofmodelswithacodebooksize32Kcomparedto16K.
+Finally,weexperimentedwithexponentialmovingaver-
+age(EMA)updatesforthetokenizermodels.Asexpected,
+the models were less responsive to gradient updates. The
+resultingreconstructionssmoothedoutmoreoffinegrained
+features.Togetherwiththegenerativediffusionprocessin
+the tokenizer decoder, the resulting reconstructions often
+lookedlikehallucinations,e.g.bridgesoverriverswerenot
+existing anymore in the reconstruction images. We there-
+fore decided to ommit expotential moving average in our
+tokenizermodels.
+9.1.FSQvs.VQ
+Generally,ourpretrainingexperimentscomparingFSQwith
+vectorquantizationsuggestthatbothapproachescanachieve
+thesamelevelofperformance,yetreachingoptimallevels
+ofperformancewithVQisregardedtobemorechallenging
+than using FSQ. We visualize this through (a) the recon-
+struction loss and (b) the gradient norms of the tokenizer
+pretrainingonS-2L2AdatainFigures10and11,respec-
+tively.Overall,weobservethatbothapproachesreachthe
+samelevelofconvergence,howeverFSQrequireslesstuning
+andisgenerallymorestablethanVQ.Thisespeciallyalso
+appliesforthegradnorms.
+Performance.Inthefollowing,weassesstheaccuracyof
+ssol
+ESM
+VQ
+FSQ
+Figure10.PretrainingreconstructionlossesofS-2L2Amodality
+comparingfinite-scalarquantization(FSQ)andvectorquantization
+(VQ)approaches.Overall,bothapproachesreachthesamelevel
+ofperformance.TheFSQapproachconvergessmootherthanVQ,
+whilerequiringlesstuning.
+100
+80
+60
+40
+20
+0
+0 20000 40000 60000 80000 100000
+mron
+tneidarG
+VQ
+FSQ
+Figure11.GradientnormsforpretrainingofS-2L2Atokenizers
+comparingfinite-scalarquantization(FSQ)andvectorquantization
+(VQ)approaches.TheFSQapproachconvergessmootherthanVQ,
+whilerequiringlesstuning.
+ourtokenizermodels.Besidesvisualqualityassessmentsand
+quantitativeassessmentswithMSEmetrics,wewerepartic-
+ularlyinterestedinwhetherourtokenizersexhibitgeospatial
+biases. Understanding this is crucial to ensure TerraMind
+hasauniformlevelofperformanceacrosstheglobe.Inaddi-
+tion,weinvestigatethereconstructionsofradardatainmore
+detail,asradardatabynatureincludessignificantnoisein
+theamplitudedata.Thiscouldinterferewiththenoisegen-
+erationinthediffusionprocessofthedecoder,whichiswhy
+weassessthestructureofthereconstructionsusingSSIM
+andPSNRmetrics.
+
+--- PAGE 16 ---
+
+Figure12.SpatialdistributionofmeansquarederrorsoftheS-1 Figure14.SpatialdistributionofmeansquarederrorsoftheDEM
+tokenizeronthevalidationsetofthepretrainingdata. tokenizeronthevalidationsetofthepretrainingdata.
+Wegiveamoreextensivebackgroundonradardatain
+thefollowingforinterestedreadersandnon-EOexperts.Re-
+constructingrealisticandaccuratesyntheticapertureradar
+(SAR) S-1 VV and VH data is challenging due to factors
+inherentinthespecificcharacteristicsofSARandtheS-1
+mission.SARdataisaffectedbycomplexinteractionsbe-
+tween the radar signal and Earth’s surface. SAR is based
+onradarbackscatter,whichisinfluencedbysurfacerough-
+nessandmoisturecontent.Theinteractionofradarwaves
+withdifferentsurfaces,includingvegetationstructureand
+Figure13.SpatialdistributionofmeansquarederrorsoftheS-2 urbanenvironments,canproducecomplexbackscatterpat-
+tokenizeronthevalidationsetofthepretrainingdata. terns.Thetwopolarizations,VVandVH,capturedifferent
+scatteringmechanisms:VVissensitivetosurfaceroughness
+andvegetation,whileVHcapturescross-polarizedinterac-
+InFigures12to14,weprovideanoverviewonthespatial tionsthatareinfluencedbysurfaceandvolumetricfeatures
+distributionsoftheS-1GRD,S-2L2A,andDEMtokenizer [14,35,56].Inaddition,SARinherentlycontainsspeckle
+on the validation data of the SSL4EO-S12 subset which noise, which obscures fine details, making it difficult to
+isfocusedonurbanareasandthereforerelevantformany extractaccurateinformation.ToevaluatetheSARdatatok-
+downstream applications. Overall, we observe low MSE enizersofTerraMind,weemployvariousevaluationmetrics
+errorsandparticularlylowdeviationacrossgeographicre- toassessqualityandaccuracy.WecomputetheMAEand
+gions. For optical S-2 data, we observe minor difficulties RMSEforquantifyingpixel-leveldifferences,theSSIMto
+in reconstructing images from Northern Asia, which we compareimagestructuralcontent,andthePSNR[1,67,73].
+manually investigated. Overall, the vast majority of those Table10presentsthequantitativeevaluationoftheTerra-
+samplesaredepictingsnowy/icyconditionsthathavevery Mindtokenizerreconstructionsacrossmultiplemodalities.
+highreflectancevaluesofupto12,000comparedtoanormal Theresultsshowareasonablereconstructionperformance
+rangeof[0,255]inRGBdata.Onthoselongtaildistribution for optical data, indicating both structural and perceptual
+samples,theS-2tokenizernaturallyhasmoredifficulties. fidelity.Forradarmodalities,S-1GRDandS-1RTCachieve
+S1-tokenizer quantitative analyses. In the following, comparable PSNR values, though SSIM scores are lower,
+wepayparticularattentiontotheperformanceoftheradar suggestingthatwhilethereconstructionsarevisuallyplausi-
+S-1tokenizer,whichmightbemorechallengingtotrainon ble,theyexhibitmoderatestructuraldeviations.Inaddition
+a reconstruction task due to the inherent speckle noise in tothesequantitativemetrics,wealsoconductedqualitative
+radarsatellitedata.Wethereforeevaluatethereconstructions assessmentsthroughvisualinspectiontoidentifyartifacts
+of the S-1 tokenizer using the structural similarity index andinconsistenciesnotcapturedbynumericalscoresalone.
+(SSIM)andpeaksignal-to-noiseratio(PSNR).Bothinput
+andreconstructionforS-1areinadBscale.Inadditionto 10.Additionalexperiments
+S-1evaluationmetricsbeingcomputedinthedBspacein
+Table10,theyalsoarecalculatedinthedenormalizedspace. Inthefollowing,weprovideadditionalexperiments,espe-
+Onthecontrary,theS-2evaluationmetricsarecomputedin ciallywithregardtothequalityofthelatentspaceandthe
+thenormalizedspace. fullfinetuningperformance.Tounderstandthequalityofthe
+
+--- PAGE 17 ---
+
+Modality MAE RMSE SSIM PSNR Overall,weobservethatthemodelcorrectlyidentifiesmany
+denslypopulatedareasacrosstheglobe.Wealsonoteover-
+S-1GRD 2.403 3.220 0.565 30.291
+predictionsin,forexample,NorthAfricaandmiddle-east.
+S-1RTC 2.216 2.888 0.466 30.389
+Thisobservationsuggeststhatthemodelmightconfusebare
+S-2L2A 0.055 0.134 0.851 27.439
+landandurbanareasintheseregions.
+DEM 170.7 737.2 0.974 20.712
+NDVI 0.091 0.168 0.647 21.517
+Table10.EvaluationofSARVVandVHandS-2reconstructions
+bytheTerraMindtokenizersusingMSE↓,SSIM↑andPSNR↑on
+thevalidationdatasetoftheSSL4EO-S12subset(8.5ksamples).
+latentspace,wecomputeperformancesofnearestneighbor
+approachesforimageclassificationtasksorusingprototypi-
+calneuralnetworks.Weassesstheperformanceoffullfine-
+Figure16.Predictiondistributionofthelanduseclass“urban”with
+tuningbycomparingwithend-to-endtrained,task-specific
+asamplingtemperatureofT =1.0.TerraMindhasareasonable
+modelslikeU-NetsandViTs.Weadditionallycomparethe
+internalrepresentationofthegeolocationofspecificcontexts,like
+quality of the generations with the pseudo-labels used to
+landuseclasses.
+pretrainTerraMindinanablationexperimentinazero-shot
+setup.
+10.2.Few-shotexperiments
+10.1.Geolocationprediction
+TobetterunderstandhowTerraMindassignsgeolocations, We present additional few-shot experiments with the Eu-
+wefurtheremployaMonte-Carlosamplingonthelatitude- roSAT and METER-ML dataset in Table 11. We use the
+longitudegridforanopticaltilefromthevalidationdatain embeddingsofthepre-trainedencoderswithoutanyaddi-
+Figure15.WeobservethatwhileTerraMindisnotpredicting tionalfine-tuning.Thepatchembeddingsofeachimageare
+thecorrectgeolocation(•),thereisaveryhighlikelihood averagedforimage-levelclassificationtasks.
+that the predicted geolocation is one of the adjacent grid Theexperimentsincludefourdifferentfew-shotsettings
+pointsthathavebeenseenduringpretraining(•).Thisre- withvaryingnumbersofexamplesandclasses.5-wayrefers
+sultsuggeststhatevenfordatafromunseengeolocations, tosamplingfiveclassesperrun,whilefull-waydescribesex-
+TerraMindrememberssimilarsamplesfromthepretraining perimentswithalldatasetclassesperrun.1-shotand5-shot
+data(•)andreturnsthegeolocationofthesampleswithhigh indicatethatoneorfiveimagesaresampledforeachclassper
+similarity.Thiscapabilitypairedwiththeglobalpretraining run.5-shotexperimentswithfivesupportsamplesperclass
+of TerraMind suggests that geo-localization of data from areusingPrototypicalNetworks[60]forclassification.This
+unseenlocationsispossiblebutdeterminedbythesimilarity approachaveragestheembeddingsoftheselectedlabeled
+toimagesfromadjacentlocations. images(supportset)andclassifiesthetargetimages(query
+set)basedontheclassprototypewiththelowestEuclidean
+distancefromeachsample.Inthe1-shotsetting,Prototypical
+Networksaremathematicallyequalto1-Nearest-Neighbor
+classification.Werefertotheoriginalpaperfordetails[60].
+Differentfromliterature,weevaluateeachrunonthefull
+testsetinsteadofsubsamplingqueryimages.
+TerraMindperformsbestonbothdatasets,outperforming
+allothergeospatialfoundationmodelsaswellastheCLIP
+visionencoder[57].Interestingly,thebaseversionleadsto
+overallbetterresultsthanthelargemodel.Similarly,Prithvi’s
+Figure15.Distributionofpredictedgeo-locationsforanoptical
+smaller1.0versionhascomparableresultstoitslarger2.0
+S-2L2Asamplefromthevalidationset.•isthecorrectlocation,•
+300Mversion,indicatingthatmodelsizehasonlyalimited
+areMonte-CarlosampledlocationsfromTerraMind,•represents
+thedistributionoftraininglocations.TerraMind’sgeo-localization effectonfew-shotperformance.
+seemstobebasedonsimilaropticalsamplesinthetrainingdataset InadditiontoS-2L1C,theMETER-MLdatasetprovides
+forwhichTerraMindthenoutputsthegeolocation. highresolutionRGBimagesfromNAIPwith1mresolution.
+OnlyCLIPandTerraMindcanprocessRGBimageswithout
+WefurtherextendtheanalysisofFigure7byaddition- anyfine-tuning.WhileCLIPprofitslargelyfromthehigher
+allypromptingthemodelforlikelylocationsofurbanareas. resolutioninputs,TerraMindonlyperformsmarginallybetter
+
+--- PAGE 18 ---
+
+EuroSAT METER-ML
+5-way 5-way full-way full-way 5-way 5-way full-way full-way
+Model Input
+1-shot 5-shot 1-shot 5-shot 1-shot 5-shot 1-shot 5-shot
+CLIP-ViT-B/16 S-2RGB 57.00 70.72 43.92 58.30 29.15 37.44 23.13 30.53
+CLIP-ViT-B/16 NAIP – – – – 32.01 42.35 25.66 35.81
+DeCUR S-2L1C 50.54 64.35 37.53 50.82 27.87 33.64 20.95 27.21
+Prithvi1.0100M S-2L1C 60.11 73.29 46.86 60.66 26.08 35.81 22.33 29.21
+Prithvi2.0300M S-2L1C 61.06 73.21 47.47 60.47 28.26 36.13 22.52 29.59
+TerraMindv1-B S-2L1C 70.83 87.94 57.48 79.66 33.90 43.89 26.85 37.41
+TerraMindv1-B NAIP – – – – 32.23 44.75 25.53 37.85
+TerraMindv1-L S-2L1C 70.07 86.29 56.58 77.39 33.09 42.72 26.02 36.34
+TerraMindv1-L NAIP – – – – 32.59 44.99 25.94 38.29
+Table11.Few-shotclassificationresultsonEuroSATandMETER-MLmeasuredinmeanaccuracy↑averagedover200runs.5-wayrefers
+tofiverandomlysampledclassesperrun,whichisadefaultsettingusedinfew-shotlearning.Full-wayreferstosamplingalldatasetclasses,
+i.e.,tenEuroSATclassesandsevenMETER-MLclasses.Wehighlightthebesttwomodelsinboldandunderlined.
+andsometimesworsethanwithmultispectralS-2data.No- 10.4.Comparinggenerationsandpseudo-labels
+ticethatTerraMindshowssimilarperformancegapsasCLIP
+Weevaluatethemodelgenerationsformodalitieswherewe
+whencomparingNAIPdatatoS-2RGB.Thisindicatesthat
+usedpseudo-labelsasinputdata.Forexample,ininitialex-
+additionalmultispectralchannelshaveacomparableeffect
+perimentswithTerraMindv1-B-single,weleverageGoogle’s
+onfew-shotperformanceashigh-resolutionimages.
+DynamicWorldmodeltopseudo-labelLULCmapswhich
+weuseasinputtothemodel.Inthefollowingexperiment
+inTable12,wetesttheperformanceoftheDynamicWorld
+10.3.Finetuningcomparisonswithbaselinemodels
+model against the generations of TerraMind. Overall, we
+Since the first approaches to foundation models for Earth observethatwhilefinetunedTerraMindv1-B-singleoutper-
+observations, experts in the field discuss on the usability formsDynamicWorld,thegenerationofTerraMinddoesnot
+ofsuch modelscompared totask-specific modelsthat are surpasstheinferenceresultsofDynamicWorld.
+trainedforeachapplicationindividually.Recentbenchmark
+resultssuggestedthattask-specificmodels,likeU-Nets,of- Approach Input IoU
+Water
+tenoutperformfinetunedGFMs[49].Wethereforeaddition-
+TerraMindv1-B-single S-2L1C 69.87
+allyinvestigatehowTerraMindcompareswithtask-specific
+DynamicWorldpseudo-labeling S-2L1C 71.98
+U-NetsandViTmodelsfollowingthePANGAEAevaluation
+TerraMindv1-B-singlefinetuning S-2L1C 76.32
+protocolinTable6.AsadvicedbytheauthorsofPANGAEA,
+weagainreportresultsonnineoftheelevendatasetsaswe
+Table12.ResultsontheSen1Floods11testsetcomparingflood
+couldnotreproducetheperformanceontheremainingtwo
+mapsderivedfromTerraMind’sout-of-the-boxLULCgenerations
+datasets.Thetask-specificmodelsaretrainedfromscratch
+tothosederivedfromLULCpseudo-labelingwithDynamicWorld.
+for each individual task, while all GFMs including Terra-
+Theresultsareinferiortothoseobtainedbyfine-tuningaspecial-
+MindarefinetunedwithafrozenencoderandanUperNet izedmodelforthisdownstreamtask,whichisexpected.
+head.Overall,ourresultsdemonstratethatTerraMindv1-B
+outperformstask-specificUNetandViTmodelsacrossthe
+PANGAEAbenchmarkinbothunimodalandmultimodal 10.5.TiMtuningforcropmapping
+settingsby1ppavg.mIoUand4ppavg.mIoUrespectively.
+WefurtherinvestigatetherelevanceofTiMtuningforcrop
+Inmultimodalsettings,theimprovementpeaksto4.5ppim-
+typemappinginordertounderstandtherelevanceofgener-
+provementofTerraMindv1-Bovertask-specificU-Nets.To
+atingartificialdataformorefinegrainedsegmentationtasks.
+thebestofourknowledge,thisisthefirsttimeaGFMmodel
+That means, we generate artificial LULC data which in-
+outperformstask-specificmodelsonaglobalbenchmark.
+cludes agricultural crop as a single class and investigate
+In addition, we observe that for most datasets, whetherthisadditionalinformationhelpstosegmentnine
+TerraMindv1-B outperforms TerraMindv1-B-single. This differenttypesofcropsinsatelliteimages.Weexperiment
+demonstratesthebenefitfromscalinginthedataandfeature withtheSouthAfricaCropTypeMappingdataset(https:
+dimension–i.e.,leveragingdual-scalefeaturerepresentations //source.coop/esa/fusion-competition)and
+onapixellevelandatokenlevel. present the results in Table 13. Overall, we observe that
+
+--- PAGE 19 ---
+
+TiMtuningimprovestheperformancebyaround1pp.That Coordinates Sentinel-2 L2A Sentinel-1 GRD LULC DEM Caption
+The image is a satellite
+means that even though the generated artificial data does v w ie it w h a o f m a i x la o n f d n s a c t a u p r e a l
+20°30′N and man-made
+not include further information on the location and shape 41°15′E f c g e o r a e lo t e u r n s r , e a a s r n . e d T b h g r e r o a d w y o , n m a , n in d a nt
+Generation t te h x e t l u a r n e d w h i a th s … a rough
+of certain crops, the information on where to expect crop
+The image shows a
+land in general helps to guide the model to an improved b sh ro a w pe n d , i l r a re n g d u w la it r h ly a
+Ground Truth rough texture.
+performance.
+Figure17.Randomlyselectedchainedgenerationexamplewith
+Input mIoU
+uni-modalgeo-locationinputdata.Toprowisartificiallygenerated
+TerraMindv1-B S-2 41.87 databyTerraMind,buttomrowrepresentsagroundtruthsampleat
+TerraMindv1-BTiM S-2+gen.LULC 42.74 thisgridlocation,respectively.
+Table13.Thinking-in-modalities(TiM)tuningcomparedwithstan-
+dardfullfine-tuningapproachesontheSACropdataset. alternativetoleveragingpixel-leveldataforthegeneration
+ofartificialdatawithTerraMind.
+11.1.Large-scalegenerations
+11.Any-to-anygeneration
+InFigures19and20,weprovideadditionalqualitativere-
+InFigure18,weprovideanexampleofany-to-anygener- sultsforlarge-tilegenerationsattheexampleofSingapore.
+ationonfourimage-likemodalitiesandtwosequence-like Specifically, we leverage a 35.5km × 69.5km optical S-
+modalities. Overall, we observe that when we start from 2 L2A tile as input and iteratively generate overlapping
+modalitieswithhighinformationcontent(e.g.,fine-grained 224x224pixelgenerationsforS-1RTC,S-1GRD,NDVI,
+image-likemodalities),thereconstructionsareparticularly andLULC.Intheoverlappingareas,weapplythemeanof
+good.Evenwithlessinformationcontent,themodelisable allgenerationsinordertoenhancethespatialconcisenessof
+togenerateconsistentartificialdata.However,wecanclearly thegenerations.TerraMindconsistentlyremovestheclouds
+observethatthequalitycomparedtothegroundtruth(rep- intheS-1generations.Itmakesassumptionsforhiddenar-
+resentedbytheinputintheleftofthefigure)isdecreasing. eas, which are look accurate for large features like water
+Finally,itisinterestingtoseehowartefactsareintroduced bodiesortheshoreline.Otherfeatureslikeairportsorships
+bythemodelwhenstartingfromlowerinformationcontent arealsoclearlyvisibleintheS-1andNDVIgenerations.
+intheinput.Forexample,whenpromtingTerraMindtogen-
+eratedatafromDEMinput,weobservethatthemodelpays
+significantattentiontothedarkerstreamsintheDEMimage,
+whicharelatergeneratedasariverinLULC.
+While we expect to see accurate generations from
+information-rich modalities like optical data, it is partic-
+ularlyinterestingtounderstandhowTerraMinddealswith
+lowinformationcontent.Therefore,wepromptTerraMindto
+generateasubsetofmodalitiesstartingfromthegeolocation
+inFigure17.Interestingly,forageolocationfromthemiddle-
+east,themodelgeneratesanopticalimagethatresembles
+adesert.Whilethegeneratedopticalimageisbasedonthe
+rightcontext,theactualstructureisunsurprisinglydifferent
+fromthegroundtruth.Basedonthechainedgeneration,this
+differenceripplesdownacrossallothermodalitiesaswell
+causing consistent but inaccurate generations. This exam-
+pleemphasizestherelevanceofaccesstoinformation-rich,
+fine-grainedfeaturestofacilitateaccurategenerations.
+Nexttotheevaluationofraw,pixel-levelinputinTable3,
+wefurtherevaluatethegenerationqualityusingtokenized
+inputinTable14.Interestingly,weobserveonlyminorre-
+ductioninperformancecomparedtopixel-levelinputeven
+though the tokenized representations are compressed sig-
+nificantly (up to 3000x for S-2 L2A). Overall, our results
+suggestthatleveragingtokenizedinputscanbeareasonable
+
+--- PAGE 20 ---
+
+Raw Input Sentinel-2 L2A Sentinel-1 GRD LULC DEM Caption Coordinates
+The image is a satellite
+view of a landscape
+that includes a variety
+of land uses such as 33°15′N
+farmland, agriculture,
+and natural features 130°00′E
+like a river or stream.
+Generation The image also shows a
+cemetery, a park, …
+The image is a satellite
+view of a developed
+area with various feat-
+ures such as residen- 34°45′N
+t r i e a c l r , e c a o t m io m na e l r s c p ia a l, c a e n s. d 127°45′E
+The area includes a
+Generation large lake, parks, and a
+school. The image …
+The image is a satellite
+view of a diverse lands-
+cape, featuring a
+mountain peak, a large 35°15′N
+s a t n a d d v iu a m rio , u a s w o a t t h e e r r w l a a y n , d 128°45′E
+uses such as residen-
+Generation tial, commercial, and
+agricultural areas. …
+The image is a satellite
+view of a developed
+area with a mix of
+industrial, agricultural, 33°45′N
+a in n c d lu n d a e t s u r a a r l i f v e e a r, t u fa re rm s. - It 112°15′E
+land, a school, a park,
+Generation and a forest. The image
+provides a …
+The image is a satellite
+view of a landscape
+that includes a river, a
+waterway, a tennis 36°00′N
+c p o a u rk rt , , a a n d ho v s a p ri i o ta u l s , a o ther 139°30′E
+land uses. The image
+provides a comprehen- Generation
+dsive view of the …
+The image is a satellite
+view of a landscape
+that includes a river, a
+33°15′N pond, a pond, and
+132°45′E v c a o r v i e o r u . s T h ty e p i e m s a o g f e l a is n d
+detailed and provides a
+Generation detailed view of the
+natural and …
+Figure18.Any-to-anygenerationexampleofTerraMindv1-B-single.Fine-grainedinputlikeopticalandradarachieveparticularlygood
+performances.
+Modalities MAE RMSE SSIM PSNR
+TokenizedS-2L2A→S-1GRD 3.3180 4.3309 0.5131 27.715
+TokenizedS-2L2A→S-1RTC 3.0544 3.9178 0.4131 27.739
+TokenizedS-2L2A→DEM 572.5 1040.6 0.5728 17.718
+TokenizedS-1GRD→S-2L2A 0.0820 0.1238 0.7182 25.630
+TokenizedS-1GRD→NDVI 0.1949 0.2425 0.4124 18.324
+TokenizedS-1GRD→DEM 327.4 550.3 0.7271 16.008
+TokenizedS-1RTC→S-2L2A 0.1195 0.1935 0.6638 24.266
+TokenizedS-1RTC→NDVI 0.1895 0.2348 0.4500 18.606
+TokenizedS-1RTC→DEM 457.9 851.6 0.7095 19.457
+Table14.PerformanceofTerraMindontokenizedinputsusing10diffusionsteps.MetricsincludeMAE↓,RMSE↓,PSNR↑,andSSIM↑.
+
+--- PAGE 21 ---
+
+(a)Input:S-2L2AdatafromSingaporecapturedJanuary9th,2025.
+(b)Generation:TerraMindoutputforS-1composition
+Figure19.Large-tilegenerationsofTerraMindforSingapore(1/1)
+
+--- PAGE 22 ---
+
+(c)Generation:TerraMindoutputforLULC
+Figure19.Large-tilegenerationsofTerraMindforSingapore(2/2)
+
+--- PAGE 23 ---
+
+(a)Input:S-2L2AdatafromSantiagodeCompostela.
+(b)Generation:TerraMindoutputforS-1GRDcomposition
+Figure20.Large-tilegenerationsofTerraMindforSantiagodeCompostela(1/3)
+
+--- PAGE 24 ---
+
+(c)TerraMindgenerationforS-1RTCcomposition
+(d)Generation:TerraMindoutputforvegetation
+Figure20.Large-tilegenerationsofTerraMindforSantiagodeCompostela(2/3)
+
+--- PAGE 25 ---
+
+(e)Generation:TerraMindoutputfordigitalelevation
+Figure20.Large-tilegenerationsofTerraMindforSantiagodeCompostela(3/3)

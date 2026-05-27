@@ -1,0 +1,839 @@
+{
+  "paper_title": "Presto: A Pixel-Level Pre-trained Multi-Sensor Masked Autoencoder for Earth Observation",
+  "total_pages": 21,
+  "total_segments": 118,
+  "segment_types": {
+    "S": "section_heading",
+    "C": "content (paragraph/bullet)",
+    "F": "figure_caption",
+    "T": "table_caption"
+  },
+  "segments": [
+    {
+      "id": "C001",
+      "page": 1,
+      "type": "paragraph",
+      "text_en_preview": "Lightweight, Pre-trained Transformers for Remote Sensing Timeseries",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C002",
+      "page": 1,
+      "type": "paragraph",
+      "text_en_preview": "Gabriel Tseng1,2      Ruben Cartuyvels1,3 Ivan Zvonkov4             Mirali Purohit5 David Rolnick1,2 Hannah Kerner5 1 Mila – Quebec AI Institute 2 McGill University arXiv:2304.14065v4 [cs.CV] 5 Feb 20",
+      "translation_status": "completed"
+    },
+    {
+      "id": "S001",
+      "page": 1,
+      "type": "section_heading",
+      "text_en_preview": "3 KU Leuven 4 University of Maryland, College Park 5 Arizona State University",
+      "translation_status": "completed"
+    },
+    {
+      "id": "S002",
+      "page": 1,
+      "type": "section_heading",
+      "text_en_preview": "Abstract",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C003",
+      "page": 1,
+      "type": "paragraph",
+      "text_en_preview": "Machine learning methods for satellite data have a range of societally relevant applications, but labels used to train models can be difficult or impossible to acquire. Self-supervision is a natural s",
+      "translation_status": "completed"
+    },
+    {
+      "id": "S003",
+      "page": 1,
+      "type": "section_heading",
+      "text_en_preview": "1    Introduction",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C004",
+      "page": 1,
+      "type": "paragraph",
+      "text_en_preview": "Machine learning is increasingly being applied to the remote sensing domain, in particular to under- stand the evolution of the Earth’s surface over time (Brown et al., 2022; Voosen, 2020; Abys et al.",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C005",
+      "page": 1,
+      "type": "paragraph",
+      "text_en_preview": "Preprint.",
+      "translation_status": "completed"
+    },
+    {
+      "id": "F001",
+      "page": 2,
+      "type": "figure_caption",
+      "text_en_preview": "Figure 1: Presto learns from structurally-masked remote sensing pixel-timeseries. We construct a multi-sensor remote sensing pixel-timeseries, and randomly select one of the four masking strategies de",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C006",
+      "page": 2,
+      "type": "paragraph",
+      "text_en_preview": "many remote sensing datasets, which are points or irregularly shaped polygons (Rao et al., 2020; Batjes et al., 2017), requiring additional methods to handle these labels (Wang et al., 2020a). We intr",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C007",
+      "page": 3,
+      "type": "paragraph",
+      "text_en_preview": "one is missing (for instance, relying on Sentinel-1, which sees through clouds, if Sentinel-2 images are cloudy). Our results support the surprising conclusion that a pixel-based approach can in some ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C008",
+      "page": 3,
+      "type": "section_heading",
+      "text_en_preview": "2     Related Work",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C009",
+      "page": 3,
+      "type": "paragraph",
+      "text_en_preview": "Architectures for Remote Sensing When processing remote sensing timeseries, transformers have been extensively investigated either as unmodified architectures (Rußwurm and Körner, 2020) or as architec",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C010",
+      "page": 3,
+      "type": "section_heading",
+      "text_en_preview": "Self-supervised learning for Remote Sensing",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C011",
+      "page": 3,
+      "type": "paragraph",
+      "text_en_preview": "While contrastive learning has been investigated for remote sensing (Manas et al., 2021), recent self-supervised learning research has focused on masked autoencoders (Yuan et al., 2022; Cong et al., 2",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C012",
+      "page": 3,
+      "type": "section_heading",
+      "text_en_preview": "3     Method",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C013",
+      "page": 3,
+      "type": "paragraph",
+      "text_en_preview": "We aim to learn a model, f , which can learn useful representations in a self-supervised manner given unlabelled remote sensing pixel-timeseries data while meeting the usability requirements outlined ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "S004",
+      "page": 3,
+      "type": "section_heading",
+      "text_en_preview": "3.1    Pre-training Data",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C014",
+      "page": 3,
+      "type": "paragraph",
+      "text_en_preview": "Self-supervised models for remote sensing must generalize to a wide range of geographies and tasks (Lacoste et al., 2023). We therefore aimed to collect a globally representative pre-training dataset.",
+      "translation_status": "completed"
+    },
+    {
+      "id": "F002",
+      "page": 4,
+      "type": "figure_caption",
+      "text_en_preview": "Figure 2: Presto learns to reconstruct channels that are completely masked in a spatially cohesive manner. In this experiment, we masked only the Sentinel-2 RGB channels; Presto was able to reconstruc",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C015",
+      "page": 4,
+      "type": "paragraph",
+      "text_en_preview": "intervals, sampled from a 2-year period from the beginning of 2020 until the end of 2021, with each month represented by one timestep (similar to the approach adopted by Tseng et al. (2021)). Derived ",
+      "translation_status": "pending"
+    },
+    {
+      "id": "S005",
+      "page": 4,
+      "type": "section_heading",
+      "text_en_preview": "3.2   Encoding and tokenization",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C016",
+      "page": 4,
+      "type": "paragraph",
+      "text_en_preview": "We transformed the pixel-timeseries x into a number of tokens (each represented by an embedding e) to be processed by the Presto transformer. Per timestep 0 ≤ i < T , we split the input variables into",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T001",
+      "page": 5,
+      "type": "table_caption",
+      "text_en_preview": "Table 1: We evaluated Presto on a wide variety of downstream tasks, including segmentation (seg.), multi-label (ml) scene classification (class.) and regression (reg.) tasks. There is diversity in ter",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C017",
+      "page": 5,
+      "type": "paragraph",
+      "text_en_preview": "Input shape       Train Dataset            Task        Region [H, W, T, C]      samples Kenya                           1,345 CropHarvest        Seg.        Brazil      [1, 1, 12, 18]        203 Togo ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C018",
+      "page": 5,
+      "type": "paragraph",
+      "text_en_preview": "the input as static variable through coordinates sLoc ) and a variable’s (ii) timestamp and (iii) channel group. We did this by adding encodings to the previously described embeddings e. The complete ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "S006",
+      "page": 5,
+      "type": "section_heading",
+      "text_en_preview": "3.3   Pre-training via Structured Masking",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C019",
+      "page": 5,
+      "type": "paragraph",
+      "text_en_preview": "A key requirement for Presto was to perform well even with incomplete inputs (i.e., when there are missing timesteps, channels, or both). When masking out part of the input x, we therefore tailored th",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T002",
+      "page": 6,
+      "type": "table_caption",
+      "text_en_preview": "Table 2: Mean F1 score across all CropHarvest tasks. Presto outpeforms TIML (Tseng et al., 2022) and MOSAIKS-1D while requiring the adaptation of far fewer parameters. The TIML and MOSAIKS-1D model di",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C020",
+      "page": 6,
+      "type": "paragraph",
+      "text_en_preview": "#. parameters Model              Total Adapted     Mean F1 Random Forest                           0.441 MOSAIKS-1DR       418K        8193      0.738 TIML               91K         91K      0.802 Pre",
+      "translation_status": "completed"
+    },
+    {
+      "id": "F003",
+      "page": 6,
+      "type": "figure_caption",
+      "text_en_preview": "Figure 3: Presto is robust to incomplete inputs. We measured the AUC ROC score of Presto with Linear probing (PrestoR ) on the CropHarvest dataset when no Dynamic World input is passed, and with a sub",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C021",
+      "page": 6,
+      "type": "paragraph",
+      "text_en_preview": "2. Channel-groups: (T × d) masked values, with d < D 3. Contiguous timesteps: (t × D) masked values, t < T 4. Timesteps: (t × D) masked values, with t < T For each training instance, we randomly sampl",
+      "translation_status": "pending"
+    },
+    {
+      "id": "S007",
+      "page": 6,
+      "type": "section_heading",
+      "text_en_preview": "4   Experiments",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C022",
+      "page": 6,
+      "type": "paragraph",
+      "text_en_preview": "In all experiments described below, we use a Presto model with identical encoder and decoder configurations (2 attention layers with 8 heads, an embedding size of 128 and an MLP ratio of 4). We invest",
+      "translation_status": "completed"
+    },
+    {
+      "id": "F004",
+      "page": 7,
+      "type": "figure_caption",
+      "text_en_preview": "Figure 4: We obtained per-image predictions using Presto by computing a mean and standard deviation of Presto’s per-pixel outputs, and passing this concatenated vector to a downstream classifier. We i",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C023",
+      "page": 7,
+      "type": "bullet",
+      "text_en_preview": "• Feature extraction. Rolf et al. (2021) demonstrated the utility of neural networks as feature- extractors on top of which computationally efficient classifiers could be trained. PrestoR and PrestoRF",
+      "translation_status": "pending"
+    },
+    {
+      "id": "S008",
+      "page": 7,
+      "type": "section_heading",
+      "text_en_preview": "5     Evaluation Tasks & Results",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C024",
+      "page": 7,
+      "type": "paragraph",
+      "text_en_preview": "We evaluated Presto using six evaluation tasks spanning diverse task types, geographic locations (4 continents and 38 countries), input data modalities, and fine-tuning dataset sizes (Table 1). Whenev",
+      "translation_status": "completed"
+    },
+    {
+      "id": "S009",
+      "page": 7,
+      "type": "section_heading",
+      "text_en_preview": "5.1   Timeseries Tasks",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C025",
+      "page": 7,
+      "type": "bullet",
+      "text_en_preview": "• Crop type Segmentation: The CropHarvest (Tseng et al., 2021) evaluation datasets consist of binary pixel classification of (i) maize in Kenya, (ii) coffee in Brazil and (iii) cropland in Togo. We co",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T003",
+      "page": 8,
+      "type": "table_caption",
+      "text_en_preview": "Table 3: RMSE results on the regression tasks. The literature baselines are not directly comparable, since they use different input datasets or private test data (or both). Rao et al. (2020) reported ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C026",
+      "page": 8,
+      "type": "paragraph",
+      "text_en_preview": "Fuel        Algae          Mean Moisture    Blooms        difference Linear Regression             28.20       0.850            0% Random Forest                23.84         1.249        15.7% MOSAIKS",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T004",
+      "page": 8,
+      "type": "table_caption",
+      "text_en_preview": "Table 4: Results on the TreeSatAI dataset. We compared Presto to the dataset’s benchmark models. The MLPs contain 3 layers (with 563K-723K parameters respectively) and are tuned for this task. We froz",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C027",
+      "page": 8,
+      "type": "paragraph",
+      "text_en_preview": "Weighted             Micro Model         Data        F1     mAP          F1     mAP MLP                    10.09     29.42      12.82      33.09 LightGBM      S1       11.86     32.79      14.07      ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C028",
+      "page": 8,
+      "type": "bullet",
+      "text_en_preview": "• Fuel Moisture: The live fuel moisture dataset (Rao et al., 2020) measures live fuel moisture content in the Western U.S. Rao et al. (2020)’s baseline used 5-fold cross validation to evaluate model p",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C029",
+      "page": 8,
+      "type": "paragraph",
+      "text_en_preview": "5.1.1   Timeseries Results",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C030",
+      "page": 8,
+      "type": "paragraph",
+      "text_en_preview": "Presto excels at timeseries tasks, significantly outperforming the state-of-the-art for CropHarvest (Table 2) and outperforming all baselines for the regression tasks (Table 3). We found that Presto i",
+      "translation_status": "completed"
+    },
+    {
+      "id": "F005",
+      "page": 9,
+      "type": "figure_caption",
+      "text_en_preview": "Figure 5: EuroSat accuracy of a kNN@5 classifier given pre-trained model embeddings at a variety of input resolutions (following Reed et al. (2022)) as a function of FLOPs required to encode an image ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C031",
+      "page": 9,
+      "type": "paragraph",
+      "text_en_preview": "Presto is also robust to the removal of input channels. On the CropHarvest dataset (Table 2), Presto remained performant without the Dynamic World input, showing a negligible difference in mean F1 sco",
+      "translation_status": "pending"
+    },
+    {
+      "id": "S010",
+      "page": 9,
+      "type": "section_heading",
+      "text_en_preview": "5.2     Image-based Tasks",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C032",
+      "page": 9,
+      "type": "paragraph",
+      "text_en_preview": "Presto is designed to ingest single pixel-timeseries. When one prediction is required for a set of pixels (as for image-based tasks and the Image-Timeseries tasks in Section 5.3), we used the followin",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C033",
+      "page": 9,
+      "type": "section_heading",
+      "text_en_preview": "5.2.1    Image-based Results",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C034",
+      "page": 9,
+      "type": "paragraph",
+      "text_en_preview": "Despite being pre-trained on pixel-timeseries data, Presto is competitive on single-timestep image datasets against much larger models. We followed the setup of Reed et al. (2022) in measuring the per",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T005",
+      "page": 10,
+      "type": "table_caption",
+      "text_en_preview": "Table 5: EuroSAT finetuning accuracy. Presto is the only backbone that can handle both MS and RGB inputs (separate SatMAE models are trained for RGB and MS inputs). We reported Presto results for full",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C035",
+      "page": 10,
+      "type": "paragraph",
+      "text_en_preview": "Params Backbone        Inputs               Accuracy (M) GASSL       ResNet-18       RGB         11.69        0.895 SeCo        ResNet-18       RGB         11.69        0.931 SatMAE      ViT-Large    ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T006",
+      "page": 10,
+      "type": "table_caption",
+      "text_en_preview": "Table 6: Results on the S2-Agri100 dataset. We followd (Yuan et al., 2022) in reporting overall accuracy (OA), Kappa Cohen score (κ) and macro-F1 score. All results are an average of 3 runs - standard",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C036",
+      "page": 10,
+      "type": "paragraph",
+      "text_en_preview": "Params       Pre OA        κ       F1 (M)       Trained? SITS                                  65.13   0.55     42.12 2.5 Former                    ✓            67.03   0.56    42.83 45.98      0.35  ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C037",
+      "page": 10,
+      "type": "paragraph",
+      "text_en_preview": "input or only RGB bands (which represent only a single token, since only one timestep is available). Similarly, we evaluated Presto when it receives either Sentinel-2 or Sentinel-1 data for the TreeSa",
+      "translation_status": "completed"
+    },
+    {
+      "id": "S011",
+      "page": 10,
+      "type": "section_heading",
+      "text_en_preview": "5.3     Image-Timeseries Tasks",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C038",
+      "page": 10,
+      "type": "bullet",
+      "text_en_preview": "• S2-Agri100 : The S2-Agri dataset (Sainte Fare Garnot et al., 2020) classifies crop types in agricul- tural parcels. We used a variant of S2-Agri (S2-Agri100 ) developed by Yuan et al. (2022) for the",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C039",
+      "page": 10,
+      "type": "paragraph",
+      "text_en_preview": "5.3.1    Image-Timeseries Results",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C040",
+      "page": 10,
+      "type": "paragraph",
+      "text_en_preview": "The S2-Agri100 dataset consists of 24 timesteps at 10 to 30 day intervals (compared to Presto’s pre-training data, which consists of 12-month timeseries). Presto remained performant on this dataset, a",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T007",
+      "page": 11,
+      "type": "table_caption",
+      "text_en_preview": "Table 7: Structured masking strategies yield the best downstream performance. We measured PrestoR ’s F1 score on the CropHarvest validation task. Combining structured strategies outperformed the “Rand",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C041",
+      "page": 11,
+      "type": "paragraph",
+      "text_en_preview": "Channel                             Contiguous       F1 Random     Timesteps Groups                              Timesteps       Score ✓                                               0.646 ✓          ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "S012",
+      "page": 11,
+      "type": "section_heading",
+      "text_en_preview": "5.4   Ablations",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C042",
+      "page": 11,
+      "type": "paragraph",
+      "text_en_preview": "We conducted three ablations to better understand Presto’s performance: • Structured masking strategies perform best: Table 7 shows results from ablating the masking strategies. Unlike other masked au",
+      "translation_status": "completed"
+    },
+    {
+      "id": "S013",
+      "page": 11,
+      "type": "section_heading",
+      "text_en_preview": "6     Discussion & Conclusion",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C043",
+      "page": 11,
+      "type": "paragraph",
+      "text_en_preview": "Limitations Presto is designed to ingest 10m/px resolution imagery and is pre-trained on products at this scale. This decision is motivated by the free, global availability over time of products at th",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C044",
+      "page": 11,
+      "type": "paragraph",
+      "text_en_preview": "Conclusion We present Presto: a lightweight, pre-trained timeseries transformer for remote sensing. By leveraging structure unique to remote sensing data—specifically, (i) an important temporal dimens",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T008",
+      "page": 12,
+      "type": "table_caption",
+      "text_en_preview": "Table 8: Effect of model size on validation performance. To understand the effect of model size on performance, we pre-train two larger variants of Presto. As in Table 7, we measure PrestoR ’s perform",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C045",
+      "page": 12,
+      "type": "paragraph",
+      "text_en_preview": "# params    FLOPs      F1 Depth   Width (M)       (M)      score 2      128       0.81     88.94   0.665 2      256       2.02    220.81   0.687 4      128       1.21    132.42   0.669",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C046",
+      "page": 12,
+      "type": "paragraph",
+      "text_en_preview": "Impact statement",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C047",
+      "page": 12,
+      "type": "paragraph",
+      "text_en_preview": "Machine learning applications to remote sensing have a wide range of societally beneficial outcomes, ranging from tracking progress on sustainable development goals (Ferreira et al., 2020) to improved",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C048",
+      "page": 12,
+      "type": "paragraph",
+      "text_en_preview": "Acknowledgements",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C049",
+      "page": 12,
+      "type": "paragraph",
+      "text_en_preview": "This work was supported by NASA under the NASA Harvest Consortium on Food Security and Agriculture (Award #80NSSC18M0039). This research was enabled in part by compute resources provided by Mila (mila",
+      "translation_status": "completed"
+    },
+    {
+      "id": "S014",
+      "page": 12,
+      "type": "section_heading",
+      "text_en_preview": "References",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C050",
+      "page": 12,
+      "type": "paragraph",
+      "text_en_preview": "Earth engine data catalogue. https://developers.google.com/earth-engine/datasets/ catalog. Accessed: 2023-01-31. Tick      tick    bloom:          Harmful        algal     bloom     detection         ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C051",
+      "page": 13,
+      "type": "paragraph",
+      "text_en_preview": "V. Böhm, W. J. Leong, R. B. Mahesh, I. Prapas, E. Nemni, F. Kalaitzis, S. Ganju, and R. Ramos- Pollan. Sar-based landslide classification pretraining leads to better segmentation. In Artificial Intell",
+      "translation_status": "pending"
+    },
+    {
+      "id": "C052",
+      "page": 14,
+      "type": "paragraph",
+      "text_en_preview": "A. Lacoste, N. Lehmann, P. Rodriguez, E. D. Sherwin, H. Kerner, B. Lütjens, J. A. Irvin, D. Dao, H. Alemohammad, A. Drouin, et al. Geo-bench: Toward foundation models for earth monitoring. arXiv prepr",
+      "translation_status": "pending"
+    },
+    {
+      "id": "C053",
+      "page": 15,
+      "type": "paragraph",
+      "text_en_preview": "A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, Ł. Kaiser, and I. Polosukhin. Attention is all you need. NeurIPS, 2017. P. Voosen. Europe builds ‘digital twin’of earth to hone ",
+      "translation_status": "pending"
+    },
+    {
+      "id": "C054",
+      "page": 16,
+      "type": "paragraph",
+      "text_en_preview": "A     Appendix",
+      "translation_status": "completed"
+    },
+    {
+      "id": "S015",
+      "page": 16,
+      "type": "section_heading",
+      "text_en_preview": "Reproducibility",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C055",
+      "page": 16,
+      "type": "paragraph",
+      "text_en_preview": "All code and data used to train and evaluate Presto will be made available upon publication, and the code is currently available at https://github.com/nasaharvest/presto. In addition, we discuss speci",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C056",
+      "page": 16,
+      "type": "paragraph",
+      "text_en_preview": "A.1     Pre-training details",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C057",
+      "page": 16,
+      "type": "paragraph",
+      "text_en_preview": "We outline training hyperparameters below: • Training length: We train the model for 20 epochs, with a batch size of 4096 (resulting in 5950 batches per epoch). On a single NVIDIA V100 GPU, this takes",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C058",
+      "page": 16,
+      "type": "paragraph",
+      "text_en_preview": "A.1.1    Pre-training data",
+      "translation_status": "completed"
+    },
+    {
+      "id": "F006",
+      "page": 16,
+      "type": "figure_caption",
+      "text_en_preview": "Figure 6: The distribution of the pre-training dataset described in Section 3.1.",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C059",
+      "page": 16,
+      "type": "paragraph",
+      "text_en_preview": "Remote sensing models can be deployed in a wide range of geographies, with few labelled datapoints available at fine-tuning time (Kerner et al., 2020; Böhm et al., 2022). We therefore aim to collect a",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C060",
+      "page": 16,
+      "type": "paragraph",
+      "text_en_preview": "A.1.2    Input data",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C061",
+      "page": 16,
+      "type": "paragraph",
+      "text_en_preview": "We leverage the following data products when pre-training Presto:",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T009",
+      "page": 17,
+      "type": "table_caption",
+      "text_en_preview": "Table 9: Model sizes and FLOPs required to encode a single EuroSat image (or pixel, for Presto), as measured by the thop library. When plotting results in Table 5, we multiply the FLOPs for Presto by ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C062",
+      "page": 17,
+      "type": "bullet",
+      "text_en_preview": "• Sentinel-1 Synthetic Aperture Radar observations (S1): The VV (emit and receive at vertical polarization) and VH (emit at vertical and receive at horizontal polarization) bands: 2 real-valued dynami",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C063",
+      "page": 17,
+      "type": "paragraph",
+      "text_en_preview": "A.1.3   Channel Groups",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C064",
+      "page": 17,
+      "type": "paragraph",
+      "text_en_preview": "As described in Section 3.2, we transform the pixel timeseries x into a number of tokens, where each token is a linear transformation of a subset of the input channels. We group together channels whic",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C065",
+      "page": 17,
+      "type": "bullet",
+      "text_en_preview": "• Sentinel-1: The VV and VH bands from the Sentinel-1 sensor • Sentinel-2 RGB: The B2, B3 and B4 bands from the Sentinel-2 sensor • Sentinel-2 Red Edge: The B5, B6 and B7 bands from the Sentinel-2 sen",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T010",
+      "page": 18,
+      "type": "table_caption",
+      "text_en_preview": "Table 10: Full results for regression tasks from Table 3, including standard error computed from three runs.",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C066",
+      "page": 18,
+      "type": "paragraph",
+      "text_en_preview": "Fuel Moisture      Algae Blooms      Mean difference Linear Regression                   28.20              0.850                   0% Random Forest               23.84 ± 0.42         1.249 ± 0.02    ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C067",
+      "page": 18,
+      "type": "paragraph",
+      "text_en_preview": "A.2   FLOP calculations",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C068",
+      "page": 18,
+      "type": "paragraph",
+      "text_en_preview": "We use the thop library (https://github.com/Lyken17/pytorch-OpCounter) to calculate the FLOPs required to encode a EuroSAT image (as plotted in Table 5(b)). For the SatMAE, ScaleMAE and ConvMAE models",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C069",
+      "page": 18,
+      "type": "paragraph",
+      "text_en_preview": "A.3   Baselines",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C070",
+      "page": 18,
+      "type": "paragraph",
+      "text_en_preview": "In addition to task-specific baselines, we benchmark Presto against: • Random Forests: Random forests are powerful baselines in remote sensing as they they remain competitive with state-of-the-art met",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C071",
+      "page": 18,
+      "type": "paragraph",
+      "text_en_preview": "A.4   Downstream Results",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C072",
+      "page": 18,
+      "type": "paragraph",
+      "text_en_preview": "We include complete results for the evaluation tasks. These include error bars, as well as additional results reported for the CropHarvest (Table 12 and Figure 3), regression tasks (Table 10), EuroSAT",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T011",
+      "page": 19,
+      "type": "table_caption",
+      "text_en_preview": "Table 11: Accuracy results for pre-trained and from-scratch Presto when fine-tuned on EuroSat, at varying resolutions. We hypothesize that the drop in performance for the full resolution (64) RGB inpu",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C073",
+      "page": 19,
+      "type": "paragraph",
+      "text_en_preview": "Resolution                          2                   4               8               16                 32             64 random init.           0.703 ± 0.005      0.684 ± 0.032      0.694 ± 0.013 ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T012",
+      "page": 19,
+      "type": "table_caption",
+      "text_en_preview": "Table 12: Additional results for the CropHarvest task. In addition to the F1 scores reported in the main paper, we report AUC ROC scores, with standard error bars computed with three runs. Model      ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C074",
+      "page": 19,
+      "type": "paragraph",
+      "text_en_preview": "A.5   Disentangling the effect of pre-training",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C075",
+      "page": 19,
+      "type": "paragraph",
+      "text_en_preview": "To understand the effect of pre-training Presto, we fine-tune Presto and train it from scratch on EuroSat (Table 5), the regression tasks (Table 3 in the main paper) and TreeSatAI (Table 15). We omit ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C076",
+      "page": 19,
+      "type": "paragraph",
+      "text_en_preview": "A.6   Presto’s failure modes",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C077",
+      "page": 19,
+      "type": "paragraph",
+      "text_en_preview": "Presto processes pixel-timeseries independently, without spatial context from other pixels or locations. This means that when we make image-based predictions (such as for scene classification), Presto",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T013",
+      "page": 20,
+      "type": "table_caption",
+      "text_en_preview": "Table 13: Additional results for the EuroSat task - results for the ScaleMAE, SatMAE and ConvMAE models are from (Reed et al., 2022). We report kNN classifier results for different values of k, and at",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T014",
+      "page": 20,
+      "type": "table_caption",
+      "text_en_preview": "Table 14: Additional results for the EuroSat task for Presto when run with reduced resolutions (compared to those used by (Reed et al., 2022) and reported in Table 13). We report kNN classifier result",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T015",
+      "page": 20,
+      "type": "table_caption",
+      "text_en_preview": "Table 15: Additional results for the TreeSatAI (as in (Ahlswede et al., 2023), we report precision and recall in addition to F1 score and mAP). In addition, we report the results of finetuning Presto ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "T016",
+      "page": 21,
+      "type": "table_caption",
+      "text_en_preview": "Table 16: Full results on the S2-Agri100 dataset, including standard errors obtained from 3 runs. To obtain standard errors for the SITS-Former, we run the official code (https://github.com/ linlei121",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C078",
+      "page": 21,
+      "type": "paragraph",
+      "text_en_preview": "Params (M)     Pre-trained?              OA                κ               F1 SITS                                     65.13 ± 3.01     0.55 ± 0.03     42.12 ± 0.52 2.5 Former                         ",
+      "translation_status": "completed"
+    },
+    {
+      "id": "F007",
+      "page": 21,
+      "type": "figure_caption",
+      "text_en_preview": "Figure 7: Accuracy of kNN@5 classifier with Presto RGB representations on the EuroSat dataset vs. the input resolution, for different categories. Some categories have been left out for clarity.",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C079",
+      "page": 21,
+      "type": "paragraph",
+      "text_en_preview": "(a) Forest            (b) Annual Crop            (c) Highway                (d) River Figure 8: the RGB bands of example images from EuroSat classes.",
+      "translation_status": "completed"
+    },
+    {
+      "id": "C080",
+      "page": 21,
+      "type": "paragraph",
+      "text_en_preview": "For example, Presto’s performance on the EuroSat dataset reaches a plateau when increasing the input resolution. As Figure 7 shows, this is mainly caused by a failure to accurately predict specific cl",
+      "translation_status": "completed"
+    }
+  ]
+}

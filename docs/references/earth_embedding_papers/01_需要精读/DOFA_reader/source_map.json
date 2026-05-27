@@ -1,0 +1,375 @@
+{
+  "paper_title": "DOFA: A Dynamic Weight Factorization Approach for Unified Earth Observation Representation",
+  "paper_authors": [
+    "Zhitong Xiong",
+    "Yi Wang",
+    "Fahong Zhang",
+    "Adam J. Stewart",
+    "Joëlle Hanna",
+    "Damian Borth",
+    "Ioannis Papoutsis",
+    "Bertrand Le Saux",
+    "Gustau Camps-Valls",
+    "Xiao Xiang Zhu"
+  ],
+  "arxiv_id": "2403.15356",
+  "total_pages": 19,
+  "segments": [
+    {
+      "id": "S001",
+      "type": "paragraph",
+      "page": 1,
+      "text_preview": "Neural Plasticity-Inspired Multimodal Foundation Model for\nEarth Observation Zhitong Xiong · Yi Wang · Fahong Zhang · Adam J. Stewart · Jo¨elle\nHanna · Damian Borth · Ioannis Papoutsis · Bertrand Le S"
+    },
+    {
+      "id": "S002",
+      "type": "paragraph",
+      "page": 1,
+      "text_preview": "Abstract (continued): mance across multiple downstream tasks and general-\nizes well to unseen modalities. Enhanced with hybrid\ncontinual pretraining, DOFA+ requires significantly fewer\ncomputational r"
+    },
+    {
+      "id": "S003",
+      "type": "paragraph",
+      "page": 1,
+      "text_preview": "1 Introduction Earth observation (EO) through satellite remote sens-\ning provides unparalleled opportunities for modeling\nEarth’s surface dynamics, addressing global challenges\nsuch as climate change,"
+    },
+    {
+      "id": "S004",
+      "type": "paragraph",
+      "page": 2,
+      "text_preview": "stricts their adaptability in dynamic real-world EO sce-\nnarios, where new sensors and spectral band configu-\nrations continuously emerge. Consequently, extensive\ncomputational and human resources are"
+    },
+    {
+      "id": "C001",
+      "type": "caption",
+      "page": 2,
+      "text_preview": "Fig. 1: Motivation of DOFA. Our primary purpose is\nto develop versatile foundation models capable of adap-\ntively processing various EO data modalities."
+    },
+    {
+      "id": "S005",
+      "type": "paragraph",
+      "page": 2,
+      "text_preview": "efficient domain adaptation, without altering the un-\nderlying architecture. Through a hierarchical distilla-\ntion strategy, it preserves strong semantic priors from\nthe source model while guiding the"
+    },
+    {
+      "id": "S006",
+      "type": "paragraph",
+      "page": 3,
+      "text_preview": "Extensive experiments across 20+ EO tasks validate\nDOFA’s robust adaptability, efficiency, and scalability.\nOur approach represents a meaningful advancement to-\nward open-world EO visual understanding"
+    },
+    {
+      "id": "S007",
+      "type": "paragraph",
+      "page": 3,
+      "text_preview": "2 Related Work Early efforts to develop EO foundation models were de-\nvoted to generating effective embeddings for data from\na single modality. For example, SeCo [30] and CACo [29]\nleverage temporal i"
+    },
+    {
+      "id": "C002",
+      "type": "caption",
+      "page": 3,
+      "text_preview": "Fig. 2: Motivation\nand\nmain\narchitecture\nof\nDOFA. We design DOFA to emulate the Neuroplas-\nticity [19, 55, 11] mechanism for processing multimodal\nEO data. (1) Illustration of the brain’s capability t"
+    },
+    {
+      "id": "S008",
+      "type": "paragraph",
+      "page": 3,
+      "text_preview": "unimodal encoders to encode multispectral and SAR\ndata individually. Subsequently, it utilizes a cross-modal\nradar-optical Transformer that leverages cross-attention\nto extract the unified representat"
+    },
+    {
+      "id": "S009",
+      "type": "paragraph",
+      "page": 4,
+      "text_preview": "baselines. However, for existing models, it is tricky to\nhandle situations where the number of spectral bands\nchanges in downstream tasks without retraining the\nmodels. DOFA and DOFA+ overcome this by"
+    },
+    {
+      "id": "S010",
+      "type": "paragraph",
+      "page": 4,
+      "text_preview": "3 Methodology Here, we provide detailed information about the pro-\nposed DOFA and DOFA+ models, along with a more\ndetailed presentation of the training method. 3.1 Preliminary Given an input image X ∈"
+    },
+    {
+      "id": "S011",
+      "type": "subsection_header",
+      "page": 4,
+      "text_preview": "3.2 Architecture overview"
+    },
+    {
+      "id": "S012",
+      "type": "paragraph",
+      "page": 4,
+      "text_preview": "The patch embedding layer transforms the input image\ninto a sequence of embeddings that the self-attention\nmechanism of the Transformer can process. A straight-\nforward way to handle the input data fr"
+    },
+    {
+      "id": "C003",
+      "type": "caption",
+      "page": 5,
+      "text_preview": "Fig. 3: Architecture and training details. DOFA builds on masked image modeling, introducing a significant\nadvancement by processing input images with any number of channels within a single framework."
+    },
+    {
+      "id": "C004",
+      "type": "caption",
+      "page": 5,
+      "text_preview": "Fig. 4: Illustration of weight space interpolation for new\nsensors or a combination of spectral bands."
+    },
+    {
+      "id": "S015",
+      "type": "paragraph",
+      "page": 5,
+      "text_preview": "tensive retraining thanks to the dynamic weight gen-\neration, from high-resolution optical imaging to multi-\nspectral and hyperspectral sensing. 3.3 Wavelength-conditioned dynamic patch embedding To m"
+    },
+    {
+      "id": "C005",
+      "type": "caption",
+      "page": 6,
+      "text_preview": "Fig. 5: Dynamic weight generator and continual training framework. (1) The central wavelengths of each\nband are utilized to derive weights tailored to each wavelength. (2) Continual pretraining proces"
+    },
+    {
+      "id": "S017",
+      "type": "paragraph",
+      "page": 6,
+      "text_preview": "as the embeddings V′′b associated with the bias query\ntokens Qb from V′′. Then, two fully-connected layers\nare utilized to generate the dynamic weights and biases: Mw = Fw(V′′\nw + V′\nλ) ∈RC×P 2D, Mb ="
+    },
+    {
+      "id": "S018",
+      "type": "paragraph",
+      "page": 7,
+      "text_preview": "connected layer is used in the decoder rather than the\nconvolution layer in the patch embedding layer."
+    },
+    {
+      "id": "S019",
+      "type": "subsection_header",
+      "page": 7,
+      "text_preview": "3.4 Multimodal continual pretraining"
+    },
+    {
+      "id": "S020",
+      "type": "paragraph",
+      "page": 7,
+      "text_preview": "The self-supervised loss formulation is pivotal for train-\ning our multimodal EO foundation model. The model\nleverages the MIM paradigm to avoid the requirement\nfor spatially aligned multimodal datase"
+    },
+    {
+      "id": "S021",
+      "type": "paragraph",
+      "page": 8,
+      "text_preview": "resent the student and teacher features from the l-th\nlayer, respectively, for sample i.\nThe total training loss is defined as: L =\n1\nN N\nX i=1\n∥Xi −X′i∥2 |\n{z\n}\nMIM Reconstruction Loss −λ· 1 L\nX l=1 "
+    },
+    {
+      "id": "S022",
+      "type": "paragraph",
+      "page": 8,
+      "text_preview": "4 Experiments We conduct extensive experiments across 22 datasets\nencompassing various Earth Observation (EO) tasks,\nincluding image classification, semantic segmentation,\nobject detection, and change"
+    },
+    {
+      "id": "T001",
+      "type": "table_caption",
+      "page": 9,
+      "text_preview": "Table 1: Linear probing results on six classification tasks. All models are trained for 50 epochs. The reported\nnumbers are top-1 overall accuracy (OA). The m-bigearthnet dataset is evaluated using mi"
+    },
+    {
+      "id": "T002",
+      "type": "table_caption",
+      "page": 9,
+      "text_preview": "Table 2: Partial fine-tuning results on six segmentation tasks. All models are trained with a frozen backbone\nfor 20 epochs. Reported numbers are mean intersection over union (mIoU). Missing values ar"
+    },
+    {
+      "id": "T003",
+      "type": "table_caption",
+      "page": 9,
+      "text_preview": "Table 3 summarizes the results across eight repre-\nsentative downstream tasks. For the results of DOFA,\nwe include the results from the PANGEA [31] bench-\nmark. DOFA with ViT-Base already achieves com"
+    },
+    {
+      "id": "S025",
+      "type": "paragraph",
+      "page": 10,
+      "text_preview": "10 When scaling to DOFA+ (ViT-Large), we observe\nsubstantial improvements across nearly all tasks, set-\nting new state-of-the-art (SOTA) results on the PANGEA\nbenchmark. Overall, DOFA+ attains the hig"
+    },
+    {
+      "id": "S026",
+      "type": "subsection_header",
+      "page": 10,
+      "text_preview": "4.3 Object Detection Experiments"
+    },
+    {
+      "id": "S027",
+      "type": "paragraph",
+      "page": 10,
+      "text_preview": "We evaluate object detection performance on the DIOR\ndataset using the Faster R-CNN detector with DOFA\nand DOFA+ backbones. The DIOR dataset is a large-\nscale benchmark for remote sensing object detec"
+    },
+    {
+      "id": "T004",
+      "type": "table_caption",
+      "page": 10,
+      "text_preview": "Table 5 reports the detection performance in terms\nof mAP50. DOFA already achieves competitive results\nwith an mAP50 of 76.21, while DOFA+ establishes a\nnew SOTA with 79.73, surpassing strong baseline"
+    },
+    {
+      "id": "S028",
+      "type": "paragraph",
+      "page": 10,
+      "text_preview": "Unlike SkySense models, which use separate back-\nbones for optical RGB and multispectral data, DOFA\nand DOFA+ employ a single set of model parameters\nacross all tasks. Despite this unified design, the"
+    },
+    {
+      "id": "T005",
+      "type": "table_caption",
+      "page": 11,
+      "text_preview": "Table 3: Benchmark results across 8 EO downstream tasks. An asterisk (∗) marks tasks that use only single-scene\ninputs. Best scores in each column are bold; second–best are underlined."
+    },
+    {
+      "id": "T006",
+      "type": "table_caption",
+      "page": 11,
+      "text_preview": "Table 4: Classification results on the RESISC-45\ndataset. The best results are shown in bold."
+    },
+    {
+      "id": "T007",
+      "type": "table_caption",
+      "page": 11,
+      "text_preview": "Table 5: Detection performance on the DIOR horizontal\ndataset. Faster R-CNN is used as the object detector."
+    },
+    {
+      "id": "T008",
+      "type": "table_caption",
+      "page": 12,
+      "text_preview": "Table 6: Ablation Studies on the performance of DOFA+ (ViT-B) using different numbers of spectral channels.\nComparison of band combinations is conducted on the Sen1Floods11 dataset."
+    },
+    {
+      "id": "C006",
+      "type": "caption",
+      "page": 12,
+      "text_preview": "Fig. 6: Trend of segmentation performance as addi-\ntional spectral bands are incrementally included. Start-\ning from RGB, performance improves significantly with\nthe addition of more bands."
+    },
+    {
+      "id": "S033",
+      "type": "paragraph",
+      "page": 12,
+      "text_preview": "the performance compared to RGB, but subsequent in-\nclusion of Red Edge (RE) bands leads to substantial\nimprovements. With RGB + CA + RE1, the Water\nIoU increases from 49.77 to 57.51, demonstrating th"
+    },
+    {
+      "id": "T009",
+      "type": "table_caption",
+      "page": 12,
+      "text_preview": "Table 7: Ablation Studies on the performance of DOFA\nwith different training epochs."
+    },
+    {
+      "id": "C007",
+      "type": "caption",
+      "page": 13,
+      "text_preview": "Fig. 7: Segmentation maps with progressively added spectral bands (from RGB to full set). As more bands are\nincluded, boundaries become sharper and errors decrease, with F1, mIoU, and Water IoU consis"
+    },
+    {
+      "id": "S036",
+      "type": "paragraph",
+      "page": 13,
+      "text_preview": "that longer pretraining enables DOFA to learn richer\nand more transferable representations. Beyond 80 epochs,\nthe gains become marginal. This suggests that while\nsufficient pretraining is important fo"
+    },
+    {
+      "id": "T010",
+      "type": "table_caption",
+      "page": 13,
+      "text_preview": "Table 8 highlights the efficiency advantages of our pro-\nposed models, DOFA and DOFA+, in comparison to\nrecent EO foundation models. Unlike prior works that\nrequire massive datasets, hundreds of train"
+    },
+    {
+      "id": "T011",
+      "type": "table_caption",
+      "page": 13,
+      "text_preview": "Table 8: Pre-training efficiency comparison of recent EO\nfoundation models (mAP column removed). N/A indi-\ncates not applicable due to missing public checkpoints\nor sensor mismatches that would lead t"
+    },
+    {
+      "id": "S038",
+      "type": "paragraph",
+      "page": 14,
+      "text_preview": "14 Sentinel-2, 9 channels Gaofen, 4 channels Sentinel-2, 13 channels NAIP (RGB), 3 channels Sentinel-1, 2 channels\nDensities (Sentinel-1, 2 channels) Densities (NAIP (RGB), 3 channels) Densities (Gaof"
+    },
+    {
+      "id": "C008",
+      "type": "caption",
+      "page": 14,
+      "text_preview": "Fig. 8: Visualization of learned embeddings. (a) Visualization of the generated weights for different input\nmodalities. (b) t-SNE plots of the feature representations from various foundation models ac"
+    },
+    {
+      "id": "S039",
+      "type": "paragraph",
+      "page": 15,
+      "text_preview": "15 – Finally, we conduct a single epoch of training on\nthe full 11.5M dataset to consolidate representation\nlearning. All images are resized to 224 × 224 and normalized\nusing modality-specific statist"
+    },
+    {
+      "id": "S040",
+      "type": "paragraph",
+      "page": 15,
+      "text_preview": "5 Conclusion In this work, we introduced DOFA and DOFA+, two\nfoundation models for Earth observation (EO) designed\nto operate flexibly across a wide range of sensors, spec-\ntral bands, and spatial res"
+    },
+    {
+      "id": "S041",
+      "type": "paragraph",
+      "page": 15,
+      "text_preview": "6 Data availability statements In this work, we have constructed an extensive multi-\nmodal dataset that is composed of five distinct modali-\nties, each offering unique spectral and spatial data char-\n"
+    },
+    {
+      "id": "S042",
+      "type": "paragraph",
+      "page": 16,
+      "text_preview": "16 NAIP This NAIP part of the dataset can be down-\nloaded from https://github.com/allenai/satlas/blob/\nmain/SatlasPretrain.md#download. EnMAP This hyperspectral data from EnMAP used in\nour dataset can"
+    },
+    {
+      "id": "S043",
+      "type": "paragraph",
+      "page": 16,
+      "text_preview": "7 Code availability The training script and inference script have been pub-\nlicly available at https://github.com/zhu-xlab/DOFA.\nThe trained models have been publicly available at https:\n//huggingface"
+    },
+    {
+      "id": "S044",
+      "type": "paragraph",
+      "page": 17,
+      "text_preview": "17 An image is worth 16x16 words: Transformers\nfor image recognition at scale.\narXiv preprint\narXiv:2010.11929, 2020.\n14. Anthony Fuller, Koreen Millard, and James R\nGreen.\nCROMA: Remote sensing repre"
+    },
+    {
+      "id": "S045",
+      "type": "paragraph",
+      "page": 18,
+      "text_preview": "18 Khalidov,\nPierre\nFernandez,\nDaniel\nHaziza,\nFrancisco Massa, Alaaeldin El-Nouby, et al.\nDi-\nnov2: Learning robust visual features without\nsupervision.\narXiv preprint arXiv:2304.07193,\n2023.\n36. Colo"
+    }
+  ],
+  "figures": [
+    {
+      "fid": "F001",
+      "page": 2,
+      "filename": "fig001.png",
+      "desc": "Fig. 1: Motivation of DOFA"
+    },
+    {
+      "fid": "F002",
+      "page": 2,
+      "filename": "fig002.png",
+      "desc": "Fig. 2: Main architecture (part)"
+    },
+    {
+      "fid": "F003",
+      "page": 2,
+      "filename": "fig003.png",
+      "desc": "Fig. 2: Neuroplasticity illustration"
+    },
+    {
+      "fid": "F004",
+      "page": 2,
+      "filename": "fig004.png",
+      "desc": "Fig. 2: Full architecture diagram"
+    },
+    {
+      "fid": "F005",
+      "page": 3,
+      "filename": "fig005.png",
+      "desc": "Small illustration"
+    },
+    {
+      "fid": "F006",
+      "page": 5,
+      "filename": "fig006.png",
+      "desc": "Fig. 3: Architecture and training details"
+    },
+    {
+      "fid": "F007",
+      "page": 12,
+      "filename": "fig007.png",
+      "desc": "Fig. 6/7: Segmentation results"
+    }
+  ]
+}

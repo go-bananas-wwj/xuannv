@@ -1,0 +1,1038 @@
+[
+  {
+    "id": "H001",
+    "type": "H",
+    "page": 1,
+    "text_preview": "Abstract",
+    "translated": false
+  },
+  {
+    "id": "S001",
+    "type": "S",
+    "page": 1,
+    "text_preview": "Unsupervised pre-training methods for large vision models have shown to enhance performance on downstream supervised tas...",
+    "translated": true
+  },
+  {
+    "id": "H002",
+    "type": "H",
+    "page": 1,
+    "text_preview": "1       Introduction",
+    "translated": false
+  },
+  {
+    "id": "S002",
+    "type": "S",
+    "page": 1,
+    "text_preview": "In recent years, self-supervised learning techniques have quickly become the norm for pre-training models on large-scale...",
+    "translated": true
+  },
+  {
+    "id": "F001",
+    "type": "F",
+    "page": 2,
+    "text_preview": "Figure 1: With carefully-designed masking strategies across mutli-spectral and temporal images, and temporal and spectra...",
+    "translated": false
+  },
+  {
+    "id": "S003",
+    "type": "S",
+    "page": 2,
+    "text_preview": "with meaningful geographical and temporal information, and can consist of multiple spectral bands representing sensor re...",
+    "translated": true
+  },
+  {
+    "id": "S004",
+    "type": "S",
+    "page": 2,
+    "text_preview": "1. We propose a novel method to leverage temporal or multi-spectral information in satellite imagery to improve self-sup...",
+    "translated": true
+  },
+  {
+    "id": "S005",
+    "type": "S",
+    "page": 2,
+    "text_preview": "2. We introduce fMoW-Sentinel, a new Sentinel-2 dataset cross-referenced with fMoW, as a benchmark for training models o...",
+    "translated": true
+  },
+  {
+    "id": "S006",
+    "type": "S",
+    "page": 2,
+    "text_preview": "3. We demonstrate the effectiveness of pre-training transformers [36] on satellite imagery, achieving significant improv...",
+    "translated": true
+  },
+  {
+    "id": "H003",
+    "type": "H",
+    "page": 2,
+    "text_preview": "2    Related Work",
+    "translated": false
+  },
+  {
+    "id": "S007",
+    "type": "S",
+    "page": 2,
+    "text_preview": "ML for SITS Deep learning has been used for many Satellite Image Time Series (SITS) supervised- learning tasks such as c...",
+    "translated": true
+  },
+  {
+    "id": "S008",
+    "type": "S",
+    "page": 2,
+    "text_preview": "SSL for Satellite Imagery Self-supervised learning [2, 3, 4, 5, 6] has emerged as a promising approach in remote sensing...",
+    "translated": true
+  },
+  {
+    "id": "H004",
+    "type": "H",
+    "page": 3,
+    "text_preview": "3     Background",
+    "translated": false
+  },
+  {
+    "id": "S009",
+    "type": "S",
+    "page": 3,
+    "text_preview": "Positional encoding Positional encoding allows transformers to make their learned representations position-aware. In MAE...",
+    "translated": true
+  },
+  {
+    "id": "H005",
+    "type": "H",
+    "page": 3,
+    "text_preview": "4     Method",
+    "translated": false
+  },
+  {
+    "id": "S010",
+    "type": "S",
+    "page": 3,
+    "text_preview": "In this section, we describe SatMAE with temporal (4.1) and multi-spectral (4.2) satellite images.",
+    "translated": true
+  },
+  {
+    "id": "H006",
+    "type": "H",
+    "page": 3,
+    "text_preview": "4.1   Temporal SatMAE",
+    "translated": false
+  },
+  {
+    "id": "S011",
+    "type": "S",
+    "page": 4,
+    "text_preview": "sampled at irregular intervals (iii) the model loses access to temporal fine-grained information in deeper layers, as it...",
+    "translated": true
+  },
+  {
+    "id": "H007",
+    "type": "H",
+    "page": 4,
+    "text_preview": "4.1.1   Temporal Encoding",
+    "translated": false
+  },
+  {
+    "id": "S012",
+    "type": "S",
+    "page": 4,
+    "text_preview": "For each embedded token in the LT length sequence, we need to ensure the model retains information about its spatial and...",
+    "translated": true
+  },
+  {
+    "id": "F002",
+    "type": "F",
+    "page": 4,
+    "text_preview": "Figure 2: Top: Encoding each temporal patch be detrimental. In contrast, a landscape may evolve over with a shared patch...",
+    "translated": false
+  },
+  {
+    "id": "H008",
+    "type": "H",
+    "page": 4,
+    "text_preview": "4.1.2   Masking Strategies",
+    "translated": false
+  },
+  {
+    "id": "S013",
+    "type": "S",
+    "page": 4,
+    "text_preview": "With an additional temporal dimension, masking a subset of the LT tokens needs to be treated with care. As seen in figur...",
+    "translated": true
+  },
+  {
+    "id": "S014",
+    "type": "S",
+    "page": 4,
+    "text_preview": "Consistent Masking Each image is “patchified” separately, but the masked regions are consistent across all images (fig. ...",
+    "translated": true
+  },
+  {
+    "id": "S015",
+    "type": "S",
+    "page": 4,
+    "text_preview": "Independent Masking Each image is “patchified” separately, and masked regions may not be the same across every image. In...",
+    "translated": true
+  },
+  {
+    "id": "F003",
+    "type": "F",
+    "page": 5,
+    "text_preview": "Figure 3: 3a Temporal masking: For images in a timeseries, we can choose to keep a patch fully visible or fully masked a...",
+    "translated": false
+  },
+  {
+    "id": "S016",
+    "type": "S",
+    "page": 5,
+    "text_preview": "Independent Masking + Inconsistent Cropping During data pre-processing, we can crop square regions for input inconsisten...",
+    "translated": true
+  },
+  {
+    "id": "H009",
+    "type": "H",
+    "page": 5,
+    "text_preview": "4.2   Multi-spectral SatMAE",
+    "translated": false
+  },
+  {
+    "id": "S017",
+    "type": "S",
+    "page": 5,
+    "text_preview": "While MAE does operate on images I ∈ RC×H×W , usually C = 3 for RGB images. Satellite data, on the other hand, can often...",
+    "translated": true
+  },
+  {
+    "id": "S018",
+    "type": "S",
+    "page": 5,
+    "text_preview": "Group Channels There are limitations to naively stacking the spectral information, especially that a single convolutiona...",
+    "translated": true
+  },
+  {
+    "id": "S019",
+    "type": "S",
+    "page": 5,
+    "text_preview": "0     GL×D to produce the final set of tokens S ∈ R           .",
+    "translated": true
+  },
+  {
+    "id": "S020",
+    "type": "S",
+    "page": 5,
+    "text_preview": "Spectral Encoding Since the tokens in S 0 correspond to a patch location (m, n) in the input image and a group of channe...",
+    "translated": true
+  },
+  {
+    "id": "S021",
+    "type": "S",
+    "page": 6,
+    "text_preview": "concatenation of the positional xk,i , yk,i and the spectral encoding gk,i such that the total dimension is D (see fig. ...",
+    "translated": true
+  },
+  {
+    "id": "S022",
+    "type": "S",
+    "page": 6,
+    "text_preview": "Masking Strategies We consider consistent masking (denoted SatMAE+Group+CM) and inde- pendent masking (SatMAE+Group+IM) ...",
+    "translated": true
+  },
+  {
+    "id": "H010",
+    "type": "H",
+    "page": 6,
+    "text_preview": "5     Experiments",
+    "translated": false
+  },
+  {
+    "id": "S023",
+    "type": "S",
+    "page": 6,
+    "text_preview": "In this section, we first introduce the datasets we considered, including a new multi-spectral remote sensing image data...",
+    "translated": true
+  },
+  {
+    "id": "H011",
+    "type": "H",
+    "page": 6,
+    "text_preview": "5.1   Datasets for Pre-training",
+    "translated": false
+  },
+  {
+    "id": "S024",
+    "type": "S",
+    "page": 6,
+    "text_preview": "fMoW RGB Functional Map of the World (fMoW) [17] is a dataset of high-resolution satellite image time series across the ...",
+    "translated": true
+  },
+  {
+    "id": "S025",
+    "type": "S",
+    "page": 6,
+    "text_preview": "fMoW Sentinel We create a new dataset based on the fMoW RGB dataset. We collect all 13 frequency bands provided by Senti...",
+    "translated": true
+  },
+  {
+    "id": "S026",
+    "type": "S",
+    "page": 6,
+    "text_preview": "5.2   fMoW RGB (non-temporal)",
+    "translated": false
+  },
+  {
+    "id": "S027",
+    "type": "S",
+    "page": 6,
+    "text_preview": "In this section, we perform experiments on Method        Backbone       Frozen/Finetune         fMoW single image classi...",
+    "translated": false
+  },
+  {
+    "id": "S028",
+    "type": "S",
+    "page": 6,
+    "text_preview": "1 shows that compared to the previous state- GASSL [34]     ResNet50         68.32/71.55 of-the-art self-supervised meth...",
+    "translated": false
+  },
+  {
+    "id": "T001",
+    "type": "T",
+    "page": 6,
+    "text_preview": "Table 1: Top 1 Accuracy on fMoW classification.           could only reach 62.48% at convergence after Frozen: only perf...",
+    "translated": false
+  },
+  {
+    "id": "S029",
+    "type": "S",
+    "page": 6,
+    "text_preview": "5.3   fMoW RGB (temporal)",
+    "translated": false
+  },
+  {
+    "id": "S030",
+    "type": "S",
+    "page": 6,
+    "text_preview": "Main experiments We perform image-sequence classification on the temporal version of fMoW RGB to evaluate our temporal S...",
+    "translated": true
+  },
+  {
+    "id": "S031",
+    "type": "S",
+    "page": 7,
+    "text_preview": "Method           Backbone    Top Acc. (1/5) Method          Backbone Top Acc. (1/5)              Sup. Learning*      Res...",
+    "translated": false
+  },
+  {
+    "id": "T002",
+    "type": "T",
+    "page": 7,
+    "text_preview": "Table 2: Classification results on the temporal fMoW Table 3: Top 1 & Top 5 Accuracy on the fMoW Sen- RGB dataset. * mea...",
+    "translated": false
+  },
+  {
+    "id": "S032",
+    "type": "S",
+    "page": 7,
+    "text_preview": "Group    Indp.     Spec. Temp.     Indep.    Cons.    Test                        Back.                                 ...",
+    "translated": false
+  },
+  {
+    "id": "T003",
+    "type": "T",
+    "page": 7,
+    "text_preview": "Table 4: Ablation studies on different components of",
+    "translated": false
+  },
+  {
+    "id": "T004",
+    "type": "T",
+    "page": 7,
+    "text_preview": "Table 5: Ablation studies on spectral SatMAE on temporal SatMAE on the temporal fMoW classification fMoW-Sentinel. The f...",
+    "translated": false
+  },
+  {
+    "id": "S033",
+    "type": "S",
+    "page": 7,
+    "text_preview": "Ablation studies Table 4 provides a comprehensive ablation study on the components of temporal SatMAE. We see that impro...",
+    "translated": true
+  },
+  {
+    "id": "S034",
+    "type": "S",
+    "page": 7,
+    "text_preview": "5.4   fMoW Sentinel (Multi-spectral)",
+    "translated": false
+  },
+  {
+    "id": "S035",
+    "type": "S",
+    "page": 7,
+    "text_preview": "In this section, we pre-train and finetune SatMAE on the image classification task of the fMoW- Sentinel dataset. We pre...",
+    "translated": true
+  },
+  {
+    "id": "S036",
+    "type": "S",
+    "page": 7,
+    "text_preview": "Model configuration As not all of the 13 Sentinel-2 bands may be useful, in our experiments we drop bands B1, B9 and B10...",
+    "translated": true
+  },
+  {
+    "id": "S037",
+    "type": "S",
+    "page": 7,
+    "text_preview": "10 bands, we form three groups: (i) RGB+NIR: B2, B3, B4, B8 (ii) Red Edge: B5, B6, B7, B8A (iii) SWIR: B11, B12. We choo...",
+    "translated": true
+  },
+  {
+    "id": "S038",
+    "type": "S",
+    "page": 8,
+    "text_preview": "Method            Backbone       Top 1 Acc.              Method          Backbone           mIoU Sup. (Scratch)       Re...",
+    "translated": false
+  },
+  {
+    "id": "T005",
+    "type": "T",
+    "page": 8,
+    "text_preview": "Table 6: NAIP land cover classification results.       Table 7: SpaceNet v1 building segmentation results.",
+    "translated": false
+  },
+  {
+    "id": "S039",
+    "type": "S",
+    "page": 8,
+    "text_preview": "Method         Backbone Top 1 Acc.                 Method          Backbone            mAP Sup. (Scratch)     ResNet18  ...",
+    "translated": false
+  },
+  {
+    "id": "T006",
+    "type": "T",
+    "page": 8,
+    "text_preview": "Table 9: BigEarthNet multi-label classification results.",
+    "translated": false
+  },
+  {
+    "id": "T007",
+    "type": "T",
+    "page": 8,
+    "text_preview": "Table 8: EuroSAT land cover classification results. * Following [35], we use mean Average Precision (mAP) means we only ...",
+    "translated": false
+  },
+  {
+    "id": "S040",
+    "type": "S",
+    "page": 8,
+    "text_preview": "Results We present results in table 3. Our method SatMAE+Group+IM achieves the highest accu- racy, outperforming supervi...",
+    "translated": true
+  },
+  {
+    "id": "S041",
+    "type": "S",
+    "page": 8,
+    "text_preview": "Ablation Studies We investigate the design of SatMAE for multi-spectral data in table 5. For grouping strategy, we imple...",
+    "translated": true
+  },
+  {
+    "id": "H012",
+    "type": "H",
+    "page": 8,
+    "text_preview": "5.5   Transfer Learning Experiments",
+    "translated": false
+  },
+  {
+    "id": "S042",
+    "type": "S",
+    "page": 8,
+    "text_preview": "Now, we finetune our pre-trained SatMAE on downstream tasks on remote-sensing datasets, including land cover classificat...",
+    "translated": true
+  },
+  {
+    "id": "S043",
+    "type": "S",
+    "page": 8,
+    "text_preview": "Land Cover Classification We perform transfer learning experiments on land cover classification using the NAIP and EuroS...",
+    "translated": true
+  },
+  {
+    "id": "T008",
+    "type": "T",
+    "page": 8,
+    "text_preview": "Table 6 and table 8 shows the remarkable improvement of our SatMAE over the state-of-the-arts. Although using the ViT-La...",
+    "translated": false
+  },
+  {
+    "id": "S044",
+    "type": "S",
+    "page": 8,
+    "text_preview": "Multi-label Classification We also use the BigEarthNet [18] dataset for multi-label classification, which consists of 13...",
+    "translated": true
+  },
+  {
+    "id": "T009",
+    "type": "T",
+    "page": 9,
+    "text_preview": "Table 9 shows SatMAE pre-training improves upon the model trained from scratch by over 2%, and achieves comparable resul...",
+    "translated": false
+  },
+  {
+    "id": "S045",
+    "type": "S",
+    "page": 9,
+    "text_preview": "Building Segmentation In this section, we evaluate SatMAE on the semantic segmentation down- stream task of the SpaceNet...",
+    "translated": true
+  },
+  {
+    "id": "S046",
+    "type": "S",
+    "page": 9,
+    "text_preview": "5000 and 1940 images, respectively. The results in table 7 show that our method achieves a larger performance gain from ...",
+    "translated": true
+  },
+  {
+    "id": "H013",
+    "type": "H",
+    "page": 9,
+    "text_preview": "5.6   Visualizing reconstruction quality for SatMAE",
+    "translated": false
+  },
+  {
+    "id": "F004",
+    "type": "F",
+    "page": 9,
+    "text_preview": "Figure 4: Reconstruction quality of SatMAE+IM (left) vs. SatMAE+CM (right). Further results in appendix C.",
+    "translated": false
+  },
+  {
+    "id": "S047",
+    "type": "S",
+    "page": 9,
+    "text_preview": "We show the visualization of the reconstruction quality of two different SatMAE masking strategies in",
+    "translated": true
+  },
+  {
+    "id": "F005",
+    "type": "F",
+    "page": 9,
+    "text_preview": "fig. 4. SatMAE+IM successfully reconstructs all the airplanes even though their number varies across time. In contrast, ...",
+    "translated": false
+  },
+  {
+    "id": "H014",
+    "type": "H",
+    "page": 9,
+    "text_preview": "6     Conclusion",
+    "translated": false
+  },
+  {
+    "id": "S048",
+    "type": "S",
+    "page": 9,
+    "text_preview": "In this paper, we propose a new SSL framework based on the MAE architecture [1] tailored to remote- sensing data (satell...",
+    "translated": true
+  },
+  {
+    "id": "S049",
+    "type": "S",
+    "page": 10,
+    "text_preview": "Broader Impact Accurate measurements of economic, social, and environmental phenomena are key inputs into policy decisio...",
+    "translated": true
+  },
+  {
+    "id": "H015",
+    "type": "H",
+    "page": 10,
+    "text_preview": "7   Acknowledgements",
+    "translated": false
+  },
+  {
+    "id": "S050",
+    "type": "S",
+    "page": 10,
+    "text_preview": "This research is based upon work supported in part by the Office of the Director of National Intelli- gence (ODNI), Inte...",
+    "translated": true
+  },
+  {
+    "id": "H016",
+    "type": "H",
+    "page": 10,
+    "text_preview": "References",
+    "translated": false
+  },
+  {
+    "id": "S051",
+    "type": "S",
+    "page": 10,
+    "text_preview": "[1] Kaiming He, Xinlei Chen, Saining Xie, Yanghao Li, Piotr Dollár, and Ross Girshick. Masked autoencoders are scalable ...",
+    "translated": false
+  },
+  {
+    "id": "S052",
+    "type": "S",
+    "page": 13,
+    "text_preview": "[45] Xingjian Shi, Zhourong Chen, Hao Wang, Dit-Yan Yeung, Wai-Kin Wong, and Wang-chun Woo. Convolutional lstm network: ...",
+    "translated": false
+  },
+  {
+    "id": "S053",
+    "type": "S",
+    "page": 14,
+    "text_preview": "[64] Maxim Neumann, Andre Susano Pinto, Xiaohua Zhai, and Neil Houlsby. In-domain representa- tion learning for remote s...",
+    "translated": false
+  },
+  {
+    "id": "H017",
+    "type": "H",
+    "page": 15,
+    "text_preview": "A.1     Datasets",
+    "translated": false
+  },
+  {
+    "id": "S054",
+    "type": "S",
+    "page": 15,
+    "text_preview": "fMoW RGB Functional Map of the World (fMoW) [17] is a dataset of high-resolution satellite image time series across the ...",
+    "translated": true
+  },
+  {
+    "id": "S055",
+    "type": "S",
+    "page": 15,
+    "text_preview": "fMoW Sentinel We collect a new dataset based on the fMoW RGB dataset. We crop surface reflectance images from the Sentin...",
+    "translated": true
+  },
+  {
+    "id": "F006",
+    "type": "F",
+    "page": 15,
+    "text_preview": "Figure 5: Distribution of images and locations across the categories over the fMoW Sentinel training set.",
+    "translated": false
+  },
+  {
+    "id": "S056",
+    "type": "S",
+    "page": 15,
+    "text_preview": "A.2     fMoW Sentinel",
+    "translated": false
+  },
+  {
+    "id": "S057",
+    "type": "S",
+    "page": 15,
+    "text_preview": "We provide information about the fMoW-Sentinel dataset, collected using Sentinel-2 3 .",
+    "translated": false
+  },
+  {
+    "id": "S058",
+    "type": "S",
+    "page": 15,
+    "text_preview": "fMoW license: https://github.com/fMoW/dataset/raw/master/LICENSE 3 Sentinel-2    license:      https://scihub.copernicus...",
+    "translated": false
+  },
+  {
+    "id": "H018",
+    "type": "H",
+    "page": 16,
+    "text_preview": "A.2.1   Geographic Distribution",
+    "translated": false
+  },
+  {
+    "id": "F007",
+    "type": "F",
+    "page": 16,
+    "text_preview": "Figure 6: Geographic distribution of fMoW Sentinel images by country",
+    "translated": false
+  },
+  {
+    "id": "S059",
+    "type": "S",
+    "page": 16,
+    "text_preview": "A.2.2   fMoW Sentinel Bands",
+    "translated": false
+  },
+  {
+    "id": "S060",
+    "type": "S",
+    "page": 16,
+    "text_preview": "Channel                Resolution      Central wavelength         Mean       Standard deviation B1: Aerosols            ...",
+    "translated": false
+  },
+  {
+    "id": "T010",
+    "type": "T",
+    "page": 16,
+    "text_preview": "Table 10: Mean and standard deviation of pixel values for each channel across the fMoW Sentinel training dataset. Note t...",
+    "translated": false
+  },
+  {
+    "id": "F008",
+    "type": "F",
+    "page": 16,
+    "text_preview": "Figure 7: Distribution of pixel counts per band across the fMoW Sentinel training set.",
+    "translated": false
+  },
+  {
+    "id": "H019",
+    "type": "H",
+    "page": 17,
+    "text_preview": "A.3     Training Details",
+    "translated": false
+  },
+  {
+    "id": "S061",
+    "type": "S",
+    "page": 17,
+    "text_preview": "Here we describe the settings used for pre-training and finetuning our models on fMoW RGB (non- temporal) (A.3.1), fMoW ...",
+    "translated": true
+  },
+  {
+    "id": "S062",
+    "type": "S",
+    "page": 17,
+    "text_preview": "A.3.1    fMoW RGB (non-temporal) SatMAE Pre-training We use ViT-Large [36] as the backbone. The model configuration is t...",
+    "translated": true
+  },
+  {
+    "id": "S063",
+    "type": "S",
+    "page": 17,
+    "text_preview": "SatMAE Finetuning We load the pre-trained weights below the ViT head and finetune the ViT- Large model in an end-to-end ...",
+    "translated": true
+  },
+  {
+    "id": "S064",
+    "type": "S",
+    "page": 17,
+    "text_preview": "A.3.2    fMoW RGB (temporal) Dataset We iterate over the dataset in the same way as in non-temporal fMoW, except that we...",
+    "translated": true
+  },
+  {
+    "id": "S065",
+    "type": "S",
+    "page": 17,
+    "text_preview": "SatMAE Pre-training We use the same model as above, though the number of input patches triples. To incorporate temporal ...",
+    "translated": true
+  },
+  {
+    "id": "S066",
+    "type": "S",
+    "page": 17,
+    "text_preview": "SatMAE Finetuning We use 4 or 8 NVIDIA V100 GPUs to train the model for 50 epochs with a learning rate of 5 × 10−4 and b...",
+    "translated": true
+  },
+  {
+    "id": "S067",
+    "type": "S",
+    "page": 17,
+    "text_preview": "Test-time Augmentation Unlike the test-time augmentation used in [34], we average the prediction score of 9 random sampl...",
+    "translated": true
+  },
+  {
+    "id": "S068",
+    "type": "S",
+    "page": 17,
+    "text_preview": "SeCo [35] Pre-training and Finetuning We use the code from the official repo of SeCo [35], and use ResNet 50 as the back...",
+    "translated": true
+  },
+  {
+    "id": "S069",
+    "type": "S",
+    "page": 18,
+    "text_preview": "UTAE [48] Training We use the code from the official repo of UTAE [48], add an averaging pooling layer to adapt the segm...",
+    "translated": true
+  },
+  {
+    "id": "S070",
+    "type": "S",
+    "page": 18,
+    "text_preview": "A.3.3    fMoW Sentinel We choose the ViT-Large backbone [36] with D = 1024. The positional encoding of the spatial locat...",
+    "translated": true
+  },
+  {
+    "id": "S071",
+    "type": "S",
+    "page": 18,
+    "text_preview": "SatMAE Pre-training We use 8 NVIDIA v100 GPUs, an effective batch size of 4096, a base learning rate of 10−4 and the sam...",
+    "translated": true
+  },
+  {
+    "id": "S072",
+    "type": "S",
+    "page": 18,
+    "text_preview": "MoCo Pre-training We use 8 NVIDIA v100 GPUs, and pick the ViT-Base backbone and an effective batch size of 512 such that...",
+    "translated": true
+  },
+  {
+    "id": "S073",
+    "type": "S",
+    "page": 18,
+    "text_preview": "SatMAE Finetuning We use 8 NVIDIA v100 GPUs, an effective batch size of 4096, a base learning rate of 10−3 and a warmup ...",
+    "translated": true
+  },
+  {
+    "id": "S074",
+    "type": "S",
+    "page": 18,
+    "text_preview": "SatMAE Further Improvements We found increased performance of around 2.18% during fine- tuning (the last row of table 3)...",
+    "translated": true
+  },
+  {
+    "id": "T011",
+    "type": "T",
+    "page": 18,
+    "text_preview": "Table 11: Improvements with longer pre-training. can outperform a model using a ViT-Large back- bone with longer pre-tra...",
+    "translated": false
+  },
+  {
+    "id": "H020",
+    "type": "H",
+    "page": 18,
+    "text_preview": "A.4     Impact of masking ratio and patch size on fMoW-RGB-temporal",
+    "translated": false
+  },
+  {
+    "id": "S075",
+    "type": "S",
+    "page": 18,
+    "text_preview": "Here, we investigate the impact of the masking ratio and patch size for a ViT-Large SatMAE on temporal data (with indepe...",
+    "translated": true
+  },
+  {
+    "id": "S076",
+    "type": "S",
+    "page": 18,
+    "text_preview": "32 from a default of P = 16 (table 12).",
+    "translated": false
+  },
+  {
+    "id": "S077",
+    "type": "S",
+    "page": 19,
+    "text_preview": "pm      P     Top 1 Acc.        We see a significant drop in performance of 7.19% with a smaller 0.6    16      72.80   ...",
+    "translated": false
+  },
+  {
+    "id": "T012",
+    "type": "T",
+    "page": 19,
+    "text_preview": "Table 12: Ablation on pm and P    We also note a drop in performance from using a larger patch size, on fMoW-RGB-tempora...",
+    "translated": false
+  },
+  {
+    "id": "H021",
+    "type": "H",
+    "page": 19,
+    "text_preview": "A.5   Impact of masking ratio and patch size on fMoW-Sentinel",
+    "translated": false
+  },
+  {
+    "id": "S078",
+    "type": "S",
+    "page": 19,
+    "text_preview": "In this section, we investigate the impact of the masking ratio pm pm      P     Top 1 Acc.        and the patch size P ...",
+    "translated": false
+  },
+  {
+    "id": "T013",
+    "type": "T",
+    "page": 19,
+    "text_preview": "Table 13: Ablation on pm and P pm = 0.9 doesn’t result in a large drop in performance, unlike [1]. on fMoW-Sentinel.    ...",
+    "translated": false
+  },
+  {
+    "id": "H022",
+    "type": "H",
+    "page": 19,
+    "text_preview": "A.6   Choosing important multi-spectral bands",
+    "translated": false
+  },
+  {
+    "id": "S079",
+    "type": "S",
+    "page": 19,
+    "text_preview": "As mentioned in 5.4, all 13 bands of the Sentinel-2 data may not be useful. In our experiments, we drop bands B1, B9, an...",
+    "translated": true
+  },
+  {
+    "id": "S080",
+    "type": "S",
+    "page": 19,
+    "text_preview": "Bands Masked        Top 1 Acc.     Top 5 Acc. None              57.80          80.07 B1               45.83          69....",
+    "translated": false
+  },
+  {
+    "id": "T014",
+    "type": "T",
+    "page": 19,
+    "text_preview": "Table 14: An ablation to determine which of the 13 bands are least useful to a SatMAE+Stack model pre-trained and finetu...",
+    "translated": false
+  },
+  {
+    "id": "S081",
+    "type": "S",
+    "page": 20,
+    "text_preview": "As seen in table 14, we notice the smallest drop in accuracy when masking bands B9 and B10. The drop in accuracy when ma...",
+    "translated": true
+  },
+  {
+    "id": "H023",
+    "type": "H",
+    "page": 20,
+    "text_preview": "A.7    NAIP Land Cover Classification",
+    "translated": false
+  },
+  {
+    "id": "S082",
+    "type": "S",
+    "page": 20,
+    "text_preview": "We use the finetuning setting as in the fMoW RGB (non-temporal) finetuning experiment (A.3.1).",
+    "translated": true
+  },
+  {
+    "id": "H024",
+    "type": "H",
+    "page": 20,
+    "text_preview": "A.8    EuroSAT Land Cover Classification",
+    "translated": false
+  },
+  {
+    "id": "S083",
+    "type": "S",
+    "page": 20,
+    "text_preview": "We use the exact finetuning setting as in the fMoW RGB (non-temporal) finetuning experiment for RGB-only input (A.3.1). ...",
+    "translated": true
+  },
+  {
+    "id": "H025",
+    "type": "H",
+    "page": 20,
+    "text_preview": "A.9    BigEarthNet Land Cover Multi-label Classification",
+    "translated": false
+  },
+  {
+    "id": "S084",
+    "type": "S",
+    "page": 20,
+    "text_preview": "We use the exact finetuning setting as in the fMoW-Sentinel finetuning experiment (A.3.3). Since the task is multi-label...",
+    "translated": true
+  },
+  {
+    "id": "S085",
+    "type": "S",
+    "page": 20,
+    "text_preview": "A.10    SpaceNet v1 Building Segmentation",
+    "translated": false
+  },
+  {
+    "id": "S086",
+    "type": "S",
+    "page": 20,
+    "text_preview": "We use PSANet [65] for the binary image segmentation and replace the backbone with ViT-Large. Following [34], we set the...",
+    "translated": true
+  },
+  {
+    "id": "S087",
+    "type": "S",
+    "page": 20,
+    "text_preview": "EuroSAT license: https://creativecommons.org/licenses/by/4.0/ 5 BigEarthNet license: https://bigearth.net/downloads/docu...",
+    "translated": false
+  },
+  {
+    "id": "S088",
+    "type": "S",
+    "page": 21,
+    "text_preview": "B     Societal Impact Measurements of economic, social, and environmental indicators are critical to policy-making acros...",
+    "translated": true
+  },
+  {
+    "id": "H026",
+    "type": "H",
+    "page": 21,
+    "text_preview": "B.1   Carbon Footprint",
+    "translated": false
+  },
+  {
+    "id": "S089",
+    "type": "S",
+    "page": 21,
+    "text_preview": "We include a brief analysis of the carbon footprint of training the model below. Our experiments were mainly conducted u...",
+    "translated": true
+  },
+  {
+    "id": "S090",
+    "type": "S",
+    "page": 21,
+    "text_preview": "Experiment                                               Carbon Footprint Dataset            GPU hours Setting          ...",
+    "translated": false
+  },
+  {
+    "id": "T015",
+    "type": "T",
+    "page": 21,
+    "text_preview": "Table 15: The estimated carbon footprint of pre-training and finetuning SatMAE on these datasets. The GPU hours are meas...",
+    "translated": false
+  },
+  {
+    "id": "S091",
+    "type": "S",
+    "page": 22,
+    "text_preview": "C     Visualizations In this section, we include visualisations in the temporal (C.1) and multi-spectral settings (C.2).",
+    "translated": false
+  },
+  {
+    "id": "H027",
+    "type": "H",
+    "page": 22,
+    "text_preview": "C.1   Temporal SatMAE",
+    "translated": false
+  },
+  {
+    "id": "F009",
+    "type": "F",
+    "page": 22,
+    "text_preview": "Figure 8: More visualization examples of the reconstruction quality of image sequences from the fMoW temporal dataset ac...",
+    "translated": false
+  },
+  {
+    "id": "S092",
+    "type": "S",
+    "page": 22,
+    "text_preview": "As shown in fig. 8, SatMAE+IM achieved relatively satisfying reconstruction quality. Without the temporal encoding, the ...",
+    "translated": true
+  },
+  {
+    "id": "H028",
+    "type": "H",
+    "page": 22,
+    "text_preview": "C.2   Spectral SatMAE",
+    "translated": false
+  },
+  {
+    "id": "S093",
+    "type": "S",
+    "page": 22,
+    "text_preview": "We also visualize the in-painting quality for different multi-spectral settings, including Sat- MAE+Group+IM, SatMAE+Gro...",
+    "translated": true
+  },
+  {
+    "id": "F010",
+    "type": "F",
+    "page": 23,
+    "text_preview": "Figure 9: Visualizations of SatMAE in-painting under different settings. RGB represents bands B4, B3, B2, from group B2,...",
+    "translated": false
+  },
+  {
+    "id": "S094",
+    "type": "S",
+    "page": 23,
+    "text_preview": "note that the model is able to learn correlations between bands; in the top-half of fig. 9 for the SWIR band group, even...",
+    "translated": true
+  },
+  {
+    "id": "F011",
+    "type": "F",
+    "page": 24,
+    "text_preview": "Figure 10: Further visualizations of SatMAE in-painting. See fig. 9 for details on band groups. The top half represents ...",
+    "translated": false
+  }
+]

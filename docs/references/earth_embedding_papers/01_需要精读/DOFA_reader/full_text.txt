@@ -1,0 +1,2558 @@
+
+--- PAGE 1 ---
+Noname manuscript No.
+(will be inserted by the editor)
+Neural Plasticity-Inspired Multimodal Foundation Model for
+Earth Observation
+Zhitong Xiong · Yi Wang · Fahong Zhang · Adam J. Stewart · Jo¨elle
+Hanna · Damian Borth · Ioannis Papoutsis · Bertrand Le Saux ·
+Gustau Camps-Valls · Xiao Xiang Zhu*
+Received: date / Accepted: date
+Abstract Earth observation (EO) in open-world set-
+tings presents a unique challenge: different applications
+rely on diverse sensor modalities, each with varying
+ground sampling distances, spectral ranges, and num-
+bers of spectral bands. However, existing EO founda-
+tion models are typically tailored to specific sensor types,
+making them inflexible when generalizing across the
+heterogeneous landscape of EO data. To address this,
+we propose the Dynamic One-For-All (DOFA) model, a
+unified, multimodal foundation framework designed for
+diverse vision tasks in EO. Inspired by neural plastic-
+ity, DOFA utilizes a wavelength-conditioned dynamic
+hypernetwork to process inputs from five distinct satel-
+lite sensors flexibly. By continually pretraining on five
+EO modalities, DOFA achieves state-of-the-art perfor-
+Z. Xiong · Y. Wang · F. Zhang · A. J. Stewart · X. X. Zhu
+Chair of Data Science in Earth Observation, Technical Uni-
+versity of Munich (TUM), Arcisstraße 21, 80333 Munich, Ger-
+many
+X. X. Zhu (Corresponding Author)
+Munich Center for Machine Learning, 80333 Munich, Ger-
+many
+E-mail: xiaoxiang.zhu@tum.de
+J. Hanna · D. Borth
+AIML Lab, School of Computer Science, University of St.
+Gallen, Rosenbergstrasse 30, 9000 St. Gallen, Switzerland
+I. Papoutsis
+School of Rural, Surveying and Geoinformatics Engineering,
+National Technical University of Athens, 157 73 Zografou,
+Greece
+B. Le Saux
+ESRIN, Φ-lab, European Space Agency (ESA), 00044 Fras-
+cati, Italy
+G. Camps-Valls
+Image Processing Laboratory (IPL), Universitat de Val`encia,
+Cat. Agust´ın Escardino Benlloch 9, 46980 Paterna, Val`encia,
+Spain
+mance across multiple downstream tasks and general-
+izes well to unseen modalities. Enhanced with hybrid
+continual pretraining, DOFA+ requires significantly fewer
+computational resources while outperforming counter-
+parts trained with extensive GPU budgets. Experiments
+on diverse datasets highlight DOFA’s potential as a
+foundation for general-purpose vision models in the sensor-
+diverse EO domain. The code and pre-trained weights
+are publicly available at https://github.com/zhu-xlab/
+DOFA.
+Keywords Dynamic foundation models · Earth
+observation · Multimodal learning
+1 Introduction
+Earth observation (EO) through satellite remote sens-
+ing provides unparalleled opportunities for modeling
+Earth’s surface dynamics, addressing global challenges
+such as climate change, urbanization, and biodiversity
+loss [6, 5, 37]. Core vision tasks like classification, de-
+tection, and segmentation support critical applications
+from disaster response to resource management. Achiev-
+ing this requires integrating data from diverse sensors
+with varying spectral and spatial characteristics, mak-
+ing EO an open-world visual understanding problem.
+Foundation models (FMs) offer a scalable solution by
+enabling generalization across modalities, reducing task-
+specific supervision, and serving as a unified backbone
+for downstream EO tasks, as illustrated in Fig. 1.
+Existing FMs, though promising, remain rigid and
+inflexible, typically pretrained using fixed spectral band
+configurations or specialized for individual EO modal-
+ities. For instance, models such as GFM [32], Scale-
+MAE [36], SatMAE [10], CROMA [14], and Spectral-
+GPT [20] illustrate these limitations. This severely re-
+arXiv:2403.15356v3  [cs.CV]  15 Oct 2025
+
+--- PAGE 2 ---
+2
+stricts their adaptability in dynamic real-world EO sce-
+narios, where new sensors and spectral band configu-
+rations continuously emerge. Consequently, extensive
+computational and human resources are required to
+adapt them to unseen sensors and spectral combina-
+tions. In summary, existing approaches that develop
+separate foundation models or use isolated visual en-
+coders for multi-sensor data fail to capture inter-sensor
+relationships, resulting in key limitations:
+1. The learned representation may not effectively cap-
+ture such an intersensor relationship.
+2. The performance of FMs will degrade when down-
+stream tasks utilize data from unseen sensors with
+varying numbers of spectral bands.
+3. The development of individual FMs requires consid-
+erably more computing resources and is not flexible
+in real-world applications.
+Addressing this critical limitation aligns with a central
+theme of open-world EO visual understanding: develop-
+ing FMs capable of dynamically and efficiently adapt-
+ing to downstream applications with flexible input data
+modalities.
+In response to this challenge, we propose the Dy-
+namic One-For-All (DOFA) model, a versatile, adap-
+tive multimodal foundation model explicitly designed
+for the EO domain. Inspired by neuroplasticity, the
+brain’s dynamic reorganization capacity in response to
+novel stimuli [12, 27], DOFA integrates a wavelength-
+conditioned dynamic hypernetwork within a unified Trans-
+former architecture, as shown in Fig. 2. This enables
+DOFA to flexibly accommodate varying spectral bands
+and sensor modalities, including those unseen during
+initial pre-training. Specifically, DOFA utilizes wave-
+length as a unifying parameter across various EO modal-
+ities to achieve a more cohesive multimodal represen-
+tation. At its core, the model integrates a hypernet-
+work [17] that dynamically generates network weights
+based on the central wavelengths of each spectral band.
+This dynamic weight generator adjusts network weights
+to align with the specific modality of the input data, fa-
+cilitating a customized network for each modality. Ad-
+ditionally, DOFA integrates a shared vision backbone,
+acting as a universal feature learning module for all
+heterogeneous data modalities.
+Pretraining unified FMs across diverse EO modali-
+ties presents a significant challenge due to the need for
+substantial computational resources. To address this,
+DOFA adopts continuous pretraining via masked im-
+age modeling (MIM) and knowledge distillation, signif-
+icantly reducing computational cost. Building on this,
+we further propose DOFA+, which is initialized from
+a powerful open-source pre-trained vision model (DI-
+NOv2 [35]) and applies the MIM objective to enable
+SAR Images
+Unified Multimodal Earth 
+Foundation Model
+NAIP RGB
+Downstream Tasks
+Sentinel 1
+Sentinel 2
+EnMAP 
+RGB-NIR
+Earth Observation
+potassium
+magnesium
+PH
+phosphorus
+Soil Parameter
+Wildfire
+Flood mapping
+Land cover
+Forest
+Monitoring
+High resolution
+Optical Images
+Multispectral
+Hyperspectral
+Multispectral
+Different Sensors
+Fig. 1: Motivation of DOFA. Our primary purpose is
+to develop versatile foundation models capable of adap-
+tively processing various EO data modalities.
+efficient domain adaptation, without altering the un-
+derlying architecture. Through a hierarchical distilla-
+tion strategy, it preserves strong semantic priors from
+the source model while guiding the learning of EO-
+specific visual patterns through local reconstruction.
+With parameter-efficient fine-tuning, DOFA and DOFA+
+enable rapid, label-efficient adaptation to a wide range
+of multimodal EO tasks, including image classification,
+semantic segmentation, object detection, and environ-
+mental change detection.
+Our contributions can be summarized as follows:
+1. We introduce DOFA, a neuroplasticity-inspired ar-
+chitecture that uses wavelength as a unifying input
+across EO modalities. A wavelength-conditioned dy-
+namic hypernetwork enables flexible adaptation to
+varying and unseen spectral bands within a single
+unified Transformer framework.
+2. The proposed hypernetwork-based architecture en-
+ables efficient continual pretraining across diverse
+EO modalities by interpolating in weight space ac-
+cording to wavelength configurations. Together with
+wavelength-aware MIM and feature distillation, this
+enables efficient EO domain adaptation with mini-
+mal data and compute.
+3. We further introduce DOFA+. DOFA+ seeds itself
+with a strong vision prior and then employs a dual
+training strategy: (i) wavelength-aware MIM to cap-
+ture EO-specific spatial patterns, and (ii) hierarchi-
+cal feature distillation to align and refine the inher-
+ited semantic representations from the vision prior.
+4. Extensive experiments demonstrate that DOFA and
+DOFA+ achieve state-of-the-art performance across
+a wide range of EO tasks and modalities. Our mod-
+els generalize well to unseen sensors and diverse
+spectral configurations without retraining, offering
+greater flexibility in open-world settings with re-
+duced computational costs.
+
+--- PAGE 3 ---
+3
+Extensive experiments across 20+ EO tasks validate
+DOFA’s robust adaptability, efficiency, and scalability.
+Our approach represents a meaningful advancement to-
+ward open-world EO visual understanding, emphasiz-
+ing continual multimodal learning and sustainable adapt-
+ability within dynamic and heterogeneous real-world
+EO environments.
+2 Related Work
+Early efforts to develop EO foundation models were de-
+voted to generating effective embeddings for data from
+a single modality. For example, SeCo [30] and CACo [29]
+leverage temporal information from acquired images to
+learn temporal-sensitive and temporal-invariant feature
+representations. GFM [32] devises a continual pretrain-
+ing paradigm that leverages ImageNet pretrained fea-
+tures to accelerate model convergence on EO data. Cha
+et al. [8] explore the impact of scaling up the number of
+parameters in foundation models, specifically on Google
+Earth images. Another line of research addresses the
+adaptability of feature representations across EO data
+with different ground sample distances (GSD).
+RingMo [53] introduces a patch-incomplete mask
+strategy during the masked image modeling phase, pre-
+venting the oversight of small objects within a single
+patch. Scale-MAE [36] takes a different approach by
+substituting the positional encoding within ViT [13]
+with a GSD positional encoding, incorporating GSD
+information into the representation learning process.
+USat [21] adopts a strategy of encoding a higher num-
+ber of patches for bands with lower GSD and a lower
+number of patches for bands with higher GSD. Another
+significant research question is how to achieve a unified
+representation for different modalities, such as RGB,
+multispectral, hyperspectral, and radar data. In this
+regard, SSL4EO-S12 [49] integrates the features from
+multispectral and SAR modalities using an early fu-
+sion strategy. SatMAE [10] suggests grouping subsets
+of spectral bands and adding a spectral encoding to
+each spectral group.
+Real-world data are characterized by diverse modal-
+ities, including but not limited to images, videos, text,
+audio, depth information, and point clouds. The ca-
+pacity of foundation models to effectively handle this
+variety of downstream tasks hinges on their ability to
+process multimodal data. In this context, OFA-Net [52]
+proposes using modality-specific patch embedding lay-
+ers to learn unified representations across diverse EO
+modalities. It further demonstrates that a single shared
+Transformer backbone is both sufficient and effective for
+capturing generalizable representations spanning mul-
+tiple types of EO data. CROMA [14] first develops two
+Before Change
+After Change
+Multi-modal Dynamic Transformer
+NAIP RGB
+Shared Transformer
+Linear
+Linear
+Norm
+Multi-Head 
+Attention
+Norm
+MLP
+Dynamic Projection
+output
+Input (x)
+Wbi,j
+Linear
+Input (x)
+Wai,j
+output
+Linear
+Dynamic
+Weight Generator
+New Modality
+Sentinel 2
+Wai,j
+Weights for
+Sentinel 2
+b
+VTA
+Before Change
+After Change
+Environment, emotions, learning, and 
+other surrounding factors
+Neural plasticity 
+a
+#bands: 13
+wave le ngth
+wavelength
+#bands: 13
+#bands: 3
+Neural connections adaptively rewire
+in response to change.
+Fig. 2: Motivation
+and
+main
+architecture
+of
+DOFA. We design DOFA to emulate the Neuroplas-
+ticity [19, 55, 11] mechanism for processing multimodal
+EO data. (1) Illustration of the brain’s capability to
+adapt its structure and function to learned informa-
+tion, experience, or injury. (2) Illustration of the core
+idea: DOFA is designed to adaptively alter its network
+weights in response to novel data modalities.
+unimodal encoders to encode multispectral and SAR
+data individually. Subsequently, it utilizes a cross-modal
+radar-optical Transformer that leverages cross-attention
+to extract the unified representation. DeCUR [48] is a
+bi-modal self-supervised foundation model that decou-
+ples the unique and common representations between
+the two modalities.
+SpectralGPT [20] is a foundation model meticulously
+tailored for hyperspectral remote sensing data. It de-
+signs a 3D masking strategy, an encoder for learning
+representations from spatial-spectral mixed tokens, and
+a decoder with multi-target reconstruction to preserve
+spectral characteristics. Beyond these, efforts have also
+been directed towards encoding geo-locational informa-
+tion into the feature representation. Notable examples
+include GASSL [3], GeoCLIP [7], SatCLIP [23], Sky-
+Sense [16] and Tile2Vec [22].
+Recent efforts aim to handle the full diversity of EO
+data in a single backbone. SkySense V2 [54] unifies op-
+tical, SAR, and elevation inputs with modality-prompt
+tokens and adaptive patch merging, while AnySat [2] is
+a multimodal model based on joint embedding predic-
+tive architecture and scale-adaptive spatial encoders.
+Panopticon [45] treats co-located multi-sensor images
+as natural augmentations, adding cross-channel atten-
+tion to remain sensor-agnostic. Galileo [42] couples global
+masked modeling with local contrastive objectives, yield-
+ing a generalist model that outperforms task-specific
+
+--- PAGE 4 ---
+4
+baselines. However, for existing models, it is tricky to
+handle situations where the number of spectral bands
+changes in downstream tasks without retraining the
+models. DOFA and DOFA+ overcome this by employ-
+ing a dynamic weight generator to encode spectral bands
+into dynamic weights for deep representation learning.
+3 Methodology
+Here, we provide detailed information about the pro-
+posed DOFA and DOFA+ models, along with a more
+detailed presentation of the training method.
+3.1 Preliminary
+Given an input image X ∈RC×H×W , where H, W,
+and C represent the height, width, and number of chan-
+nels, respectively, the image is first divided into a patch
+sequence. Each patch has a fixed spatial size P × P
+with C channels, and thus the image is converted into
+N = HW
+P 2 patches. Each patch is flattened into a vector
+and linearly transformed into a D-dimensional embed-
+ding. This transformation is represented by a trainable
+embedding matrix E ∈RP 2C×D.
+Formally, the patch embedding can be described as
+X = [Xp1; Xp2; . . . ; XpN ],
+Xpi ∈RP 2C,
+(1)
+where Xpi is the flattened vector of the i-th patch.
+Next, the flattened vectors are linearly projected into
+D−dimensional embeddings with a learnable embed-
+ding matrix:
+Z0 = [Xp1E; Xp2E; . . . ; XpN E],
+Z0 ∈RN×D,
+(2)
+where Z0 represents the sequence of patch embeddings.
+Note that this process can be implemented utilizing a
+single convolution layer with a P × P kernel, C input
+channels, and D output channels. Class token Xcls, an
+additional learnable embedding, is prepended to the se-
+quence. Finally, position embeddings are added to re-
+tain positional information.
+Z′ = [Xcls; Z0] + Epos,
+Z′ ∈R(N+1)×D.
+(3)
+Here, Epos denotes the position embeddings, and the
+resulting Z′ serves as the input to the subsequent layers
+of the ViT architecture.
+3.2 Architecture overview
+The patch embedding layer transforms the input image
+into a sequence of embeddings that the self-attention
+mechanism of the Transformer can process. A straight-
+forward way to handle the input data from different
+modalities is to utilize multiple patch embedding lay-
+ers to convert data with different spectral wavelengths
+into embeddings with the same dimension [52]. Sup-
+pose that the input image X of dimensions RC×H×W
+can originate from various data modalities. Initially, im-
+ages from different sources are standardized to height
+H and width W. Specifically, we consider five distinct
+modalities: Sentinel-1 data (Xs1) with two SAR chan-
+nels (R2×H×W ), Sentinel 2 data (Xs2) with nine mul-
+tispectral channels (R9×H×W ), Gaofen data (Xg) with
+four multispectral channels (R4×H×W ), NAIP imagery
+(Xrgb) with three RGB channels (R3×H×W ), and En-
+MAP data (Xe) with 202 available hyperspectral chan-
+nels (R202×H×W ). Note that, for the sake of simplicity,
+we omit the batch size from the notation of tensors.
+As illustrated in Fig. 3, the whole architecture fol-
+lows the design of masked image modeling (MIM) [18].
+The main difference from traditional masked autoen-
+coders (MAE) lies in DOFA’s capacity to process in-
+put images with various channels. This flexibility is
+achieved through a hypernetwork-based dynamic weight
+generator. The dynamic weight generator takes inputs
+from the spectral wavelength associated with each im-
+age channel, and dynamically predicts the patch em-
+bedding matrix E for different data modalities. As pre-
+sented in Fig. 4, the dynamic weight generator maps
+spectral band configurations to a weight space. In open-
+world tasks with new spectral ranges or sensors, it in-
+terpolates this space to produce appropriate weights
+for the given input. The latent representations are then
+passed through a series of shared Transformer blocks
+for learning generalizable multimodal representations.
+Parallel to the dynamic weight generation for the
+encoder part of the network, the dynamic decoder is re-
+sponsible for reconstructing the output image from the
+encoded latent space. Similarly, the dynamic decoder
+utilizes another set of dynamically generated weights
+to ensure that the reconstructed image matches the
+number of spectral bands of the target modality. We
+employ a MIM strategy to train this self-supervised ar-
+chitecture. The input images are masked randomly, and
+the model learns to reconstruct these missing parts. As
+the parameters in DOFA are learned across different
+modalities, this process helps the model to learn ro-
+bust multimodal representations beneficial for various
+EO tasks. After the pre-training process, the model can
+be transferred to various EO applications without ex-
+
+--- PAGE 5 ---
+5
+Dynamic
+Weight Generator
+Linear
+Norm
+Multi-Head 
+Attention
+Norm
+MLP
+Shared Transformer
+Dynamic Projection
+Finetune
+Meta Info
+Input Data
+Wavelength-conditioned
+Weight Generation
+Images
+Masked Image
+Modeling
+wavelength
+wavelength
+wavelength
+wavelength
+wavelength
+wavelength
+Dynamic
+Weight Generator
+wavelength
+wavelength
+wavelength
+Shared Decoder
+Norm
+Multi-Head 
+Attention
+Norm
+MLP
+Dynamic
+Decoder
+NAIP RGB
+Sentinel 2
+Hyperspectral
+NAIP RGB
+Sentinel 2
+Hyperspectral
+Wavelength-conditioned
+Weight Generation
+Downstream
+Tasks
+Fig. 3: Architecture and training details. DOFA builds on masked image modeling, introducing a significant
+advancement by processing input images with any number of channels within a single framework.
+wavelength
+[0.665, 0.56, 0.49,
+0.705, 0.74, 0.783, 
+0.842, 1.61, 2.19]
+wavelength
+[0.665, 0.56, 0.49]
+[5.405, 5.405]
+wavelength
+wavelength
+[0.665, 0.49,
+0.705, 2.19]
+New Spectral Range
+Optical (RGB)
+SAR
+Dynamic
+Weight Space
+Weight Space
+Interpolation
+Sentinel 2
+New Sensor
+wavelength
+100+ bands
+GSD: 4 m
+GSD: 1 m
+GSD: 10 m
+GSD: 10 m
+DWG
+DWG: Dynamic
+Weight Generator
+DWG
+DWG
+DWG
+DWG
+Fig. 4: Illustration of weight space interpolation for new
+sensors or a combination of spectral bands.
+tensive retraining thanks to the dynamic weight gen-
+eration, from high-resolution optical imaging to multi-
+spectral and hyperspectral sensing.
+3.3 Wavelength-conditioned dynamic patch embedding
+To manage the diversity of spectral bands across differ-
+ent modalities, we project the data into a latent space
+with uniform feature dimensionality using the dynamic
+patch embedding layer Fdpe. As described before, we
+denote the input image as X ∈RC×H×W . Fig. 5 (1)
+illustrates the detailed steps used to compute the dy-
+namic weights given the wavelength information of each
+channel. Each channel of the input image has a corre-
+sponding central wavelength. The wavelengths of an in-
+put image with C channels can be represented by λ ∈
+RC. To convert the wavelengths to a higher-dimensional
+feature space, we encode the wavelengths λ using a 1D
+sine-cosine positional encoding:
+Vλ = PE(λ) ∈RC×Dλ,
+(4)
+where Dλ is the dimension of the converted wavelength
+feature. The positional encoding PE(λi) for wavelength
+λi in channel i is given by:
+PE(λi, 2k) = sin
+
+λi
+100002k/Dλ
+
+,
+PE(λi, 2k + 1) = cos
+
+λi
+100002k/Dλ
+
+,
+(5)
+where k = 0, . . . , Dλ
+2
+−1. The positionally encoded
+wavelengths Vλ are further transformed through two
+fully-connected layers with residual connections:
+V′
+λ = ReLU(F2(ReLU(F1(Vλ)))) + Vλ,
+(6)
+where F1 and F2 represent the fully-connected layers,
+and ReLU denotes the Rectified Linear Unit activation
+function [1].
+Next, we employ a Transformer encoder [44] layer
+with four attention heads to generate the dynamic weights
+and bias for each wavelength. Specifically, the embed-
+ding V′
+λ, Nw learnable query tokens Qw, and one learn-
+able bias query token Qb are concatenated together to
+form the input to the Transformer encoder:
+V′′ = TransformerEncoder(Concat(Qw, V′
+λ, Qb)).
+(7)
+We subsequently extract the embeddings V′′w that cor-
+respond to the weight query tokens Qw from V′′, as well
+
+--- PAGE 6 ---
+6
+Linear
+Linear
+Norm
+Multi-Head 
+Attention
+Norm
+MLP
+Pooling
+Norm
+Multi-Head 
+Attention
+Norm
+MLP
+Pooling
+Decoder
+Masked Multi-spectral Image
+Unmasked Selected RGB Channels
+Unmasked Selected RGB Channels
+Masked Image Modeling
+Pre-trained
+Model
+Feature
+Distillation
+Shared Parameters
+Teacher Model
+Stop Gradient
+Patchify
+FC Layers
+Linear
+0.49
+0.56
+0.65
+…
+0.85
+1.28
+…
+…
+Transformer 
+Block
+Learnable 
+Bias token
+Learnable 
+Weight tokens
+wavelength
+query tokens
+Linear
+Linear
+wavelength 
+wavelength 
+Generated 
+Bias
+Generated 
+Weights
+Image
+Tokens
+Tokens
+Reshape
+Output tokens
+(1)
+(2)
+Fig. 5: Dynamic weight generator and continual training framework. (1) The central wavelengths of each
+band are utilized to derive weights tailored to each wavelength. (2) Continual pretraining process. There is a
+distillation and a reconstruction loss.
+as the embeddings V′′b associated with the bias query
+tokens Qb from V′′. Then, two fully-connected layers
+are utilized to generate the dynamic weights and biases:
+Mw = Fw(V′′
+w + V′
+λ) ∈RC×P 2D,
+Mb = Fb(V′′
+b) ∈RC×D,
+(8)
+where Fw and Fb denote the fully-connected layers for
+weight and bias generation, respectively. As introduced
+in the Mathematical formalism section, the patch em-
+bedding layer can be implemented efficiently using a
+convolution layer. Thus, we reshape the generated weights
+into the convolution kernel as:
+Kconv = Reshape(Mw, [D, C, P, P]),
+(9)
+The convolution operation for patch embedding is then
+performed using the dynamically generated weights Kconv
+and biases Mb:
+PatchEmbedding := Conv(X, Kconv, Mb).
+(10)
+where Conv denotes the convolution operation. Utiliz-
+ing this approach, the patch embedding layer achieves
+independence from the number of spectral bands of the
+input images. The weights for these layers are dynami-
+cally generated based on the central wavelength of each
+channel in a compositional manner. This mechanism
+enables the model to learn modality-specific represen-
+tations dynamically, thereby enhancing its adaptability
+and performance across various data domains.
+For the wavelength-conditioned dynamic decoder,
+we use different parameters to generate dynamic weights
+and biases. The computation process is similar to the
+dynamic patch embedding layer described before. In the
+vanilla masked autoencoder, the final layer of the de-
+coder is usually implemented as a fully-connected layer
+to convert features from latent space into pixel space.
+For the dynamic decoder layer, we follow the same pro-
+cess used in the dynamic patch embedding to generate
+the dynamic weights. The only difference is that a fully-
+
+--- PAGE 7 ---
+7
+connected layer is used in the decoder rather than the
+convolution layer in the patch embedding layer.
+3.4 Multimodal continual pretraining
+The self-supervised loss formulation is pivotal for train-
+ing our multimodal EO foundation model. The model
+leverages the MIM paradigm to avoid the requirement
+for spatially aligned multimodal datasets. To reduce the
+computational cost of training on extensive datasets, we
+propose a continual pretraining strategy in the multi-
+modal setting, incorporating a distillation loss inspired
+by GFM [32] and a weight initialization strategy.
+Considering the varying number of channels in dif-
+ferent EO modalities, directly using ImageNet pretrained
+weights for continual pretraining is impossible. Instead,
+we design a proxy-based distillation method that ex-
+tracts optical data as a proxy to ensure representation
+similarity between the teacher and student networks. As
+illustrated in Fig. 5 (2), for multi-channel input data
+with more than three channels, we extract the RGB
+channels to form a three-channel input Xp ∈R3×H×W .
+We randomly select one channel for Sentinel-1 data
+with only two bands and duplicate it to a synthetic
+three-channel image. This input Xp is then fed into an
+ImageNet-pretrained teacher model to get teacher fea-
+tures Ft. Concurrently, the dynamic encoder in DOFA
+is also used to encode Xp into student features Fs.
+Throughout this procedure, the teacher model’s weights
+remain frozen to preserve structured representations
+and reduce the computational load during optimization.
+We also follow a continual pretraining strategy for
+initializing the dynamic weight generator. First, we pre-
+train the weight generator to mimic the teacher model’s
+patch embedding layer weights. We then use the pre-
+trained weights to initialize the dynamic embedding
+layer. The training loss comprises two distinct compo-
+nents. One is the MIM reconstruction loss, which forces
+the model to predict X′ ∈RC×H×W for reconstruct-
+ing various data modalities from the full-channel inputs
+X. The other is the feature distillation loss, which em-
+ploys the cosine similarity between the teacher and stu-
+dent feature representations to guide the student model.
+Suppose that the encoded feature of the full channel
+input is F; then the composite loss function can be for-
+mulated as follows:
+L = 1
+N
+N
+X
+i=1
+∥Xi −X′
+i∥2 −
+FP (Fi
+s) · Fi
+t
+∥FP (Fis)∥2 · ∥Fi
+t∥2
+,
+(11)
+where FP is a linear projection layer, and N is the
+number of data samples.
+The model training is supervised from two distinct
+perspectives. First, it leverages the complete spectral
+information present in the input to learn cross-modal
+features via image reconstruction. Second, it distills
+knowledge from extensively pretrained models into di-
+verse data modalities using a single dynamic model.
+This approach enables efficient and robust feature learn-
+ing across various modalities.
+3.5 DOFA+: Hybrid Continual Pre-training
+To further enhance both performance and efficiency, we
+extend DOFA with three key improvements:
+Adaptation from Strong Priors Starting from
+DINOv2 [35] weights, we apply the MIM objective to
+enable efficient adaptation to multiple EO modalities.
+This preserves the strong semantic priors of DINOv2
+while guiding the model to learn EO-specific visual pat-
+terns through local reconstruction.
+Hierarchical Feature Distillation To complement
+the MIM objective, we introduce a hierarchical distilla-
+tion strategy that aligns the student’s intermediate rep-
+resentations with those of the DINOv2 teacher across
+multiple layers.
+Compact Pre-training Regime We demonstrate
+that high-quality adaptation does not require billion-scale
+corpora: DOFA+ attains state-of-the-art performance
+after seeing only 410k EO image tiles, much fewer sam-
+ples to reduce both cost and carbon footprint.
+Building on these refinements, we present DOFA+,
+a lightweight, universal Earth-observation encoder that
+combines the reconstruction pressure of MAE with the
+semantic guidance of a vision foundation model. Dur-
+ing training, the student reconstructs randomly masked
+patches while simultaneously distilling hierarchical su-
+pervision signals from DINOv2. This recipe offers two
+practical benefits:
+1. Simplicity DOFA+ maintains a single-branch ar-
+chitecture with a minimal training objective, avoid-
+ing the need for complex multi-task losses or auxil-
+iary network modules.
+2. Complementary Learning DOFA+ combines lo-
+cal detail learning and global semantic alignment in
+a lightweight continual pretraining setup, enabling
+efficient adaptation to diverse EO tasks without re-
+training the model.
+The training objective of DOFA+ combines a recon-
+struction loss from masked image modeling and a multi-
+level feature distillation loss based on cosine similarity.
+Let X ∈RC×H×W denote the full-spectrum input, and
+X′ the reconstructed output. Let Fsi,l and Fti,l rep-
+
+--- PAGE 8 ---
+8
+resent the student and teacher features from the l-th
+layer, respectively, for sample i.
+The total training loss is defined as:
+L =
+1
+N
+N
+X
+i=1
+∥Xi −X′i∥2
+|
+{z
+}
+MIM Reconstruction Loss
+−λ· 1
+L
+L
+X
+l=1
+Fl
+P (Fi,l
+s ) · Fi,l
+t
+∥Fl
+P (Fi,l
+s )∥2 · ∥Fi,l
+t ∥2
+|
+{z
+}
+Multi-layer Feature Distillation
+(12)
+Here, Fl
+P (·) is a linear projection aligning student fea-
+tures to the teacher’s dimension, L is the number of
+distillation layers, N is the batch size, and λ is a bal-
+ancing coefficient.
+This training procedure enables DOFA+ to learn se-
+mantically rich, transferable representations, support-
+ing scalable and general-purpose EO foundation models
+with strong cross-modal generalization and low resource
+demands.
+4 Experiments
+We conduct extensive experiments across 22 datasets
+encompassing various Earth Observation (EO) tasks,
+including image classification, semantic segmentation,
+object detection, and change detection. We assess model
+performance under several settings: linear probing, de-
+coder fine-tuning, and full fine-tuning. To demonstrate
+generalizability, we use diverse datasets with varying
+resolutions, spectral modalities, and geospatial regions.
+We emphasize energy-efficient training protocols by lim-
+iting training epochs and freezing pre-trained backbones
+wherever possible.
+4.1 GEO-Bench Experiments
+4.1.1 GEO-Bench Classification Experiments
+There are six image classification datasets provided in
+GEO-Bench [24]: m-bigearthnet, m-so2sat, m-brick-kiln,
+m-forestnet, m-eurosat, and m-pv4ger. These datasets
+span diverse domains and applications, including for-
+est monitoring, land use classification, and infrastruc-
+ture detection. They are sourced from multiple satellite
+platforms, covering different spectral ranges and spatial
+resolutions.
+On the classification datasets, we follow the com-
+mon practice of using RandomResizedCrop (scale 0.8 to
+1.0) and RandomHorizontalFlip as data augmentations.
+The default crop size is 224×224 for all datasets and
+baseline models except SatMAE [10] and CROMA [14],
+of which the crop size is 96×96 for SatMAE and 120×120
+for CROMA, following the official setup to match their
+smaller patch size of 8. We optimize cross-entropy loss
+for most datasets, except for m-bigearthnet, for which
+the multi-label soft margin loss is used. The LARS op-
+timizer is utilized with cosine decay to train the last
+linear layer of each foundation model for 50 epochs.
+Considering the wide range of diversity among existing
+foundation models, we employ dataset-specific learn-
+ing rates and batch sizes tailored to enhance the per-
+formance of classification tasks. We sweep over a grid
+search to pick the best learning rate from [0.5, 1.0, 10,
+20] for each dataset.
+Table 1 presents the classification results. Our pro-
+posed DOFA and DOFA+ demonstrate superior perfor-
+mance across multiple datasets, validating their strong
+generalization capability with minimal training cost.
+Regarding the flexibility, DOFA and DOFA+ can be
+adapted to diverse EO modalities without changing the
+model architectures or retraining any part of the model.
+Unlike other models that often require modality-specific
+adaptation, DOFA adapts seamlessly to unseen sensors.
+For instance, DOFA achieves strong performance on
+m-forestnet, despite never seeing the Landsat-8 data
+during pretraining. This cross-modal adaptability veri-
+fies DOFA’s utility as a general-purpose EO foundation
+model.
+4.1.2 GEO-Bench Segmentation Experiments
+The six segmentation datasets include m-pv4ger-seg,
+m-chesapeake-landcover, m-cashew-plantation, m-SA-
+crop-type, m-nz-cattle, and m-NeonTree. These datasets
+cover tasks like solar panel mapping, land cover seg-
+mentation, crop classification, and canopy delineation,
+across RGB, multispectral, and hyperspectral modali-
+ties. We freeze the encoder and train a UPerNet [51]
+decoder for segmentation tasks. For all the models ex-
+cept the GFM with Swin Transformer, we transform
+the features into a feature pyramid with channels 512
+and four different scales: 4, 2, 1, 0.5. The UPerNet seg-
+mentation head is then used to output the segmenta-
+tion results. We use the AdamW optimizer, batch size
+64, and an initial learning rate of 0.005 with cosine de-
+cay for 20 epochs for segmentation tasks. The learning
+rate is relatively stable across datasets for segmentation
+tasks.
+We use center crop, random rotation, and random
+horizontal and vertical flips for segmentation tasks. Im-
+ages of each dataset are normalized based on the dataset’s
+mean and standard deviation. Table 2 shows that DOFA
+and DOFA+ consistently outperform other foundation
+models across all datasets. Specifically, DOFA with ViT-
+Base and ViT-Large backbones achieves particularly
+high accuracy on both the m-NeonTree and m-nz-cattle
+
+--- PAGE 9 ---
+9
+Table 1: Linear probing results on six classification tasks. All models are trained for 50 epochs. The reported
+numbers are top-1 overall accuracy (OA). The m-bigearthnet dataset is evaluated using micro-averaged multilabel
+average precision. Missing values are due to the inability of the model to adapt to this domain.
+Method
+Backbone
+m-bigearthnet
+m-forestnet
+m-brick-kiln
+m-pv4ger
+m-so2sat
+m-eurosat
+MAE Single [18]
+ViT-B
+63.6
+-
+88.9
+92.2
+50.0
+89.0
+OFA-Net [52]
+ViT-B
+65.0
+-
+94.7
+93.2
+49.4
+91.9
+SatMAE [10]
+ViT-B
+62.1
+-
+93.9
+-
+46.9
+86.4
+Scale-MAE [36]
+ViT-L
+-
+-
+-
+96.9
+-
+-
+GFM [32]
+Swin-B
+-
+-
+-
+96.8
+-
+-
+Cross-Scale MAE [40]
+ViT-B
+-
+-
+-
+93.1
+-
+-
+FG-MAE [50]
+ViT-B
+63.0
+-
+94.7
+-
+51.4
+87.0
+CROMA [14]
+ViT-B
+67.4
+-
+91.0
+-
+49.2
+90.1
+AnySat [2]
+ViT-B
+63.8
+50.9
+90.3
+92.8
+42.5
+87.6
+Galileo [42]
+ViT-B
+65.1
+-
+93.1
+-
+54.2
+88.6
+DOFA
+ViT-B
+65.7
+50.9
+95.8
+96.9
+55.1
+93.9
+DOFA
+ViT-L
+67.5
+54.6
+96.9
+97.3
+60.1
+97.1
+DOFA+
+ViT-B
+64.8
+49.8
+94.9
+96.9
+57.5
+93.0
+DOFA+
+ViT-L
+68.3
+55.1
+96.9
+97.9
+61.3
+95.3
+Table 2: Partial fine-tuning results on six segmentation tasks. All models are trained with a frozen backbone
+for 20 epochs. Reported numbers are mean intersection over union (mIoU). Missing values are due to the inability
+of the model to readily adapt to this domain.
+Method
+Backbone
+m-pv4ger-seg
+m-nz-cattle
+m-NeonTree
+m-cashew-plant
+m-SA-crop
+m-chesapeake
+MAE Single [18]
+ViT-B
+88.4
+76.4
+53.0
+40.7
+30.7
+51.9
+OFA-Net [52]
+ViT-B
+89.4
+77.6
+53.3
+47.9
+31.9
+54.5
+Scale-MAE [36]
+ViT-L
+83.5
+76.5
+51.0
+-
+-
+61.0
+GFM [32]
+Swin-B
+92.0
+75.0
+51.1
+-
+-
+63.8
+Cross-Scale MAE [40]
+ViT-B
+83.2
+77.9
+52.1
+-
+-
+52.3
+CROMA [14]
+ViT-B
+-
+-
+-
+30.1
+31.4
+-
+FG-MAE [50]
+ViT-B
+-
+-
+-
+40.8
+30.6
+-
+AnySat [2]
+ViT-B
+89.9
+76.7
+52.2
+27.2
+26.8
+54.0
+DOFA
+ViT-B
+94.5
+81.4
+58.8
+51.5
+33.0
+65.3
+DOFA
+ViT-L
+95.0
+81.8
+59.4
+56.9
+32.1
+66.3
+DOFA+
+ViT-B
+95.1
+82.7
+61.1
+55.1
+30.2
+70.8
+DOFA+
+ViT-L
+95.7
+83.5
+63.8
+60.2
+33.2
+71.6
+datasets, highlighting the strength of its high-capacity
+architecture. On the segmentation datasets, DOFA+
+shows a significant performance improvement compared
+with DOFA. We attribute this improvement to the multi-
+layer distillation method, which ensures the model learns
+fine-grained spatial patterns. These results further con-
+firm DOFA’s robustness, adaptability, and efficiency
+across segmentation tasks.
+4.2 PANGEA Benchmark Experiments
+We further evaluate DOFA+ on the PANGEA bench-
+mark, which covers a diverse range of EO downstream
+tasks. In this setting, we perform decoder fine-tuning
+only, while freezing the pretrained DOFA and DOFA+
+backbones. All models are trained for 100 epochs with
+fixed optimization hyperparameters to ensure fairness.
+To maintain consistency, we restrict our experiments
+to the datasets for which the original benchmark pro-
+vides direct download links, ensuring that comparisons
+are conducted under the same conditions. Training hy-
+perparameters are kept identical to those specified in
+the original PANGEA paper. The indices used for com-
+bining intermediate layers may be tuned for different
+datasets. For input resolution, if the original image size
+is smaller than 224, we upscale it to 224 for DOFA+
+since DOFA+ is pretrained with an image size of 224.
+If it is larger, we retain the original size, following the
+UNet baseline setting.
+Table 3 summarizes the results across eight repre-
+sentative downstream tasks. For the results of DOFA,
+we include the results from the PANGEA [31] bench-
+mark. DOFA with ViT-Base already achieves compet-
+itive performance against existing foundation models,
+outperforming RemoteCLIP and SatlasNet by a clear
+margin, and reaching a comparable average mIoU to
+CROMA with fewer computational costs. More impor-
+tantly, DOFA exhibits consistent performance across
+tasks of different types, including burned area mapping
+(BurnSr), flood mapping (Sen1Floods11), and crop mon-
+itoring (AI4Farms). This demonstrates that DOFA ef-
+fectively learns transferable EO-specific spectral-spatial
+representations.
+
+--- PAGE 10 ---
+10
+When scaling to DOFA+ (ViT-Large), we observe
+substantial improvements across nearly all tasks, set-
+ting new state-of-the-art (SOTA) results on the PANGEA
+benchmark. Overall, DOFA+ attains the highest aver-
+age mIoU of 59.81, outperforming TerraMindv1-L, de-
+spite being trained with substantially fewer pretrain-
+ing images and significantly lower computational re-
+sources. It also achieves the best or second-best scores in
+6 out of 8 tasks, with particularly strong performance in
+BurnSr (86.53), CTM-SS (57.47), and SN7 (63.06).
+These tasks involve heterogeneous data sources, indi-
+cating the robustness of DOFA+ in handling diverse
+EO modalities. Although TerraMindv1-L achieves the
+best score on the MADOS dataset, DOFA+ still de-
+livers the second-best performance. Importantly, unlike
+the TerraMind models, DOFA+ does not rely on LULC
+maps during pretraining, even though such maps can
+provide a strong advantage for Sentinel-2–based seg-
+mentation tasks. Overall, DOFA+ attains a superior
+average rank (2.25) across all benchmarks, highlighting
+both its strong accuracy and its stability across diverse
+downstream tasks.
+4.2.1 Image Classification on RESISC45
+In addition to the datasets in GEO-Bench, we com-
+pare DOFA and DOFA+ with existing foundation mod-
+els on the widely-used RESISC-45 dataset [9], which
+contains 31,500 remote sensing images across 45 scene
+categories. Table 4 presents the classification results
+under both frozen backbone evaluation (linear prob-
+ing) and full finetuning. With the ViT-Base backbone,
+DOFA achieves 91.3% (frozen) and 97.3% (finetuned),
+already surpassing existing methods. When scaling to
+ViT-Large, DOFA reaches 91.9% (frozen) and 97.8%
+(finetuned), outperforming other models in both set-
+tings.
+The performance gains become even more pronounced
+with DOFA+. Using ViT-Base, DOFA+ improves frozen
+accuracy to 93.7%, while finetuning yields 97.5%. With
+ViT-Large, DOFA+ achieves the best overall results of
+95.3% (frozen) and 98.1% (finetuned), significantly
+outperforming all prior methods. For the RESISC45 ex-
+periments, we apply global mean pooling to the penul-
+timate layer of DOFA and DOFA+, and use the pooled
+features as input to a linear classification layer. We
+choose the penultimate layer rather than the final layer
+because the latter is more directly influenced by the re-
+construction objective during pretraining, whereas the
+penultimate representations tend to capture more gen-
+eralizable semantic features, leading to better transfer
+performance on classification tasks.
+4.3 Object Detection Experiments
+We evaluate object detection performance on the DIOR
+dataset using the Faster R-CNN detector with DOFA
+and DOFA+ backbones. The DIOR dataset is a large-
+scale benchmark for remote sensing object detection,
+containing 23,463 images and 192,472 annotated in-
+stances across 20 object categories, covering diverse scenes
+with significant variation in scale, orientation, and back-
+ground complexity. Following the existing experimen-
+tal setting, Faster R-CNN is adopted as the detection
+head, and all models are fully finetuned. For DOFA and
+DOFA+, we train the models for 15 epochs with a learn-
+ing rate of 1e-4 and batch size 16. For the evaluation
+metric, mAP50 is used, which refers to the mean Aver-
+age Precision computed at an Intersection-over-Union
+threshold of 0.5, which is a standard metric for evalu-
+ating object detection performance.
+Table 5 reports the detection performance in terms
+of mAP50. DOFA already achieves competitive results
+with an mAP50 of 76.21, while DOFA+ establishes a
+new SOTA with 79.73, surpassing strong baselines such
+as RingMo (75.90), CMID (75.11), SkySense (78.73),
+and even the high-capacity SkySense V2 (79.50). Note
+that, compared with SkySense V2, our model uses ViT-
+L, which is considerably more computationally efficient
+than Swin-Huge. Furthermore, our pretraining dataset
+and GPU hours are significantly smaller, highlighting
+the efficiency of our approach.
+Unlike SkySense models, which use separate back-
+bones for optical RGB and multispectral data, DOFA
+and DOFA+ employ a single set of model parameters
+across all tasks. Despite this unified design, they adapt
+effectively to the high-resolution characteristics of the
+DIOR dataset, while also delivering strong performance
+on Sentinel-1 and Sentinel-2 benchmarks that involve
+much lower-resolution imagery. This highlights the flex-
+ibility of DOFA+ in handling diverse input conditions,
+including different sensors, GSD, and spectral band com-
+binations. The ability to seamlessly adapt to varying
+data modalities while maintaining state-of-the-art per-
+formance underscores the robustness and universality
+of the DOFA framework.
+From these experiments, we conclude that DOFA+
+provides both flexibility and scalability: it can effec-
+tively exploit spectral-spatial information across datasets
+with widely differing properties, and it achieves superior
+performance on high-resolution detection tasks without
+requiring task-specific architectural modifications.
+
+--- PAGE 11 ---
+11
+Table 3: Benchmark results across 8 EO downstream tasks. An asterisk (∗) marks tasks that use only single-scene
+inputs. Best scores in each column are bold; second–best are underlined.
+Model
+BurnSr∗
+MADOS∗
+PASTIS
+Sen1Fl11
+DEN∗
+CTM-SS
+SN7∗
+AI4Farms∗
+Avg. mIoU
+CROMA
+82.42
+67.55
+32.32
+90.89
+38.29
+49.38
+59.28
+25.65
+55.72
+DOFA (Base)
+80.63
+59.58
+30.02
+89.37
+39.29
+51.33
+61.84
+27.07
+54.89
+GFM-Swin
+76.90
+64.71
+21.24
+72.60
+34.09
+46.98
+60.89
+27.19
+50.58
+Prithvi 1.0 100M
+83.62
+49.98
+33.93
+90.37
+27.86
+43.07
+56.54
+26.86
+51.53
+RemoteCLIP
+76.59
+60.00
+18.23
+74.26
+31.78
+52.05
+57.76
+25.12
+49.47
+SatlasNet
+79.96
+55.86
+17.51
+90.30
+36.31
+46.97
+61.88
+25.13
+51.74
+Scale-MAE
+76.68
+57.32
+24.55
+74.13
+35.11
+25.42
+62.96
+21.47
+47.20
+SpectralGPT
+80.47
+57.99
+35.44
+89.07
+37.85
+46.95
+58.86
+26.75
+54.17
+S.-S12-MoCo
+81.58
+51.76
+34.49
+89.26
+35.44
+48.58
+57.64
+25.38
+53.02
+S.-S12-DINO
+81.72
+49.37
+36.18
+88.61
+34.81
+48.66
+56.47
+25.62
+52.68
+S.-S12-MAE
+81.91
+49.90
+32.03
+87.79
+34.08
+45.80
+57.13
+24.69
+51.67
+S.-S12-Data2Vec
+81.91
+44.36
+34.32
+88.15
+35.90
+54.03
+58.23
+24.23
+52.64
+SMARTIES-B
+82.80
+—
+—
+—
+38.50
+—
+62.20
+—
+—
+UNet Baseline
+84.51
+54.79
+31.60
+91.42
+39.46
+47.57
+62.09
+46.34
+57.22
+ViT Baseline
+81.58
+48.19
+38.53
+87.66
+36.83
+44.08
+52.57
+38.37
+53.48
+TerraMindv1-B-single
+84.00
+65.01
+40.80
+90.32
+–
+52.66
+59.71
+27.71
+52.53
+TerraMindv1-B
+82.42
+69.52
+40.51
+90.62
+37.87
+55.80
+60.61
+28.12
+58.18
+TerraMindv1-L
+82.93
+75.57
+43.13
+90.78
+37.89
+55.04
+59.98
+27.47
+59.10
+DOFA+ (Large)
+86.53
+69.77
+40.26
+90.38
+41.12
+57.47
+63.06
+29.93
+59.81
+Table 4: Classification results on the RESISC-45
+dataset. The best results are shown in bold.
+Methods
+Venue
+Backbone
+Frozen
+Finetune
+SatMAE [10]
+NeurIPS 2022
+ViT-L
+88.3
+94.8
+ConvMAE [15]
+NeurIPS 2022
+ConvVit-L
+81.2
+95.0
+Scale-MAE [36]
+ICCV 2023
+ViT-L
+89.6
+95.7
+Vanilla MAE [18]
+CVPR 2022
+ViT-L
+88.9
+93.3
+SMARTIES [39]
+ICCV 2025
+ViT-L
+–
+95.8
+SatMAE++ [34]
+CVPR 2024
+ViT-L
+–
+97.5
+DOFA
+–
+ViT-B
+91.3
+97.3
+DOFA
+–
+ViT-L
+91.9
+97.8
+DOFA+
+–
+ViT-B
+93.7
+97.5
+DOFA+
+–
+ViT-L
+95.3
+98.1
+Table 5: Detection performance on the DIOR horizontal
+dataset. Faster R-CNN is used as the object detector.
+Models
+Backbone
+DIOR (mAP50)
+GASSL [3]
+ViT-B
+67.40
+SatMAE [10]
+ViT-B
+70.89
+RingMo [53]
+ViT-B
+75.90
+RVSA [46]
+ViT-B
+73.22
+BFM [8]
+ViT-B
+–
+TOV [41]
+ViT-B
+70.16
+SSL4EO [47]
+ViT-B
+64.82
+CMID [33]
+ViT-B
+75.11
+CACo [29]
+ViT-B
+66.91
+SatLas [4]
+ViT-B
+74.10
+GFM [32]
+ViT-B
+72.84
+Scale-MAE [36]
+ViT-B
+73.81
+MA3E [26]
+ViT-B
+–
+SkySense [16]
+ViT-B
+78.73
+SkySense V2 [54]
+Swin-H
+79.50
+DOFA
+ViT-L
+76.21
+DOFA+
+ViT-L
+79.73
+4.4 Ablation Studies
+We conduct ablation studies to investigate the con-
+tributions of key components in DOFA’s pretraining
+pipeline and to better understand the robustness of the
+learned representations. Unless otherwise specified, ex-
+periments are performed with DOFA (ViT-Base) and
+DOFA+ (ViT-Base).
+First, we examine the impact of the number of spec-
+tral bands used during pretraining. A central question is
+whether the pretrained DOFA+ encoder can effectively
+learn and preserve representations for spectral modal-
+ities beyond RGB. To this end, we evaluate DOFA+
+(ViT-Base) on the Sen1Floods11 dataset using Sentinel-
+2 imagery with 13 spectral bands. This experiment pro-
+vides insights into the model’s capacity to generalize
+across different spectral combinations and its ability
+to leverage richer spectral information for downstream
+tasks.
+Second, we analyze the influence of pretraining du-
+ration. Specifically, we vary the number of pretraining
+epochs and evaluate the resulting representations via
+linear probing on the RESISC45 dataset. This allows us
+to assess how the length of pretraining affects represen-
+tation quality and transfer performance, and whether
+longer pretraining yields diminishing or consistent re-
+turns.
+Together, these ablations shed light on how spec-
+tral diversity and pretraining duration contribute to
+DOFA’s effectiveness, providing guidance for scaling
+the model to different data modalities and training regimes.
+
+--- PAGE 12 ---
+12
+Table 6: Ablation Studies on the performance of DOFA+ (ViT-B) using different numbers of spectral channels.
+Comparison of band combinations is conducted on the Sen1Floods11 dataset.
+Bands
+F1
+mIoU
+Water IoU
+RGB
+81.03
+70.66
+49.77
+RGB + Coastal Aerosol (CA)
+80.48
+70.02
+48.63
+RGB + CA + RED EDGE 1 (RE1)
+84.71
+75.27
+57.51
+RGB + CA + RE1 + RE2
+86.49
+77.67
+61.51
+RGB + CA + RE1 + RE2 + RE3
+87.45
+78.98
+63.77
+RGB + CA + RE1 + RE2 + RE3 + NIR Broad
+88.83
+80.90
+67.49
+RGB + CA + RE1 + RE2 + RE3 + NIR Broad + NIR Narrow
+89.31
+81.60
+68.67
+RGB + CA + RE1 + RE2 + RE3 + NIR Broad + NIR Narrow + Water Vapor
+90.12
+82.84
+70.58
+RGB + CA + RE1 + RE2 + RE3 + NIR Broad + NIR Narrow + Water Vapor + Cirrus
+89.62
+82.09
+69.38
+RGB + CA + RE1 + RE2 + RE3 + NIR Broad + NIR Narrow + Water Vapor + Cirrus + SWIR1
+91.85
+85.53
+75.03
+RGB + CA + RE1 + RE2 + RE3 + NIR Broad + NIR Narrow + Water Vapor + Cirrus + SWIR1 + SWIR2
+92.51
+86.58
+76.83
+4.4.1 Number of Spectral Bands
+On the Sen1Floods11 dataset, we evaluate DOFA+ (ViT-
+B) with different combinations of spectral bands to as-
+sess how spectral diversity influences segmentation per-
+formance. The results are presented in Table 6. It is
+worth noting that in this ablation study, we do not tune
+hyperparameters, but focus solely on analyzing the ef-
+fect of different spectral bands. Starting from the RGB
+setting, the model achieves an F1 score of 81.03. As
+additional bands are incrementally introduced, perfor-
+mance consistently improves across all metrics, indi-
+cating that the pretrained DOFA+ backbone is capa-
+ble of effectively exploiting richer spectral information.
+Adding the Coastal Aerosol (CA) band doesn’t improve
+Fig. 6: Trend of segmentation performance as addi-
+tional spectral bands are incrementally included. Start-
+ing from RGB, performance improves significantly with
+the addition of more bands.
+the performance compared to RGB, but subsequent in-
+clusion of Red Edge (RE) bands leads to substantial
+improvements. With RGB + CA + RE1, the Water
+IoU increases from 49.77 to 57.51, demonstrating the
+Table 7: Ablation Studies on the performance of DOFA
+with different training epochs.
+Epochs
+Backbone
+RESISC-45 (Acc@1)
+E20
+ViT-B
+86.22
+E40
+ViT-B
+87.41
+E60
+ViT-B
+89.36
+E80
+ViT-B
+91.12
+E100
+ViT-B
+91.30
+importance of vegetation-sensitive bands for flood map-
+ping. As shown in Fig. 6, performance continues to rise
+steadily as more RE and NIR bands are introduced,
+with the model benefiting from complementary spec-
+tral responses across vegetation, soil, and water sur-
+faces. For an intuitive visualization, Fig. 7 shows that
+the segmentation maps become progressively finer and
+more accurate as additional spectral bands are incor-
+porated.
+The most significant gains are observed when SWIR
+bands are included. With the full combination of spec-
+tral bands, DOFA+ achieves the best overall perfor-
+mance, with an F1 score of 92.51, mIoU of 86.58, and
+Water IoU of 76.83. These results confirm that the pre-
+trained backbone is not only robust to varying spectral
+inputs but also capable of leveraging additional modali-
+ties without requiring architecture changes or retraining
+the model. Overall, the ablation results validate that
+DOFA+ learns powerful and flexible spectral–spatial
+representations during pretraining. Even with a frozen
+backbone, it adapts effectively to different band combi-
+nations and consistently benefits from the inclusion of
+additional spectral information.
+4.4.2 Training Epochs
+The results in Table 7 show a clear trend of improve-
+ment as the number of pretraining epochs increases. Ac-
+curacy steadily rises from 20 to 80 epochs, indicating
+
+--- PAGE 13 ---
+13
+Ground truth
+All bands
+S2 Image RGB Bands
+RGB
++COASTAL_AEROSOL
++RED_EDGE_1
++RED_EDGE_2
++RED_EDGE_3
++NIR_BROAD
++NIR_NARROW
++WATER_VAPOR
++CIRRUS
++SWIR1
+S2 Image RGB Bands
+Ground truth
+All bands
+RGB
++COASTAL_AEROSOL
++RED_EDGE_1
++RED_EDGE_2
++RED_EDGE_3
++NIR_BROAD
++NIR_NARROW
++WATER_VAPOR
++CIRRUS
++SWIR1
+Fig. 7: Segmentation maps with progressively added spectral bands (from RGB to full set). As more bands are
+included, boundaries become sharper and errors decrease, with F1, mIoU, and Water IoU consistently improving
+and reaching their peak in the full-band configuration.
+that longer pretraining enables DOFA to learn richer
+and more transferable representations. Beyond 80 epochs,
+the gains become marginal. This suggests that while
+sufficient pretraining is important for representation qual-
+ity, excessively long training may yield diminishing re-
+turns. Overall, these results confirm the benefit of ex-
+tended pretraining while also highlighting a tradeoff be-
+tween efficiency and performance.
+4.5 Pre-training efficiency comparison
+Table 8 highlights the efficiency advantages of our pro-
+posed models, DOFA and DOFA+, in comparison to
+recent EO foundation models. Unlike prior works that
+require massive datasets, hundreds of training epochs,
+and large computational budgets, DOFA and DOFA+
+achieve competitive or superior performance with sig-
+nificantly lower resource requirements.
+DOFA is pretrained on a large-scale multimodal EO
+dataset comprising approximately 11.5 million images
+from five different modalities: Sentinel-1, Sentinel-2, NAIP,
+Gaofen, and EnMAP. Pretraining is conducted with a
+75% masking ratio, a batch size of 128, the AdamW op-
+timizer [28] (weight decay 0.05), and an initial learning
+rate of 1.5e-4. The learning rate is warmed up for 20
+epochs and then decayed using a cosine schedule. The
+training follows a progressive scheme:
+Table 8: Pre-training efficiency comparison of recent EO
+foundation models (mAP column removed). N/A indi-
+cates not applicable due to missing public checkpoints
+or sensor mismatches that would lead to unfair com-
+parisons.
+Model
+Backbone
+PT Epochs
+PT Data Size
+RESISC-45
+S2
+RGB
+SatMAE (S2) [10]
+ViT-L
+50
+713K
+–
+N/A
+SatMAE (S2) [10]
+ViT-L
+200
+713K
+–
+N/A
+SatMAE (RGB) [10]
+ViT-L
+800
+–
+364K
+94.8
+Scale-MAE [36]
+ViT-L
+800
+–
+364K
+95.7
+CROMA [14]
+ViT-B (×2)
+300
+1M
+–
+N/A
+SpectralGPT [20]
+ViT-L
+200
+713K
+–
+N/A
+SpectralGPT+ [20]
+ViT-L
+300
+1M
+–
+N/A
+S2MAE [25]
+ViT-L
+200
+713K
+–
+N/A
+S2MAE∗[25]
+ViT-L
+300
+1M
+–
+N/A
+SatMAE++ (RGB) [34]
+ViT-L
+800
+–
+364K
+97.5
+SatMAE++ (S2) [34]
+ViT-L
+50
+713K
+–
+N/A
+SMARTIES [39]
+ViT-L
+300
+248K
+60K
+95.8
+CROMA [14]
+ViT-L (×2)
+600
+1M
+–
+N/A
+SpectralGPT [20]
+ViT-H
+200
+713K
+–
+N/A
+SpectralGPT+ [20]
+ViT-H
+300
+1M
+–
+N/A
+S2MAE [25]
+ViT-H
+200
+713K
+–
+N/A
+S2MAE∗[25]
+ViT-H
+300
+1M
+–
+N/A
+SkySense [16]
+ViT-L+Swin-H
+780
+21.5M
+21.5M
+96.3∗
+SkySenseV2 [54]
+ViT-L+Swin-H
+–
+21.5M
+21.5M
+97.2∗
+DOFA
+ViT-L
+–
+3.5M
+4.5M
+97.8
+DOFA+
+ViT-L
+150
+100K
+100K
+98.1
+– Initially, the model is trained on a 50K-image subset
+for 100 epochs.
+– Then, it is further trained on a 410K-image sub-
+set (100K from each of Sentinel-1, Sentinel-2, NAIP,
+Gaofen, and 10K from EnMAP) for 20 epochs.
+
+--- PAGE 14 ---
+14
+Sentinel-2, 9 channels
+Gaofen, 4 channels
+Sentinel-2, 13 channels
+NAIP (RGB), 3 channels
+Sentinel-1, 2 channels
+Densities (Sentinel-1, 2 channels)
+Densities (NAIP (RGB), 3 channels)
+Densities (Gaofen, 4 channels)
+Densities (Sentinel-2, 9 channels)
+Densities (Sentinel-2, 13 channels)
+Generated kernels (Sentinel-1, 2 channels)
+Generated kernels (NAIP (RGB), 3 channels)
+Generated kernels (Gaofen, 4 channels)
+Generated kernels (Sentinel-2, 9 channels)
+Generated kernels (Sentinel-2, 13 channels)
+Channel #1
+Channel #2
+Channel #2
+Channel #1
+Channel #2
+Channel #3
+Channel #1
+Channel #3
+Channel #4
+Channel #1
+Channel #4
+Channel #8
+Channel #1
+Channel #8
+Channel #13
+NAIP RGB
+Sentinel 1
+Sentinel 2
+Gaofen RGB-NIR
+Sentinel 2
+(a) Visualization of the dynamic weight generator. From left to right: examples of input images, learned embeddings
+for different central wavelengths, the histogram distributions of the generated weights, and some examples of the generated
+kernel weights.
+Scale-MAE
+Cross-scale-MAE
+GFM-MAE
+DOFA(base)-MAE
+DOFA(large)-MAE
+SatMAE
+CROMA
+DOFA(base)-MAE
+DOFA(large)-MAE
+FG-MAE
+SatMAE
+CROMA
+DOFA(base)-MAE
+DOFA(large)-MAE
+FG-MAE
+(b) t-SNE plots of the feature representations from various foundation models across multiple datasets. From
+top to bottom row: the m-pv4ger dataset, the m-so2sat dataset, and the m-eurosat dataset. Enhanced separability signifies
+more effective representations.
+Fig. 8: Visualization of learned embeddings. (a) Visualization of the generated weights for different input
+modalities. (b) t-SNE plots of the feature representations from various foundation models across multiple datasets.
+
+--- PAGE 15 ---
+15
+– Finally, we conduct a single epoch of training on
+the full 11.5M dataset to consolidate representation
+learning.
+All images are resized to 224 × 224 and normalized
+using modality-specific statistics. ViT-Base and ViT-
+Large teacher models pretrained on ImageNet-21K [38]
+are used for distillation.
+DOFA+ represents a more lightweight variant, de-
+signed to validate the efficiency of our distillation strat-
+egy under constrained data and compute. It is pre-
+trained for only 150 epochs on a compact dataset of
+410K EO images, including 100K samples each from
+Sentinel-1, Sentinel-2, NAIP, Gaofen, and 10K from En-
+MAP. All training is conducted using just 8 NVIDIA
+L40 GPUs (48GB memory each), completing within
+three days. Despite its lightweight setup, DOFA+ achieves
+SOTA performance on the RESISC-45 classification bench-
+mark with 98.1% accuracy. This result is particularly
+notable when compared to large-scale models such as
+SatMAE, Scale-MAE, and SatMAE++, which use mil-
+lions of images and up to 800 training epochs. Training
+TerraMindv1-B took 12 days on 32 A100 GPUs, total-
+ing 9,216 GPU hours, representing a substantial com-
+putational cost. Even more resource-intensive models
+like SkySenseV2 [54] require 21.5M images, heavy back-
+bones (e.g., Swin-H), and over 44,500 hours of H20 GPU
+time.
+In contrast, DOFA+ employs a single ViT-L back-
+bone with much lower computational cost, yet achieves
+competitive or even superior performance compared to
+task-specific counterparts. This demonstrates the strength
+of our distillation-based pretraining pipeline in extract-
+ing rich spectral–spatial representations efficiently, mak-
+ing it suitable for real-world deployment where compu-
+tational resources are limited.
+4.6 Visualizations
+DOFA generates diverse weights dynamically.
+We visualize the learned embeddings of various wave-
+lengths and the generated kernels for different sensors
+in Fig. 8a for a better understanding of DOFA. We
+randomly select and plot six 16 × 16 kernel weights for
+input images with more than four channels. The figures
+indicate that DOFA can generate weights for different
+sensors dynamically and effectively.
+DOFA optimizes separability in latent space.
+We visualize the pretrained representations of differ-
+ent models using the dimensionality reduction tech-
+nique t-SNE [43] to represent high-dimensional data.
+Specifically, the extracted features of the pretrained
+models on downstream datasets m-pv4ger, m-so2sat,
+and m-eurosat are shown in Fig. 8b. Different colors
+represent different semantic categories. On these three
+datasets, the learned features of both versions of DOFA
+are clustered better than those of other compared mod-
+els. These figures further validate the effectiveness of
+the proposed DOFA as a unified EO foundation model.
+5 Conclusion
+In this work, we introduced DOFA and DOFA+, two
+foundation models for Earth observation (EO) designed
+to operate flexibly across a wide range of sensors, spec-
+tral bands, and spatial resolutions. Unlike prior ap-
+proaches that are often limited to specific modalities
+or require excessive compute, our models are built to
+generalize across tasks and modalities in an efficient and
+scalable manner. We proposed a wavelength-conditioned
+dynamic hypernetwork architecture that enables a sin-
+gle model to process multimodal satellite inputs. Through
+continual and hybrid pretraining across five EO modal-
+ities, DOFA learns rich spectral–spatial representations
+that transfer effectively to downstream tasks. DOFA+
+extends this capability further with a lightweight dis-
+tillation pipeline, offering strong performance even un-
+der constrained computational budgets. Comprehensive
+experiments across multiple benchmarks demonstrate
+that DOFA and DOFA+ achieve state-of-the-art re-
+sults. Notably, the models generalize well to unseen sen-
+sors and spectral configurations without the need for
+retraining, highlighting their flexibility and robustness
+in open-world EO scenarios.
+6 Data availability statements
+In this work, we have constructed an extensive multi-
+modal dataset that is composed of five distinct modali-
+ties, each offering unique spectral and spatial data char-
+acteristics. In this section, we provide the download
+links to ensure data availability.
+Sentinel-1 The Sentinel-1 subset of the dataset can be
+downloaded from https://github.com/allenai/satlas/
+blob/main/SatlasPretrain.md#download.
+Sentinel-2 The Sentinel-2 subset of the dataset can be
+downloaded from https://github.com/allenai/satlas/
+blob/main/SatlasPretrain.md#download.
+Gaofen The Gaofen part of the dataset can be down-
+loaded from https://drive.google.com/drive/folders/
+1924VnO08Gqo3Nv7Y4KirgJ9kqqCup7f0.
+
+--- PAGE 16 ---
+16
+NAIP This NAIP part of the dataset can be down-
+loaded from https://github.com/allenai/satlas/blob/
+main/SatlasPretrain.md#download.
+EnMAP This hyperspectral data from EnMAP used in
+our dataset can be downloaded from https://hyspecnet.
+rsim.berlin/.
+Evaluation datasets The resisc45 dataset can be down-
+loaded from https://huggingface.co/datasets/timm/
+resisc45.
+We evaluate the pretrained models on 12 down-
+stream tasks organized in GEO-Bench [24]. These datasets
+cover various applications and data modalities in EO,
+including six classification tasks and six segmentation
+tasks. The full guidance for the dataset downloading is
+available at https://github.com/ServiceNow/geo-bench.
+All the datasets for evaluation on PANGEA bench-
+mark can be found at https://github.com/VMarsocci/
+pangaea-bench.
+7 Code availability
+The training script and inference script have been pub-
+licly available at https://github.com/zhu-xlab/DOFA.
+The trained models have been publicly available at https:
+//huggingface.co/earthflow/DOFA.
+Acknowledgements The work of Z.X., F.Z., Y.W., F.Z.,
+A.J.S., and X.X.Z is jointly supported by the German Federal
+Ministry of Education and Research (BMBF) in the frame-
+work of the international future AI lab “AI4EO – Artifi-
+cial Intelligence for Earth Observation: Reasoning, Uncer-
+tainties, Ethics and Beyond” (grant number: 01DD20001),
+by German Federal Ministry for Economic Affairs and Cli-
+mate Action in the framework of the “national center of
+excellence ML4Earth” (grant number: 50EE2201C), by the
+German Federal Ministry for the Environment, Nature Con-
+servation, Nuclear Safety and Consumer Protection (BMUV)
+based on a resolution of the German Bundestag (grant num-
+ber: 67KI32002B; Acronym: EKAPEx) and by Munich Cen-
+ter for Machine Learning. The work of Z. X., I.P., G.C.V., and
+X. X. Z is also funded by the European Commission through
+the project “ThinkingEarth—Copernicus Foundation Models
+for a Thinking Earth” under the Horizon 2020 Research and
+Innovation program (Grant Agreement No. 101130544). GCV
+was partly funded by the European Research Council (ERC)
+Synergy Grant “Understanding and Modeling the Earth Sys-
+tem with Machine Learning” (USMILE) under the Horizon
+2020 Research and Innovation program (Grant Agreement
+No. 855187).
+References
+1. Abien Fred Agarap.
+Deep learning using rec-
+tified
+linear
+units
+(ReLU).
+arXiv
+preprint
+arXiv:1803.08375, 2018.
+2. Guillaume Astruc, Nicolas Gonthier, Cl´ement Mal-
+let, and Loic Landrieu.
+Anysat: One earth ob-
+servation model for many resolutions, scales, and
+modalities. In Proceedings of the IEEE/CVF Con-
+ference on Computer Vision and Pattern Recogni-
+tion (CVPR), 2025.
+3. Kumar Ayush, Burak Uzkent, Chenlin Meng, Ku-
+mar Tanmay, Marshall Burke, David Lobell, and
+Stefano Ermon.
+Geography-aware self-supervised
+learning.
+In Proceedings of the IEEE/CVF In-
+ternational Conference on Computer Vision, pages
+10181–10190, 2021.
+4. Favyen Bastani, Piper Wolters, Ritwik Gupta,
+Joe Ferdinando, and Aniruddha Kembhavi.
+Sat-
+lasPretrain: A large-scale dataset for remote sens-
+ing image understanding.
+In Proceedings of the
+IEEE/CVF International Conference on Computer
+Vision, pages 16772–16782, 2023.
+5. Gustau Camps-Valls, Devis Tuia, Xiao Xiang Zhu,
+and Markus Reichstein. Deep learning for the Earth
+sciences: A comprehensive approach to remote sens-
+ing, climate science and geosciences. 2021.
+6. Gustavo Camps-Valls, Devis Tuia, Luis G´omez-
+Chova, Sandra Jim´enez, and Jes´us Malo. Remote
+sensing image processing. 2011.
+7. Vicente Vivanco Cepeda, Gaurav Kumar Nayak,
+and Mubarak Shah. GeoCLIP: Clip-inspired align-
+ment between locations and images for effec-
+tive worldwide geo-localization.
+arXiv preprint
+arXiv:2309.16020, 2023.
+8. Keumgang Cha, Junghoon Seo, and Taekyung Lee.
+A billion-scale foundation model for remote sensing
+images. arXiv preprint arXiv:2304.05215, 2023.
+9. Gong Cheng, Junwei Han, and Xiaoqiang Lu. Re-
+mote sensing image scene classification: Benchmark
+and state of the art. Proceedings of the IEEE, 105
+(10):1865–1883, 2017.
+10. Yezhen Cong, Samar Khanna, Chenlin Meng,
+Patrick Liu, Erik Rozi, Yutong He, Marshall Burke,
+David Lobell, and Stefano Ermon.
+SatMAE:
+Pre-training transformers for temporal and multi-
+spectral satellite imagery. Advances in Neural In-
+formation Processing Systems, 35:197–211, 2022.
+11. Yang Dan and Mu-ming Poo.
+Spike timing-
+dependent plasticity of neural circuits. Neuron, 44
+(1):23–30, 2004.
+12. Eran Dayan and Leonardo G Cohen. Neuroplastic-
+ity subserving motor skill learning. Neuron, 72(3):
+443–454, 2011.
+13. Alexey
+Dosovitskiy,
+Lucas
+Beyer,
+Alexander
+Kolesnikov,
+Dirk
+Weissenborn,
+Xiaohua
+Zhai,
+Thomas Unterthiner, Mostafa Dehghani, Matthias
+Minderer, Georg Heigold, Sylvain Gelly, et al.
+
+--- PAGE 17 ---
+17
+An image is worth 16x16 words: Transformers
+for image recognition at scale.
+arXiv preprint
+arXiv:2010.11929, 2020.
+14. Anthony Fuller, Koreen Millard, and James R
+Green.
+CROMA: Remote sensing representa-
+tions with contrastive radar-optical masked autoen-
+coders. arXiv preprint arXiv:2311.00566, 2023.
+15. Peng Gao, Teli Ma, Hongsheng Li, Ziyi Lin, Jifeng
+Dai, and Yu Qiao.
+Convmae: Masked convolu-
+tion meets masked autoencoders.
+arXiv preprint
+arXiv:2205.03892, 2022.
+16. Xin Guo, Jiangwei Lao, Bo Dang, Yingying Zhang,
+Lei Yu, Lixiang Ru, Liheng Zhong, Ziyuan Huang,
+Kang Wu, Dingxiang Hu, et al. SkySense: A multi-
+modal remote sensing foundation model towards
+universal interpretation for Earth observation im-
+agery. arXiv preprint arXiv:2312.10115, 2023.
+17. David Ha, Andrew M. Dai, and Quoc V. Le. Hy-
+pernetworks. In ICLR 2017, 2017.
+18. Kaiming He, Xinlei Chen, Saining Xie, Yanghao Li,
+Piotr Doll´ar, and Ross Girshick. Masked autoen-
+coders are scalable vision learners. In Proceedings
+of the IEEE/CVF Conference on Computer Vision
+and Pattern Recognition, pages 16000–16009, 2022.
+19. Donald Olding Hebb. The organization of behavior:
+A neuropsychological theory. 2005.
+20. D Hong, B Zhang, X Li, Y Li, C Li, J Yao,
+N Yokoya, H Li, P Ghamisi, X Jia, et al. Spectral-
+GPT: Spectral remote sensing foundation model.
+IEEE Transactions on Pattern Analysis and Ma-
+chine Intelligence, 2024.
+21. Jeremy Irvin, Lucas Tao, Joanne Zhou, Yuntao
+Ma, Langston Nashold, Benjamin Liu, and An-
+drew Y Ng. USat: A unified self-supervised encoder
+for multi-sensor satellite imagery. arXiv preprint
+arXiv:2312.02199, 2023.
+22. Neal Jean, Sherrie Wang, Anshul Samar, George
+Azzari,
+David
+Lobell,
+and
+Stefano
+Ermon.
+Tile2Vec:
+Unsupervised
+representation
+learning
+for spatially distributed data.
+In Proceedings of
+the AAAI Conference on Artificial Intelligence,
+volume 33, pages 3967–3974, 2019.
+23. Konstantin Klemmer, Esther Rolf, Caleb Robin-
+son, Lester Mackey, and Marc Rußwurm. SatCLIP:
+Global, general-purpose location embeddings with
+satellite imagery. arXiv preprint arXiv:2311.17179,
+2023.
+24. Alexandre Lacoste, Nils Lehmann, Pau Rodriguez,
+Evan
+David
+Sherwin,
+Hannah
+Kerner,
+Bj¨orn
+L¨utjens, Jeremy Andrew Irvin, David Dao, Hamed
+Alemohammad, Alexandre Drouin, et al.
+GEO-
+Bench: Toward foundation models for Earth moni-
+toring. arXiv preprint arXiv:2306.03831, 2023.
+25. Xuyang Li, Danfeng Hong, and Jocelyn Chanussot.
+S2mae: A spatial-spectral pretraining foundation
+model for spectral remote sensing data. In Proceed-
+ings of the IEEE/CVF Conference on Computer
+Vision and Pattern Recognition (CVPR), 2024.
+26. Zhihao Li, Biao Hou, Siteng Ma, Zitong Wu, Xi-
+anpeng Guo, Bo Ren, and Licheng Jiao. Masked
+angle-aware autoencoder for remote sensing im-
+ages. In European Conference on Computer Vision,
+pages 260–278. Springer, 2024.
+27. Timothy P Lillicrap, Adam Santoro, Luke Marris,
+Colin J Akerman, and Geoffrey Hinton. Backpropa-
+gation and the brain. Nature Reviews Neuroscience,
+21(6):335–346, 2020.
+28. Ilya
+Loshchilov
+and
+Frank
+Hutter.
+Decou-
+pled weight decay regularization.
+arXiv preprint
+arXiv:1711.05101, 2017.
+29. Utkarsh Mall, Bharath Hariharan, and Kavita
+Bala.
+Change-aware sampling and contrastive
+learning for satellite images. In Proceedings of the
+IEEE/CVF Conference on Computer Vision and
+Pattern Recognition, pages 5261–5270, 2023.
+30. Oscar Manas, Alexandre Lacoste, Xavier Gir´o-i Ni-
+eto, David Vazquez, and Pau Rodriguez.
+Sea-
+sonal contrast: Unsupervised pre-training from un-
+curated remote sensing data. In Proceedings of the
+IEEE/CVF International Conference on Computer
+Vision, pages 9414–9423, 2021.
+31. Valerio Marsocci, Yuru Jia, Georges Le Bellier,
+David Kerekes, Liang Zeng, Sebastian Hafner, Se-
+bastian Gerard, Eric Brune, Ritu Yadav, Ali Shibli,
+et al. Pangaea: A global and inclusive benchmark
+for geospatial foundation models.
+arXiv preprint
+arXiv:2412.04204, 2024.
+32. Mat´ıas Mendieta, Boran Han, Xingjian Shi, Yi Zhu,
+and Chen Chen.
+Towards geospatial foundation
+models via continual pretraining. In Proceedings of
+the IEEE/CVF International Conference on Com-
+puter Vision, pages 16806–16816, 2023.
+33. Dilxat Muhtar, Xueliang Zhang, Pengfeng Xiao,
+Zhenshi Li, and Feng Gu. CMID: A unified self-
+supervised learning framework for remote sensing
+image understanding. IEEE Transactions on Geo-
+science and Remote Sensing, 2023.
+34. Mubashir Noman, Muzammal Naseer, Hisham
+Cholakkal, Rao Muhammad Anwer, Salman Khan,
+and Fahad Shahbaz Khan. Rethinking transform-
+ers pre-training for multi-spectral satellite imagery.
+In Proceedings of the IEEE/CVF Conference on
+Computer Vision and Pattern Recognition, pages
+27811–27819, 2024.
+35. Maxime
+Oquab,
+Timoth´ee
+Darcet,
+Th´eo
+Moutakanni,
+Huy
+Vo,
+Marc
+Szafraniec,
+Vasil
+
+--- PAGE 18 ---
+18
+Khalidov,
+Pierre
+Fernandez,
+Daniel
+Haziza,
+Francisco Massa, Alaaeldin El-Nouby, et al.
+Di-
+nov2: Learning robust visual features without
+supervision.
+arXiv preprint arXiv:2304.07193,
+2023.
+36. Colorado
+J
+Reed,
+Ritwik
+Gupta,
+Shufan
+Li,
+Sarah Brockman, Christopher Funk, Brian Clipp,
+Kurt Keutzer, Salvatore Candido, Matt Uytten-
+daele, and Trevor Darrell.
+Scale-MAE: A scale-
+aware masked autoencoder for multiscale geospa-
+tial representation learning. In Proceedings of the
+IEEE/CVF International Conference on Computer
+Vision, pages 4088–4099, 2023.
+37. Markus Reichstein, Gustau Camps-Valls, Bjorn
+Stevens, Martin Jung, Joachim Denzler, Nuno Car-
+valhais, and Prabhat. Deep learning and process
+understanding for data-driven Earth system sci-
+ence. Nature, 566(7743):195–204, 2019.
+38. Andreas Steiner, Alexander Kolesnikov, Xiaohua
+Zhai, Ross Wightman, Jakob Uszkoreit, and Lu-
+cas Beyer. How to train your ViT? data, augmen-
+tation, and regularization in vision transformers.
+arXiv preprint arXiv:2106.10270, 2021.
+39. Gencer Sumbul, Chang Xu, Emanuele Dalsasso,
+and Devis Tuia. Smarties: Spectrum-aware multi-
+sensor auto-encoder for remote sensing images.
+arXiv preprint arXiv:2506.19585, 2025.
+40. Maofeng Tang, Andrei Cozma, Konstantinos Geor-
+giou, and Hairong Qi.
+Cross-Scale MAE: A tale
+of multiscale exploitation in remote sensing. Ad-
+vances in Neural Information Processing Systems,
+36, 2024.
+41. Chao Tao, Ji Qi, Guo Zhang, Qing Zhu, Weipeng
+Lu, and Haifeng Li. Tov: The original vision model
+for optical remote sensing image understanding via
+self-supervised learning. IEEE Journal of Selected
+Topics in Applied Earth Observations and Remote
+Sensing, 16:4916–4930, 2023.
+42. Gabriel Tseng, Anthony Fuller, Marlena Reil,
+Henry Herzog, Patrick Beukema, Favyen Bastani,
+James R. Green, Evan Shelhamer, Hannah Kerner,
+and David Rolnick. Galileo: Learning global & local
+features of many remote sensing modalities. arXiv
+preprint arXiv:2502.09356, 2025.
+43. Laurens Van der Maaten and Geoffrey Hinton. Vi-
+sualizing data using t-SNE.
+Journal of Machine
+Learning Research, 9(11), 2008.
+44. Ashish Vaswani, Noam Shazeer, Niki Parmar,
+Jakob Uszkoreit, Llion Jones, Aidan N Gomez,
+ Lukasz Kaiser, and Illia Polosukhin. Attention is
+all you need. Advances in Neural Information Pro-
+cessing Systems, 30, 2017.
+45. Leonard Waldmann, Ando Shah, Yi Wang, Nils
+Lehmann,
+Adam
+J.
+Stewart,
+Zhitong
+Xiong,
+Xiao Xiang Zhu, Stefan Bauer, and John Chuang.
+Panopticon:
+Advancing
+any-sensor
+foundation
+models for earth observation.
+arXiv preprint
+arXiv:2503.10845, 2025.
+46. Di Wang, Qiming Zhang, Yufei Xu, Jing Zhang,
+Bo Du, Dacheng Tao, and Liangpei Zhang. Advanc-
+ing plain vision transformer toward remote sens-
+ing foundation model. IEEE Transactions on Geo-
+science and Remote Sensing, 61:1–15, 2022.
+47. Yi Wang, Nassim Ait Ali Braham, Zhitong Xiong,
+Chenying Liu, Conrad M Albrecht, and Xiao Xi-
+ang Zhu.
+SSL4EO-S12: A large-scale multi-
+modal, multi-temporal dataset for self-supervised
+learning in Earth observation.
+arXiv preprint
+arXiv:2211.07044, 2022.
+48. Yi Wang, Conrad M Albrecht, Nassim Ait Ali Bra-
+ham, Chenying Liu, Zhitong Xiong, and Xiao Xiang
+Zhu. DeCUR: decoupling common & unique rep-
+resentations for multimodal self-supervision. arXiv
+preprint arXiv:2309.05300, 2023.
+49. Yi Wang, Nassim Ait Ali Braham, Zhitong Xiong,
+Chenying Liu, Conrad M Albrecht, and Xiao Xi-
+ang Zhu. SSL4EO-S12: A large-scale multimodal,
+multitemporal dataset for self-supervised learning
+in Earth observation.
+IEEE Geoscience and Re-
+mote Sensing Magazine, 11(3):98–106, 2023.
+50. Yi Wang, Hugo Hern´andez Hern´andez, Conrad M
+Albrecht, and Xiao Xiang Zhu.
+Feature guided
+masked autoencoder for self-supervised learning in
+remote sensing. arXiv preprint arXiv:2310.18653,
+2023.
+51. Tete Xiao, Yingcheng Liu, Bolei Zhou, Yuning
+Jiang, and Jian Sun.
+Unified perceptual parsing
+for scene understanding. In Proceedings of the Eu-
+ropean Conference on Computer Vision (ECCV),
+pages 418–434, 2018.
+52. Zhitong Xiong, Yi Wang, Fahong Zhang, and
+Xiao Xiang Zhu. One for all: Toward unified foun-
+dation models for Earth vision.
+arXiv preprint
+arXiv:2401.07527, 2024.
+53. Fanglong
+Yao,
+Wanxuan
+Lu,
+Heming
+Yang,
+Liangyu Xu, Chenglong Liu, Leiyi Hu, Hongfeng
+Yu, Nayu Liu, Chubo Deng, Deke Tang, et al.
+RingMo-sense: Remote sensing foundation model
+for spatiotemporal prediction via spatiotemporal
+evolution disentangling.
+IEEE Transactions on
+Geoscience and Remote Sensing, 2023.
+54. Yingying Zhang, Lixiang Ru, Kang Wu, Lei Yu, Lei
+Liang, Yansheng Li, and Jingdong Chen. Skysense
+v2: A unified foundation model for multi-modal
+remote sensing. arXiv preprint arXiv:2507.13812,
+
+--- PAGE 19 ---
+19
+2025.
+55. Robert S Zucker and Wade G Regehr. Short-term
+synaptic plasticity. Annual Review of Physiology,
+64(1):355–405, 2002.
