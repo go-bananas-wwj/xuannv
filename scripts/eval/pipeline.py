@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Round 8+ 标准化评估流水线 — 一站式评估入口.
+"""标准化评估流水线 — 一站式评估入口。
 
 Phase 1: 预计算 Embedding (before/after)
-Phase 2: Embedding 质量分析 (RankMe, Uniformity, ActiveDims...)
+Phase 2: Embedding 质量分析 (RankMe, Uniformity, ActiveDims)
 Phase 3: 变化检测 Few-Shot 评估 (Bare AUC + CD Head)
 Phase 4: 语义分割 Few-Shot 评估 (WorldCover + Dynamic World)
 Phase 5: 二值分割 Few-Shot 评估 (JRC Water + OSM Buildings)

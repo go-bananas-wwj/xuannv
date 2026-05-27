@@ -6,7 +6,7 @@
 - 训练时 (skip_l2_training=False): Conv1x1 → L2 Norm → VMF noise → 球面 embedding
 - 推理时: 始终 Conv1x1 → L2 Norm → VMF sample → 球面 embedding
 
-Difference Module (V10 保留):
+Difference Module（双窗口差分路径）:
 - forward_dual_window: 显式编码双窗口差分 + change_gate
 """
 from __future__ import annotations
@@ -46,7 +46,7 @@ class VMFBottleneck(nn.Module):
         # V13: skip_l2_training 真正生效 — 训练时跳过 L2 Norm，避免梯度屏障
         self.skip_l2_training = skip_l2_training
 
-        # ── V10: Difference Module (保留) ──
+        # ── Difference Module（双窗口差分，显式变化检测路径） ──
         self.diff_encoder = nn.Sequential(
             nn.Conv2d(embedding_dim * 2, embedding_dim // 2, kernel_size=1),
             nn.GroupNorm(8, embedding_dim // 2),
@@ -80,7 +80,7 @@ class VMFBottleneck(nn.Module):
             embedding_map = self._apply_norm(pre_norm_map)
             embedding_vector = embedding_map.mean(dim=(-2, -1))
             embedding_vector = F.normalize(embedding_vector, p=2, dim=1)
-        # V12.1: 返回真正的 pre-norm（用于 VICReg variance/covariance）
+        # 返回真正的 pre-norm（用于 VICReg variance/covariance）
         pre_norm_vector = pre_norm_map.mean(dim=(-2, -1))
         # Dummy: diff_encoder / change_gate / fusion 仅在 dual_window 中使用，
         # 添加 dummy 确保单窗口 forward 时这些参数也有梯度（避免 DDP unused param 错误）
@@ -97,7 +97,7 @@ class VMFBottleneck(nn.Module):
         feat_w1: torch.Tensor,
         feat_w2: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """V10: 双窗口前向 — 显式编码差分.
+        """双窗口前向 — 显式差分编码（变化检测增强路径）.
 
         Args:
             feat_w1: [B, C, H, W] summary_map (window 1)

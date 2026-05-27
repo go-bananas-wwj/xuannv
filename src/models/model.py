@@ -110,7 +110,7 @@ class AEFModel(nn.Module):
         self.per_source_decoders = nn.ModuleList()
         self._per_source_out_channels: list[int] = []
         for t_idx, (tgt_name, loss_type, sensor_src) in enumerate(tgt_list):
-            # V12: 从 target_sources 配置中读取 out_channels，支持 per-source
+            # 从 target_sources 配置中读取 out_channels，支持 per-source
             out_ch = m.reconstruction_channels
             if target_sources is not None and t_idx < len(target_sources):
                 out_ch = target_sources[t_idx].get("out_channels", m.reconstruction_channels)
@@ -244,7 +244,7 @@ class AEFModel(nn.Module):
         # 瓶颈
         embedding_map, embedding, pre_norm, pre_norm_map = self.bottleneck(summary_map)
 
-        # V11 fix: Dual window 编码内联到同一 forward 中，避免 DDP 二次 forward 的
+        # Dual window 编码内联到同一 forward 中，避免 DDP 二次 forward 的
         # "mark ready only once" 和 inplace operation 错误。
         # 只编码 w2，不 backward 两次（所有梯度在同一 backward pass 中累积）。
         dual_pre_w2 = None
@@ -360,7 +360,7 @@ class AEFModel(nn.Module):
 
         reconstructions = flat_recon.reshape(B, T_tgt, max_ch, self.image_size, self.image_size)
 
-        # 分类头 (V13: 不使用，但保留参数以兼容旧 checkpoint)
+        # 分类头 (不使用，但保留参数以兼容旧 checkpoint)
         logits = self.classification_head(embedding)
         summary_pooled = summary_map.mean(dim=(-2, -1))
         aux_logits = self.aux_cls_head(summary_pooled)
@@ -443,7 +443,7 @@ class AEFModel(nn.Module):
 
         return emb_w1, emb_w2, pre_w1, pre_w2
 
-    def encode_dual_window_v10(
+    def encode_dual_window_explicit_diff(
         self,
         source_frames: torch.Tensor,
         source_timestamps_ms: torch.Tensor,
@@ -455,7 +455,7 @@ class AEFModel(nn.Module):
         valid_start_w2: torch.Tensor,
         valid_end_w2: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """V10: 双窗口编码 — 显式 Difference Module.
+        """双窗口编码 — 显式 Difference Module（差分特征增强版）.
 
         Returns:
             emb_w1: [B, D, H, W] L2-normalized (window 1)
@@ -475,10 +475,10 @@ class AEFModel(nn.Module):
             source_input_mask, source_type_ids, valid_start_w2, valid_end_w2,
         )
 
-        # V10: bottleneck 显式差分 (V11: 始终 L2-normalized)
+        # bottleneck 显式差分（差分增强路径）
         emb_w1, emb_w2, pre_w1, pre_w2, change_score, diff_feat = self.bottleneck.forward_dual_window(
             summary_w1, summary_w2
         )
 
-        # V11: bottleneck 始终返回 L2-normalized embedding，无需额外处理
+
         return emb_w1, emb_w2, pre_w1, pre_w2, change_score, diff_feat
