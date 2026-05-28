@@ -70,21 +70,31 @@ class MultiRegionPatchDataset(HarbinPatchDataset):
         return super()._resolve_source_dir(source_name, patch_id)
     
     def _resolve_region_source_dir(self, region: str, source_name: str, patch_id: str) -> Path | None:
-        """解析特定区域的源目录."""
+        """解析特定区域的源目录.
+
+        优先级:
+            1. source_roots 覆盖（用于 SAR 等不在 cloud_filtered_dir 的源）
+            2. data_root / source_name / patch_id
+            3. S2: data_root / s2 / patch_id（cloud_filtered 结构）
+        """
         info = self.region_manifest[region]
         region_root = Path(info['data_root'])
-        
-        # S2特殊处理：优先使用云筛选后的目录
+
+        # source_roots 覆盖（per-source 根目录，由 generate_manifest 写入）
+        source_roots = info.get('source_roots', {})
+        if source_name in source_roots:
+            override_root = Path(source_roots[source_name])
+            src_dir = override_root / source_name / patch_id
+            if src_dir.exists():
+                return src_dir
+
+        # S2 直接在 data_root/s2/（cloud_filtered_dir 已是根目录）
         if source_name == 's2':
-            cloud_dir = region_root / 's2_cloud_filtered' / patch_id
-            if cloud_dir.exists():
-                return cloud_dir
-            # fallback到原始s2
             orig_dir = region_root / 's2' / patch_id
             if orig_dir.exists():
                 return orig_dir
             return None
-        
+
         # 其他源
         src_dir = region_root / source_name / patch_id
         if src_dir.exists():
@@ -126,5 +136,6 @@ class MultiRegionPatchDataset(HarbinPatchDataset):
             'worldcover': 1,
             'dynamic_world': 1,
             'jrc_water': 1,
+            'sar': 1,   # 干涉 SAR 振幅 (dB)，单通道
         }
         return channels_map.get(source_name, 1)
