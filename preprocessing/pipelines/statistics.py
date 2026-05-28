@@ -84,8 +84,9 @@ def _compute_source_stats_worker(args: tuple) -> tuple[str, dict | None]:
         return source_name, None
 
     stacked = np.stack(all_samples, axis=0)        # (N, C, H, W) 或 (N, C) 等
-    if stacked.ndim == 3:
-        stacked = stacked[:, :, np.newaxis, np.newaxis]  # 统一 4D
+    # 统一补到 4D (N, C, H, W)，以便 ravel 统计
+    while stacked.ndim < 4:
+        stacked = stacked[..., np.newaxis]
 
     n_channels = stacked.shape[1]
     stats: dict = {"n_channels": n_channels}

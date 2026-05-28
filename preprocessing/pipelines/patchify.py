@@ -45,6 +45,7 @@ def run_patchify(region_cfg: dict, max_patches: int | None = None) -> list[dict]
         patch_size_m=patch_cfg["size_m"],
         step_m=patch_cfg.get("step_m", patch_cfg["size_m"]),
         crs_override=crs_override,
+        utm_grid=patch_cfg.get("utm_grid"),
     )
 
     if max_patches is not None:

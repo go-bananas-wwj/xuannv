@@ -84,7 +84,7 @@ class LocalSARImporter(BaseDownloader):
         self.local_raw_dir = Path(self.source_cfg["local_raw_dir"])
         self.product_types = set(self.source_cfg.get("product_types", ["SLC", "ORG"]))
         self.polarizations = set(self.source_cfg.get("polarizations", ["VV"]))
-        self.satellites = set(self.source_cfg.get("satellites", ["BC3", "BC4"]))
+        self.satellites = set(self.source_cfg.get("satellites", ["BC3", "BC4", "BC5"]))
         self._tmp_dir = Path("/tmp/sar_unzip")
 
     # ------------------------------------------------------------------ #
@@ -152,7 +152,6 @@ class LocalSARImporter(BaseDownloader):
     ) -> str:
         """处理单个 ZIP：解压 → 找 GeoTIFF → 按 patch 裁剪写出。"""
         import rasterio
-        from rasterio.warp import calculate_default_transform, reproject
 
         zip_path = Path(meta["zip_path"])
         tmp_dir = self._tmp_dir / zip_path.stem
