@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """
-从 preprocessing/configs/*.json 读取区域配置，生成可视化用的 patches 数据。
+从 preprocessing/configs/*.json 读取区域配置，生成可视化用的 patches JSON。
+
+优先级：
+  1. config 里有 patches_meta_path  → 直接读取真实训练 patch 数据
+  2. config 里有 patch.utm_grid     → 从精确 UTM 网格坐标生成
+  3. 兜底                            → bbox + CRS 浮点推算
+
 输出到 preprocessing/viz/data/{region_name}_patches.json
 
 用法:
@@ -16,7 +22,6 @@ sys.path.insert(0, str(ROOT))
 from preprocessing.utils.geo import bbox_to_utm_patches
 
 
-# SAR 点位 bbox（用于 haidian 地图标注）
 HAIDIAN_SAR_SITES = {
     "点位1_干涉（海淀/昌平）": {
         "color": "#f59e0b",
@@ -37,28 +42,118 @@ HAIDIAN_SAR_SITES = {
 }
 
 REGION_EXTRAS: dict[str, dict] = {
-    "haidian": {
-        "sar_sites": HAIDIAN_SAR_SITES,
-    }
+    "haidian": {"sar_sites": HAIDIAN_SAR_SITES},
 }
 
 
-def load_config(config_path: Path) -> dict:
-    with open(config_path) as f:
+def load_config(cfg_path: Path) -> dict:
+    with open(cfg_path) as f:
         return json.load(f)
 
 
-def make_viz_data(cfg: dict) -> dict:
+def utm_bounds_to_wgs84(utm_bounds: list, crs: str) -> list[float]:
+    """[left, bottom, right, top] UTM → [west, south, east, north] WGS84."""
+    from pyproj import Transformer
+    to_wgs = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
+    pw, ps = to_wgs.transform(utm_bounds[0], utm_bounds[1])
+    pe, pn = to_wgs.transform(utm_bounds[2], utm_bounds[3])
+    return [round(pw, 6), round(ps, 6), round(pe, 6), round(pn, 6)]
+
+
+def center_from_wgs84(bwgs84: list[float]) -> list[float]:
+    cx = round((bwgs84[0] + bwgs84[2]) / 2, 6)
+    cy = round((bwgs84[1] + bwgs84[3]) / 2, 6)
+    return [cx, cy]
+
+
+def read_patches_meta(meta_path: Path, crs: str) -> list[dict]:
+    """读取真实 patches_meta.json，统一转换为可视化格式。
+
+    兼容两种格式:
+      - list of {patch_id, bounds/utm_bounds, bounds_wgs84?, center_lonlat, ...}
+      - dict {city, patches: [...{id, utm_bounds, center_lonlat}]}
+    """
+    raw = json.loads(meta_path.read_text())
+
+    # 展开 dict 包装
+    if isinstance(raw, dict):
+        raw_patches = raw.get("patches", [])
+        meta_crs = raw.get("crs", crs)
+    else:
+        raw_patches = raw
+        meta_crs = crs
+
+    result = []
+    for i, p in enumerate(raw_patches):
+        pid = p.get("id", p.get("patch_id", i))
+
+        # 获取 UTM bounds
+        utm = p.get("utm_bounds") or p.get("bounds")
+
+        # 如果已经有 bounds_wgs84 直接用, 否则转换
+        bwgs84 = p.get("bounds_wgs84")
+        if not bwgs84:
+            if utm:
+                bwgs84 = utm_bounds_to_wgs84(utm, meta_crs)
+            else:
+                continue  # 无坐标信息，跳过
+
+        # 中心点
+        center = p.get("center_lonlat")
+        if not center:
+            center = center_from_wgs84(bwgs84)
+
+        result.append({
+            "id": pid,
+            "bounds_wgs84": [round(v, 6) for v in bwgs84],
+            "center_lonlat": [round(v, 6) for v in center],
+        })
+
+    return result
+
+
+def make_viz_data_from_meta(cfg: dict, meta_path: Path) -> dict:
+    """从真实 patches_meta.json 生成可视化数据。"""
+    region_name = cfg["region_name"]
+    crs = cfg.get("crs", "EPSG:32652")
+
+    print(f"  ↳ 读取真实 patches: {meta_path}", end=" ", flush=True)
+    viz_patches = read_patches_meta(meta_path, crs)
+
+    all_w = [p["bounds_wgs84"][0] for p in viz_patches]
+    all_s = [p["bounds_wgs84"][1] for p in viz_patches]
+    all_e = [p["bounds_wgs84"][2] for p in viz_patches]
+    all_n = [p["bounds_wgs84"][3] for p in viz_patches]
+    overall_bbox = [
+        round(min(all_w), 6), round(min(all_s), 6),
+        round(max(all_e), 6), round(max(all_n), 6),
+    ]
+
+    out: dict = {
+        "region_name": region_name,
+        "display_name": cfg.get("display_name", region_name),
+        "crs": crs,
+        "patch_size_m": cfg.get("patch", {}).get("size_m", 1280),
+        "total_patches": len(viz_patches),
+        "overall_bbox_wgs84": overall_bbox,
+        "source": "patches_meta",
+        "patches": viz_patches,
+    }
+    out.update(REGION_EXTRAS.get(region_name, {}))
+    return out
+
+
+def make_viz_data_from_config(cfg: dict) -> dict:
+    """从 bbox/utm_grid 配置生成可视化数据（无真实patch文件时）。"""
     region_name = cfg["region_name"]
     crs = cfg.get("crs", "EPSG:32652")
     patch_cfg = cfg["patch"]
     patch_size_m = patch_cfg["size_m"]
     step_m = patch_cfg.get("step_m", patch_size_m)
     utm_grid = patch_cfg.get("utm_grid")
-    bbox = cfg["bbox"]
 
     patches, resolved_crs = bbox_to_utm_patches(
-        bbox, patch_size_m, step_m=step_m,
+        cfg["bbox"], patch_size_m, step_m=step_m,
         crs_override=crs, utm_grid=utm_grid
     )
 
@@ -76,10 +171,8 @@ def make_viz_data(cfg: dict) -> dict:
     all_e = [p["bounds_wgs84"][2] for p in patches]
     all_n = [p["bounds_wgs84"][3] for p in patches]
     overall_bbox = [
-        round(min(all_w), 6),
-        round(min(all_s), 6),
-        round(max(all_e), 6),
-        round(max(all_n), 6),
+        round(min(all_w), 6), round(min(all_s), 6),
+        round(max(all_e), 6), round(max(all_n), 6),
     ]
 
     out: dict = {
@@ -89,12 +182,10 @@ def make_viz_data(cfg: dict) -> dict:
         "patch_size_m": patch_size_m,
         "total_patches": len(viz_patches),
         "overall_bbox_wgs84": overall_bbox,
+        "source": "config_generated",
         "patches": viz_patches,
     }
-
-    extras = REGION_EXTRAS.get(region_name, {})
-    out.update(extras)
-
+    out.update(REGION_EXTRAS.get(region_name, {}))
     return out
 
 
@@ -119,28 +210,45 @@ def main() -> None:
             print(f"[SKIP] {cfg_path.name}: 缺少必要字段")
             continue
 
-        print(f"[{cfg['region_name']}] 正在生成...", end=" ", flush=True)
-        viz_data = make_viz_data(cfg)
+        region_name = cfg["region_name"]
+        print(f"[{region_name}] 正在生成...", end=" ", flush=True)
 
-        out_path = out_dir / f"{cfg['region_name']}_patches.json"
+        # 优先使用真实 patches_meta 文件
+        meta_path_str = cfg.get("patches_meta_path")
+        if meta_path_str:
+            meta_path = Path(meta_path_str)
+            if meta_path.exists():
+                viz_data = make_viz_data_from_meta(cfg, meta_path)
+            else:
+                print(f"\n  ⚠ patches_meta_path 不存在: {meta_path}，回退到 config 生成")
+                viz_data = make_viz_data_from_config(cfg)
+        else:
+            print(" (config_generated)", end=" ", flush=True)
+            viz_data = make_viz_data_from_config(cfg)
+
+        out_path = out_dir / f"{region_name}_patches.json"
         with open(out_path, "w") as f:
             json.dump(viz_data, f, ensure_ascii=False, separators=(",", ":"))
 
-        print(f"{viz_data['total_patches']} patches → {out_path.relative_to(ROOT)}")
+        src_tag = "✓ 真实数据" if viz_data.get("source") == "patches_meta" else "⚙ config生成"
+        print(f" [{src_tag}]  {viz_data['total_patches']} patches → {out_path.relative_to(ROOT)}")
         summary.append({
             "region": viz_data["region_name"],
             "display": viz_data["display_name"],
             "patches": viz_data["total_patches"],
             "bbox": viz_data["overall_bbox_wgs84"],
+            "source": viz_data.get("source", "unknown"),
         })
 
     index_path = out_dir / "index.json"
     with open(index_path, "w") as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
     print(f"\n汇总索引 → {index_path.relative_to(ROOT)}")
-    print(f"\n共 {len(summary)} 个区域:")
+    print(f"\n{'区域':<28} {'Patches':>7}  {'来源'}")
+    print("-" * 55)
     for s in summary:
-        print(f"  {s['display']:24s}  {s['patches']:5d} patches")
+        tag = "✓真实训练数据" if s["source"] == "patches_meta" else "⚙格网推算"
+        print(f"  {s['display']:<26} {s['patches']:>7}  {tag}")
 
 
 if __name__ == "__main__":

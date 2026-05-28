@@ -2,35 +2,37 @@
   "region_name": "harbin",
   "display_name": "哈尔滨",
   "crs": "EPSG:32652",
-
   "bbox": {
     "west": 126.0,
     "south": 45.5,
     "east": 127.2,
     "north": 46.2
   },
-
   "time_range": {
     "start": "2023-01-01",
     "end": "2025-10-31"
   },
-
   "patch": {
     "size_m": 1280,
     "step_m": 1280,
     "image_size_px": 128
   },
-
   "output_dir": "/workspace/raw/phase1_harbin/harbin_scenes",
   "cloud_filtered_dir": "/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered",
   "statistics_dir": "/workspace/statistics/harbin_scenes",
-
   "sources": {
     "s2": {
       "enabled": true,
       "download_source": "planetary_computer",
       "collection": "sentinel-2-l2a",
-      "bands": ["B02", "B03", "B04", "B8A", "B11", "B12"],
+      "bands": [
+        "B02",
+        "B03",
+        "B04",
+        "B8A",
+        "B11",
+        "B12"
+      ],
       "resolution_m": 10,
       "cloud_filter": {
         "enabled": true,
@@ -43,15 +45,27 @@
       "enabled": true,
       "download_source": "planetary_computer",
       "collection": "sentinel-1-rtc",
-      "bands": ["vv", "vh"],
+      "bands": [
+        "vv",
+        "vh"
+      ],
       "resolution_m": 10,
-      "cloud_filter": {"enabled": false}
+      "cloud_filter": {
+        "enabled": false
+      }
     },
     "landsat": {
       "enabled": true,
       "download_source": "planetary_computer",
       "collection": "landsat-c2-l2",
-      "bands": ["blue", "green", "red", "nir08", "swir16", "swir22"],
+      "bands": [
+        "blue",
+        "green",
+        "red",
+        "nir08",
+        "swir16",
+        "swir22"
+      ],
       "resolution_m": 30,
       "cloud_filter": {
         "enabled": true,
@@ -62,43 +76,58 @@
       "enabled": true,
       "download_source": "planetary_computer",
       "collection": "cop-dem-glo-30",
-      "bands": ["data"],
+      "bands": [
+        "data"
+      ],
       "resolution_m": 30,
-      "cloud_filter": {"enabled": false}
+      "cloud_filter": {
+        "enabled": false
+      }
     },
     "worldcover": {
       "enabled": true,
       "download_source": "planetary_computer",
       "collection": "esa-worldcover",
-      "bands": ["map"],
+      "bands": [
+        "map"
+      ],
       "resolution_m": 10,
       "resampling": "nearest",
-      "cloud_filter": {"enabled": false}
+      "cloud_filter": {
+        "enabled": false
+      }
     },
     "dynamic_world": {
       "enabled": true,
       "download_source": "gee",
       "collection": "GOOGLE/DYNAMICWORLD/V1",
-      "bands": ["label"],
+      "bands": [
+        "label"
+      ],
       "resolution_m": 10,
       "resampling": "nearest",
-      "cloud_filter": {"enabled": false}
+      "cloud_filter": {
+        "enabled": false
+      }
     },
     "jrc_water": {
       "enabled": true,
       "download_source": "gee",
       "collection": "JRC/GSW1_4/MonthlyHistory",
-      "bands": ["water"],
+      "bands": [
+        "water"
+      ],
       "resolution_m": 30,
       "resampling": "nearest",
-      "cloud_filter": {"enabled": false}
+      "cloud_filter": {
+        "enabled": false
+      }
     },
     "sar": {
       "enabled": false,
       "comment": "哈尔滨暂无额外干涉 SAR 数据"
     }
   },
-
   "credentials": {
     "planetary_computer": {
       "subscription_key_env": "PC_SDK_SUBSCRIPTION_KEY"
@@ -107,5 +136,6 @@
       "credentials_path_env": "GEE_CREDENTIALS_PATH",
       "service_account_env": "GEE_SERVICE_ACCOUNT"
     }
-  }
+  },
+  "patches_meta_path": "/workspace/raw/harbin_scenes/patches_meta.json"
 }
