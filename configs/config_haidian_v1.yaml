@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_stats_fix_0530_v20
+  output_dir: /workspace/outputs/exp_v1_haidian_stats_fix_0530_v21
 
 data:
   dataset_type: harbin_patches
@@ -135,8 +135,11 @@ training:
   reconstruction_weight: 0.1
   consistency_weight: 0.05
   temporal_cosine_pixel_weight: 0.5
-  use_pre_norm_uniform: true
-  pre_norm_uniform_weight: 0.5
+  # V21: 关闭raw_uniformity(欧氏空间，方向坍缩时梯度≈0)，改用L2余弦uniformity
+  # batch_uniformity_loss_l2: 内部L2归一化→余弦相似度，方向坍缩时梯度O(ε)不消失
+  use_pre_norm_uniform: false
+  pre_norm_uniform_weight: 0.5      # 已禁用，值保留
+  batch_uniformity_weight: 3.0      # V21: L2余弦uniformity，主力反方向坍缩损失
 
   # ★ VICReg（哈尔滨参数）
   use_spatial_vicreg: true      # V18: spatial_flat [B*H*W, D] N>>D，梯度不被bank稀释
