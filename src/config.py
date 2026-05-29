@@ -184,6 +184,9 @@ class TrainingConfig:
     # V12 样本间方差
     inter_variance_weight: float = 0.0
     inter_variance_min_std: float = 0.3
+    # V19 Inter-Patch InfoNCE (NT-Xent)，防止方向坍缩
+    inter_patch_infonce_weight: float = 0.0
+    inter_patch_infonce_temperature: float = 0.1
     # Warmup
     recon_warmup_epochs: int = 20
     warmup_epochs: int = 10
