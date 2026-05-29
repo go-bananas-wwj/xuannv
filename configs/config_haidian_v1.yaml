@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_instdiscr_0529_v7
+  output_dir: /workspace/outputs/exp_v1_haidian_pid_dominant_0530_v8
 
 data:
   dataset_type: harbin_patches
@@ -115,44 +115,42 @@ training:
   weight_decay: 0.01
   grad_clip_norm: 1.0
 
-  # ★ 损失权重
-  reconstruction_weight: 0.3
-  consistency_weight: 0.05
-  classification_weight: 0.03
+  # ★★★ v8 根因修复：pid 作为主驱动力，彻底清除"完全坍缩时梯度=0"的噪声损失
+  #
+  # 诊断结论：
+  #   pre_norm_uniform (8.0×2.0=16)、hyperspherical (15.0×0.44=6.6)、decorr (0.2×17.9=3.6)
+  #   三项合计占 loss 的 90%，但坍缩时梯度=0 或产生放大噪声，完全淹没了 pid 的有效梯度信号。
+  #   pid=0.15 × 5.9 = 0.89，被 27:1 的噪声掩埋 → 无效。
+  #   解决方案：清零所有坍缩时无效的损失，将 pid 权重提升 33x。
 
-  # ★ P0 改进：Barlow Twins 权重提升（0.05→0.2，之前无效因为太弱）
-  decorrelation_weight: 0.2
-
-  orthogonality_weight: 0.01
-  # ★ 关键修复：必须设 use_pre_norm_uniform: true 才能激活 raw_uniformity_loss
-  use_pre_norm_uniform: true
-  pre_norm_uniform_weight: 8.0
-  # ★ 球面 Uniformity Loss — 像素级用 Wang-Isola，全局级用 pairwise_cosine（坍缩时梯度非零）
-  hyperspherical_uniform_weight: 15.0
-  # ★ 球面方差正则 — L2 归一化后各维度 std ≥ 0.1（补充 pairwise_cosine 从维度角度防坍缩）
-  spherical_variance_weight: 3.0
-  spherical_variance_min_std: 0.1
-  # ★ Decoder Conditioning Dropout — 提升到 0.6，更强迫 decoder 依赖 embedding
-  decoder_cond_dropout: 0.6
-
-  # ★★ v7 新增：实例判别损失 — Instance Discrimination
-  # 预测 patch 身份 (0~319)，坍缩时 CE=log(320)≈5.77 → 对每个 patch 梯度方向不同 → 真正打破坍缩
-  patch_id_loss_weight: 0.15
+  # ★ 主驱动力：实例判别（唯一能打破完全坍缩的损失）
+  patch_id_loss_weight: 5.0        # v7: 0.15 → v8: 5.0（×33，成为总 loss 主项）
   patch_id_num_patches: 320
 
-  # ★ P0 改进：增强 VICReg 协方差正则（恢复默认强度）
-  variance_weight: 1.0
-  covariance_weight: 0.01
+  # ★ 辅助：重建损失（提供 per-patch 语义多样性，保持感知）
+  reconstruction_weight: 0.3
+  classification_weight: 0.03
+  orthogonality_weight: 0.01      # conv1x1 正交约束，权重极小不干扰
+
+  # ★ 清零：完全坍缩时梯度=0 的损失（v8 全部关闭，不贡献噪声梯度）
+  use_pre_norm_uniform: false
+  pre_norm_uniform_weight: 0.0    # v7: 8.0 → v8: 0.0（坍缩时梯度=0，纯噪声）
+  hyperspherical_uniform_weight: 0.0  # v7: 15.0 → v8: 0.0（同上）
+  spherical_variance_weight: 0.0  # v7: 3.0 → v8: 0.0（同上）
+  spherical_variance_min_std: 0.1
+  decorrelation_weight: 0.0       # v7: 0.2 → v8: 0.0（坍缩时除以1e-4=放大噪声）
+  variance_weight: 0.0            # v7: 1.0 → v8: 0.0（坍缩时梯度=0）
+  covariance_weight: 0.0          # v7: 0.01 → v8: 0.0（同上）
   vicreg_min_std: 1.0
 
-  # ★ P0 改进：启用 gap-aware 时序损失（原值 0.0）
-  temporal_gap_aware_weight: 0.1
+  # ★ 清零：强制 w1≈w2 的损失（加速坍缩）
+  consistency_weight: 0.0         # v7: 0.05 → v8: 0.0（强制 window1≈window2 → 坍缩）
+  lmim_weight: 0.0                # v7: 0.1 → v8: 0.0（teacher-student 对齐 = 同上）
+  temporal_gap_aware_weight: 0.0  # v7: 0.1 → v8: 0.0
+  temporal_cosine_pixel_weight: 0.0  # v7: 0.5 → v8: 0.0（坍缩时梯度=0）
 
-  # ★ v7: 降低 lmim（减少 teacher 污染），reconstruction 是主要语义信号
-  lmim_weight: 0.1
-
-  # ★ 空间感知 Temporal Loss（沿用 Round 9 配置）
-  temporal_cosine_pixel_weight: 0.5
+  # ★ Decoder Conditioning Dropout
+  decoder_cond_dropout: 0.6
   temporal_magnitude_temperature: 0.1
   temporal_use_spatial_weight: true
 
@@ -187,9 +185,9 @@ training:
   kappa_end: 8000.0
   kappa_warmup_epochs: 0
 
-  # 学习率调度
+  # 学习率调度（v8: warmup 缩短到 2 epochs，4x 更快到达峰值 lr）
   lr_schedule: cosine_no_restart
-  warmup_epochs: 8
+  warmup_epochs: 2               # v7: 8 → v8: 2（在 step 400 达到峰值 lr=1e-4）
   recon_warmup_epochs: 0
 
   # 320 patches ÷ batch_size=2 = 160 steps/epoch（保留余量）
