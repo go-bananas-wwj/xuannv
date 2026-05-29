@@ -587,10 +587,17 @@ class DDPv13Trainer:
                 inter_std_mean = inter_std.mean().item()
 
             # Decorrelation Loss (Barlow Twins)
+            # V18: 当 use_spatial_vicreg=True 时，使用 spatial_flat（N=B*H*W>>D）
+            # 而不是 gathered_pre（N=16<D），避免协方差矩阵欠定导致的噪声梯度
             decorr_w = getattr(t, 'decorrelation_weight', 0.0)
             decorr = torch.tensor(0.0, device=self.device)
-            if decorr_w > 0 and gathered_pre.shape[0] >= 2:
-                decorr = decorrelation_loss(gathered_pre.float())
+            if decorr_w > 0:
+                if use_spatial_vicreg and pre_norm_map is not None:
+                    decorr_input = spatial_flat  # [B*H*W, D], N>>D
+                else:
+                    decorr_input = gathered_pre  # [N, D]
+                if decorr_input.shape[0] >= 2:
+                    decorr = decorrelation_loss(decorr_input.float())
 
             # V13: Bottleneck Orthogonality Loss
             orth_w = getattr(t, 'orthogonality_weight', 0.0)
