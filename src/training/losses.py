@@ -56,8 +56,35 @@ def raw_uniformity_loss(embeddings: torch.Tensor) -> torch.Tensor:
 
 
 # ────────────────────────────────────────────
-# 1b. Batch Uniformity Loss — L2-normalized (V11 改进版)
+# 1c. Hyperspherical Uniformity Loss (核心新增)
 # ────────────────────────────────────────────
+
+def hyperspherical_uniformity_loss(embeddings: torch.Tensor) -> torch.Tensor:
+    """球面 uniformity loss — 直接防止方向坍缩.
+
+    原理:
+    - 先 L2 归一化到单位球面，再计算 RBF uniformity（Wang & Isola 2020）
+    - 与 raw_uniformity_loss 的关键区别:
+      * raw_uniformity: 欧氏空间，幅度差异即可满足，方向可以一样 → 坍缩
+      * hyperspherical: 球面空间，必须方向分散才能满足 → 直接防止方向坍缩
+    - 梯度非零性: skip_l2_norm_training=True 时 ||z_raw|| > 0，
+      ∂z_norm/∂z_raw = (I - z_norm z_norm^T) / ||z_raw|| 非零，
+      梯度可以回传到 pre-norm embedding
+
+    良好分散时 (64-dim): loss ≈ -4
+    完全坍缩时 (全部同向): loss ≈ 0
+    """
+    if embeddings.shape[0] < 2:
+        return embeddings.new_tensor(0.0)
+
+    z = F.normalize(embeddings, p=2, dim=1)  # 投影到单位球面
+    t = 2.0  # 球面标准温度（Wang & Isola 2020）
+
+    sq_pdist = torch.cdist(z, z, p=2).pow(2)
+    pair_mask = torch.triu(torch.ones(z.shape[0], z.shape[0], device=z.device, dtype=torch.bool), diagonal=1)
+    sq_pdist_pairs = sq_pdist[pair_mask]
+    loss = torch.logsumexp(-t * sq_pdist_pairs, dim=0) - math.log(sq_pdist_pairs.shape[0])
+    return loss
 
 def batch_uniformity_loss_l2(embeddings: torch.Tensor, dim_dropout: float = 0.1,
                                  max_samples: int = 512) -> torch.Tensor:

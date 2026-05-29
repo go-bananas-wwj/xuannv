@@ -224,6 +224,8 @@ class TrainingConfig:
     ct_reconstruction_weight: float = 0.0
     # LMIM：潜在空间掩码预测损失（OlmoEarth/AnySat JEPA 风格）
     lmim_weight: float = 0.0
+    # 球面 Uniformity Loss — L2 归一化后计算，直接防方向坍缩
+    hyperspherical_uniform_weight: float = 0.0
 
 
 @dataclass

@@ -25,6 +25,7 @@ from src.training.losses import (
     reconstruction_loss,
     batch_uniformity_loss_l2,
     raw_uniformity_loss,
+    hyperspherical_uniformity_loss,
     consistency_loss,
     consistency_loss_spatial,
     variance_regularizer,
@@ -480,6 +481,18 @@ class DDPv13Trainer:
                     gathered_l2 = embedding
                 l2_uniform = batch_uniformity_loss_l2(gathered_l2.float()) if l2_uniform_w > 0 else torch.tensor(0.0, device=self.device)
 
+            # ★ 球面 Uniformity Loss — 直接防止方向坍缩（raw_uniformity 靠幅度满足，无法防方向坍缩）
+            hsph_uniform_w = getattr(t, 'hyperspherical_uniform_weight', 0.0)
+            hsph_uniform = torch.tensor(0.0, device=self.device)
+            if hsph_uniform_w > 0:
+                if dist.is_initialized() and self.world_size > 1:
+                    gathered_hsph = [torch.zeros_like(pre_norm) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_hsph, pre_norm)
+                    gathered_hsph = torch.cat(gathered_hsph, dim=0)
+                else:
+                    gathered_hsph = pre_norm
+                hsph_uniform = hyperspherical_uniformity_loss(gathered_hsph.float())
+
             # Per-dim 诊断（日志用）
             # ★ FIX: 使用 gathered_spatial_map 计算 active，与 spatial_vicreg 一致
             with torch.no_grad():
@@ -536,6 +549,7 @@ class DDPv13Trainer:
                 + var_w * var
                 + cov_w * cov
                 + l2_uniform_w * l2_uniform
+                + hsph_uniform_w * hsph_uniform
                 + decorr_w * decorr
                 + orth_w * orth
                 + dummy_cls
@@ -619,7 +633,7 @@ class DDPv13Trainer:
                       f"cls={cls.item():.4f} "
                       f"var={var.item():.4f} cov={cov.item():.4f} "
                       f"decorr={decorr.item():.4f} orth={orth.item():.4f} "
-                      f"l2unif={l2_uniform.item():.4f} "
+                      f"l2unif={l2_uniform.item():.4f} hsph={hsph_uniform.item():.4f} "
                       f"inter_var={inter_var.item():.4f} "
                       f"bank={bank_size}/{self.memory_bank.K} "
                       f"spatial=[{active_dims}/{pre_norm_map.shape[1] if pre_norm_map is not None else pre_norm.shape[1]}:{std_mean:.4f}] "
