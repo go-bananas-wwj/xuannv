@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_harbin_combo_0530_v12
+  output_dir: /workspace/outputs/exp_v1_haidian_stats_fix_0530_v13
 
 data:
   dataset_type: harbin_patches
@@ -196,7 +196,7 @@ training:
 
   # 学习率调度（v9: warmup 1 epoch，快速到达峰值 lr）
   lr_schedule: cosine_no_restart
-  warmup_epochs: 1               # v9: 1（~200 steps 达峰值 lr=1e-4）
+  warmup_epochs: 2               # v13: 2 epoch warmup（统计量修复后稳定启动）
   recon_warmup_epochs: 0
 
   # 320 patches ÷ batch_size=2 = 160 steps/epoch（保留余量）
