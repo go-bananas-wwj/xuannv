@@ -23,7 +23,7 @@ data:
   #   同时通过一层嵌套搜索找到 haidian/s2/, haidian/s1/ 等
   manifest_path: /workspace/raw/haidian_train
   stats_dir: /workspace/statistics/haidian_train
-  batch_size: 2
+  batch_size: 4
   num_workers: 0
   image_size: 128
   max_frames: 24
@@ -79,8 +79,8 @@ data:
   temporal_window_max_frames: 24
   preload: true
 
-  # ★ MAE-style block 掩码（75% 掩码 → 强迫 decoder 依赖 embedding）
-  recon_mask_ratio: 0.75       # 75% 的 block 被掩码
+  # ★ MAE-style block 掩码（50% 掩码，保留足够重建压力防止坍缩）
+  recon_mask_ratio: 0.5        # 降回50%：75%时recon太容易→decoder用均值即可→embedding无压力
   recon_mask_patch_size: 16    # 每个 block 16×16 像素（128/16=8×8=64 个 block）
 
   # ★ 必须保持 false——海淀数据含 2026 年帧，设 true 会全部丢失
@@ -116,7 +116,7 @@ training:
   grad_clip_norm: 1.0
 
   # ★ 损失权重
-  reconstruction_weight: 0.1
+  reconstruction_weight: 0.3
   consistency_weight: 0.05
   classification_weight: 0.03
 
@@ -126,7 +126,7 @@ training:
   orthogonality_weight: 0.01
   # ★ 关键修复：必须设 use_pre_norm_uniform: true 才能激活 raw_uniformity_loss
   use_pre_norm_uniform: true
-  pre_norm_uniform_weight: 3.0
+  pre_norm_uniform_weight: 8.0
 
   # ★ P0 改进：增强 VICReg 协方差正则（恢复默认强度）
   variance_weight: 1.0
