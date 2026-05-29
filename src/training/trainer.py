@@ -481,33 +481,44 @@ class DDPv13Trainer:
                     gathered_l2 = embedding
                 l2_uniform = batch_uniformity_loss_l2(gathered_l2.float()) if l2_uniform_w > 0 else torch.tensor(0.0, device=self.device)
 
-            # ★ 球面 Uniformity Loss — 作用于 pre_norm_map 随机采样像素（非全局平均）
-            #   防止方向坍缩：L2 归一化后计算，全局平均池化后 erank 低，像素级梯度更强
+            # ★ 球面 Uniformity Loss — 双级别：像素级 + 全局平均级
+            #   像素级: 每个 patch 内随机采样 8 像素，防止像素方向坍缩
+            #   全局级: pre_norm_embedding ([B,D]) 全局平均，防止 patch 间全局方向坍缩
+            #   之前只用像素级 → 模型学到所有 patch 全局平均朝同一方向（erank≈2）而像素内多样
             hsph_uniform_w = getattr(t, 'hyperspherical_uniform_weight', 0.0)
             hsph_uniform = torch.tensor(0.0, device=self.device)
-            if hsph_uniform_w > 0 and student_out.pre_norm_map is not None:
-                pre_norm_map_s = student_out.pre_norm_map  # [B, D, H, W]
-                B_s, D_s, H_s, W_s = pre_norm_map_s.shape
-                # 每张图随机采样 8 个空间位置，再在 GPU 间 all_gather
-                n_px = min(8, H_s * W_s)
-                perm = torch.randperm(H_s * W_s, device=self.device)[:n_px]
-                flat_px = pre_norm_map_s.permute(0, 2, 3, 1).reshape(B_s, H_s * W_s, D_s)
-                sampled_px = flat_px[:, perm, :].reshape(B_s * n_px, D_s)  # [B*n_px, D]
-                if dist.is_initialized() and self.world_size > 1:
-                    gathered_hsph = [torch.zeros_like(sampled_px) for _ in range(self.world_size)]
-                    dist.all_gather(gathered_hsph, sampled_px)
-                    gathered_hsph = torch.cat(gathered_hsph, dim=0)
+            hsph_pixel = torch.tensor(0.0, device=self.device)
+            hsph_global = torch.tensor(0.0, device=self.device)
+            if hsph_uniform_w > 0:
+                # Part A: 像素级（pre_norm_map 随机采样，梯度不经全局平均稀释）
+                if student_out.pre_norm_map is not None:
+                    pre_norm_map_s = student_out.pre_norm_map  # [B, D, H, W]
+                    B_s, D_s, H_s, W_s = pre_norm_map_s.shape
+                    n_px = min(8, H_s * W_s)
+                    perm = torch.randperm(H_s * W_s, device=self.device)[:n_px]
+                    flat_px = pre_norm_map_s.permute(0, 2, 3, 1).reshape(B_s, H_s * W_s, D_s)
+                    sampled_px = flat_px[:, perm, :].reshape(B_s * n_px, D_s)  # [B*n_px, D]
+                    if dist.is_initialized() and self.world_size > 1:
+                        gathered_px = [torch.zeros_like(sampled_px) for _ in range(self.world_size)]
+                        dist.all_gather(gathered_px, sampled_px)
+                        gathered_px = torch.cat(gathered_px, dim=0)
+                    else:
+                        gathered_px = sampled_px
+                    hsph_pixel = hyperspherical_uniformity_loss(gathered_px.float())
                 else:
-                    gathered_hsph = sampled_px
-                hsph_uniform = hyperspherical_uniformity_loss(gathered_hsph.float())
-            elif hsph_uniform_w > 0:
-                # fallback: 全局平均
-                gathered_hsph_fb = pre_norm
+                    hsph_pixel = torch.tensor(0.0, device=self.device)
+
+                # Part B: 全局平均级（pre_norm_embedding [B,D]，防止 patch 间全局方向坍缩）
                 if dist.is_initialized() and self.world_size > 1:
-                    gathered_hsph_fb_list = [torch.zeros_like(pre_norm) for _ in range(self.world_size)]
-                    dist.all_gather(gathered_hsph_fb_list, pre_norm)
-                    gathered_hsph_fb = torch.cat(gathered_hsph_fb_list, dim=0)
-                hsph_uniform = hyperspherical_uniformity_loss(gathered_hsph_fb.float())
+                    gathered_global = [torch.zeros_like(pre_norm) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_global, pre_norm)
+                    gathered_global = torch.cat(gathered_global, dim=0)
+                else:
+                    gathered_global = pre_norm
+                hsph_global = hyperspherical_uniformity_loss(gathered_global.float())
+
+                # 两级别加权合并（全局级权重加倍，因为 erank 是全局度量的）
+                hsph_uniform = 0.5 * hsph_pixel + 1.5 * hsph_global
 
             # Per-dim 诊断（日志用）
             # ★ FIX: 使用 gathered_spatial_map 计算 active，与 spatial_vicreg 一致
@@ -649,7 +660,8 @@ class DDPv13Trainer:
                       f"cls={cls.item():.4f} "
                       f"var={var.item():.4f} cov={cov.item():.4f} "
                       f"decorr={decorr.item():.4f} orth={orth.item():.4f} "
-                      f"l2unif={l2_uniform.item():.4f} hsph={hsph_uniform.item():.4f} "
+                      f"l2unif={l2_uniform.item():.4f} "
+                      f"hsph={hsph_uniform.item():.4f}(px={hsph_pixel.item():.2f},g={hsph_global.item():.2f}) "
                       f"inter_var={inter_var.item():.4f} "
                       f"bank={bank_size}/{self.memory_bank.K} "
                       f"spatial=[{active_dims}/{pre_norm_map.shape[1] if pre_norm_map is not None else pre_norm.shape[1]}:{std_mean:.4f}] "
