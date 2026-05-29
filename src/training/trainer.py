@@ -373,6 +373,16 @@ class DDPv13Trainer:
                         if student_out.bottleneck_logits is not None:
                             dummy_cls = dummy_cls + student_out.bottleneck_logits.sum() * 0.0
 
+                # ★ 实例判别损失: 预测 patch 身份 (0 ~ N_patches-1)
+                # 坍缩时 CE = log(N_patches) ≈ 5.77 (N=320)，梯度对每个 patch 方向不同 → 打破坍缩
+                patch_id_w = getattr(t, 'patch_id_loss_weight', 0.0)
+                patch_id_loss = torch.tensor(0.0, device=self.device)
+                if patch_id_w > 0 and "patch_index" in batch and student_out.patch_id_logits is not None:
+                    patch_id_loss = F.cross_entropy(student_out.patch_id_logits.float(), batch["patch_index"])
+                elif student_out.patch_id_logits is not None:
+                    # Dummy: 确保 patch_id_head 参数参与 backward
+                    dummy_cls = dummy_cls + student_out.patch_id_logits.sum() * 0.0
+
             # === VICReg Variance + Covariance (L2-norm 或 Pre-norm 空间) + Memory Bank ===
             # V13: 支持在 L2-norm 空间计算 VICReg，强制模型在球面上学习时间方向
             if use_l2_vicreg:
@@ -587,6 +597,7 @@ class DDPv13Trainer:
                 + consist_w * consist
                 + temporal_w * temporal_loss
                 + cls_w * cls
+                + patch_id_w * patch_id_loss
                 + var_w * var
                 + cov_w * cov
                 + l2_uniform_w * l2_uniform
@@ -672,7 +683,7 @@ class DDPv13Trainer:
                     temp_diag = f"temp={temporal_loss.item():.4f}(gap={d['avg_gap_months']:.1f}m,sim={d['avg_sim']:.3f}) "
                 step_msg = (f"  [Step {step}] recon={recon.item():.4f} "
                       f"consist={consist.item():.4f} {temp_diag}"
-                      f"cls={cls.item():.4f} "
+                      f"cls={cls.item():.4f} pid={patch_id_loss.item():.4f} "
                       f"var={var.item():.4f} cov={cov.item():.4f} "
                       f"decorr={decorr.item():.4f} orth={orth.item():.4f} "
                       f"l2unif={l2_uniform.item():.4f} "

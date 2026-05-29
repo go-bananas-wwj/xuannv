@@ -247,6 +247,8 @@ class HarbinPatchDataset(Dataset):
                 rng = random.Random(getattr(cfg.experiment, 'seed', 42) + 12345)
                 self.patches = rng.sample(self.patches, max_patches)
                 print(f"[Dataset] Randomly sampled {max_patches} patches for fast validation")
+        # 实例判别: 构建 patch_id → 整数索引的映射
+        self._patch_to_idx: dict[str, int] = {p: i for i, p in enumerate(self.patches)}
         stats_dir = Path(d.stats_dir) if d.stats_dir else None
         self.stats = self._load_stats(stats_dir)
 
@@ -1164,4 +1166,5 @@ class HarbinPatchDataset(Dataset):
             "target_loss_type": torch.from_numpy(target_loss_type),
             "target_source_idx": torch.from_numpy(target_source_idx),
             "label": torch.tensor(patch_label, dtype=torch.long),
+            "patch_index": torch.tensor(self._patch_to_idx.get(patch_id, 0), dtype=torch.long),
         }

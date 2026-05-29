@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_hsph_0529_v6
+  output_dir: /workspace/outputs/exp_v1_haidian_instdiscr_0529_v7
 
 data:
   dataset_type: harbin_patches
@@ -135,6 +135,11 @@ training:
   # ★ Decoder Conditioning Dropout — 提升到 0.6，更强迫 decoder 依赖 embedding
   decoder_cond_dropout: 0.6
 
+  # ★★ v7 新增：实例判别损失 — Instance Discrimination
+  # 预测 patch 身份 (0~319)，坍缩时 CE=log(320)≈5.77 → 对每个 patch 梯度方向不同 → 真正打破坍缩
+  patch_id_loss_weight: 0.15
+  patch_id_num_patches: 320
+
   # ★ P0 改进：增强 VICReg 协方差正则（恢复默认强度）
   variance_weight: 1.0
   covariance_weight: 0.01
@@ -143,8 +148,8 @@ training:
   # ★ P0 改进：启用 gap-aware 时序损失（原值 0.0）
   temporal_gap_aware_weight: 0.1
 
-  # ★ P1 改进：新增 LMIM 潜在空间预测损失
-  lmim_weight: 0.3
+  # ★ v7: 降低 lmim（减少 teacher 污染），reconstruction 是主要语义信号
+  lmim_weight: 0.1
 
   # ★ 空间感知 Temporal Loss（沿用 Round 9 配置）
   temporal_cosine_pixel_weight: 0.5

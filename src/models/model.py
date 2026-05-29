@@ -45,6 +45,7 @@ class AEFOutput:
     summary_pooled: torch.Tensor | None = None
     bottleneck_logits: torch.Tensor | None = None
     dual_pre_w2: torch.Tensor | None = None  # [B, D, H, W] 第二窗口 pre_norm (用于 temporal loss)
+    patch_id_logits: torch.Tensor | None = None  # [B, num_patches] 实例判别 logits
 
 
 class AEFModel(nn.Module):
@@ -134,6 +135,14 @@ class AEFModel(nn.Module):
         self.classification_head = CosineClassificationHead(m.embedding_dim, d.num_classes)
         self.aux_cls_head = CosineClassificationHead(m.precision_dim, d.num_classes)
         self.bottleneck_cls_head = CosineClassificationHead(m.embedding_dim, d.num_classes)
+
+        # ★ 实例判别头: 预测 patch 身份 (0 ~ num_patches-1)，迫使全局 embedding 多样化
+        t = cfg.training
+        patch_id_num = getattr(t, 'patch_id_num_patches', 0)
+        if patch_id_num > 0:
+            self.patch_id_head: nn.Linear | None = nn.Linear(m.embedding_dim, patch_id_num)
+        else:
+            self.patch_id_head = None
 
     def encode_frames(
         self,
@@ -378,9 +387,14 @@ class AEFModel(nn.Module):
         aux_logits = self.aux_cls_head(summary_pooled)
         bottleneck_logits = self.bottleneck_cls_head(pre_norm)
 
+        # ★ 实例判别头: 从 pre_norm 预测 patch 身份
+        patch_id_logits = self.patch_id_head(pre_norm) if self.patch_id_head is not None else None
+
         # Dummy 梯度流：确保 classification head 参数参与 backward
         # 加到 reconstructions 上（recon loss 一定会 backward）
         dummy_cls = (logits.sum() + aux_logits.sum() + bottleneck_logits.sum()) * 0.0
+        if patch_id_logits is None and self.patch_id_head is not None:
+            dummy_cls = dummy_cls  # head exists, logits computed
         reconstructions = reconstructions + dummy_cls.view(1, 1, 1, 1, 1)
 
         return AEFOutput(
@@ -394,6 +408,7 @@ class AEFModel(nn.Module):
             summary_pooled=summary_pooled,
             bottleneck_logits=bottleneck_logits,
             dual_pre_w2=dual_pre_w2,
+            patch_id_logits=patch_id_logits,
         )
 
     def encode_dual_window(

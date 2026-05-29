@@ -231,6 +231,10 @@ class TrainingConfig:
     # 球面方差正则 — 在 L2 归一化 embedding 上强制各维度方差 ≥ min_std（补充 pairwise_cosine 从维度角度防坍缩）
     spherical_variance_weight: float = 0.0
     spherical_variance_min_std: float = 0.1
+    # ★ 实例判别 (Instance Discrimination) — 预测 patch 身份 (0 ~ N-1)
+    # 坍缩时 CE = log(N)，对每个 patch 方向不同 → 真正打破坍缩的核心机制
+    patch_id_loss_weight: float = 0.0
+    patch_id_num_patches: int = 0  # 0 = 禁用
 
 
 @dataclass
