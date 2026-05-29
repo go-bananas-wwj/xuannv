@@ -187,6 +187,8 @@ class TrainingConfig:
     # V19 Inter-Patch InfoNCE (NT-Xent)，防止方向坍缩
     inter_patch_infonce_weight: float = 0.0
     inter_patch_infonce_temperature: float = 0.1
+    # V22 Inter-Patch Decorrelation (Barlow Twins on gathered_pre)，防止维度坍缩
+    inter_decorr_weight: float = 0.0
     # Warmup
     recon_warmup_epochs: int = 20
     warmup_epochs: int = 10

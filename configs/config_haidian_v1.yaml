@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_stats_fix_0530_v21
+  output_dir: /workspace/outputs/exp_v1_haidian_stats_fix_0530_v22
 
 data:
   dataset_type: harbin_patches
@@ -161,6 +161,11 @@ training:
   # 原理：完全坍缩时loss=log(N)≈2.77，梯度最大；N=16即可工作（不需要N>>D）
   inter_patch_infonce_weight: 2.0
   inter_patch_infonce_temperature: 0.1
+
+  # ★ V22: Barlow Twins inter-patch去相关（防止维度坍缩核心机制）
+  # 原理：erank=2时64维高度相关→decorr_inter≈2.0→梯度强；erank高时相关→0→自然停止
+  # 关键：decorr_w作用于spatial_flat（空间捷径），这里直接作用于16个全局embedding
+  inter_decorr_weight: 1.0
 
   # ★ 移除PID（所有PID变体失败，根因：完全坍缩态零梯度）
   patch_id_loss_weight: 0.0

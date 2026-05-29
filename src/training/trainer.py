@@ -371,6 +371,16 @@ class DDPv13Trainer:
                         temperature=infonce_temp,
                     )
 
+                # V22: Inter-Patch Decorrelation (Barlow Twins on gathered_pre) — 防止维度坍缩
+                # 直接在 16 个全局 embedding 上计算 Barlow Twins 去相关损失
+                # erank=2 时：64 维高度相关 → decorr_inter≈2.0 → 梯度强
+                # erank=64 时：相关=0 → decorr_inter≈0 → 自然停止
+                # 关键差异：decorr_w 作用于 spatial_flat (空间捷径)；这里直接作用于全局 embedding
+                inter_decorr_w = getattr(t, 'inter_decorr_weight', 0.0)
+                inter_decorr = torch.tensor(0.0, device=self.device)
+                if inter_decorr_w > 0 and gathered_pre is not None and gathered_pre.shape[0] >= 2:
+                    inter_decorr = decorrelation_loss(gathered_pre.float())
+
                 # Classification Loss (语义监督)
                 cls_w = getattr(t, 'classification_weight', 0.0)
                 cls = torch.tensor(0.0, device=self.device)
@@ -641,6 +651,7 @@ class DDPv13Trainer:
                 + orth_w * orth
                 + dummy_cls
                 + inter_var_w * inter_var
+                + inter_decorr_w * inter_decorr
                 + lmim_w * lmim
             )
 
@@ -723,6 +734,7 @@ class DDPv13Trainer:
                       f"decorr={decorr.item():.4f} orth={orth.item():.4f} "
                       f"l2unif={l2_uniform.item():.4f} "
                       f"infonce={inter_infonce.item():.4f} "
+                      f"idecorr={inter_decorr.item():.4f} "
                       f"hsph={hsph_uniform.item():.4f}(px={hsph_pixel.item():.2f},g={hsph_global.item():.2f}) "
                       f"sphvar={spherical_var.item():.4f} "
                       f"inter_var={inter_var.item():.4f} "
