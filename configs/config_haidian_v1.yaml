@@ -92,7 +92,7 @@ model:
   precision_dim: 128
   time_dim: 256
   space_dim: 256
-  embedding_dim: 128
+  embedding_dim: 64
   time_code_dim: 64
   window_code_dim: 64
   relative_time_code_dim: 16
