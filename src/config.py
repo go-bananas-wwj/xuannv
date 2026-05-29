@@ -189,6 +189,8 @@ class TrainingConfig:
     inter_patch_infonce_temperature: float = 0.1
     # V22 Inter-Patch Decorrelation (Barlow Twins on gathered_pre)，防止维度坍缩
     inter_decorr_weight: float = 0.0
+    # V23 直接 erank 最大化（SVD 奇异值熵），N<D 时唯一可靠的维度坍缩对抗
+    erank_loss_weight: float = 0.0
     # Warmup
     recon_warmup_epochs: int = 20
     warmup_epochs: int = 10

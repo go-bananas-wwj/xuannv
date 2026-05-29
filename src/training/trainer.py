@@ -36,6 +36,7 @@ from src.training.losses import (
     bottleneck_orthogonality_loss,
     latent_mim_loss,
     inter_patch_infonce_loss,
+    erank_maximization_loss,
 )
 from src.training.memory_bank import EmbeddingMemoryBank
 from src.training.optimizer import build_optimizer, build_scheduler, get_cosine_lr
@@ -468,12 +469,20 @@ class DDPv13Trainer:
                 var = var + inter_var_w * inter_var
                 cov = cov + inter_var_w * inter_cov
 
-            # V22: Inter-Patch Decorrelation (Barlow Twins on gathered_pre) — 防止维度坍缩
-            # gathered_pre 已在 line 434 通过 all_gather 定义（16个全局embedding）
+            # V22: Inter-Patch Decorrelation (Barlow Twins on gathered_pre)
+            # 注意：N=16 < D=64 时 Barlow Twins 估计不稳定（rank 不足），已确认无效
             inter_decorr_w = getattr(t, 'inter_decorr_weight', 0.0)
             inter_decorr = torch.tensor(0.0, device=self.device)
             if inter_decorr_w > 0 and gathered_pre is not None and gathered_pre.shape[0] >= 2:
                 inter_decorr = decorrelation_loss(gathered_pre.float())
+
+            # V23: 直接 erank 最大化（SVD 奇异值熵）
+            # N=16, D=64 → SVD 给出 16 个奇异值 → 最大化熵 → max erank=16
+            # loss = log(N) - H(singular_values)，坍缩时→log(N)，理想时→0
+            erank_loss_w = getattr(t, 'erank_loss_weight', 0.0)
+            erank_loss_val = torch.tensor(0.0, device=self.device)
+            if erank_loss_w > 0 and gathered_pre is not None and gathered_pre.shape[0] >= 2:
+                erank_loss_val = erank_maximization_loss(gathered_pre.float())
 
             # === Uniformity Loss（实验变体支持）===
             use_spatial_unif = getattr(t, 'use_spatial_uniformity', False)
@@ -649,6 +658,7 @@ class DDPv13Trainer:
                 + dummy_cls
                 + inter_var_w * inter_var
                 + inter_decorr_w * inter_decorr
+                + erank_loss_w * erank_loss_val
                 + lmim_w * lmim
             )
 
@@ -732,6 +742,7 @@ class DDPv13Trainer:
                       f"l2unif={l2_uniform.item():.4f} "
                       f"infonce={inter_infonce.item():.4f} "
                       f"idecorr={inter_decorr.item():.4f} "
+                      f"erank_l={erank_loss_val.item():.4f} "
                       f"hsph={hsph_uniform.item():.4f}(px={hsph_pixel.item():.2f},g={hsph_global.item():.2f}) "
                       f"sphvar={spherical_var.item():.4f} "
                       f"inter_var={inter_var.item():.4f} "

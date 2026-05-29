@@ -867,3 +867,54 @@ def inter_patch_infonce_loss(
     logits = torch.mm(q, k.T) / temperature           # [N, N]
     labels = torch.arange(len(q), device=q.device)   # 对角线为正样本
     return F.cross_entropy(logits, labels)
+
+
+# ────────────────────────────────────────────
+# V23: erank 最大化损失（直接最优化目标）
+# ────────────────────────────────────────────
+
+def erank_maximization_loss(x: torch.Tensor) -> torch.Tensor:
+    """直接最大化 erank = exp(entropy(singular_values)).
+
+    动机：
+    - Barlow Twins / decorrelation_loss 在 N < D 时（本项目 N=16, D=64）
+      协方差矩阵秩不足，梯度估计不稳定，无法有效防止维度坍缩。
+    - 此函数跳过协方差估计，直接在 SVD 奇异值空间最大化熵，
+      等价于最大化 erank，梯度在任何 N, D 组合下均有效。
+
+    原理：
+    - x [N, D] → SVD → S [min(N,D)]（奇异值）
+    - p = S / sum(S)（归一化为概率分布）
+    - H = -sum(p * log(p))（奇异值熵）
+    - erank = exp(H)
+    - 返回 loss = max_H - H → 0 时 erank 最大（= N）
+
+    梯度方向：
+    - 当 erank=2（两个大奇异值）: 梯度让最大奇异值缩小、最小奇异值增大
+    - 当 erank→N（理想均匀分布）: loss→0，梯度→0，自然停止
+
+    Args:
+        x: [N, D] 全局 pre-norm embedding（gathered_pre），N 通常=16, D=64
+
+    Returns:
+        scalar loss ≥ 0，最大值 = log(N)（完全坍缩时），0（理想时）
+    """
+    N, D = x.shape
+    if N < 2:
+        return x.new_tensor(0.0)
+
+    x = x - x.mean(0, keepdim=True)  # 中心化
+
+    try:
+        # full_matrices=False → S: [min(N,D),]，节省内存
+        S = torch.linalg.svd(x, full_matrices=False).S
+    except Exception:
+        return x.new_tensor(0.0)
+
+    S = S.clamp(min=1e-8)
+    p = S / S.sum()
+    entropy = -(p * p.log()).sum()
+    max_entropy = math.log(float(len(S)))  # log(min(N,D))
+
+    # 返回 (max - current)：当 erank=N 时 loss=0，坍缩时 loss>0
+    return torch.tensor(max_entropy, device=x.device, dtype=x.dtype) - entropy
