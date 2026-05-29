@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_stats_fix_0530_v19
+  output_dir: /workspace/outputs/exp_v1_haidian_stats_fix_0530_v20
 
 data:
   dataset_type: harbin_patches
@@ -147,7 +147,8 @@ training:
   # ★ 辅助损失
   classification_weight: 0.03
   orthogonality_weight: 0.01
-  decorrelation_weight: 0.0     # V19: 禁用（InfoNCE更有效且无N<D问题）
+  decorrelation_weight: 0.1     # V20: 重新启用！spatial_flat [1024,64] N>>D，Barlow Twins稳定
+                                # 防止维度间高相关（cov=0.12，erank=2）；v16失败因N=16<D=64
 
   # ★ V18: inter-sample VICReg（patch间多样性）直接用gathered_pre，无bank稀释
   inter_variance_weight: 1.0    # V19: 降低（InfoNCE是主力，VICReg作为辅助）
