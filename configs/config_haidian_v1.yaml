@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_gmppid_0530_v11
+  output_dir: /workspace/outputs/exp_v1_haidian_harbin_combo_0530_v12
 
 data:
   dataset_type: harbin_patches
@@ -115,43 +115,52 @@ training:
   weight_decay: 0.01
   grad_clip_norm: 1.0
 
-  # ★★★ v11 架构级修复：GMP-PID + Spatial VICReg（双管齐下）
+  # ★★★ v12 根因修复：完全复制哈尔滨成功损失组合
   #
-  # v10 诊断：空间 token PID 把判别信息压缩到 1 个维度（erank 6→1.2）
-  #   原因：PID 最优解 = 找 1 个方向区分所有 patch → 维度坍缩
+  # 根因分析（v1-v11 共同失败）：
+  #   所有已尝试的损失（PID/VICReg/uniformity）在完全坍缩态(所有z=z*)都有零梯度
+  #   无法从坍缩态逃出 → v1-v11全部失败
   #
-  # v11 两步修复：
-  #   1. GMP-PID: max 聚合比 GAP/all-token 更 patch-specific
-  #      即使 GAP=z* for all patches，max 值仍然不同（土地覆盖→不同最大激活）
-  #   2. Spatial VICReg (use_spatial_vicreg=true): 在 [B*H*W, D] 空间 token 上计算
-  #      保证所有 64 维度都被激活，防止 PID 引发的维度坍缩
+  # 哈尔滨成功的真正原因：
+  #   多重损失协同【预防】坍缩（而非逃出坍缩）：
+  #   1. reconstruction(0.1): 重建目标各patch不同 → 梯度非零（但trivial solution存在）
+  #   2. consistency(0.05): teacher(full)≠student(50%frame_drop) → 无法坍缩到同一点
+  #   3. temporal_cosine_pixel(0.5): 多时序窗口对比 → temporal sensitivity
+  #   4. pre_norm_uniform(0.5): 欧氏空间uniformity → 维持分散
+  #   5. variance(0.25): VICReg variance → 维持维度活跃
+  #
+  # v12 = 哈尔滨配置（去掉PID、去掉spatial VICReg）
 
-  # ★ 主驱动力：GMP 实例判别
-  patch_id_loss_weight: 5.0
+  # ★ 核心四件套（哈尔滨成功组合）
+  reconstruction_weight: 0.1
+  consistency_weight: 0.05
+  temporal_cosine_pixel_weight: 0.5
+  use_pre_norm_uniform: true
+  pre_norm_uniform_weight: 0.5
+
+  # ★ VICReg（哈尔滨参数）
+  use_spatial_vicreg: false
+  variance_weight: 0.25
+  covariance_weight: 0.001
+  vicreg_min_std: 1.0
+
+  # ★ 辅助损失
+  classification_weight: 0.03
+  orthogonality_weight: 0.01
+  decorrelation_weight: 0.0
+
+  # ★ 移除PID（所有PID变体失败，根因：完全坍缩态零梯度）
+  patch_id_loss_weight: 0.0
   patch_id_num_patches: 320
 
-  # ★ 辅助：Spatial VICReg（核心新增：在 H×W 空间 token 上维持维度多样性）
-  use_spatial_vicreg: true         # v10: false → v11: true
-  variance_weight: 0.2             # 略微提高（spatial token 数量大，梯度相对小）
-  covariance_weight: 0.01
-  vicreg_min_std: 0.3              # 降低阈值（spatial token std 本身较小）
-
-  # ★ 关闭所有坍缩诱因和数值不稳定项（与 v10 相同）
-  decorrelation_weight: 0.0
-  orthogonality_weight: 0.01
-  reconstruction_weight: 0.0
-  classification_weight: 0.0
-  consistency_weight: 0.0
+  # ★ 移除其他不稳定损失
   lmim_weight: 0.0
   temporal_gap_aware_weight: 0.0
-  temporal_cosine_pixel_weight: 0.0
-
-  use_pre_norm_uniform: false
-  pre_norm_uniform_weight: 0.0
   hyperspherical_uniform_weight: 0.0
   spherical_variance_weight: 0.0
   spherical_variance_min_std: 0.1
 
+  # ★ 哈尔滨参数
   decoder_cond_dropout: 0.6
   temporal_magnitude_temperature: 0.1
   temporal_use_spatial_weight: true
