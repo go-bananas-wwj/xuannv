@@ -35,6 +35,7 @@ from src.training.losses import (
     classification_loss,
     bottleneck_orthogonality_loss,
     latent_mim_loss,
+    inter_patch_infonce_loss,
 )
 from src.training.memory_bank import EmbeddingMemoryBank
 from src.training.optimizer import build_optimizer, build_scheduler, get_cosine_lr
@@ -357,6 +358,19 @@ class DDPv13Trainer:
                             'target_sim': target_sim.mean().item(),
                         }
 
+                # V19: Inter-Patch InfoNCE (NT-Xent) — 防止方向坍缩
+                # 不同patch的teacher(key)和student(query)作为正负样本对
+                # 对方向坍缩梯度强：完全坍缩时 loss=log(N)≈2.77（最大梯度）
+                infonce_w = getattr(t, 'inter_patch_infonce_weight', 0.0)
+                infonce_temp = getattr(t, 'inter_patch_infonce_temperature', 0.1)
+                inter_infonce = torch.tensor(0.0, device=self.device)
+                if infonce_w > 0:
+                    inter_infonce = inter_patch_infonce_loss(
+                        student_out.pre_norm_embedding,
+                        teacher_out.pre_norm_embedding.detach(),
+                        temperature=infonce_temp,
+                    )
+
                 # Classification Loss (语义监督)
                 cls_w = getattr(t, 'classification_weight', 0.0)
                 cls = torch.tensor(0.0, device=self.device)
@@ -615,6 +629,7 @@ class DDPv13Trainer:
                 recon_w * recon_warmup * recon
                 + consist_w * consist
                 + temporal_w * temporal_loss
+                + infonce_w * inter_infonce
                 + cls_w * cls
                 + patch_id_w * patch_id_loss
                 + var_w * var
@@ -686,6 +701,7 @@ class DDPv13Trainer:
                 "orth": orth.item(),
                 "lr": lr,
                 "inter_var": inter_var.item() if inter_var_w > 0 else 0.0,
+                "infonce": inter_infonce.item() if infonce_w > 0 else 0.0,
                 "active_dims": float(active_dims),
                 "std_mean": float(std_mean),
                 "erank": float(erank),
@@ -706,6 +722,7 @@ class DDPv13Trainer:
                       f"var={var.item():.4f} cov={cov.item():.4f} "
                       f"decorr={decorr.item():.4f} orth={orth.item():.4f} "
                       f"l2unif={l2_uniform.item():.4f} "
+                      f"infonce={inter_infonce.item():.4f} "
                       f"hsph={hsph_uniform.item():.4f}(px={hsph_pixel.item():.2f},g={hsph_global.item():.2f}) "
                       f"sphvar={spherical_var.item():.4f} "
                       f"inter_var={inter_var.item():.4f} "

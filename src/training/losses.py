@@ -830,3 +830,40 @@ def latent_mim_loss(
     # 余弦相似度: [B, H*W] → 标量损失
     cos_sim = (s_norm * t_norm).sum(dim=1)   # [B, H*W]
     return 1.0 - cos_sim.mean()
+
+
+def inter_patch_infonce_loss(
+    queries: torch.Tensor,
+    keys: torch.Tensor,
+    temperature: float = 0.1,
+) -> torch.Tensor:
+    """NT-Xent / InfoNCE inter-patch 对比损失.
+
+    防止方向坍缩（directional collapse）：即使每维方差非零，所有 patch 仍可能指向
+    同一方向（erank=1）。variance_regularizer 无法检测此类坍缩；NT-Xent 通过显式对比
+    不同 patch 的方向强制多样性。
+
+    Args:
+        queries: student pre_norm_embedding, [N, D]（未经 L2 归一化也可，函数内部归一化）
+        keys:    teacher pre_norm_embedding（已 detach），[N, D]
+        temperature: softmax 温度，越低梯度越集中（推荐 0.07-0.1）
+
+    Returns:
+        scalar: cross-entropy over N×N similarity matrix, 对角线为正样本对
+
+    Note:
+        - 正样本对：同一 patch 的 teacher (key_i) 和 student (query_i)
+        - 负样本对：不同 patch 之间的所有组合
+        - N=16 即可工作（不需要 N>>D），对方向坍缩梯度强
+        - 完全坍缩时 loss = log(N)（梯度最大），正常时 loss → 0
+    """
+    if queries.shape[0] < 2:
+        return queries.new_tensor(0.0)
+
+    q = F.normalize(queries.float(), p=2, dim=-1)   # [N, D]
+    k = F.normalize(keys.float(), p=2, dim=-1)       # [N, D]
+
+    # logits[i, j] = sim(query_i, key_j) / temperature
+    logits = torch.mm(q, k.T) / temperature           # [N, N]
+    labels = torch.arange(len(q), device=q.device)   # 对角线为正样本
+    return F.cross_entropy(logits, labels)

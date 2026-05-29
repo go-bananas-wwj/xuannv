@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_stats_fix_0530_v18
+  output_dir: /workspace/outputs/exp_v1_haidian_stats_fix_0530_v19
 
 data:
   dataset_type: harbin_patches
@@ -140,18 +140,23 @@ training:
 
   # ★ VICReg（哈尔滨参数）
   use_spatial_vicreg: true      # V18: spatial_flat [B*H*W, D] N>>D，梯度不被bank稀释
-  variance_weight: 1.0          # spatial N=1024足够，不需要5.0
+  variance_weight: 0.5          # V19: spatial var保留但降低（InfoNCE是主力）
   covariance_weight: 0.001
   vicreg_min_std: 0.3           # 从1.0降低：pre_norm在L2norm空间std≈0.05-0.15，1.0太高
 
   # ★ 辅助损失
   classification_weight: 0.03
   orthogonality_weight: 0.01
-  decorrelation_weight: 0.05    # V18: spatial N=1024>>D=64，decorr有效
+  decorrelation_weight: 0.0     # V19: 禁用（InfoNCE更有效且无N<D问题）
 
   # ★ V18: inter-sample VICReg（patch间多样性）直接用gathered_pre，无bank稀释
-  inter_variance_weight: 5.0    # N=16, 无bank稀释，梯度强度 ≈ 5×(1/(16×64))
-  inter_variance_min_std: 0.3   # pre_norm空间合理阈值（L2norm球面std≈0.125）
+  inter_variance_weight: 1.0    # V19: 降低（InfoNCE是主力，VICReg作为辅助）
+  inter_variance_min_std: 0.3   # pre_norm空间合理阈值
+
+  # ★ V19: NT-Xent / InfoNCE inter-patch对比损失（防止方向坍缩核心机制）
+  # 原理：完全坍缩时loss=log(N)≈2.77，梯度最大；N=16即可工作（不需要N>>D）
+  inter_patch_infonce_weight: 2.0
+  inter_patch_infonce_temperature: 0.1
 
   # ★ 移除PID（所有PID变体失败，根因：完全坍缩态零梯度）
   patch_id_loss_weight: 0.0
