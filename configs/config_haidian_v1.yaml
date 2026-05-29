@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_stats_fix_0530_v15
+  output_dir: /workspace/outputs/exp_v1_haidian_stats_fix_0530_v16
 
 data:
   dataset_type: harbin_patches
@@ -147,7 +147,7 @@ training:
   # ★ 辅助损失
   classification_weight: 0.03
   orthogonality_weight: 0.01
-  decorrelation_weight: 0.0
+  decorrelation_weight: 0.05
 
   # ★ 移除PID（所有PID变体失败，根因：完全坍缩态零梯度）
   patch_id_loss_weight: 0.0
