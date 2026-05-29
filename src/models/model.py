@@ -299,6 +299,10 @@ class AEFModel(nn.Module):
         # AEF 对齐: 恢复条件解码 — 传递时间条件
         expanded_map = embedding_map[:, None, ...].repeat(1, T_tgt, 1, 1, 1)
         flat_map = expanded_map.reshape(B * T_tgt, *embedding_map.shape[1:])
+        # ★ 关键修复: decoder 始终使用 L2 归一化后的 embedding，切断幅度信息泄漏通道。
+        #   skip_l2_norm_training=True 时 embedding_map 是 pre-norm（有幅度），
+        #   若 decoder 直接用幅度重建，recon 会快速降到 0 而不需要方向多样性 → 坍缩。
+        flat_map = F.normalize(flat_map, p=2, dim=1)
 
         # Round 2: 使用目标窗口的 window_code（跨时相重建）
         if target_valid_start_ms is not None and target_valid_end_ms is not None:
