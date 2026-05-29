@@ -226,6 +226,8 @@ class TrainingConfig:
     lmim_weight: float = 0.0
     # 球面 Uniformity Loss — L2 归一化后计算，直接防方向坍缩
     hyperspherical_uniform_weight: float = 0.0
+    # Decoder Conditioning Dropout — 随机清零时间条件码，防decoder依赖时间码走捷径
+    decoder_cond_dropout: float = 0.0
 
 
 @dataclass

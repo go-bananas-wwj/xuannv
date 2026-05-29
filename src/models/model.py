@@ -313,6 +313,14 @@ class AEFModel(nn.Module):
             cond_window = target_window_code[:, None, :].expand(B, T_tgt, -1).reshape(B * T_tgt, -1)
         else:
             cond_window = window_code[:, None, :].expand(B, T_tgt, -1).reshape(B * T_tgt, -1)
+
+        # ★ Decoder Conditioning Dropout — 防止decoder依赖时间码走捷径
+        #   训练时随机以 decoder_cond_dropout 概率将时间条件码清零，
+        #   迫使 decoder 必须从 embedding 中提取信息，防止 embedding 坍缩。
+        decoder_cond_dropout = getattr(self.cfg.training if hasattr(self.cfg, 'training') else self.cfg, 'decoder_cond_dropout', 0.0)
+        if self.training and decoder_cond_dropout > 0:
+            drop_mask = (torch.rand(B * T_tgt, 1, device=flat_map.device) < decoder_cond_dropout)
+            cond_window = cond_window * (~drop_mask).float()
         
         # Round 2: 编码 relative_time
         # target_relative_time: [B, S_tgt] 或 [B, S_tgt, 1]

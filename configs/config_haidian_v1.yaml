@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_hsph_0529_v3
+  output_dir: /workspace/outputs/exp_v1_haidian_hsph_0529_v4
 
 data:
   dataset_type: harbin_patches
@@ -127,8 +127,10 @@ training:
   # ★ 关键修复：必须设 use_pre_norm_uniform: true 才能激活 raw_uniformity_loss
   use_pre_norm_uniform: true
   pre_norm_uniform_weight: 8.0
-  # ★ 球面 Uniformity Loss — 直接防方向坍缩（raw_uniformity 靠幅度满足，无法防方向坍缩）
-  hyperspherical_uniform_weight: 5.0
+  # ★ 球面 Uniformity Loss — 作用于 pre_norm_map 像素级采样，直接防方向坍缩
+  hyperspherical_uniform_weight: 15.0
+  # ★ Decoder Conditioning Dropout — 防止decoder依赖时间码走捷径重建
+  decoder_cond_dropout: 0.3
 
   # ★ P0 改进：增强 VICReg 协方差正则（恢复默认强度）
   variance_weight: 1.0

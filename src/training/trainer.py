@@ -481,17 +481,33 @@ class DDPv13Trainer:
                     gathered_l2 = embedding
                 l2_uniform = batch_uniformity_loss_l2(gathered_l2.float()) if l2_uniform_w > 0 else torch.tensor(0.0, device=self.device)
 
-            # ★ 球面 Uniformity Loss — 直接防止方向坍缩（raw_uniformity 靠幅度满足，无法防方向坍缩）
+            # ★ 球面 Uniformity Loss — 作用于 pre_norm_map 随机采样像素（非全局平均）
+            #   防止方向坍缩：L2 归一化后计算，全局平均池化后 erank 低，像素级梯度更强
             hsph_uniform_w = getattr(t, 'hyperspherical_uniform_weight', 0.0)
             hsph_uniform = torch.tensor(0.0, device=self.device)
-            if hsph_uniform_w > 0:
+            if hsph_uniform_w > 0 and student_out.pre_norm_map is not None:
+                pre_norm_map_s = student_out.pre_norm_map  # [B, D, H, W]
+                B_s, D_s, H_s, W_s = pre_norm_map_s.shape
+                # 每张图随机采样 8 个空间位置，再在 GPU 间 all_gather
+                n_px = min(8, H_s * W_s)
+                perm = torch.randperm(H_s * W_s, device=self.device)[:n_px]
+                flat_px = pre_norm_map_s.permute(0, 2, 3, 1).reshape(B_s, H_s * W_s, D_s)
+                sampled_px = flat_px[:, perm, :].reshape(B_s * n_px, D_s)  # [B*n_px, D]
                 if dist.is_initialized() and self.world_size > 1:
-                    gathered_hsph = [torch.zeros_like(pre_norm) for _ in range(self.world_size)]
-                    dist.all_gather(gathered_hsph, pre_norm)
+                    gathered_hsph = [torch.zeros_like(sampled_px) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_hsph, sampled_px)
                     gathered_hsph = torch.cat(gathered_hsph, dim=0)
                 else:
-                    gathered_hsph = pre_norm
+                    gathered_hsph = sampled_px
                 hsph_uniform = hyperspherical_uniformity_loss(gathered_hsph.float())
+            elif hsph_uniform_w > 0:
+                # fallback: 全局平均
+                gathered_hsph_fb = pre_norm
+                if dist.is_initialized() and self.world_size > 1:
+                    gathered_hsph_fb_list = [torch.zeros_like(pre_norm) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_hsph_fb_list, pre_norm)
+                    gathered_hsph_fb = torch.cat(gathered_hsph_fb_list, dim=0)
+                hsph_uniform = hyperspherical_uniformity_loss(gathered_hsph_fb.float())
 
             # Per-dim 诊断（日志用）
             # ★ FIX: 使用 gathered_spatial_map 计算 active，与 spatial_vicreg 一致
