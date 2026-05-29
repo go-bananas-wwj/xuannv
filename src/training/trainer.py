@@ -378,7 +378,11 @@ class DDPv13Trainer:
                 patch_id_w = getattr(t, 'patch_id_loss_weight', 0.0)
                 patch_id_loss = torch.tensor(0.0, device=self.device)
                 if patch_id_w > 0 and "patch_index" in batch and student_out.patch_id_logits is not None:
-                    patch_id_loss = F.cross_entropy(student_out.patch_id_logits.float(), batch["patch_index"])
+                    # spatial token PID: logits=[B*HW, N], labels=[B] → expand to [B*HW]
+                    _B_pid = batch["patch_index"].shape[0]
+                    _hw = student_out.patch_id_spatial_hw
+                    _labels_exp = batch["patch_index"].unsqueeze(1).expand(_B_pid, _hw).reshape(_B_pid * _hw)
+                    patch_id_loss = F.cross_entropy(student_out.patch_id_logits.float(), _labels_exp)
                 elif student_out.patch_id_logits is not None:
                     # Dummy: 确保 patch_id_head 参数参与 backward
                     dummy_cls = dummy_cls + student_out.patch_id_logits.sum() * 0.0

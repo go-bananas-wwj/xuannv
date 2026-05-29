@@ -45,7 +45,8 @@ class AEFOutput:
     summary_pooled: torch.Tensor | None = None
     bottleneck_logits: torch.Tensor | None = None
     dual_pre_w2: torch.Tensor | None = None  # [B, D, H, W] 第二窗口 pre_norm (用于 temporal loss)
-    patch_id_logits: torch.Tensor | None = None  # [B, num_patches] 实例判别 logits
+    patch_id_logits: torch.Tensor | None = None  # [B*H*W, num_patches] 空间token级实例判别logits
+    patch_id_spatial_hw: int = 1  # H*W 空间token数，供 trainer 扩展 labels
 
 
 class AEFModel(nn.Module):
@@ -387,8 +388,18 @@ class AEFModel(nn.Module):
         aux_logits = self.aux_cls_head(summary_pooled)
         bottleneck_logits = self.bottleneck_cls_head(pre_norm)
 
-        # ★ 实例判别头: 从 pre_norm 预测 patch 身份
-        patch_id_logits = self.patch_id_head(pre_norm) if self.patch_id_head is not None else None
+        # ★ 实例判别头: 作用于 pre_norm_map 的全部空间 token（不做 GAP）
+        # 关键修复：GAP 坍缩时不同 patch 的梯度互相抵消；空间 token 级别的梯度可突破坍缩
+        if self.patch_id_head is not None and pre_norm_map is not None:
+            _B, _D, _H, _W = pre_norm_map.shape
+            _HW = _H * _W
+            # [B, D, H, W] → [B*H*W, D]（所有空间 token 展开）
+            _tokens = pre_norm_map.permute(0, 2, 3, 1).reshape(_B * _HW, _D)
+            patch_id_logits = self.patch_id_head(_tokens)  # [B*H*W, num_patches]
+            patch_id_spatial_hw = _HW
+        else:
+            patch_id_logits = None
+            patch_id_spatial_hw = 1
 
         # Dummy 梯度流：确保 classification head 参数参与 backward
         # 加到 reconstructions 上（recon loss 一定会 backward）
@@ -409,6 +420,7 @@ class AEFModel(nn.Module):
             bottleneck_logits=bottleneck_logits,
             dual_pre_w2=dual_pre_w2,
             patch_id_logits=patch_id_logits,
+            patch_id_spatial_hw=patch_id_spatial_hw,
         )
 
     def encode_dual_window(

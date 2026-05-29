@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_pid_dominant_0530_v8
+  output_dir: /workspace/outputs/exp_v1_haidian_spatialpid_0530_v10
 
 data:
   dataset_type: harbin_patches
@@ -115,46 +115,49 @@ training:
   weight_decay: 0.01
   grad_clip_norm: 1.0
 
-  # ★★★ v8 根因修复：pid 作为主驱动力，彻底清除"完全坍缩时梯度=0"的噪声损失
+  # ★★★ v10 架构级修复：空间 token 级别的实例判别（突破 GAP 坍缩）
   #
-  # 诊断结论：
-  #   pre_norm_uniform (8.0×2.0=16)、hyperspherical (15.0×0.44=6.6)、decorr (0.2×17.9=3.6)
-  #   三项合计占 loss 的 90%，但坍缩时梯度=0 或产生放大噪声，完全淹没了 pid 的有效梯度信号。
-  #   pid=0.15 × 5.9 = 0.89，被 27:1 的噪声掩埋 → 无效。
-  #   解决方案：清零所有坍缩时无效的损失，将 pid 权重提升 33x。
+  # v9 诊断结论（最终根因）：
+  #   inter=[44-63/64] 高（空间多样性存在）但 inter_var=0（GAP 后消失）
+  #   PID 作用在 GAP 向量上，当所有 patch 的 GAP=z* 时，不同 patch 的梯度方向相互矛盾
+  #   → 梯度在 encoder 处完全抵消 → PID 无法打破 GAP 坍缩（v1-v9 共同失败根因）
+  #
+  # v10 修复：
+  #   patch_id_head 现在作用于 pre_norm_map 的全部 H×W 空间 token（不做 GAP）
+  #   每个空间 token 独立预测所属 patch ID → 利用已存在的空间多样性 → 梯度不再抵消
+  #   等效于 DenseCL / PixelContrast 风格的像素级对比
 
-  # ★ 主驱动力：实例判别（唯一能打破完全坍缩的损失）
-  patch_id_loss_weight: 5.0        # v7: 0.15 → v8: 5.0（×33，成为总 loss 主项）
+  # ★ 主驱动力：空间 token 级实例判别
+  patch_id_loss_weight: 5.0
   patch_id_num_patches: 320
 
-  # ★ 辅助：重建损失（提供 per-patch 语义多样性，保持感知）
-  reconstruction_weight: 0.3
-  classification_weight: 0.03
-  orthogonality_weight: 0.01      # conv1x1 正交约束，权重极小不干扰
+  # ★ 辅助：VICReg 方差正则（防止维度死亡）
+  variance_weight: 0.1
 
-  # ★ 清零：完全坍缩时梯度=0 的损失（v8 全部关闭，不贡献噪声梯度）
+  # ★ 关闭所有坍缩诱因和数值不稳定项
+  decorrelation_weight: 0.0       # v9 decorr=17-35 数值不稳定（除以近零 std）
+  covariance_weight: 0.01
+  orthogonality_weight: 0.01
+
+  # ★ 重建关闭（坍缩根因）
+  reconstruction_weight: 0.0
+  classification_weight: 0.0
+  consistency_weight: 0.0
+  lmim_weight: 0.0
+  temporal_gap_aware_weight: 0.0
+  temporal_cosine_pixel_weight: 0.0
+
+  # ★ 保持 v8/v9 清零的项
   use_pre_norm_uniform: false
-  pre_norm_uniform_weight: 0.0    # v7: 8.0 → v8: 0.0（坍缩时梯度=0，纯噪声）
-  hyperspherical_uniform_weight: 0.0  # v7: 15.0 → v8: 0.0（同上）
-  spherical_variance_weight: 0.0  # v7: 3.0 → v8: 0.0（同上）
+  pre_norm_uniform_weight: 0.0
+  hyperspherical_uniform_weight: 0.0
+  spherical_variance_weight: 0.0
   spherical_variance_min_std: 0.1
-  decorrelation_weight: 0.0       # v7: 0.2 → v8: 0.0（坍缩时除以1e-4=放大噪声）
-  variance_weight: 0.0            # v7: 1.0 → v8: 0.0（坍缩时梯度=0）
-  covariance_weight: 0.0          # v7: 0.01 → v8: 0.0（同上）
   vicreg_min_std: 1.0
 
-  # ★ 清零：强制 w1≈w2 的损失（加速坍缩）
-  consistency_weight: 0.0         # v7: 0.05 → v8: 0.0（强制 window1≈window2 → 坍缩）
-  lmim_weight: 0.0                # v7: 0.1 → v8: 0.0（teacher-student 对齐 = 同上）
-  temporal_gap_aware_weight: 0.0  # v7: 0.1 → v8: 0.0
-  temporal_cosine_pixel_weight: 0.0  # v7: 0.5 → v8: 0.0（坍缩时梯度=0）
-
-  # ★ Decoder Conditioning Dropout
   decoder_cond_dropout: 0.6
   temporal_magnitude_temperature: 0.1
   temporal_use_spatial_weight: true
-
-  # ★ 5 个目标源的重建权重: S2, S1, Landsat, DEM, WorldCover
   source_recon_weights: [1.0, 1.0, 1.0, 0.05, 0.5]
 
   # 禁用其他损失（未调优，暂不启用）
@@ -185,9 +188,9 @@ training:
   kappa_end: 8000.0
   kappa_warmup_epochs: 0
 
-  # 学习率调度（v8: warmup 缩短到 2 epochs，4x 更快到达峰值 lr）
+  # 学习率调度（v9: warmup 1 epoch，快速到达峰值 lr）
   lr_schedule: cosine_no_restart
-  warmup_epochs: 2               # v7: 8 → v8: 2（在 step 400 达到峰值 lr=1e-4）
+  warmup_epochs: 1               # v9: 1（~200 steps 达峰值 lr=1e-4）
   recon_warmup_epochs: 0
 
   # 320 patches ÷ batch_size=2 = 160 steps/epoch（保留余量）
