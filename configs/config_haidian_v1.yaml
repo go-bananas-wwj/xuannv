@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_stats_fix_0530_v13
+  output_dir: /workspace/outputs/exp_v1_haidian_stats_fix_0530_v15
 
 data:
   dataset_type: harbin_patches
@@ -159,6 +159,10 @@ training:
   hyperspherical_uniform_weight: 0.0
   spherical_variance_weight: 0.0
   spherical_variance_min_std: 0.1
+
+  # ★ V14: 修复 temporal contrastive（正确参数名 + 适当权重）
+  # 解决：v13 temporal=0.0000 因为config使用 temporal_cosine_pixel_weight 而trainer读 temporal_contrastive_weight
+  temporal_contrastive_weight: 2.0   # 强信号，在坍缩时提供非零梯度
 
   # ★ 哈尔滨参数
   decoder_cond_dropout: 0.6

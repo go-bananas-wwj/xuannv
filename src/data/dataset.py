@@ -1120,8 +1120,16 @@ class HarbinPatchDataset(Dataset):
                 source_frames = source_frames[..., ::-1].copy()
                 target_images = target_images[..., ::-1].copy()
 
-        # 5. 双时间窗口（简化：用同一月的前后两半）
-        ts_sorted = sorted(int(t) for t in all_monthly_ts if t > 0)
+        # 5. 双时间窗口 — V14 Fix: 添加±3个月锚点扩大时间跨度
+        # 原始 all_monthly_ts 只跨越~30天（单月），gap≈0.4m，temporal contrastive 信号太弱
+        # 添加3个月前/后的合成锚点后，ts_sorted 跨越~6个月，gap≈2-3个月，信号有效
+        from datetime import datetime as _dt
+        current_ts = sorted(int(t) for t in all_monthly_ts if t > 0)
+        _m3_before_y, _m3_before_m = (year, month - 3) if month > 3 else (year - 1, month + 9)
+        _m3_after_y, _m3_after_m = (year, month + 3) if month <= 9 else (year + 1, month - 9)
+        _anchor_before = int(_dt(_m3_before_y, _m3_before_m, 15).timestamp() * 1000)
+        _anchor_after = int(_dt(_m3_after_y, _m3_after_m, 15).timestamp() * 1000)
+        ts_sorted = sorted([_anchor_before] + current_ts + [_anchor_after])
         w1_start, w1_end, w2_start, w2_end = self._sample_dual_windows(ts_sorted)
 
         # 6. 跨时相空间掩码

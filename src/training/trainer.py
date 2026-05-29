@@ -311,12 +311,17 @@ class DDPv13Trainer:
                 else:
                     consist = torch.tensor(0.0, device=self.device)
 
-                # V13: Temporal Contrastive Loss — 利用 dual window 学习时间方向
+                # V14: Temporal Contrastive Loss — 利用 dual window 学习时间方向
+                # 修复：使用 pre_norm_embedding 并先 L2 归一化再计算 cosine similarity
+                # 防止未归一化 embedding 产生数值不稳定的 dot product
                 temporal_loss = torch.tensor(0.0, device=self.device)
                 if temporal_w > 0 and has_dual:
-                    # Teacher (w1) vs Student (w2) 的 L2-norm embedding cosine similarity
-                    teacher_emb = teacher_out.embedding.detach()  # [B, D]
-                    student_emb = student_out.embedding           # [B, D]
+                    # 使用 pre_norm_embedding（训练时与 embedding 相同，但更语义清晰）
+                    teacher_emb_raw = teacher_out.pre_norm_embedding.detach()  # [B, D]
+                    student_emb_raw = student_out.pre_norm_embedding           # [B, D]
+                    # 归一化后计算 cosine similarity（值域 [-1, 1]，数值稳定）
+                    teacher_emb = F.normalize(teacher_emb_raw, dim=-1)
+                    student_emb = F.normalize(student_emb_raw, dim=-1)
                     sim = torch.sum(teacher_emb * student_emb, dim=1)  # [B]
                     
                     # 计算 w1 和 w2 的时间 gap（月份）
