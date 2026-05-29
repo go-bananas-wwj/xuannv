@@ -371,16 +371,6 @@ class DDPv13Trainer:
                         temperature=infonce_temp,
                     )
 
-                # V22: Inter-Patch Decorrelation (Barlow Twins on gathered_pre) — 防止维度坍缩
-                # 直接在 16 个全局 embedding 上计算 Barlow Twins 去相关损失
-                # erank=2 时：64 维高度相关 → decorr_inter≈2.0 → 梯度强
-                # erank=64 时：相关=0 → decorr_inter≈0 → 自然停止
-                # 关键差异：decorr_w 作用于 spatial_flat (空间捷径)；这里直接作用于全局 embedding
-                inter_decorr_w = getattr(t, 'inter_decorr_weight', 0.0)
-                inter_decorr = torch.tensor(0.0, device=self.device)
-                if inter_decorr_w > 0 and gathered_pre is not None and gathered_pre.shape[0] >= 2:
-                    inter_decorr = decorrelation_loss(gathered_pre.float())
-
                 # Classification Loss (语义监督)
                 cls_w = getattr(t, 'classification_weight', 0.0)
                 cls = torch.tensor(0.0, device=self.device)
@@ -477,6 +467,13 @@ class DDPv13Trainer:
                 inter_cov = covariance_loss(gathered_pre.float())
                 var = var + inter_var_w * inter_var
                 cov = cov + inter_var_w * inter_cov
+
+            # V22: Inter-Patch Decorrelation (Barlow Twins on gathered_pre) — 防止维度坍缩
+            # gathered_pre 已在 line 434 通过 all_gather 定义（16个全局embedding）
+            inter_decorr_w = getattr(t, 'inter_decorr_weight', 0.0)
+            inter_decorr = torch.tensor(0.0, device=self.device)
+            if inter_decorr_w > 0 and gathered_pre is not None and gathered_pre.shape[0] >= 2:
+                inter_decorr = decorrelation_loss(gathered_pre.float())
 
             # === Uniformity Loss（实验变体支持）===
             use_spatial_unif = getattr(t, 'use_spatial_uniformity', False)
