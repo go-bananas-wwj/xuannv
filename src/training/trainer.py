@@ -32,6 +32,7 @@ from src.training.losses import (
     decorrelation_loss,
     classification_loss,
     bottleneck_orthogonality_loss,
+    latent_mim_loss,
 )
 from src.training.memory_bank import EmbeddingMemoryBank
 from src.training.optimizer import build_optimizer, build_scheduler, get_cosine_lr
@@ -492,7 +493,18 @@ class DDPv13Trainer:
                 std_max = std_per_dim.max().item()
                 active_dims = (std_per_dim > 0.05).sum().item()
                 cov_offdiag = cov.item() if cov_w > 0 else 0.0
-                
+
+                # 有效秩（erank）监控 — 检测 embedding 空间坍缩
+                # 范围：1（完全坍缩）→ embedding_dim（理想均匀），目标 > dim/4
+                try:
+                    _z = gathered_pre.float()
+                    _z = _z - _z.mean(dim=0)
+                    _svs = torch.linalg.svdvals(_z.T @ _z)
+                    _p = _svs / (_svs.sum() + 1e-9)
+                    erank = torch.exp(-(_p * (_p + 1e-9).log()).sum()).item()
+                except Exception:
+                    erank = 0.0
+
                 # ★ 新增：样本间多样性诊断
                 inter_std = torch.sqrt(gathered_pre.var(dim=0, unbiased=False) + 1e-6)
                 inter_active = (inter_std > 0.05).sum().item()
@@ -510,6 +522,12 @@ class DDPv13Trainer:
             if orth_w > 0:
                 orth = bottleneck_orthogonality_loss(self.model.module.bottleneck.to_embedding.weight)
 
+            # LMIM: 潜在空间预测损失（替代像素重建的语义增强，来源：OlmoEarth/AnySat）
+            lmim_w = getattr(t, 'lmim_weight', 0.0)
+            lmim = torch.tensor(0.0, device=self.device)
+            if lmim_w > 0 and student_out.pre_norm_map is not None and teacher_out.pre_norm_map is not None:
+                lmim = latent_mim_loss(student_out.pre_norm_map, teacher_out.pre_norm_map)
+
             total = (
                 recon_w * recon_warmup * recon
                 + consist_w * consist
@@ -522,6 +540,7 @@ class DDPv13Trainer:
                 + orth_w * orth
                 + dummy_cls
                 + inter_var_w * inter_var
+                + lmim_w * lmim
             )
 
             if torch.isnan(total) or torch.isinf(total):
@@ -583,6 +602,8 @@ class DDPv13Trainer:
                 "inter_var": inter_var.item() if inter_var_w > 0 else 0.0,
                 "active_dims": float(active_dims),
                 "std_mean": float(std_mean),
+                "erank": float(erank),
+                "lmim": lmim.item(),
             }.items():
                 loss_accum[k] = loss_accum.get(k, 0.0) + v
             n_steps += 1
@@ -603,6 +624,7 @@ class DDPv13Trainer:
                       f"bank={bank_size}/{self.memory_bank.K} "
                       f"spatial=[{active_dims}/{pre_norm_map.shape[1] if pre_norm_map is not None else pre_norm.shape[1]}:{std_mean:.4f}] "
                       f"inter=[{inter_active}/{pre_norm.shape[1]}:{inter_std_mean:.4f}] "
+                      f"erank={erank:.1f} lmim={lmim.item():.4f} "
                       f"perturb=[fd={perturb_stats['frame_drop_ratio']:.2f} "
                       f"sd={perturb_stats['source_drop_ratio']:.2f}] "
                       f"lr={lr:.6f}")
@@ -693,3 +715,23 @@ class DDPv13Trainer:
             m = re.search(r'(\d+)', str(epoch))
             epoch = int(m.group(1)) if m else 0
         return epoch
+
+    def soft_restart(self, path: str) -> None:
+        """从指定 checkpoint 加载模型权重，但不恢复 epoch/optimizer 状态.
+
+        用途：跨域迁移学习（哈尔滨→海淀），保留权重、丢弃训练进度，从 epoch 0 开始。
+        """
+        ckpt = torch.load(path, map_location=self.device, weights_only=False)
+        missing, unexpected = self.model.module.load_state_dict(
+            ckpt["model_state_dict"], strict=False
+        )
+        if self.global_rank == 0:
+            print(f"[soft_restart] Loaded weights from {path}")
+            print(f"[soft_restart] Missing: {len(missing)}, Unexpected: {len(unexpected)}")
+        # 同步教师模型权重
+        self.teacher = copy.deepcopy(self.model.module)
+        self.teacher.eval()
+        for p in self.teacher.parameters():
+            p.requires_grad = False
+        if self.global_rank == 0:
+            print("[soft_restart] Teacher synced. Training starts from epoch 0.")

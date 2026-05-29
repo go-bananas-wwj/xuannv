@@ -744,3 +744,38 @@ def pixel_change_supervision_loss(
     loss = (weights * change_mask * (emb_diff - img_diff_norm).pow(2)).sum()
     loss = loss / change_mask.sum().clamp(min=1.0)
     return loss
+
+
+def latent_mim_loss(
+    student_map: torch.Tensor,
+    teacher_map: torch.Tensor,
+) -> torch.Tensor:
+    """潜在空间掩码图像建模损失 (LMIM).
+
+    用教师网络的 pre_norm_map 作为预测目标，而非原始像素值。
+    迫使模型学习语义特征，而非记忆云/传感器噪声。
+
+    来源：OlmoEarth (ECCV 2024), AnySat JEPA
+
+    Args:
+        student_map: [B, D, H, W] 学生 pre_norm_map
+        teacher_map: [B, D, H, W] 教师 pre_norm_map（将被 detach）
+
+    Returns:
+        scalar 余弦距离损失（越小越好，最小值接近 0）
+    """
+    if student_map.shape[0] < 1:
+        return student_map.new_tensor(0.0)
+
+    B, D, H, W = student_map.shape
+    # 展平空间维度: [B, D, H*W]
+    s = student_map.reshape(B, D, -1)
+    t = teacher_map.reshape(B, D, -1).detach()
+
+    # L2 归一化沿特征维度
+    s_norm = F.normalize(s, p=2, dim=1)   # [B, D, H*W]
+    t_norm = F.normalize(t, p=2, dim=1)
+
+    # 余弦相似度: [B, H*W] → 标量损失
+    cos_sim = (s_norm * t_norm).sum(dim=1)   # [B, H*W]
+    return 1.0 - cos_sim.mean()

@@ -1,0 +1,189 @@
+# ============================================================
+# xuannv 海淀嵌入底座 v1 — 改进版训练配置
+# 创建时间: 2026-05-29
+#
+# 核心改进（相比哈尔滨 Round 9 基线）:
+#   1. 集成天仪 SAR 作为第 4 路输入（X 波段，1 通道 VV）
+#   2. 启用 Barlow Twins 去相关（decorrelation_weight: 0.01）
+#   3. 启用 gap-aware 时序损失（temporal_gap_aware_weight: 0.1）
+#   4. 增强 VICReg 协方差正则（covariance_weight: 0.001 → 0.01）
+#   5. 新增 LMIM 潜在空间预测损失（lmim_weight: 0.3）
+#   6. 5 个目标源（无 dynamic_world / jrc_water，海淀数据不含）
+# ============================================================
+
+experiment:
+  name: haidian_v1_improved
+  seed: 42
+  output_dir: /workspace/outputs/exp_v1_haidian_improved_0529
+
+data:
+  dataset_type: harbin_patches
+  # ★ 指向 haidian_train 根目录（不是 /haidian 子目录），
+  #   这样 dataset.py 能在直接子目录找到 tianyi_sar/，
+  #   同时通过一层嵌套搜索找到 haidian/s2/, haidian/s1/ 等
+  manifest_path: /workspace/raw/haidian_train
+  stats_dir: /workspace/statistics/haidian_train
+  batch_size: 4
+  num_workers: 0
+  image_size: 128
+  max_frames: 32
+  num_samples: 320
+  num_classes: 11
+  input_dim: 6
+  metadata_dim: 4
+
+  # ★ 4 路输入（含天仪 SAR）
+  num_input_sources: 4
+  input_sources:
+    - s2
+    - s1
+    - landsat
+    - tianyi_sar
+
+  # ★ 每个源的实际通道数
+  source_channels:
+    s2: 6
+    s1: 2
+    landsat: 6
+    tianyi_sar: 1
+
+  # ★ 5 个目标源（海淀无 dynamic_world / jrc_water）
+  num_target_sources: 5
+  target_sources:
+    - name: s2
+      loss_type: 0        # continuous (L1)
+      sensor_src: s2
+      out_channels: 6
+    - name: s1
+      loss_type: 0
+      sensor_src: s1
+      out_channels: 2
+    - name: landsat
+      loss_type: 0
+      sensor_src: landsat
+      out_channels: 6
+    - name: dem
+      loss_type: 0
+      sensor_src: null
+      out_channels: 1
+    - name: worldcover
+      loss_type: 1        # classification (CE)
+      sensor_src: null
+      out_channels: 11
+
+  random_target_frame: true
+  spatial_augmentation: true
+  temporal_window_augmentation: true
+  temporal_window_prob: 0.5
+  temporal_window_min_frames: 4
+  temporal_window_max_frames: 24
+  preload: true
+
+  # ★ 必须保持 false——海淀数据含 2026 年帧，设 true 会全部丢失
+  filter_2025_monthly: false
+
+model:
+  input_dim: 6
+  stem_dim: 128
+  precision_dim: 128
+  time_dim: 256
+  space_dim: 256
+  embedding_dim: 128
+  time_code_dim: 64
+  window_code_dim: 64
+  relative_time_code_dim: 16
+  num_blocks: 8
+  num_heads: 8
+  vmf_kappa: 50.0
+  bottleneck_noise_scale: 0.02
+  metadata_dim: 4
+  num_sensor_types: 16   # 已预留足够类型 ID（tianyi_sar=7）
+  gradient_checkpointing: true
+  per_source_decoders: true
+  decoder_hidden_mult: 1
+  skip_l2_norm_training: true
+
+training:
+  epochs: 80
+  gradient_accumulation_steps: 1
+  lr: 0.0001
+  lr_min: 0.000001
+  weight_decay: 0.01
+  grad_clip_norm: 1.0
+
+  # ★ 损失权重
+  reconstruction_weight: 0.1
+  consistency_weight: 0.05
+  classification_weight: 0.03
+
+  # ★ P0 改进：启用 Barlow Twins（原值 0.0）
+  decorrelation_weight: 0.01
+
+  orthogonality_weight: 0.01
+  pre_norm_uniform_weight: 0.5
+
+  # ★ P0 改进：增强 VICReg 协方差正则（原值 0.001）
+  variance_weight: 0.25
+  covariance_weight: 0.01
+  vicreg_min_std: 1.0
+
+  # ★ P0 改进：启用 gap-aware 时序损失（原值 0.0）
+  temporal_gap_aware_weight: 0.1
+
+  # ★ P1 改进：新增 LMIM 潜在空间预测损失
+  lmim_weight: 0.3
+
+  # ★ 空间感知 Temporal Loss（沿用 Round 9 配置）
+  temporal_cosine_pixel_weight: 0.5
+  temporal_magnitude_temperature: 0.1
+  temporal_use_spatial_weight: true
+
+  # ★ 5 个目标源的重建权重: S2, S1, Landsat, DEM, WorldCover
+  source_recon_weights: [1.0, 1.0, 1.0, 0.05, 0.5]
+
+  # 禁用其他损失（未调优，暂不启用）
+  temporal_magnitude_weight: 0.0
+  pixel_change_supervision_weight: 0.0
+  change_consistency_weight: 0.0
+  text_contrastive_weight: 0.0
+  vicreg_weight: 0.0
+  dino_weight: 0.0
+  koleo_weight: 0.0
+  pixel_temporal_info_nce_weight: 0.0
+  l2_temporal_weight: 0.0
+  ct_reconstruction_weight: 0.0
+  aux_classification_weight: 0.0
+  bottleneck_cls_weight: 0.0
+  encoder_uniform_weight: 0.0
+
+  # Teacher-Student
+  teacher_momentum: 0.996
+  teacher_dropout_rate: 0.1
+  student_frame_drop_rate: 0.5
+  student_source_drop_rate: 0.3
+  student_front_drop_prob: 0.15
+  student_back_drop_prob: 0.15
+
+  # Kappa
+  kappa_start: 50.0
+  kappa_end: 50.0
+  kappa_warmup_epochs: 0
+
+  # 学习率调度
+  lr_schedule: cosine_no_restart
+  warmup_epochs: 8
+  recon_warmup_epochs: 0
+
+  # 320 patches ÷ batch_size=4 = 80 steps/epoch（保留余量）
+  max_steps_per_epoch: 160
+
+  # 保存
+  save_every: 20
+  save_best_balanced: true
+  best_balanced_uniform_min: 0.0
+  best_balanced_uniform_max: 0.3
+  early_stop_patience: 100
+
+evaluation:
+  knn_k: 5
+  bootstrap_samples: 100

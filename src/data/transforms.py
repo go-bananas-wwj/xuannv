@@ -39,11 +39,12 @@ SOURCE_TYPE_MAP = {
     "worldcover": 4,
     "dynamic_world": 5,
     "jrc_water": 6,
+    "tianyi_sar": 7,   # 天仪卫星 X 波段 SAR（1通道 VV，已是 dB 值）
 }
 
 # 预处理常量 (对齐原版 AEF)
 LOG_TRANSFORM_SOURCES = {"s2", "landsat", "s2_hr"}
-SAR_SOURCES = {"s1", "s1_hr"}
+SAR_SOURCES = {"s1", "s1_hr", "tianyi_sar"}   # 天仪 SAR 已是 dB 值，走同一 clip[-30,10] 分支
 SAR_CLIP_RANGE = (-30.0, 10.0)
 CATEGORICAL_SOURCES = {"worldcover", "dynamic_world"}
 SIGMA_CLIP = 6.0
@@ -167,6 +168,8 @@ def normalize_data(data: np.ndarray, source_name: str, stats: dict, num_classes:
         out = np.zeros_like(data, dtype=np.float32)
         for c in range(data.shape[0]):
             key = f"band_{c}"
+            if key not in source_stats:
+                key = f"channel_{c}"   # 兼容 compute_statistics.py 的 channel_N 格式
             if key in source_stats:
                 mean = source_stats[key]["mean"]
                 std = source_stats[key]["std"]
