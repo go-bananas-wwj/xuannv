@@ -230,6 +230,9 @@ class HarbinPatchDataset(Dataset):
         # 跨时相掩码重建配置
         self.ct_mask_ratio = getattr(d, "ct_mask_ratio", 0.3)   # 掩码比例
         self.ct_mask_patch_size = getattr(d, "ct_mask_patch_size", 8)  # 掩码 patch 尺寸
+        # MAE-style recon_mask：visible_ratio = 1 - mask_ratio，默认 75% 掩码 → 25% 可见
+        self.recon_mask_visible_ratio = 1.0 - getattr(d, "recon_mask_ratio", 0.75)
+        self.recon_mask_patch_size = getattr(d, "recon_mask_patch_size", 16)  # block 掩码大小
         
         # ★ Round 2: 跨时相重建配置
         self.cross_temporal = getattr(d, "cross_temporal", False)
@@ -895,22 +898,38 @@ class HarbinPatchDataset(Dataset):
         return mask
 
     def _generate_recon_mask(self) -> np.ndarray:
-        """V13-MAE: 生成重建掩码 [target_res, target_res].
-        
-        随机 mask 50% 的空间像素。返回 1.0 表示 visible（计算loss），
-        0.0 表示 masked（不计算loss）。
-        这样 decoder 必须依赖 embedding 才能重建被 mask 的区域，
-        常数 embedding 无法完成重建 → 结构免疫坍缩。
+        """MAE-style block 重建掩码 [target_res, target_res].
+
+        将图像分成 patch_size×patch_size 的 block，随机保留 visible_ratio 的 block 可见
+        (mask=1.0)，其余 block 掩码 (mask=0.0)。
+
+        Block 掩码比随机像素掩码更有效：decoder 无法利用邻近像素作弊，
+        必须完全依赖 embedding → 更强的结构性约束。
+        默认：75% 掩码、25% 可见（recon_mask_ratio=0.75）。
         """
-        target_res = self.image_size  # 对齐原始分辨率
-        total_pixels = target_res * target_res
-        n_visible = max(1, int(total_pixels * 0.5))  # 50% 可见
+        target_res = self.image_size
+        ps = self.recon_mask_patch_size  # block 尺寸，默认 16
+        # 将 image_size 对齐到 ps 的倍数
+        n_patches_h = target_res // ps
+        n_patches_w = target_res // ps
+        total_patches = n_patches_h * n_patches_w
+
+        n_visible = max(1, int(total_patches * self.recon_mask_visible_ratio))
+        visible_idx = random.sample(range(total_patches), n_visible)
+        visible_set = set(visible_idx)
+
         mask = np.zeros((target_res, target_res), dtype=np.float32)
-        indices = random.sample(range(total_pixels), n_visible)
-        for idx in indices:
-            h = idx // target_res
-            w = idx % target_res
-            mask[h, w] = 1.0
+        for pid in visible_set:
+            ph = pid // n_patches_w
+            pw = pid % n_patches_w
+            h0, w0 = ph * ps, pw * ps
+            mask[h0:h0 + ps, w0:w0 + ps] = 1.0
+
+        # 若 image_size 不是 ps 整除，边缘区域默认可见
+        if target_res % ps != 0:
+            mask[n_patches_h * ps:, :] = 1.0
+            mask[:, n_patches_w * ps:] = 1.0
+
         return mask
 
     def __len__(self) -> int:

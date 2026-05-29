@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_improved_0529
+  output_dir: /workspace/outputs/exp_v1_haidian_improved_0529_v2
 
 data:
   dataset_type: harbin_patches
@@ -79,6 +79,10 @@ data:
   temporal_window_max_frames: 24
   preload: true
 
+  # ★ MAE-style block 掩码（75% 掩码 → 强迫 decoder 依赖 embedding）
+  recon_mask_ratio: 0.75       # 75% 的 block 被掩码
+  recon_mask_patch_size: 16    # 每个 block 16×16 像素（128/16=8×8=64 个 block）
+
   # ★ 必须保持 false——海淀数据含 2026 年帧，设 true 会全部丢失
   filter_2025_monthly: false
 
@@ -116,14 +120,16 @@ training:
   consistency_weight: 0.05
   classification_weight: 0.03
 
-  # ★ P0 改进：启用 Barlow Twins（原值 0.0）
-  decorrelation_weight: 0.01
+  # ★ P0 改进：启用 Barlow Twins（降低权重，避免主导损失）
+  decorrelation_weight: 0.001
 
   orthogonality_weight: 0.01
-  pre_norm_uniform_weight: 0.5
+  # ★ 关键修复：必须设 use_pre_norm_uniform: true 才能激活 raw_uniformity_loss
+  use_pre_norm_uniform: true
+  pre_norm_uniform_weight: 3.0
 
-  # ★ P0 改进：增强 VICReg 协方差正则（原值 0.001）
-  variance_weight: 0.25
+  # ★ P0 改进：增强 VICReg 协方差正则（恢复默认强度）
+  variance_weight: 1.0
   covariance_weight: 0.01
   vicreg_min_std: 1.0
 
