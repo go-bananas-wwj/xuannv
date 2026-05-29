@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_improved_0529_v2
+  output_dir: /workspace/outputs/exp_v1_haidian_hsph_0529_v3
 
 data:
   dataset_type: harbin_patches
@@ -23,7 +23,7 @@ data:
   #   同时通过一层嵌套搜索找到 haidian/s2/, haidian/s1/ 等
   manifest_path: /workspace/raw/haidian_train
   stats_dir: /workspace/statistics/haidian_train
-  batch_size: 4
+  batch_size: 2
   num_workers: 0
   image_size: 128
   max_frames: 24
@@ -109,7 +109,7 @@ model:
 
 training:
   epochs: 80
-  gradient_accumulation_steps: 1
+  gradient_accumulation_steps: 2
   lr: 0.0001
   lr_min: 0.000001
   weight_decay: 0.01
