@@ -228,6 +228,9 @@ class TrainingConfig:
     hyperspherical_uniform_weight: float = 0.0
     # Decoder Conditioning Dropout — 随机清零时间条件码，防decoder依赖时间码走捷径
     decoder_cond_dropout: float = 0.0
+    # 球面方差正则 — 在 L2 归一化 embedding 上强制各维度方差 ≥ min_std（补充 pairwise_cosine 从维度角度防坍缩）
+    spherical_variance_weight: float = 0.0
+    spherical_variance_min_std: float = 0.1
 
 
 @dataclass

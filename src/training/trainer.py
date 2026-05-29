@@ -26,6 +26,7 @@ from src.training.losses import (
     batch_uniformity_loss_l2,
     raw_uniformity_loss,
     hyperspherical_uniformity_loss,
+    pairwise_cosine_diversity_loss,
     consistency_loss,
     consistency_loss_spatial,
     variance_regularizer,
@@ -508,17 +509,30 @@ class DDPv13Trainer:
                 else:
                     hsph_pixel = torch.tensor(0.0, device=self.device)
 
-                # Part B: 全局平均级（pre_norm_embedding [B,D]，防止 patch 间全局方向坍缩）
+                # Part B: 全局平均级 — 使用 pairwise cosine（坍缩时梯度非零，与 Wang-Isola 相比更稳健）
+                # ★ 关键修复: Wang-Isola 在完全坍缩时 zi-zj≈0 → 梯度≈0（无法逃脱陷阱）
+                #             pairwise_cosine 梯度 = 其他样本均值方向，坍缩时非零 ✓
                 if dist.is_initialized() and self.world_size > 1:
                     gathered_global = [torch.zeros_like(pre_norm) for _ in range(self.world_size)]
                     dist.all_gather(gathered_global, pre_norm)
                     gathered_global = torch.cat(gathered_global, dim=0)
                 else:
                     gathered_global = pre_norm
-                hsph_global = hyperspherical_uniformity_loss(gathered_global.float())
+                hsph_global = pairwise_cosine_diversity_loss(gathered_global.float())
 
-                # 两级别加权合并（全局级权重加倍，因为 erank 是全局度量的）
+                # 两级别加权合并
+                # hsph_pixel ∈ [-∞,0]（更负=更好），hsph_global ∈ [-1,1]（更小=更好）
+                # total += w * (0.5*px + 1.5*g)：坍缩时 g≈1 → 正值 → 优化器推散; 正常时 g≈0 → 负值 ✓
                 hsph_uniform = 0.5 * hsph_pixel + 1.5 * hsph_global
+
+            # ★ 球面方差正则化：在 L2 归一化后的 embedding 上强制各维度方差 ≥ min_std
+            # 补充 Wang-Isola 损失，从"维度填充"角度防止坍缩（各维度信息量均等）
+            spherical_var_w = getattr(t, 'spherical_variance_weight', 0.0)
+            spherical_var = torch.tensor(0.0, device=self.device)
+            if spherical_var_w > 0 and gathered_pre.shape[0] >= 2:
+                z_sph = F.normalize(gathered_pre.float(), p=2, dim=1)  # [N, D] 单位球面
+                sph_min_std = getattr(t, 'spherical_variance_min_std', 0.1)
+                spherical_var = variance_regularizer(z_sph, min_std=sph_min_std)
 
             # Per-dim 诊断（日志用）
             # ★ FIX: 使用 gathered_spatial_map 计算 active，与 spatial_vicreg 一致
@@ -577,6 +591,7 @@ class DDPv13Trainer:
                 + cov_w * cov
                 + l2_uniform_w * l2_uniform
                 + hsph_uniform_w * hsph_uniform
+                + spherical_var_w * spherical_var
                 + decorr_w * decorr
                 + orth_w * orth
                 + dummy_cls
@@ -662,6 +677,7 @@ class DDPv13Trainer:
                       f"decorr={decorr.item():.4f} orth={orth.item():.4f} "
                       f"l2unif={l2_uniform.item():.4f} "
                       f"hsph={hsph_uniform.item():.4f}(px={hsph_pixel.item():.2f},g={hsph_global.item():.2f}) "
+                      f"sphvar={spherical_var.item():.4f} "
                       f"inter_var={inter_var.item():.4f} "
                       f"bank={bank_size}/{self.memory_bank.K} "
                       f"spatial=[{active_dims}/{pre_norm_map.shape[1] if pre_norm_map is not None else pre_norm.shape[1]}:{std_mean:.4f}] "

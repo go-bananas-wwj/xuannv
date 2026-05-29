@@ -86,6 +86,30 @@ def hyperspherical_uniformity_loss(embeddings: torch.Tensor) -> torch.Tensor:
     loss = torch.logsumexp(-t * sq_pdist_pairs, dim=0) - math.log(sq_pdist_pairs.shape[0])
     return loss
 
+def pairwise_cosine_diversity_loss(embeddings: torch.Tensor) -> torch.Tensor:
+    """均值两两余弦相似度损失 — 坍缩时梯度非零，直接防止方向坍缩.
+
+    与 hyperspherical_uniformity_loss 的关键区别:
+    - Wang-Isola: 在完全坍缩（zi≈zj）时，zi-zj≈0，梯度=0，无法逃脱坍缩陷阱
+    - 本损失: 梯度 = 其他样本的归一化方向均值，即使完全坍缩时也非零
+
+    值域: [-1, 1]
+      -1: 所有样本完全反相关（理想）
+       0: 样本正交（好）
+      +1: 所有样本完全对齐（坍缩）
+
+    坍缩时 loss≈1.0, 梯度=非零 → 持续推散
+    理想分布时 loss≈0, 梯度趋近0 → 自然停止
+    """
+    if embeddings.shape[0] < 2:
+        return embeddings.new_tensor(0.0)
+
+    z = F.normalize(embeddings, p=2, dim=1)
+    gram = z @ z.T  # [N,N]，值域 [-1,1]
+    mask = torch.triu(torch.ones(z.shape[0], z.shape[0], device=z.device, dtype=torch.bool), diagonal=1)
+    return gram[mask].mean()
+
+
 def batch_uniformity_loss_l2(embeddings: torch.Tensor, dim_dropout: float = 0.1,
                                  max_samples: int = 512) -> torch.Tensor:
     """改进版 Batch Uniformity Loss — All-Pairs + 空间采样 + 维度 Dropout.

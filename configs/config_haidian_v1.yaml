@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_hsph_0529_v5
+  output_dir: /workspace/outputs/exp_v1_haidian_hsph_0529_v6
 
 data:
   dataset_type: harbin_patches
@@ -120,17 +120,20 @@ training:
   consistency_weight: 0.05
   classification_weight: 0.03
 
-  # ★ P0 改进：启用 Barlow Twins（降低权重，避免主导损失）
-  decorrelation_weight: 0.05
+  # ★ P0 改进：Barlow Twins 权重提升（0.05→0.2，之前无效因为太弱）
+  decorrelation_weight: 0.2
 
   orthogonality_weight: 0.01
   # ★ 关键修复：必须设 use_pre_norm_uniform: true 才能激活 raw_uniformity_loss
   use_pre_norm_uniform: true
   pre_norm_uniform_weight: 8.0
-  # ★ 球面 Uniformity Loss — 作用于 pre_norm_map 像素级采样，直接防方向坍缩
+  # ★ 球面 Uniformity Loss — 像素级用 Wang-Isola，全局级用 pairwise_cosine（坍缩时梯度非零）
   hyperspherical_uniform_weight: 15.0
-  # ★ Decoder Conditioning Dropout — 防止decoder依赖时间码走捷径重建
-  decoder_cond_dropout: 0.3
+  # ★ 球面方差正则 — L2 归一化后各维度 std ≥ 0.1（补充 pairwise_cosine 从维度角度防坍缩）
+  spherical_variance_weight: 3.0
+  spherical_variance_min_std: 0.1
+  # ★ Decoder Conditioning Dropout — 提升到 0.6，更强迫 decoder 依赖 embedding
+  decoder_cond_dropout: 0.6
 
   # ★ P0 改进：增强 VICReg 协方差正则（恢复默认强度）
   variance_weight: 1.0
