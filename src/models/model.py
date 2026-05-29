@@ -388,15 +388,19 @@ class AEFModel(nn.Module):
         aux_logits = self.aux_cls_head(summary_pooled)
         bottleneck_logits = self.bottleneck_cls_head(pre_norm)
 
-        # ★ 实例判别头: 作用于 pre_norm_map 的全部空间 token（不做 GAP）
-        # 关键修复：GAP 坍缩时不同 patch 的梯度互相抵消；空间 token 级别的梯度可突破坍缩
+        # ★ 实例判别头: 使用 Global Max Pooling（GMP）代替 GAP 和空间 token
+        # 根因修复：
+        #   GAP PID: mean(pre_norm_map)=z* → 不同patch梯度互消 → 无效 (v1-v9)
+        #   All-token PID: 驱动模型把判别信息压缩到1维 → erank从6→1.2 (v10)
+        #   GMP PID: max(pre_norm_map) 不受零均值对称约束
+        #            即使 mean(pre_norm_map)=z* for all patches，
+        #            max 值仍然 patch-specific（不同土地覆盖→不同最大激活）
         if self.patch_id_head is not None and pre_norm_map is not None:
-            _B, _D, _H, _W = pre_norm_map.shape
-            _HW = _H * _W
-            # [B, D, H, W] → [B*H*W, D]（所有空间 token 展开）
-            _tokens = pre_norm_map.permute(0, 2, 3, 1).reshape(_B * _HW, _D)
-            patch_id_logits = self.patch_id_head(_tokens)  # [B*H*W, num_patches]
-            patch_id_spatial_hw = _HW
+            # Global Max Pooling: [B, D, H, W] → [B, D]
+            _gmp_h = pre_norm_map.max(dim=-1)[0]     # [B, D, H]
+            _gmp = _gmp_h.max(dim=-1)[0]              # [B, D]
+            patch_id_logits = self.patch_id_head(_gmp)  # [B, num_patches]
+            patch_id_spatial_hw = 1  # single vector per sample
         else:
             patch_id_logits = None
             patch_id_spatial_hw = 1

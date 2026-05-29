@@ -14,7 +14,7 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_spatialpid_0530_v10
+  output_dir: /workspace/outputs/exp_v1_haidian_gmppid_0530_v11
 
 data:
   dataset_type: harbin_patches
@@ -115,31 +115,30 @@ training:
   weight_decay: 0.01
   grad_clip_norm: 1.0
 
-  # ★★★ v10 架构级修复：空间 token 级别的实例判别（突破 GAP 坍缩）
+  # ★★★ v11 架构级修复：GMP-PID + Spatial VICReg（双管齐下）
   #
-  # v9 诊断结论（最终根因）：
-  #   inter=[44-63/64] 高（空间多样性存在）但 inter_var=0（GAP 后消失）
-  #   PID 作用在 GAP 向量上，当所有 patch 的 GAP=z* 时，不同 patch 的梯度方向相互矛盾
-  #   → 梯度在 encoder 处完全抵消 → PID 无法打破 GAP 坍缩（v1-v9 共同失败根因）
+  # v10 诊断：空间 token PID 把判别信息压缩到 1 个维度（erank 6→1.2）
+  #   原因：PID 最优解 = 找 1 个方向区分所有 patch → 维度坍缩
   #
-  # v10 修复：
-  #   patch_id_head 现在作用于 pre_norm_map 的全部 H×W 空间 token（不做 GAP）
-  #   每个空间 token 独立预测所属 patch ID → 利用已存在的空间多样性 → 梯度不再抵消
-  #   等效于 DenseCL / PixelContrast 风格的像素级对比
+  # v11 两步修复：
+  #   1. GMP-PID: max 聚合比 GAP/all-token 更 patch-specific
+  #      即使 GAP=z* for all patches，max 值仍然不同（土地覆盖→不同最大激活）
+  #   2. Spatial VICReg (use_spatial_vicreg=true): 在 [B*H*W, D] 空间 token 上计算
+  #      保证所有 64 维度都被激活，防止 PID 引发的维度坍缩
 
-  # ★ 主驱动力：空间 token 级实例判别
+  # ★ 主驱动力：GMP 实例判别
   patch_id_loss_weight: 5.0
   patch_id_num_patches: 320
 
-  # ★ 辅助：VICReg 方差正则（防止维度死亡）
-  variance_weight: 0.1
-
-  # ★ 关闭所有坍缩诱因和数值不稳定项
-  decorrelation_weight: 0.0       # v9 decorr=17-35 数值不稳定（除以近零 std）
+  # ★ 辅助：Spatial VICReg（核心新增：在 H×W 空间 token 上维持维度多样性）
+  use_spatial_vicreg: true         # v10: false → v11: true
+  variance_weight: 0.2             # 略微提高（spatial token 数量大，梯度相对小）
   covariance_weight: 0.01
-  orthogonality_weight: 0.01
+  vicreg_min_std: 0.3              # 降低阈值（spatial token std 本身较小）
 
-  # ★ 重建关闭（坍缩根因）
+  # ★ 关闭所有坍缩诱因和数值不稳定项（与 v10 相同）
+  decorrelation_weight: 0.0
+  orthogonality_weight: 0.01
   reconstruction_weight: 0.0
   classification_weight: 0.0
   consistency_weight: 0.0
@@ -147,13 +146,11 @@ training:
   temporal_gap_aware_weight: 0.0
   temporal_cosine_pixel_weight: 0.0
 
-  # ★ 保持 v8/v9 清零的项
   use_pre_norm_uniform: false
   pre_norm_uniform_weight: 0.0
   hyperspherical_uniform_weight: 0.0
   spherical_variance_weight: 0.0
   spherical_variance_min_std: 0.1
-  vicreg_min_std: 1.0
 
   decoder_cond_dropout: 0.6
   temporal_magnitude_temperature: 0.1
