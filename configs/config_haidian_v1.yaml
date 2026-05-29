@@ -98,7 +98,7 @@ model:
   relative_time_code_dim: 16
   num_blocks: 8
   num_heads: 8
-  vmf_kappa: 50.0
+  vmf_kappa: 8000.0
   bottleneck_noise_scale: 0.02
   metadata_dim: 4
   num_sensor_types: 16   # 已预留足够类型 ID（tianyi_sar=7）
@@ -170,9 +170,9 @@ training:
   student_front_drop_prob: 0.15
   student_back_drop_prob: 0.15
 
-  # Kappa
-  kappa_start: 50.0
-  kappa_end: 50.0
+  # Kappa（D=128 维时，需足够大才能保证推理 embedding 方向稳定）
+  kappa_start: 8000.0
+  kappa_end: 8000.0
   kappa_warmup_epochs: 0
 
   # 学习率调度
