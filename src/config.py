@@ -222,6 +222,8 @@ class TrainingConfig:
     expander_dim: int = 0
     # 跨时相掩码重建
     ct_reconstruction_weight: float = 0.0
+    # LMIM：潜在空间掩码预测损失（OlmoEarth/AnySat JEPA 风格）
+    lmim_weight: float = 0.0
 
 
 @dataclass
