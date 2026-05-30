@@ -505,13 +505,10 @@ class DDPv13Trainer:
                 l2_uniform_w = pre_norm_uniform_w
             elif use_pre_norm_unif and pre_norm_uniform_w > 0:
                 # Pre-norm raw uniformity（欧氏空间，无 L2 Jacobian 屏障）
-                if dist.is_initialized() and self.world_size > 1:
-                    gathered_pre_unif = [torch.zeros_like(pre_norm) for _ in range(self.world_size)]
-                    dist.all_gather(gathered_pre_unif, pre_norm)
-                    gathered_pre_unif = torch.cat(gathered_pre_unif, dim=0)
-                else:
-                    gathered_pre_unif = pre_norm
-                l2_uniform = raw_uniformity_loss(gathered_pre_unif.float())
+                # ★ 使用 all_pre（含 memory bank，~528样本）而非 gathered_pre（16样本）
+                # 样本数更多 → 梯度信噪比高 ~30倍，uniformity 对坍缩的抵抗力更强
+                # 对齐 archive/ddp_xuannv_v2_trainer.py（exp_v2 成功的实现）
+                l2_uniform = raw_uniformity_loss(all_pre.float())
                 l2_uniform_w = pre_norm_uniform_w
             elif use_spatial_unif and l2_uniform_w > 0:
                 # Spatial uniformity on embedding_map [B, D, H, W]
