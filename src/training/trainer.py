@@ -198,10 +198,12 @@ class DDPv13Trainer:
         bank_size = getattr(cfg.training, 'memory_bank_size', 512)
         self.memory_bank = EmbeddingMemoryBank(K=bank_size, dim=emb_dim, device=self.device)
         
-        # 日志文件句柄（用于 step 日志同时写入文件）
+        # 日志文件句柄（用于 step 日志同时写入文件），文件名含时间戳避免多次训练混写
         self.log_file = None
         if self.global_rank == 0:
-            self.log_file = open(self.output_dir / "train.log", "a", buffering=1, encoding="utf-8")
+            from datetime import datetime
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.log_file = open(self.output_dir / f"train_{ts}.log", "a", buffering=1, encoding="utf-8")
 
     @torch.no_grad()
     def update_teacher(self) -> None:
