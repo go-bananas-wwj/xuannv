@@ -148,7 +148,7 @@ def _preload_patch_worker(args: tuple) -> tuple[str, dict, int]:
     for tgt_name, loss_type, sensor_src in target_sources:
         if tgt_name in cache_entry:
             continue
-        if tgt_name in ("dem", "worldcover", "jrc_water"):
+        if tgt_name in ("dem", "worldcover", "jrc_water", "dynamic_world"):
             src_dir = _resolve(tgt_name, patch_id)
             if src_dir is not None:
                 tif_files = sorted(src_dir.glob("*.tif"))
@@ -162,22 +162,6 @@ def _preload_patch_worker(args: tuple) -> tuple[str, dict, int]:
                         data = _pad_channels(data, reconstruction_channels)
                         cache_entry[tgt_name] = (data[np.newaxis, ...], np.array([0.0]))
                         n_cached += 1
-        elif tgt_name == "dynamic_world":
-            src_dir = _resolve(tgt_name, patch_id)
-            if src_dir is not None:
-                tif_files = sorted(src_dir.glob("*.tif"))
-                frames_list = []
-                ts_list = []
-                for tf in tif_files:
-                    d = read_tif(tf, image_size)
-                    if d is not None:
-                        d = normalize_data(d, tgt_name, stats, num_classes)
-                        d = _pad_channels(d, reconstruction_channels)
-                        frames_list.append(d)
-                        ts_list.append(float(label_to_timestamp_ms(tf.stem)))
-                if frames_list:
-                    cache_entry[tgt_name] = (np.stack(frames_list), np.array(ts_list, dtype=np.float64))
-                    n_cached += 1
 
     return patch_id, cache_entry, n_cached
 
@@ -480,7 +464,7 @@ class HarbinPatchDataset(Dataset):
                 for tgt_name, loss_type, sensor_src in self.target_sources:
                     if tgt_name in self._cache[patch_id]:
                         continue
-                    if tgt_name in ("dem", "worldcover", "jrc_water"):
+                    if tgt_name in ("dem", "worldcover", "jrc_water", "dynamic_world"):
                         src_dir = self._resolve_source_dir(tgt_name, patch_id)
                         if src_dir is not None:
                             tif_files = sorted(src_dir.glob("*.tif"))
@@ -494,22 +478,6 @@ class HarbinPatchDataset(Dataset):
                                     data = self._pad_channels(data, self.reconstruction_channels)
                                     self._cache[patch_id][tgt_name] = (data[np.newaxis, ...], np.array([0.0]))
                                     n_cached += 1
-                    elif tgt_name == "dynamic_world":
-                        src_dir = self._resolve_source_dir(tgt_name, patch_id)
-                        if src_dir is not None:
-                            tif_files = sorted(src_dir.glob("*.tif"))
-                            frames_list = []
-                            ts_list = []
-                            for tf in tif_files:
-                                d = read_tif(tf, self.image_size)
-                                if d is not None:
-                                    d = self._normalize(d, tgt_name)
-                                    d = self._pad_channels(d, self.reconstruction_channels)
-                                    frames_list.append(d)
-                                    ts_list.append(float(label_to_timestamp_ms(tf.stem)))
-                            if frames_list:
-                                self._cache[patch_id][tgt_name] = (np.stack(frames_list), np.array(ts_list, dtype=np.float64))
-                                n_cached += 1
         elapsed = time.time() - start
         print(f"[Dataset] Pre-loaded {len(self.patches)} patches, {n_cached} sources in {elapsed:.1f}s ({elapsed/60:.1f}min)")
 

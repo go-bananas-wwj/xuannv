@@ -49,15 +49,33 @@ SAR_CLIP_RANGE = (-30.0, 10.0)
 CATEGORICAL_SOURCES = {"worldcover", "dynamic_world"}
 SIGMA_CLIP = 6.0
 
-# WorldCover / Dynamic World 类别映射
+# WorldCover / Dynamic World / IO-LULC 类别映射
 WC_NUM_CLASSES = 11
 DW_NUM_CLASSES = 9
 WC_CLASS_MAP = {
     10: 0, 20: 1, 30: 2, 40: 3, 50: 4, 60: 5, 70: 6, 80: 7, 90: 8, 95: 9, 100: 10,
 }
+# Google Dynamic World 原始类别 (0-8, 如使用 GEE 数据)
 DW_CLASS_MAP = {
     0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8,
 }
+# IO-LULC Annual V2 类别（1-11 非连续）→ 0-based 9类
+# 来源：Esri/Impact Observatory 10m LULC
+# 1=Water, 2=Trees, 4=Flooded Veg, 5=Crops, 7=Built, 8=Bare, 9=Snow, 10=Clouds, 11=Rangeland
+IOLULC_CLASS_MAP = {
+    0: 0,   # background
+    1: 1,   # Water
+    2: 2,   # Trees
+    4: 3,   # Flooded Vegetation
+    5: 4,   # Crops
+    7: 5,   # Built Area（海淀主导类别）
+    8: 6,   # Bare Ground
+    9: 7,   # Snow/Ice
+    10: 0,  # Clouds → background（忽略）
+    11: 8,  # Rangeland
+}
+# JRC 全球地表水：连续值 0-100（水体出现频率 %）
+JRC_WATER_CLIP = (0.0, 100.0)
 
 
 # ---------------------------------------------------------------------------
@@ -197,15 +215,22 @@ def normalize_data(data: np.ndarray, source_name: str, stats: dict, num_classes:
 
 def _normalize_categorical(data: np.ndarray, source_name: str) -> np.ndarray:
     """分类源: class index → one-hot 编码 (num_classes, H, W)."""
-    class_map = WC_CLASS_MAP if source_name == "worldcover" else DW_CLASS_MAP
-    num_classes = WC_NUM_CLASSES if source_name == "worldcover" else DW_NUM_CLASSES
+    if source_name == "worldcover":
+        class_map = WC_CLASS_MAP
+        num_classes = WC_NUM_CLASSES
+    elif source_name == "dynamic_world":
+        # 使用 IO-LULC Annual V2 映射（1-11 非连续 → 0-based 9类）
+        class_map = IOLULC_CLASS_MAP
+        num_classes = DW_NUM_CLASSES
+    else:
+        class_map = DW_CLASS_MAP
+        num_classes = DW_NUM_CLASSES
 
     if data.ndim == 3:
         data = data[0:1]
     label = data[0].astype(np.int64)
     H, W = label.shape
     one_hot = np.zeros((num_classes, H, W), dtype=np.float32)
-    valid = (label >= 0)
     # 将原始值映射到类别索引
     mapped = np.full_like(label, -1, dtype=np.int64)
     for val, idx in class_map.items():
