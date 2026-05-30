@@ -153,7 +153,7 @@ def _build_student_view(
 class DDPv13Trainer:
     """DDP 训练器 — Teacher-Student + 反坍缩损失体系."""
 
-    def __init__(self, cfg: Config, local_rank: int = 0) -> None:
+    def __init__(self, cfg: Config, local_rank: int = 0, log_ts: str | None = None) -> None:
         self.cfg = cfg
         self.local_rank = local_rank
         self.device = torch.device(f"npu:{local_rank}")
@@ -199,10 +199,11 @@ class DDPv13Trainer:
         self.memory_bank = EmbeddingMemoryBank(K=bank_size, dim=emb_dim, device=self.device)
         
         # 日志文件句柄（用于 step 日志同时写入文件），文件名含时间戳避免多次训练混写
+        # log_ts 由 train.py 传入（rank 0 广播），确保与启动日志在同一文件
         self.log_file = None
         if self.global_rank == 0:
             from datetime import datetime
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            ts = log_ts if log_ts else datetime.now().strftime("%Y%m%d_%H%M%S")
             self.log_file = open(self.output_dir / f"train_{ts}.log", "a", buffering=1, encoding="utf-8")
 
     @torch.no_grad()

@@ -80,8 +80,16 @@ def main():
     world_size = dist.get_world_size()
 
     cfg = load_config(args.config)
+    # 时间戳由 rank 0 生成后广播，确保所有 rank 使用同一文件名
     from datetime import datetime
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    import torch
+    ts_tensor = torch.zeros(15, dtype=torch.uint8, device=f"npu:{local_rank}")
+    if global_rank == 0:
+        ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        for i, c in enumerate(ts_str):
+            ts_tensor[i] = ord(c)
+    dist.broadcast(ts_tensor, src=0)
+    ts = "".join(chr(int(ts_tensor[i])) for i in range(15))
     log_path = Path(cfg.experiment.output_dir) / f"train_{ts}.log"
     logger = FileLogger(str(log_path), global_rank)
 
@@ -129,8 +137,8 @@ def main():
         rank=global_rank,
     )
 
-    # Trainer
-    trainer = DDPv13Trainer(cfg, local_rank=local_rank)
+    # Trainer（传入同一 ts，确保 step 日志与启动日志写入同一文件）
+    trainer = DDPv13Trainer(cfg, local_rank=local_rank, log_ts=ts)
 
     start_epoch = 0
     if args.soft_restart:

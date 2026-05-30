@@ -32,14 +32,11 @@ class EmbeddingMemoryBank:
         """将当前 batch 的 embedding 入队.
 
         Args:
-            embeddings: [B, D] L2-normalized embedding
+            embeddings: [B, D] pre-norm embedding（不做 L2 归一化，保持与 gathered_pre 同一空间）
         """
         B = embeddings.shape[0]
         if B == 0:
             return
-
-        # 确保是 L2 归一化的
-        embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=-1)
 
         # 环形写入
         for i in range(B):
