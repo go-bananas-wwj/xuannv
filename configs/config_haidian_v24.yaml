@@ -156,6 +156,8 @@ training:
   temporal_magnitude_weight: 0.0
   pixel_change_supervision_weight: 0.0
   change_consistency_weight: 0.0
+  # Memory Bank — K=1024：N=1040 >> D=64，协方差满秩，staleness 刷新周期=64步
+  memory_bank_size: 1024
   text_contrastive_weight: 0.0
   vicreg_weight: 0.0
   dino_weight: 0.0

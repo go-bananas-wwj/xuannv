@@ -193,9 +193,10 @@ class DDPv13Trainer:
             device=self.device,
         )
 
-        # Memory Bank — 扩大 pre-norm 有效 batch
+        # Memory Bank — 扩大 pre-norm 有效 batch（大小从 config 读取）
         emb_dim = getattr(cfg.model, 'embedding_dim', 128)
-        self.memory_bank = EmbeddingMemoryBank(K=512, dim=emb_dim, device=self.device)
+        bank_size = getattr(cfg.training, 'memory_bank_size', 512)
+        self.memory_bank = EmbeddingMemoryBank(K=bank_size, dim=emb_dim, device=self.device)
         
         # 日志文件句柄（用于 step 日志同时写入文件）
         self.log_file = None
@@ -598,9 +599,10 @@ class DDPv13Trainer:
                 cov_offdiag = cov.item() if cov_w > 0 else 0.0
 
                 # 有效秩（erank）监控 — 检测 embedding 空间坍缩
-                # 范围：1（完全坍缩）→ embedding_dim（理想均匀），目标 > dim/4
+                # 使用 all_pre（含 memory bank，N >> D=64），协方差矩阵满秩，可测真实维度利用率
+                # 范围：1（完全坍缩）→ D=embedding_dim（理想均匀），目标 > D/2 = 32
                 try:
-                    _z = gathered_pre.float()
+                    _z = all_pre.float()
                     _z = _z - _z.mean(dim=0)
                     _svs = torch.linalg.svdvals(_z.T @ _z)
                     _p = _svs / (_svs.sum() + 1e-9)

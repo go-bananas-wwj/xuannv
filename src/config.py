@@ -242,6 +242,9 @@ class TrainingConfig:
     # 坍缩时 CE = log(N)，对每个 patch 方向不同 → 真正打破坍缩的核心机制
     patch_id_loss_weight: float = 0.0
     patch_id_num_patches: int = 0  # 0 = 禁用
+    # Memory Bank — 扩大 uniformity loss 的有效 batch
+    # K 越大梯度越稳定，但 uniformity O(N²) 会变慢；建议 512-1024
+    memory_bank_size: int = 512
 
 
 @dataclass

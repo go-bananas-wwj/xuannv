@@ -80,7 +80,9 @@ def main():
     world_size = dist.get_world_size()
 
     cfg = load_config(args.config)
-    log_path = Path(cfg.experiment.output_dir) / "train.log"
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = Path(cfg.experiment.output_dir) / f"train_{ts}.log"
     logger = FileLogger(str(log_path), global_rank)
 
     # 覆盖参数
