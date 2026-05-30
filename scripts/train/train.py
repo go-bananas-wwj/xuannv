@@ -82,7 +82,6 @@ def main():
     cfg = load_config(args.config)
     # 时间戳由 rank 0 生成后广播，确保所有 rank 使用同一文件名
     from datetime import datetime
-    import torch
     ts_tensor = torch.zeros(15, dtype=torch.uint8, device=f"npu:{local_rank}")
     if global_rank == 0:
         ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")

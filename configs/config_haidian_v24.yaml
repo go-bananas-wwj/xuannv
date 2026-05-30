@@ -28,7 +28,7 @@ data:
   dataset_type: harbin_patches
   manifest_path: /workspace/raw/haidian_train
   stats_dir: /workspace/statistics/haidian_train
-  batch_size: 2
+  batch_size: 4
   num_workers: 0
   image_size: 128
   max_frames: 24
@@ -190,7 +190,7 @@ training:
   warmup_epochs: 10               # exp_v2: 10 epochs（比v1的2更稳定）
   recon_warmup_epochs: 0
 
-  # 320 patches ÷ batch_size=2 = 160 steps/epoch
+  # 320 patches ÷ batch_size=4 = 80 steps/epoch（effective batch=64: 4×8卡×2 accum）
   max_steps_per_epoch: 200
 
   # 保存
