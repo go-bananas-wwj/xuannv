@@ -59,6 +59,11 @@ def compute_source_stats(data_root: Path, source_name: str, s2_dir: str,
                 if all_samples and data.shape != all_samples[0].shape:
                     continue
 
+                # jrc_water: -128 是 nodata，替换为 nan
+                if source_name == "jrc_water":
+                    data = data.astype(np.float32)
+                    data[data == -128] = np.nan
+
                 # 光学源：log(x+1)/10 变换
                 if source_name in {"s2", "s2_hr", "landsat"}:
                     if data.max() < 2.0:
