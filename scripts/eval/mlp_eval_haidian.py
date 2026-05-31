@@ -348,10 +348,14 @@ def fewshot_experiment(X_train_full: np.ndarray, y_train_full: np.ndarray,
                        pixel_budgets: list[int]) -> dict:
     """用不同数量的训练像素训练 MLP，绘制 few-shot 学习曲线。"""
     results = {}
+    done_full = False
     for budget in pixel_budgets:
         if budget >= len(X_train_full):
+            if done_full:
+                continue  # 跳过重复的"全量"实验
             X_tr, y_tr = X_train_full, y_train_full
             label = "full"
+            done_full = True
         else:
             # 按类别均匀采样（每类 budget // num_classes，不足则用实际有的）
             selected = []
