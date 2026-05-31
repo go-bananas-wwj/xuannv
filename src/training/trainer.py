@@ -37,6 +37,8 @@ from src.training.losses import (
     latent_mim_loss,
     inter_patch_infonce_loss,
     erank_maximization_loss,
+    coding_rate_loss,
+    gap_aware_temporal_cosine_loss,
 )
 from src.training.memory_bank import EmbeddingMemoryBank
 from src.training.optimizer import build_optimizer, build_scheduler, get_cosine_lr
@@ -237,6 +239,8 @@ class DDPv13Trainer:
         recon_w = t.reconstruction_weight
         consist_w = getattr(t, 'consistency_weight', 0.0)
         temporal_w = getattr(t, 'temporal_contrastive_weight', 0.0)
+        temporal_gap_aware_w = getattr(t, 'temporal_gap_aware_weight', 0.0)
+        coding_rate_w = getattr(t, 'coding_rate_weight', 0.0)
         use_l2_vicreg = getattr(t, 'use_l2_space_vicreg', False)
         uniform_w = getattr(t, 'batch_uniformity_weight', 0.0)
         recon_warmup = min(1.0, (epoch + 1) / max(getattr(t, 'recon_warmup_epochs', 10), 1))
@@ -275,6 +279,9 @@ class DDPv13Trainer:
                         target_source_idx=batch.get("target_source_idx"),
                         target_valid_start_ms=batch.get("target_valid_start_ms"),
                         target_valid_end_ms=batch.get("target_valid_end_ms"),
+                        dual_window=has_dual,
+                        valid_start_w2=batch.get("valid_start_w2") if has_dual else None,
+                        valid_end_w2=batch.get("valid_end_w2") if has_dual else None,
                     )
 
                 # Student forward: 扰动输入
@@ -295,14 +302,17 @@ class DDPv13Trainer:
                     source_frame_mask=student_frame_mask,
                     source_input_mask=student_input_mask,
                     source_type_ids=batch["source_type_ids"],
-                    valid_start_ms=batch["valid_start_ms"],
-                    valid_end_ms=batch["valid_end_ms"],
+                    valid_start_ms=batch["valid_start_w1"] if has_dual else batch["valid_start_ms"],
+                    valid_end_ms=batch["valid_end_w1"] if has_dual else batch["valid_end_ms"],
                     target_relative_time=batch["target_relative_time"],
                     target_metadata=batch["target_metadata"],
                     target_loss_type=batch.get("target_loss_type"),
                     target_source_idx=batch.get("target_source_idx"),
                     target_valid_start_ms=batch.get("target_valid_start_ms"),
                     target_valid_end_ms=batch.get("target_valid_end_ms"),
+                    dual_window=has_dual,
+                    valid_start_w2=batch.get("valid_start_w2") if has_dual else None,
+                    valid_end_w2=batch.get("valid_end_w2") if has_dual else None,
                 )
 
                 # Reconstruction
@@ -317,51 +327,30 @@ class DDPv13Trainer:
                 else:
                     consist = torch.tensor(0.0, device=self.device)
 
-                # V14: Temporal Contrastive Loss — 利用 dual window 学习时间方向
-                # 修复：使用 pre_norm_embedding 并先 L2 归一化再计算 cosine similarity
-                # 防止未归一化 embedding 产生数值不稳定的 dot product
+                # V28: Gap-aware temporal cosine loss（修复接线 bug）
+                # 原 broken 版本：teacher(W1) vs student(W1)，语义倒置
+                # 修复版本：student pre_norm_map(W1) vs student dual_pre_w2(W2)
+                # target: gap 越大，cos_sim 目标越低（连续衰减，无需负样本）
                 temporal_loss = torch.tensor(0.0, device=self.device)
                 if temporal_w > 0 and has_dual:
-                    # 使用 pre_norm_embedding（训练时与 embedding 相同，但更语义清晰）
-                    teacher_emb_raw = teacher_out.pre_norm_embedding.detach()  # [B, D]
-                    student_emb_raw = student_out.pre_norm_embedding           # [B, D]
-                    # 归一化后计算 cosine similarity（值域 [-1, 1]，数值稳定）
-                    teacher_emb = F.normalize(teacher_emb_raw, dim=-1)
-                    student_emb = F.normalize(student_emb_raw, dim=-1)
-                    sim = torch.sum(teacher_emb * student_emb, dim=1)  # [B]
-                    
-                    # 计算 w1 和 w2 的时间 gap（月份）
-                    # 使用中点作为代表时间
+                    # 保留 backward-compat：若有人仍开启旧权重，打印警告并跳过
+                    if self.global_rank == 0:
+                        print("[WARN] temporal_contrastive_weight > 0 但该路径已弃用，"
+                              "请改用 temporal_gap_aware_weight。跳过此 step 的时序损失。")
+
+                gap_aware_temporal_loss = torch.tensor(0.0, device=self.device)
+                if temporal_gap_aware_w > 0 and has_dual and student_out.dual_pre_w2 is not None:
                     w1_center = (batch["valid_start_w1"] + batch["valid_end_w1"]) / 2.0
                     w2_center = (batch["valid_start_w2"] + batch["valid_end_w2"]) / 2.0
                     gap_ms = (w2_center - w1_center).abs().float()
-                    ms_per_month = 30.0 * 24 * 3600 * 1000
-                    gap_months = gap_ms / ms_per_month  # [B]
-                    
-                    # target: gap 越大，similarity 越低
-                    # 使用指数衰减，tau=3个月为半衰期
-                    tau = 3.0
-                    target_sim = torch.exp(-gap_months / tau)
-                    
-                    temporal_loss = F.mse_loss(sim, target_sim.to(sim.device))
-                    
-                    # 诊断：记录平均 gap 和平均 sim
-                    if dist.is_initialized() and self.world_size > 1:
-                        avg_gap = gap_months.mean()
-                        dist.all_reduce(avg_gap, op=dist.ReduceOp.AVG)
-                        avg_sim = sim.mean()
-                        dist.all_reduce(avg_sim, op=dist.ReduceOp.AVG)
-                        self._last_temporal_diag = {
-                            'avg_gap_months': avg_gap.item(),
-                            'avg_sim': avg_sim.item(),
-                            'target_sim': target_sim.mean().item(),
-                        }
-                    else:
-                        self._last_temporal_diag = {
-                            'avg_gap_months': gap_months.mean().item(),
-                            'avg_sim': sim.mean().item(),
-                            'target_sim': target_sim.mean().item(),
-                        }
+                    # temperature=1.0：不放大损失幅度（原默认 0.05 会放大 20x 导致梯度不均衡）
+                    gap_aware_temporal_loss = gap_aware_temporal_cosine_loss(
+                        student_out.pre_norm_map.float(),
+                        student_out.dual_pre_w2.float(),
+                        gap_ms,
+                        max_gap_ms=6 * 30 * 24 * 3600 * 1000,
+                        temperature=1.0,
+                    )
 
                 # V19: Inter-Patch InfoNCE (NT-Xent) — 防止方向坍缩
                 # 不同patch的teacher(key)和student(query)作为正负样本对
@@ -487,6 +476,13 @@ class DDPv13Trainer:
             erank_loss_val = torch.tensor(0.0, device=self.device)
             if erank_loss_w > 0 and gathered_pre is not None and gathered_pre.shape[0] >= 2:
                 erank_loss_val = erank_maximization_loss(gathered_pre.float())
+
+            # V28: MCR² Coding Rate Loss — 直接 log-det 优化（绕过 VICReg 的 N<D 梯度上界问题）
+            # 在 all_pre（含 memory bank，N >> D）上计算，保证协方差矩阵满秩
+            # 梯度 ∂logdet/∂C = C⁻¹，弱维度梯度最大，直接均衡奇异值分布
+            coding_rate_val = torch.tensor(0.0, device=self.device)
+            if coding_rate_w > 0 and all_pre is not None and all_pre.shape[0] >= 2:
+                coding_rate_val = coding_rate_loss(all_pre.float(), eps=0.5)
 
             # === Uniformity Loss（实验变体支持）===
             use_spatial_unif = getattr(t, 'use_spatial_uniformity', False)
@@ -647,6 +643,7 @@ class DDPv13Trainer:
                 recon_w * recon_warmup * recon
                 + consist_w * consist
                 + temporal_w * temporal_loss
+                + temporal_gap_aware_w * gap_aware_temporal_loss
                 + infonce_w * inter_infonce
                 + cls_w * cls
                 + patch_id_w * patch_id_loss
@@ -661,6 +658,7 @@ class DDPv13Trainer:
                 + inter_var_w * inter_var
                 + inter_decorr_w * inter_decorr
                 + erank_loss_w * erank_loss_val
+                + coding_rate_w * coding_rate_val
                 + lmim_w * lmim
             )
 
@@ -726,25 +724,25 @@ class DDPv13Trainer:
                 "std_mean": float(std_mean),
                 "erank": float(erank),
                 "lmim": lmim.item(),
+                "gap_aware_temporal": gap_aware_temporal_loss.item(),
+                "coding_rate": coding_rate_val.item(),
             }.items():
                 loss_accum[k] = loss_accum.get(k, 0.0) + v
             n_steps += 1
 
             if self.global_rank == 0:
                 bank_size = self.memory_bank.size
-                temp_diag = ""
-                if temporal_w > 0 and hasattr(self, '_last_temporal_diag'):
-                    d = self._last_temporal_diag
-                    temp_diag = f"temp={temporal_loss.item():.4f}(gap={d['avg_gap_months']:.1f}m,sim={d['avg_sim']:.3f}) "
                 step_msg = (f"  [Step {step}] recon={recon.item():.4f} "
-                      f"consist={consist.item():.4f} {temp_diag}"
+                      f"consist={consist.item():.4f} "
+                      f"gap_t={gap_aware_temporal_loss.item():.4f} "
                       f"cls={cls.item():.4f} pid={patch_id_loss.item():.4f} "
                       f"var={var.item():.4f} cov={cov.item():.4f} "
                       f"decorr={decorr.item():.4f} orth={orth.item():.4f} "
                       f"l2unif={l2_uniform.item():.4f} "
+                      f"erank_l={erank_loss_val.item():.4f} "
+                      f"mcr2={coding_rate_val.item():.4f} "
                       f"infonce={inter_infonce.item():.4f} "
                       f"idecorr={inter_decorr.item():.4f} "
-                      f"erank_l={erank_loss_val.item():.4f} "
                       f"hsph={hsph_uniform.item():.4f}(px={hsph_pixel.item():.2f},g={hsph_global.item():.2f}) "
                       f"sphvar={spherical_var.item():.4f} "
                       f"inter_var={inter_var.item():.4f} "

@@ -653,17 +653,18 @@ def temporal_magnitude_loss(
 # 6b. Coding Rate Loss (MCR²)
 # ────────────────────────────────────────────
 
-def coding_rate_loss(embeddings: torch.Tensor, eps: float = 0.01) -> torch.Tensor:
+def coding_rate_loss(embeddings: torch.Tensor, eps: float = 0.5) -> torch.Tensor:
     """Maximal Coding Rate Reduction (MCR²) Loss.
 
     基于率失真理论，最大化整体编码率：
     R(Z; eps) = 0.5 * log det(I + d/(N*eps²) * ZZ^T)
 
     对低秩构型（坍缩）施加无限惩罚，比VICReg的hinge variance更严格。
+    梯度 ∂logdet/∂C = C⁻¹，最弱维度获得最大梯度（自然均衡奇异值）。
 
     Args:
         embeddings: [N, D] pre-norm embedding
-        eps: 正则化参数，防止奇异
+        eps: 正则化参数（默认 0.5，比原 0.01 更稳定；0.01 在坍缩态 logdet 可能爆炸）
 
     Returns:
         scalar loss, 负值（最大化编码率）
@@ -678,8 +679,17 @@ def coding_rate_loss(embeddings: torch.Tensor, eps: float = 0.01) -> torch.Tenso
     cov = (emb_centered.T @ emb_centered) / N
 
     I = torch.eye(D, device=embeddings.device, dtype=embeddings.dtype)
-    # 编码率
-    logdet = torch.logdet(I + (D / (N * eps**2 + 1e-8)) * cov + 1e-6 * I)
+    # 编码率：eps=0.5 时缩放因子 D/(N*0.25) ≈ 64/(1056*0.25) ≈ 0.24（all_pre 场景）
+    # 比 eps=0.01 的 ~256 小得多，数值更稳定
+    scale = D / (N * eps ** 2 + 1e-8)
+    mat = I + scale * cov
+    # 加微小 identity 扰动防止奇异（尤其在训练早期 embedding 接近零）
+    mat = mat + 1e-5 * I
+    logdet = torch.logdet(mat)
+
+    # 防止 NaN（logdet 在奇异矩阵上为 -inf）
+    if torch.isnan(logdet) or torch.isinf(logdet):
+        return embeddings.new_tensor(0.0)
 
     return -0.5 * logdet
 
