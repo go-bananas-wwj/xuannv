@@ -6,11 +6,20 @@
   B. JRC Water 二值水体检测（occurrence > 50 = water）
   C. Dynamic World 9 类分类（参考）
 
-用法：
+推荐用法（先用 extract_embeddings.py 提取，再用 NPZ 评估，最快）：
+    # 1. 先提取（eval_v25 tmux 中已运行）
+    python scripts/eval/extract_embeddings.py --config configs/config_haidian_v25.yaml \\
+        --checkpoint epoch_best_epoch78.pt --output-dir out/eval_v25_0531/ --format npz
+
+    # 2. 再评估（CPU 即可，秒级完成）
+    python scripts/eval/mlp_eval_haidian.py \\
+        --embedding-file out/eval_v25_0531/patch_embeddings_shard0.npz \\
+        --output-dir out/eval_v25_0531/mlp/
+
+内联提取用法（首次 NPU JIT 编译约 5-10 分钟）：
     python scripts/eval/mlp_eval_haidian.py \\
         --config configs/config_haidian_v25.yaml \\
-        --checkpoint /workspace/outputs/exp_v25_haidian_loss_opt_0530/epoch_best_epoch78.pt \\
-        --device npu:0 \\
+        --checkpoint epoch_best_epoch78.pt --device npu:0 \\
         --output-dir out/eval_v25_0531/mlp/
 """
 from __future__ import annotations
@@ -372,19 +381,51 @@ def fewshot_experiment(X_train_full: np.ndarray, y_train_full: np.ndarray,
     return results
 
 
+# ── 从 NPZ 加载预提取 embedding ───────────────────────────────────────────────
+
+def load_spatial_maps_from_npz(npz_path: str | Path) -> tuple[np.ndarray, list[str]]:
+    """从 extract_embeddings.py 生成的 NPZ 加载 spatial maps。
+
+    NPZ 格式：spatial_maps [N, N_months, D, H, W], patch_ids [N]
+    返回：monthly average spatial_maps [N, D, H, W]，patch_ids
+    """
+    data = np.load(npz_path, allow_pickle=True)
+    sm   = data["spatial_maps"].astype(np.float32)   # [N, N_months, D, H, W]
+    pids = [str(p) for p in data["patch_ids"]]
+
+    # 对所有月份取平均作为全年合成 embedding（适合静态标注）
+    sm_mean = sm.mean(axis=1)  # [N, D, H, W]
+
+    # 重新 L2 normalize（月均之后的向量可能偏离单位球）
+    norm = np.linalg.norm(sm_mean, axis=1, keepdims=True).clip(min=1e-8)
+    sm_norm = sm_mean / norm
+
+    print(f"[加载 NPZ] {npz_path}")
+    print(f"  原始: {sm.shape}  →  月均后: {sm_norm.shape}  patches={len(pids)}")
+    return sm_norm, pids
+
+
 # ── 主评估流程 ────────────────────────────────────────────────────────────────
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    # 快速路径：直接加载已提取的 NPZ（推荐）
+    parser.add_argument("--embedding-file", default=None,
+                        help="extract_embeddings.py 输出的 NPZ 文件（推荐，无需加载模型）")
+    # 内联提取路径（首次 NPU JIT 编译慢）
     parser.add_argument("--config", default="configs/config_haidian_v25.yaml")
-    parser.add_argument("--checkpoint", required=True)
-    parser.add_argument("--device", default="npu:0")
+    parser.add_argument("--checkpoint", default=None)
+    parser.add_argument("--device", default="cpu",
+                        help="MLP 训练设备（cpu/npu:0）；内联提取时也用于模型推理")
     parser.add_argument("--output-dir", default="out/eval_v25_0531/mlp/")
-    parser.add_argument("--train-ratio", type=float, default=0.8, help="训练集比例")
+    parser.add_argument("--train-ratio", type=float, default=0.8)
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--num-patches", type=int, default=0, help="限制评估 patch 数（0=全量）")
+    parser.add_argument("--num-patches", type=int, default=0, help="限制 patch 数（0=全量）")
     args = parser.parse_args()
+
+    if args.embedding_file is None and args.checkpoint is None:
+        parser.error("必须提供 --embedding-file 或 --checkpoint")
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -393,58 +434,61 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── 加载模型和数据集 ────────────────────────────────────────────────────
-    print("[加载] 配置和数据集...")
-    from src.config import load_config
-    from src.data.dataset import HarbinPatchDataset
-    from src.models.model import AEFModel
+    # ── 路径 A：从 NPZ 直接加载（推荐，快） ──────────────────────────────────
+    if args.embedding_file:
+        spatial_maps, valid_patches = load_spatial_maps_from_npz(args.embedding_file)
+        checkpoint_label = args.embedding_file
+    else:
+        # ── 路径 B：内联提取（需 NPU，首次 JIT 编译约 5-10 min） ─────────────
+        print("[加载] 配置和数据集（内联提取模式）...")
+        from src.config import load_config
+        from src.data.dataset import HarbinPatchDataset
+        from src.models.model import AEFModel
 
-    cfg = load_config(args.config)
-    cfg.data.preload = False
+        cfg = load_config(args.config)
+        cfg.data.preload = False
 
-    dataset = HarbinPatchDataset(cfg=cfg)
-    sample_map = {
-        (pid, y, m): idx
-        for idx, (pid, y, m) in enumerate(dataset.monthly_samples)
-    }
-    all_patches = sorted({pid for pid, _, _ in dataset.monthly_samples})
-    print(f"[信息] 总 patch 数: {len(all_patches)}")
+        dataset = HarbinPatchDataset(cfg=cfg)
+        sample_map = {
+            (pid, y, m): idx
+            for idx, (pid, y, m) in enumerate(dataset.monthly_samples)
+        }
+        all_patches = sorted({pid for pid, _, _ in dataset.monthly_samples})
 
-    if args.num_patches > 0:
-        all_patches = all_patches[: args.num_patches]
-        print(f"[信息] 限制为前 {len(all_patches)} 个 patch")
+        if args.num_patches > 0:
+            all_patches = all_patches[:args.num_patches]
+        print(f"[信息] patch 数: {len(all_patches)}")
 
-    print("[加载] 模型...")
-    model = AEFModel(cfg=cfg).to(device)
-    ckpt = torch.load(args.checkpoint, map_location=device, weights_only=False)
-    sd = ckpt.get("model_state_dict") or ckpt.get("state_dict") or ckpt
-    model.load_state_dict(sd, strict=False)
-    model.eval()
-    print(f"[加载] checkpoint: {args.checkpoint}")
+        print(f"[加载] 模型到 {device}  (首次 NPU JIT 约 5-10 min，请耐心等待)...")
+        model = AEFModel(cfg=cfg).to(device)
+        ckpt = torch.load(args.checkpoint, map_location=device, weights_only=False)
+        sd = ckpt.get("model_state_dict") or ckpt.get("state_dict") or ckpt
+        model.load_state_dict(sd, strict=False)
+        model.eval()
+        print(f"[加载] checkpoint: {args.checkpoint}")
 
-    # ── 提取空间 embedding ──────────────────────────────────────────────────
-    print(f"\n[提取] {len(all_patches)} patches 的 spatial embedding map...")
-    spatial_maps = []
-    valid_patches = []
-    t0 = time_mod.time()
+        print(f"\n[提取] {len(all_patches)} patches  (每 patch ~2-10s)...")
+        _maps, _pids = [], []
+        t0 = time_mod.time()
+        for i, pid in enumerate(all_patches):
+            emb_map = extract_spatial_map(model, dataset, cfg, sample_map, device, pid)
+            if emb_map is None:
+                print(f"  [跳过] {pid}")
+                continue
+            _maps.append(emb_map)
+            _pids.append(pid)
+            if (i + 1) % 20 == 0:
+                el = time_mod.time() - t0
+                eta = el / (i + 1) * (len(all_patches) - i - 1)
+                print(f"  [{i+1}/{len(all_patches)}] {el:.0f}s  ETA={eta:.0f}s")
 
-    for i, pid in enumerate(all_patches):
-        emb_map = extract_spatial_map(model, dataset, cfg, sample_map, device, pid)
-        if emb_map is None:
-            print(f"  [跳过] {pid}: 无法提取")
-            continue
-        spatial_maps.append(emb_map)
-        valid_patches.append(pid)
-        if (i + 1) % 50 == 0:
-            elapsed = time_mod.time() - t0
-            eta = elapsed / (i + 1) * (len(all_patches) - i - 1)
-            print(f"  [{i+1}/{len(all_patches)}] elapsed={elapsed:.0f}s ETA={eta:.0f}s")
-
-    spatial_maps = np.stack(spatial_maps, axis=0)  # [N, D, H, W]
-    D, H, W = spatial_maps.shape[1], spatial_maps.shape[2], spatial_maps.shape[3]
-    print(f"[完成] 提取 {len(valid_patches)} patches，spatial_maps={spatial_maps.shape}")
+        spatial_maps   = np.stack(_maps, axis=0)
+        valid_patches  = _pids
+        checkpoint_label = args.checkpoint
+        print(f"[完成] spatial_maps={spatial_maps.shape}")
 
     # ── 计算 erank ──────────────────────────────────────────────────────────
+    D, H, W = spatial_maps.shape[1], spatial_maps.shape[2], spatial_maps.shape[3]
     emb_flat = spatial_maps.reshape(len(valid_patches), D, -1).mean(-1)  # [N, D]
     emb_t = torch.from_numpy(emb_flat).float()
     emb_c = emb_t - emb_t.mean(0, keepdim=True)
@@ -472,7 +516,7 @@ def main() -> None:
     print(f"[划分] train={len(train_patches)} patches, test={len(test_patches)} patches")
 
     results: dict = {
-        "checkpoint": args.checkpoint,
+        "checkpoint": checkpoint_label,
         "n_patches": len(valid_patches),
         "n_train_patches": len(train_patches),
         "n_test_patches": len(test_patches),
@@ -500,7 +544,7 @@ def main() -> None:
         print(f"    {cn:12s}: F1={f1:.4f}  IoU={iou:.4f}")
 
     print("\n[任务 A] KNN k=5 基线...")
-    wc_knn = knn_eval(X_tr_wc, y_tr_wc, X_te_wc, y_te_wc, WC_NUM_CLASSES, k=5, device=device)
+    wc_knn = knn_eval(X_tr_wc, y_tr_wc, X_te_wc, y_te_wc, WC_NUM_CLASSES, k=5, device=torch.device("cpu"))
     print(f"  OA={wc_knn['oa']:.4f}  mF1={wc_knn['macro_f1']:.4f}  mIoU={wc_knn['miou']:.4f}")
 
     print("\n[任务 A] Few-shot 学习曲线...")
@@ -535,7 +579,7 @@ def main() -> None:
     print(f"  OA={jrc_mlp['oa']:.4f}  F1-water={f1_water:.4f}  mF1={jrc_mlp['macro_f1']:.4f}")
 
     print("\n[任务 B] KNN k=5 基线...")
-    jrc_knn = knn_eval(X_tr_jrc, y_tr_jrc, X_te_jrc, y_te_jrc, JRC_NUM_CLASSES, k=5, device=device)
+    jrc_knn = knn_eval(X_tr_jrc, y_tr_jrc, X_te_jrc, y_te_jrc, JRC_NUM_CLASSES, k=5, device=torch.device("cpu"))
     print(f"  OA={jrc_knn['oa']:.4f}  mF1={jrc_knn['macro_f1']:.4f}")
 
     results["jrc_water"] = {
@@ -559,7 +603,7 @@ def main() -> None:
         print(f"  OA={dw_mlp['oa']:.4f}  mF1={dw_mlp['macro_f1']:.4f}")
 
         print("\n[任务 C] KNN k=5 基线...")
-        dw_knn = knn_eval(X_tr_dw, y_tr_dw, X_te_dw, y_te_dw, DW_NUM_CLASSES, k=5, device=device)
+        dw_knn = knn_eval(X_tr_dw, y_tr_dw, X_te_dw, y_te_dw, DW_NUM_CLASSES, k=5, device=torch.device("cpu"))
         print(f"  OA={dw_knn['oa']:.4f}  mF1={dw_knn['macro_f1']:.4f}")
         results["dynamic_world"] = {"mlp_full": dw_mlp, "knn_k5": dw_knn}
     else:
