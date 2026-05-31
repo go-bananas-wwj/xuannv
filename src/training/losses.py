@@ -653,6 +653,29 @@ def temporal_magnitude_loss(
 # 6b. Coding Rate Loss (MCR²)
 # ────────────────────────────────────────────
 
+def _logdet_npu_safe(mat: torch.Tensor) -> torch.Tensor | None:
+    """NPU 安全的 log-determinant 计算（带梯度）。
+
+    Ascend NPU 不支持 torch.logdet（_linalg_slogdet.sign），直接 fallback CPU 会
+    在 backward 时耗尽宿主内存。依次尝试：
+      1. Cholesky：专为 PSD 矩阵设计，logdet = 2 * sum(log(diag(L)))
+      2. eigvalsh：对称矩阵实特征值，logdet = sum(log(lambda))
+      3. 返回 None（调用方跳过该 loss）
+    """
+    # 方法 1：Cholesky（最稳定，PSD 矩阵专用）
+    try:
+        L = torch.linalg.cholesky(mat)
+        return 2.0 * L.diagonal().clamp(min=1e-8).log().sum()
+    except Exception:
+        pass
+    # 方法 2：对称实特征值分解
+    try:
+        eigvals = torch.linalg.eigvalsh(mat)
+        return eigvals.clamp(min=1e-8).log().sum()
+    except Exception:
+        pass
+    return None
+
 def coding_rate_loss(embeddings: torch.Tensor, eps: float = 0.5) -> torch.Tensor:
     """Maximal Coding Rate Reduction (MCR²) Loss.
 
@@ -685,9 +708,13 @@ def coding_rate_loss(embeddings: torch.Tensor, eps: float = 0.5) -> torch.Tensor
     mat = I + scale * cov
     # 加微小 identity 扰动防止奇异（尤其在训练早期 embedding 接近零）
     mat = mat + 1e-5 * I
-    logdet = torch.logdet(mat)
 
-    # 防止 NaN（logdet 在奇异矩阵上为 -inf）
+    # NPU 安全 logdet：torch.logdet 在 Ascend 上 fallback CPU 会 OOM。
+    # 优先 Cholesky（PSD 矩阵专用，最稳定），次选 eigvalsh（对称矩阵），最后 return 0。
+    logdet = _logdet_npu_safe(mat)
+    if logdet is None:
+        return embeddings.new_tensor(0.0)
+
     if torch.isnan(logdet) or torch.isinf(logdet):
         return embeddings.new_tensor(0.0)
 
@@ -916,8 +943,8 @@ def erank_maximization_loss(x: torch.Tensor) -> torch.Tensor:
     x = x - x.mean(0, keepdim=True)  # 中心化
 
     try:
-        # full_matrices=False → S: [min(N,D),]，节省内存
-        S = torch.linalg.svd(x, full_matrices=False).S
+        # svdvals 只返回奇异值，比 full svd 占用更少内存，且 gradient 仍可传播
+        S = torch.linalg.svdvals(x)
     except Exception:
         return x.new_tensor(0.0)
 
