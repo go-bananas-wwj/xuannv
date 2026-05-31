@@ -311,26 +311,45 @@ def train_mlp(X_train: np.ndarray, y_train: np.ndarray,
 
 # ── KNN 基线 ─────────────────────────────────────────────────────────────────
 
+_KNN_MAX_TRAIN = 50_000  # 训练像素上限，避免全量 cdist OOM（1M×1M 需数十 GB）
+
+
 def knn_eval(X_train: np.ndarray, y_train: np.ndarray,
              X_test: np.ndarray, y_test: np.ndarray,
              num_classes: int, k: int = 5,
              device: torch.device | None = None) -> dict:
-    """PyTorch KNN 基线。"""
-    dev = device or torch.device("cpu")
-    X_tr = torch.from_numpy(X_train).float().to(dev)
-    y_tr = torch.from_numpy(y_train.astype(np.int64)).to(dev)
-    preds = []
-    batch = 1024
-    with torch.no_grad():
-        for i in range(0, len(X_test), batch):
-            q = torch.from_numpy(X_test[i:i + batch]).float().to(dev)
-            dist = torch.cdist(q, X_tr)
-            _, idx = dist.topk(min(k, len(X_train)), largest=False, dim=1)
-            nbr = y_tr[idx]
-            for j in range(nbr.shape[0]):
-                vals, cnts = torch.unique(nbr[j], return_counts=True)
-                preds.append(vals[cnts.argmax()].item())
-    y_pred = np.array(preds)
+    """sklearn BallTree KNN 基线（自动降采样到 _KNN_MAX_TRAIN）。
+
+    原 torch.cdist 实现在 1M 训练像素时每批产生 4GB 中间矩阵，无法完成。
+    改用 sklearn NearestNeighbors(algorithm='ball_tree') + 分层随机降采样。
+    """
+    from sklearn.neighbors import NearestNeighbors
+
+    # 分层降采样：每类均匀采样，总量不超过 _KNN_MAX_TRAIN
+    if len(X_train) > _KNN_MAX_TRAIN:
+        classes = np.unique(y_train)
+        per_class = max(1, _KNN_MAX_TRAIN // len(classes))
+        sel = []
+        for c in classes:
+            idx_c = np.where(y_train == c)[0]
+            n = min(per_class, len(idx_c))
+            sel.append(np.random.choice(idx_c, n, replace=False))
+        sel = np.concatenate(sel)
+        X_tr_sub = X_train[sel]
+        y_tr_sub = y_train[sel]
+        print(f"    [KNN] 降采样 {len(X_train)} → {len(X_tr_sub)} 训练像素")
+    else:
+        X_tr_sub, y_tr_sub = X_train, y_train
+
+    nn = NearestNeighbors(n_neighbors=min(k, len(X_tr_sub)),
+                          algorithm="ball_tree", n_jobs=-1)
+    nn.fit(X_tr_sub)
+    _, idx = nn.kneighbors(X_test)
+    y_pred = np.array([
+        np.bincount(y_tr_sub[idx[i]].astype(np.int64)).argmax()
+        for i in range(len(X_test))
+    ])
+
     oa = accuracy_score(y_test, y_pred)
     f1_macro = f1_score(y_test, y_pred, average="macro", zero_division=0)
     try:
@@ -419,7 +438,7 @@ def main() -> None:
     # 内联提取路径（首次 NPU JIT 编译慢）
     parser.add_argument("--config", default="configs/config_haidian_v25.yaml")
     parser.add_argument("--checkpoint", default=None)
-    parser.add_argument("--device", default="cpu",
+    parser.add_argument("--device", default="npu:0",
                         help="MLP 训练设备（cpu/npu:0）；内联提取时也用于模型推理")
     parser.add_argument("--output-dir", default="out/eval_v25_0531/mlp/")
     parser.add_argument("--train-ratio", type=float, default=0.8)
@@ -547,10 +566,6 @@ def main() -> None:
         iou = wc_mlp_full['iou_per_class'][ci]
         print(f"    {cn:12s}: F1={f1:.4f}  IoU={iou:.4f}")
 
-    print("\n[任务 A] KNN k=5 基线...")
-    wc_knn = knn_eval(X_tr_wc, y_tr_wc, X_te_wc, y_te_wc, WC_NUM_CLASSES, k=5, device=torch.device("cpu"))
-    print(f"  OA={wc_knn['oa']:.4f}  mF1={wc_knn['macro_f1']:.4f}  mIoU={wc_knn['miou']:.4f}")
-
     print("\n[任务 A] Few-shot 学习曲线...")
     pixel_budgets = [100, 1000, 10000, 50000]
     wc_fewshot = fewshot_experiment(
@@ -560,7 +575,6 @@ def main() -> None:
 
     results["worldcover"] = {
         "mlp_full": wc_mlp_full,
-        "knn_k5": wc_knn,
         "fewshot": wc_fewshot,
     }
 
@@ -582,13 +596,8 @@ def main() -> None:
     f1_water = jrc_mlp['f1_per_class'][1]
     print(f"  OA={jrc_mlp['oa']:.4f}  F1-water={f1_water:.4f}  mF1={jrc_mlp['macro_f1']:.4f}")
 
-    print("\n[任务 B] KNN k=5 基线...")
-    jrc_knn = knn_eval(X_tr_jrc, y_tr_jrc, X_te_jrc, y_te_jrc, JRC_NUM_CLASSES, k=5, device=torch.device("cpu"))
-    print(f"  OA={jrc_knn['oa']:.4f}  mF1={jrc_knn['macro_f1']:.4f}")
-
     results["jrc_water"] = {
         "mlp_full": jrc_mlp,
-        "knn_k5": jrc_knn,
     }
 
     # ── 任务 C：Dynamic World ───────────────────────────────────────────────
@@ -605,11 +614,7 @@ def main() -> None:
         print("\n[任务 C] MLP 全量训练...")
         dw_mlp = train_mlp(X_tr_dw, y_tr_dw, X_te_dw, y_te_dw, DW_NUM_CLASSES, device, epochs=args.epochs)
         print(f"  OA={dw_mlp['oa']:.4f}  mF1={dw_mlp['macro_f1']:.4f}")
-
-        print("\n[任务 C] KNN k=5 基线...")
-        dw_knn = knn_eval(X_tr_dw, y_tr_dw, X_te_dw, y_te_dw, DW_NUM_CLASSES, k=5, device=torch.device("cpu"))
-        print(f"  OA={dw_knn['oa']:.4f}  mF1={dw_knn['macro_f1']:.4f}")
-        results["dynamic_world"] = {"mlp_full": dw_mlp, "knn_k5": dw_knn}
+        results["dynamic_world"] = {"mlp_full": dw_mlp}
     else:
         print("  [跳过] 像素数不足")
         results["dynamic_world"] = None
@@ -620,16 +625,13 @@ def main() -> None:
     print("="*60)
     print(f"  erank = {erank:.2f}")
     print(f"\n  WorldCover 6类:")
-    print(f"    KNN k=5   | OA={wc_knn['oa']:.4f}  mF1={wc_knn['macro_f1']:.4f}  mIoU={wc_knn['miou']:.4f}")
     print(f"    MLP 全量  | OA={wc_mlp_full['oa']:.4f}  mF1={wc_mlp_full['macro_f1']:.4f}  mIoU={wc_mlp_full['miou']:.4f}")
     print(f"\n  JRC Water 二值:")
-    print(f"    KNN k=5   | OA={jrc_knn['oa']:.4f}  mF1={jrc_knn['macro_f1']:.4f}")
     print(f"    MLP 全量  | OA={jrc_mlp['oa']:.4f}  F1-water={f1_water:.4f}  mF1={jrc_mlp['macro_f1']:.4f}")
 
     if results.get("dynamic_world"):
         dw = results["dynamic_world"]
         print(f"\n  Dynamic World 9类（参考）:")
-        print(f"    KNN k=5   | OA={dw['knn_k5']['oa']:.4f}  mF1={dw['knn_k5']['macro_f1']:.4f}")
         print(f"    MLP 全量  | OA={dw['mlp_full']['oa']:.4f}  mF1={dw['mlp_full']['macro_f1']:.4f}")
 
     print("\n  WorldCover Few-shot 学习曲线:")
