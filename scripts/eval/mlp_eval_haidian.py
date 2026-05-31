@@ -45,8 +45,11 @@ import torch.nn.functional as F
 import rasterio
 from pathlib import Path
 from sklearn.metrics import (
-    accuracy_score, f1_score, jaccard_score, confusion_matrix, classification_report
+    accuracy_score, balanced_accuracy_score, f1_score, jaccard_score,
+    confusion_matrix, classification_report, roc_auc_score,
 )
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import KFold
 
 try:
     import torch_npu  # noqa: F401
@@ -289,6 +292,7 @@ def train_mlp(X_train: np.ndarray, y_train: np.ndarray,
     y_pred = np.concatenate(preds)
 
     oa = accuracy_score(y_test, y_pred)
+    ba = balanced_accuracy_score(y_test, y_pred)
     f1_per = f1_score(y_test, y_pred, average=None, labels=list(range(num_classes)), zero_division=0)
     f1_macro = float(np.mean(f1_per))
     try:
@@ -300,6 +304,7 @@ def train_mlp(X_train: np.ndarray, y_train: np.ndarray,
 
     return {
         "oa": float(oa),
+        "ba": float(ba),
         "macro_f1": f1_macro,
         "miou": miou,
         "f1_per_class": f1_per.tolist(),
@@ -359,6 +364,93 @@ def knn_eval(X_train: np.ndarray, y_train: np.ndarray,
     return {"oa": float(oa), "macro_f1": float(f1_macro), "miou": float(miou)}
 
 
+# ── 线性探测（方式一，跟随 pipeline.py 标准）────────────────────────────────────
+
+def eval_linear_probe(X: np.ndarray, y: np.ndarray,
+                      num_classes: int,
+                      task_type: str = "multi",
+                      n_folds: int = 3,
+                      max_train: int = 30_000) -> dict:
+    """LogisticRegression + K-Fold(3) + balanced_accuracy。
+
+    与 pipeline.py 的 evaluate_semantic_task / evaluate_binary_task 保持一致：
+      - 多分类：multi_class='multinomial', solver='lbfgs'
+      - 二分类：默认 LR
+      - 每折训练集最多 max_train 像素（分层随机采样）
+      - 主指标：balanced_accuracy（不受类别不平衡影响）
+    """
+    present_classes = np.unique(y)
+    if len(present_classes) < 2:
+        return {"error": f"only {len(present_classes)} class"}
+
+    kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
+    ba_scores, f1m_scores, miou_scores = [], [], []
+    f1_bin, iou_bin, auc_bin = [], [], []   # 二分类专用
+
+    for fold_idx, (tr_idx, te_idx) in enumerate(kf.split(X)):
+        X_tr, X_te = X[tr_idx], X[te_idx]
+        y_tr, y_te = y[tr_idx], y[te_idx]
+
+        # 分层降采样到 max_train
+        if len(y_tr) > max_train:
+            classes = np.unique(y_tr)
+            per_class = max(1, max_train // len(classes))
+            sel = []
+            for c in classes:
+                idx_c = np.where(y_tr == c)[0]
+                n = min(per_class, len(idx_c))
+                sel.append(np.random.choice(idx_c, n, replace=False))
+            sel = np.concatenate(sel)
+            X_tr, y_tr = X_tr[sel], y_tr[sel]
+
+        if task_type == "binary":
+            clf = LogisticRegression(max_iter=300, n_jobs=4, random_state=42)
+        else:
+            clf = LogisticRegression(max_iter=300, multi_class="multinomial",
+                                     solver="lbfgs", n_jobs=4, random_state=42)
+        clf.fit(X_tr, y_tr)
+        y_pred = clf.predict(X_te)
+
+        ba_scores.append(balanced_accuracy_score(y_te, y_pred))
+        f1m_scores.append(f1_score(y_te, y_pred, average="macro",
+                                   labels=present_classes, zero_division=0))
+
+        ious = []
+        for c in present_classes:
+            inter = int(((y_pred == c) & (y_te == c)).sum())
+            union = int(((y_pred == c) | (y_te == c)).sum())
+            ious.append(inter / max(union, 1))
+        miou_scores.append(float(np.mean(ious)))
+
+        if task_type == "binary":
+            f1_bin.append(f1_score(y_te, y_pred, zero_division=0))
+            inter = int(((y_pred == 1) & (y_te == 1)).sum())
+            union = int(((y_pred == 1) | (y_te == 1)).sum())
+            iou_bin.append(inter / max(union, 1))
+            try:
+                y_prob = clf.predict_proba(X_te)[:, 1]
+                auc_bin.append(float(roc_auc_score(y_te, y_prob)))
+            except ValueError:
+                auc_bin.append(0.5)
+
+        print(f"    Fold {fold_idx+1}/{n_folds}: BAcc={ba_scores[-1]:.4f}  "
+              f"mF1={f1m_scores[-1]:.4f}  mIoU={miou_scores[-1]:.4f}"
+              + (f"  AUC={auc_bin[-1]:.4f}" if task_type == "binary" else ""))
+
+    result: dict = {
+        "balanced_accuracy": float(np.mean(ba_scores)),
+        "f1_macro": float(np.mean(f1m_scores)),
+        "miou": float(np.mean(miou_scores)),
+        "n_classes": int(len(present_classes)),
+        "n_pixels": int(len(y)),
+    }
+    if task_type == "binary":
+        result["f1_water"] = float(np.mean(f1_bin))
+        result["iou_water"] = float(np.mean(iou_bin))
+        result["auc"] = float(np.mean(auc_bin))
+    return result
+
+
 # ── Few-shot 实验 ─────────────────────────────────────────────────────────────
 
 def fewshot_experiment(X_train_full: np.ndarray, y_train_full: np.ndarray,
@@ -406,25 +498,32 @@ def fewshot_experiment(X_train_full: np.ndarray, y_train_full: np.ndarray,
 
 # ── 从 NPZ 加载预提取 embedding ───────────────────────────────────────────────
 
-def load_spatial_maps_from_npz(npz_path: str | Path) -> tuple[np.ndarray, list[str]]:
+def load_spatial_maps_from_npz(npz_path: str | Path,
+                               month_str: str = "2025-06") -> tuple[np.ndarray, list[str]]:
     """从 extract_embeddings.py 生成的 NPZ 加载 spatial maps。
 
-    NPZ 格式：spatial_maps [N, N_months, D, H, W], patch_ids [N]
-    返回：monthly average spatial_maps [N, D, H, W]，patch_ids
+    NPZ 格式：spatial_maps [N, N_months, D, H, W], patch_ids [N], month_labels [N_months]
+    返回：单月 spatial_maps [N, D, H, W]（L2 normalized），patch_ids
     """
     data = np.load(npz_path, allow_pickle=True)
-    sm   = data["spatial_maps"].astype(np.float32)   # [N, N_months, D, H, W]
-    pids = [str(p) for p in data["patch_ids"]]
+    sm     = data["spatial_maps"].astype(np.float32)   # [N, N_months, D, H, W]
+    pids   = [str(p) for p in data["patch_ids"]]
+    mlabels = [str(m) for m in data["month_labels"]]   # e.g. ['2025-04', ..., '2025-10']
 
-    # 对所有月份取平均作为全年合成 embedding（适合静态标注）
-    sm_mean = sm.mean(axis=1)  # [N, D, H, W]
+    if month_str in mlabels:
+        midx = mlabels.index(month_str)
+    else:
+        midx = 2  # fallback: 第3个月（通常 2025-06）
+        print(f"  [警告] month_str={month_str!r} 不在 {mlabels}，fallback → index {midx} ({mlabels[midx]})")
 
-    # 重新 L2 normalize（月均之后的向量可能偏离单位球）
-    norm = np.linalg.norm(sm_mean, axis=1, keepdims=True).clip(min=1e-8)
-    sm_norm = sm_mean / norm
+    sm_sel = sm[:, midx]  # [N, D, H, W]
+
+    # L2 normalize
+    norm = np.linalg.norm(sm_sel, axis=1, keepdims=True).clip(min=1e-8)
+    sm_norm = sm_sel / norm
 
     print(f"[加载 NPZ] {npz_path}")
-    print(f"  原始: {sm.shape}  →  月均后: {sm_norm.shape}  patches={len(pids)}")
+    print(f"  原始: {sm.shape}  →  选月 '{mlabels[midx]}' (index={midx}): {sm_norm.shape}  patches={len(pids)}")
     return sm_norm, pids
 
 
@@ -445,6 +544,11 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--num-patches", type=int, default=0, help="限制 patch 数（0=全量）")
+    parser.add_argument("--month", type=str, default="2025-06",
+                        help="选择哪个月的 embedding（NPZ 中的 month_label，如 '2025-06'）")
+    parser.add_argument("--method", type=str, default="both",
+                        choices=["linear", "mlp", "both"],
+                        help="linear=线性探测(方式一) mlp=MLP微调(方式二) both=两者都做")
     args = parser.parse_args()
 
     if args.embedding_file is None and args.checkpoint is None:
@@ -459,7 +563,8 @@ def main() -> None:
 
     # ── 路径 A：从 NPZ 直接加载（推荐，快） ──────────────────────────────────
     if args.embedding_file:
-        spatial_maps, valid_patches = load_spatial_maps_from_npz(args.embedding_file)
+        spatial_maps, valid_patches = load_spatial_maps_from_npz(args.embedding_file,
+                                                                   month_str=args.month)
         checkpoint_label = args.embedding_file
     else:
         # ── 路径 B：内联提取（需 NPU，首次 JIT 编译约 5-10 min） ─────────────
@@ -524,7 +629,61 @@ def main() -> None:
     erank = float((-(p * p.log()).sum()).exp())
     print(f"\n[诊断] erank = {erank:.2f} ({'✅ 正常' if erank > 8 else '⚠️ 偏低（目标>8）'})")
 
-    # ── 训练/测试 split ────────────────────────────────────────────────────
+    # ── 方式一：线性探测（LogisticRegression + K-Fold + balanced_accuracy）──
+    linear_results: dict = {}
+    if args.method in ("linear", "both"):
+        print("\n" + "="*60)
+        print("【方式一：线性探测 — LogisticRegression + K-Fold(3)】")
+        print("="*60)
+
+        # WorldCover（全量 patches）
+        print("\n  [线性] WorldCover 6 类...")
+        X_wc_all, y_wc_all = build_pixel_dataset(spatial_maps, valid_patches,
+                                                  load_worldcover, WC_NUM_CLASSES, "worldcover")
+        print(f"    像素总量: {len(X_wc_all)}, 类别分布: {np.bincount(y_wc_all, minlength=WC_NUM_CLASSES).tolist()}")
+        linear_results["worldcover"] = eval_linear_probe(X_wc_all, y_wc_all, WC_NUM_CLASSES, task_type="multi")
+        lw = linear_results["worldcover"]
+        print(f"    BAcc={lw['balanced_accuracy']:.4f}  mF1={lw['f1_macro']:.4f}  mIoU={lw['miou']:.4f}")
+
+        # JRC Water
+        print("\n  [线性] JRC Water 二值...")
+        X_jrc_all, y_jrc_all = build_pixel_dataset(spatial_maps, valid_patches,
+                                                    load_jrc_water, JRC_NUM_CLASSES, "jrc_water")
+        cnts = np.bincount(y_jrc_all, minlength=2)
+        print(f"    像素总量: {len(X_jrc_all)}, land={cnts[0]} water={cnts[1]} ratio={cnts[1]/len(y_jrc_all):.3f}")
+        linear_results["jrc_water"] = eval_linear_probe(X_jrc_all, y_jrc_all, JRC_NUM_CLASSES, task_type="binary")
+        lj = linear_results["jrc_water"]
+        print(f"    BAcc={lj['balanced_accuracy']:.4f}  F1-water={lj['f1_water']:.4f}  IoU-water={lj['iou_water']:.4f}  AUC={lj['auc']:.4f}")
+
+        # Dynamic World
+        print("\n  [线性] Dynamic World 9 类...")
+        X_dw_all, y_dw_all = build_pixel_dataset(spatial_maps, valid_patches,
+                                                  load_dynamic_world, DW_NUM_CLASSES, "dynamic_world")
+        print(f"    像素总量: {len(X_dw_all)}, 类别分布: {np.bincount(y_dw_all, minlength=DW_NUM_CLASSES).tolist()}")
+        if len(X_dw_all) > 0:
+            linear_results["dynamic_world"] = eval_linear_probe(X_dw_all, y_dw_all, DW_NUM_CLASSES, task_type="multi")
+            ld = linear_results["dynamic_world"]
+            print(f"    BAcc={ld['balanced_accuracy']:.4f}  mF1={ld['f1_macro']:.4f}  mIoU={ld['miou']:.4f}")
+        else:
+            print("    [跳过] 像素数不足")
+            linear_results["dynamic_world"] = {"error": "no pixels"}
+
+    results["linear_probe"] = linear_results
+
+    # ── 跳过 MLP 如果 --method linear ────────────────────────────────────────
+    if args.method == "linear":
+        print("\n[方式一完成，跳过 MLP 微调]")
+        # 保存结果
+        out_file = output_dir / "eval_results.json"
+        with open(out_file, "w") as f:
+            json.dump(results, f, indent=2)
+        print(f"\n[保存] 结果已写入 {out_file}")
+        return
+
+    # ── 方式二：MLP 微调（神经网络 + 80/20 patch split）──────────────────────
+    print("\n" + "="*60)
+    print("【方式二：MLP 微调 — PixelMLP + 80/20 split】")
+    print("="*60)
     n = len(valid_patches)
     n_train = int(n * args.train_ratio)
     idx_perm = np.random.permutation(n)
@@ -623,16 +782,26 @@ def main() -> None:
     print("\n" + "="*60)
     print("【评估汇总】")
     print("="*60)
-    print(f"  erank = {erank:.2f}")
-    print(f"\n  WorldCover 6类:")
-    print(f"    MLP 全量  | OA={wc_mlp_full['oa']:.4f}  mF1={wc_mlp_full['macro_f1']:.4f}  mIoU={wc_mlp_full['miou']:.4f}")
-    print(f"\n  JRC Water 二值:")
-    print(f"    MLP 全量  | OA={jrc_mlp['oa']:.4f}  F1-water={f1_water:.4f}  mF1={jrc_mlp['macro_f1']:.4f}")
+    print(f"  erank = {erank:.2f}  月份 = {args.month}")
 
+    if linear_results:
+        print("\n  ── 方式一：线性探测（BAcc = balanced_accuracy）──")
+        lw = linear_results.get("worldcover", {})
+        lj = linear_results.get("jrc_water", {})
+        ld = linear_results.get("dynamic_world", {})
+        if lw and "balanced_accuracy" in lw:
+            print(f"  WorldCover 6类:   BAcc={lw['balanced_accuracy']:.4f}  mF1={lw['f1_macro']:.4f}  mIoU={lw['miou']:.4f}")
+        if lj and "balanced_accuracy" in lj:
+            print(f"  JRC Water 二值:   BAcc={lj['balanced_accuracy']:.4f}  F1-water={lj['f1_water']:.4f}  AUC={lj['auc']:.4f}")
+        if ld and "balanced_accuracy" in ld:
+            print(f"  Dynamic World 9类: BAcc={ld['balanced_accuracy']:.4f}  mF1={ld['f1_macro']:.4f}  mIoU={ld['miou']:.4f}")
+
+    print(f"\n  ── 方式二：MLP 微调（OA + BAcc）──")
+    print(f"  WorldCover 6类:   OA={wc_mlp_full['oa']:.4f}  BAcc={wc_mlp_full['ba']:.4f}  mF1={wc_mlp_full['macro_f1']:.4f}  mIoU={wc_mlp_full['miou']:.4f}")
+    print(f"  JRC Water 二值:   OA={jrc_mlp['oa']:.4f}  BAcc={jrc_mlp['ba']:.4f}  F1-water={f1_water:.4f}")
     if results.get("dynamic_world"):
         dw = results["dynamic_world"]
-        print(f"\n  Dynamic World 9类（参考）:")
-        print(f"    MLP 全量  | OA={dw['mlp_full']['oa']:.4f}  mF1={dw['mlp_full']['macro_f1']:.4f}")
+        print(f"  Dynamic World 9类: OA={dw['mlp_full']['oa']:.4f}  BAcc={dw['mlp_full']['ba']:.4f}  mF1={dw['mlp_full']['macro_f1']:.4f}")
 
     print("\n  WorldCover Few-shot 学习曲线:")
     for budget_key, v in wc_fewshot.items():
