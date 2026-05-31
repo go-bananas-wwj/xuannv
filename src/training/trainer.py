@@ -310,9 +310,9 @@ class DDPv13Trainer:
                     target_source_idx=batch.get("target_source_idx"),
                     target_valid_start_ms=batch.get("target_valid_start_ms"),
                     target_valid_end_ms=batch.get("target_valid_end_ms"),
-                    dual_window=has_dual,
-                    valid_start_w2=batch.get("valid_start_w2") if has_dual else None,
-                    valid_end_w2=batch.get("valid_end_w2") if has_dual else None,
+                    # V28 fix: student 不跑 dual_window（避免 HBM OOM）
+                    # W2 目标用 teacher_out.dual_pre_w2（EMA，已在 no_grad 内）
+                    dual_window=False,
                 )
 
                 # Reconstruction
@@ -339,14 +339,14 @@ class DDPv13Trainer:
                               "请改用 temporal_gap_aware_weight。跳过此 step 的时序损失。")
 
                 gap_aware_temporal_loss = torch.tensor(0.0, device=self.device)
-                if temporal_gap_aware_w > 0 and has_dual and student_out.dual_pre_w2 is not None:
+                if temporal_gap_aware_w > 0 and has_dual and teacher_out.dual_pre_w2 is not None:
                     w1_center = (batch["valid_start_w1"] + batch["valid_end_w1"]) / 2.0
                     w2_center = (batch["valid_start_w2"] + batch["valid_end_w2"]) / 2.0
                     gap_ms = (w2_center - w1_center).abs().float()
-                    # temperature=1.0：不放大损失幅度（原默认 0.05 会放大 20x 导致梯度不均衡）
+                    # student W1（有梯度）→ 预测 teacher W2（EMA 无梯度，更稳定）
                     gap_aware_temporal_loss = gap_aware_temporal_cosine_loss(
                         student_out.pre_norm_map.float(),
-                        student_out.dual_pre_w2.float(),
+                        teacher_out.dual_pre_w2.detach().float(),
                         gap_ms,
                         max_gap_ms=6 * 30 * 24 * 3600 * 1000,
                         temperature=1.0,
