@@ -1,0 +1,238 @@
+# ============================================================
+# xuannv 海淀嵌入底座 v28 — erank 坍缩根本修复 + 时序损失接线修复
+# 创建时间: 2026-05-31
+#
+# v28 相比 v27 的改动（基于 4 份深度调研报告）：
+#
+# 【P0 — 时序损失接线修复】
+#   - trainer.py: teacher/student forward 增加 dual_window + valid_start/end_w2
+#   - 删除 broken 内联时序损失（teacher(W1) vs student(W1) 语义倒置）
+#   - 启用 gap_aware_temporal_cosine_loss（W1 pre_norm_map vs W2 dual_pre_w2）
+#   - temporal_gap_aware_weight: 0.2
+#
+# 【P0 — erank 梯度修复】
+#   - use_spatial_vicreg: false（消除优化对象像素级 vs 度量对象 patch 级 不匹配）
+#   - erank_loss_weight: 0.3（直接 SVD 熵最大化，gathered_pre 上）
+#   - coding_rate_weight: 0.05（MCR² log-det，all_pre 上，梯度弱维度最大）
+#   - decorrelation_weight: 0.2（Barlow Twins，归一化后相关矩阵，强制维度均等）
+#   - covariance_weight: 0.0（关闭 VICReg covariance，避免与 decorrelation 重复）
+#
+# 【P0 — 数值稳定性修复】
+#   - losses.py: coding_rate_loss eps 从 0.01 → 0.5
+#
+# v28 理论预期：
+#   - erank: 9.09 → 18-22（数学上限 gathered_pre N=32 → max_erank≈16，
+#     all_pre N=1056 >> D=64，MCR² 无上界限制）
+#   - CD AUC: 0.93 → 0.95+（gap_aware 时序损失激活真实 W1/W2 梯度）
+#   - WorldCover BAcc: 0.388 → 0.45+（erank 提升带动下游任务）
+#
+# 参考文献：
+#   MCR²: Yu et al. 2020 (arXiv:2006.08558)
+#   Barlow Twins: Zbontar et al. 2021 (arXiv:2103.03230)
+#   CaCo: Ma et al. 2023 (CVPR, arXiv:2211.11555)
+#   OR_in_SSL: NeurIPS 2024 (arXiv:2411.00392)
+# ============================================================
+
+experiment:
+  name: exp_v28_haidian_rank_temporal_0531
+  seed: 42
+  output_dir: /workspace/outputs/quick_v29_diag
+
+data:
+  dataset_type: harbin_patches
+  manifest_path: /workspace/raw/haidian_train
+  stats_dir: /workspace/statistics/haidian_train
+  batch_size: 4
+  num_workers: 0
+  image_size: 128
+  max_frames: 24
+  num_samples: 50
+  num_classes: 11
+  input_dim: 6
+  metadata_dim: 4
+
+  # ★ 4 路输入（含天仪 SAR）
+  num_input_sources: 4
+  input_sources:
+    - s2
+    - s1
+    - landsat
+    - tianyi_sar
+
+  source_channels:
+    s2: 6
+    s1: 2
+    landsat: 6
+    tianyi_sar: 1
+
+  # 6 个目标源
+  num_target_sources: 6
+  target_sources:
+    - name: s2
+      loss_type: 0
+      sensor_src: s2
+      out_channels: 6
+    - name: s1
+      loss_type: 0
+      sensor_src: s1
+      out_channels: 2
+    - name: landsat
+      loss_type: 0
+      sensor_src: landsat
+      out_channels: 6
+    - name: dem
+      loss_type: 0
+      sensor_src: null
+      out_channels: 1
+    - name: worldcover
+      loss_type: 1
+      sensor_src: null
+      out_channels: 11
+    - name: dynamic_world
+      loss_type: 1
+      sensor_src: null
+      out_channels: 9
+
+  random_target_frame: true
+  spatial_augmentation: true
+  temporal_window_augmentation: true
+  temporal_window_prob: 0.5
+  temporal_window_min_frames: 4
+  temporal_window_max_frames: 24
+  preload: true
+
+  recon_mask_ratio: 0.85
+  recon_mask_patch_size: 16
+
+  filter_2025_monthly: false
+
+model:
+  input_dim: 6
+  stem_dim: 128
+  precision_dim: 128
+  time_dim: 256
+  space_dim: 256
+  embedding_dim: 64
+  time_code_dim: 64
+  window_code_dim: 64
+  relative_time_code_dim: 16
+  num_blocks: 8
+  num_heads: 8
+  vmf_kappa: 8000.0
+  bottleneck_noise_scale: 0.02
+  metadata_dim: 4
+  num_sensor_types: 16
+  gradient_checkpointing: true
+  per_source_decoders: true
+  decoder_hidden_mult: 1
+  skip_l2_norm_training: true
+
+training:
+  epochs: 5
+  gradient_accumulation_steps: 2
+  lr: 0.0001
+  lr_min: 0.000001
+  weight_decay: 0.01
+  grad_clip_norm: 1.0
+
+  # ★ 重建损失（保持 v25/v27 验证的低权重）
+  reconstruction_weight: 0.08      # U-MAE 论文：过高重建权重损害线性探测
+  consistency_weight: 0.05           # v29: 大幅降低（v28=0.15），防止 teacher 坍缩正反馈
+  classification_weight: 0.03
+
+  # ★ 核心：欧氏空间 pre-norm uniformity
+  use_pre_norm_uniform: true
+  pre_norm_uniform_weight: 1.5
+  batch_uniformity_weight: 0.0
+
+  # ★ VICReg —— 只保留 variance hinge，关闭 covariance（改用 decorrelation）
+  use_spatial_vicreg: true         # v29 FIX: 重新开启！像素级 VICReg 全梯度（256样本）
+  variance_weight: 1.5               # v29: 增强方差约束（v27=0.6）
+  covariance_weight: 0.1           # v29: 恢复（v27=0.1），配合 spatial VICReg
+  vicreg_min_std: 1.0
+
+  # ★ v28 新增：Barlow Twins 装饰相关（强制所有维度方差均等）
+  # decorrelation_loss 先归一化再算相关矩阵 → 对角线强制 = 1 → 奇异值均等
+  # 在 all_pre（N=1056 >> D=64）上计算，协方差矩阵满秩，数值稳定
+  decorrelation_weight: 0.1          # v29: 降低（v28=0.2），减少与 variance 对抗
+
+  # ★ 辅助反坍缩
+  orthogonality_weight: 0.01
+
+  # ★ v28 新增：MCR² coding rate（log-det 梯度，弱维度自动获得最大推力）
+  # 在 all_pre（N=1056）上计算，eps=0.5（trainer.py 内已固定，此处可选覆盖）
+  coding_rate_weight: 0.1            # v29: 略增（v28=0.05）
+
+  # ★ v28 新增：直接 erank 最大化（gathered_pre N=32，SVD 奇异值熵）
+  erank_loss_weight: 0.5             # v29: 增强（v28=0.3）
+
+  # ★ v28 新增：gap-aware 时序损失（修复接线 bug 后首次启用）
+  # 使用 student W1 pre_norm_map vs student dual_pre_w2（W2 窗口）
+  # target cosine = 1 - 2*gap_norm，连续衰减，无需负样本
+  temporal_gap_aware_weight: 0.0     # v29: 禁用（v28 根因！MSE small-gap→坍缩）
+  temporal_contrastive_weight: 0.3   # v29: 恢复（纯斥力 hinge，teacher W1 vs W2）
+
+  # 关闭所有其他未验证损失
+  inter_patch_infonce_weight: 0.0
+  inter_patch_infonce_temperature: 0.1
+  inter_variance_weight: 0.0
+  inter_variance_min_std: 0.3
+  inter_decorr_weight: 0.0
+  temporal_cosine_pixel_weight: 0.0
+  patch_id_loss_weight: 0.0
+  lmim_weight: 0.0
+  hyperspherical_uniform_weight: 0.0
+  spherical_variance_weight: 0.0
+  temporal_magnitude_weight: 0.0
+  pixel_change_supervision_weight: 0.0
+  change_consistency_weight: 0.0
+  memory_bank_size: 1024
+  text_contrastive_weight: 0.0
+  vicreg_weight: 0.0
+  dino_weight: 0.0
+  koleo_weight: 0.0
+  pixel_temporal_info_nce_weight: 0.0
+  l2_temporal_weight: 0.0
+  ct_reconstruction_weight: 0.0
+  aux_classification_weight: 0.0
+  bottleneck_cls_weight: 0.0
+  encoder_uniform_weight: 0.0
+
+  # 源重建权重
+  source_recon_weights: [1.0, 1.0, 1.0, 0.02, 0.1, 0.1]
+
+  # Teacher-Student
+  teacher_momentum: 0.996
+  teacher_dropout_rate: 0.1
+  student_frame_drop_rate: 0.5
+  student_source_drop_rate: 0.3
+  student_front_drop_prob: 0.15
+  student_back_drop_prob: 0.15
+
+  # Kappa
+  kappa_start: 8000.0
+  kappa_end: 8000.0
+  kappa_warmup_epochs: 0
+
+  # 学习率调度
+  lr_schedule: cosine_no_restart
+  warmup_epochs: 2
+  recon_warmup_epochs: 0
+
+  # 每 epoch 最大步数（320 patches ÷ 4 = 80 steps，× 2 = 160，留余量到 200）
+  max_steps_per_epoch: 200
+
+  # 保存
+  save_every: 20
+  save_best_balanced: true
+  best_balanced_uniform_min: 0.0
+  best_balanced_uniform_max: 0.3
+  early_stop_patience: 100
+
+  decoder_cond_dropout: 0.6
+  temporal_magnitude_temperature: 0.1
+  temporal_use_spatial_weight: true
+
+evaluation:
+  knn_k: 5
+  bootstrap_samples: 100

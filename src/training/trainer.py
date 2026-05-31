@@ -39,6 +39,7 @@ from src.training.losses import (
     erank_maximization_loss,
     coding_rate_loss,
     gap_aware_temporal_cosine_loss,
+    temporal_contrastive_loss,
 )
 from src.training.memory_bank import EmbeddingMemoryBank
 from src.training.optimizer import build_optimizer, build_scheduler, get_cosine_lr
@@ -327,29 +328,45 @@ class DDPv13Trainer:
                 else:
                     consist = torch.tensor(0.0, device=self.device)
 
-                # V28: Gap-aware temporal cosine loss（修复接线 bug）
-                # 原 broken 版本：teacher(W1) vs student(W1)，语义倒置
-                # 修复版本：student pre_norm_map(W1) vs student dual_pre_w2(W2)
-                # target: gap 越大，cos_sim 目标越低（连续衰减，无需负样本）
+                # V29: 时序对比损失（纯斥力 hinge loss，不含吸引力）
+                # teacher W1 vs teacher W2（双窗口，EMA 无梯度）→ 时序不变性监督
+                # student W1 vs teacher W2（有梯度）→ 学生端时序感知
+                # 关键修复：v28 gap_aware MSE 在 small gap 时 target=1 → 引发坍缩
+                # 新方案：纯斥力 hinge loss，只要 cos_sim > target_margin 就惩罚
                 temporal_loss = torch.tensor(0.0, device=self.device)
-                if temporal_w > 0 and has_dual:
-                    # 保留 backward-compat：若有人仍开启旧权重，打印警告并跳过
-                    if self.global_rank == 0:
-                        print("[WARN] temporal_contrastive_weight > 0 但该路径已弃用，"
-                              "请改用 temporal_gap_aware_weight。跳过此 step 的时序损失。")
+                if temporal_w > 0 and has_dual and teacher_out.dual_pre_w2 is not None:
+                    # 教师双窗口：teacher(W1) vs teacher(W2) — 提供稳定时序梯度
+                    tc_teacher = temporal_contrastive_loss(
+                        teacher_out.pre_norm_map.detach(),
+                        teacher_out.dual_pre_w2.detach(),
+                        temperature=1.0,
+                        target_margin=0.2,
+                    )
+                    # 学生-教师跨窗口：student(W1) vs teacher(W2) — 学生端有梯度
+                    tc_cross = temporal_contrastive_loss(
+                        student_out.pre_norm_map,
+                        teacher_out.dual_pre_w2.detach(),
+                        temperature=1.0,
+                        target_margin=0.2,
+                    )
+                    temporal_loss = (tc_teacher + tc_cross) / 2.0
 
+                # gap_aware MSE 已废弃（v28 根因：small gap 时 target=1 引发坍缩）
+                # 若需 gap-aware 行为，应改用 hinge-only 变体（target_margin = f(gap)）
                 gap_aware_temporal_loss = torch.tensor(0.0, device=self.device)
                 if temporal_gap_aware_w > 0 and has_dual and teacher_out.dual_pre_w2 is not None:
                     w1_center = (batch["valid_start_w1"] + batch["valid_end_w1"]) / 2.0
                     w2_center = (batch["valid_start_w2"] + batch["valid_end_w2"]) / 2.0
                     gap_ms = (w2_center - w1_center).abs().float()
-                    # student W1（有梯度）→ 预测 teacher W2（EMA 无梯度，更稳定）
-                    gap_aware_temporal_loss = gap_aware_temporal_cosine_loss(
-                        student_out.pre_norm_map.float(),
-                        teacher_out.dual_pre_w2.detach().float(),
-                        gap_ms,
-                        max_gap_ms=6 * 30 * 24 * 3600 * 1000,
+                    # Hinge-only gap-aware：target_margin 随 gap 增大而减小（越大 gap 越要推开）
+                    # 注意：不用 MSE；用 F.relu(cos_sim - margin) 不含吸引力
+                    gap_norm = torch.clamp(gap_ms / (6 * 30 * 24 * 3600 * 1000), 0.0, 1.0)
+                    margin_map = (0.5 * (1.0 - gap_norm)).mean().item()  # 标量 margin
+                    gap_aware_temporal_loss = temporal_contrastive_loss(
+                        student_out.pre_norm_map,
+                        teacher_out.dual_pre_w2.detach(),
                         temperature=1.0,
+                        target_margin=float(margin_map),
                     )
 
                 # V19: Inter-Patch InfoNCE (NT-Xent) — 防止方向坍缩
@@ -448,8 +465,11 @@ class DDPv13Trainer:
                 var = variance_regularizer(spatial_flat.float(), min_std=vicreg_min_std) if var_w > 0 else torch.tensor(0.0, device=self.device)
                 cov = covariance_loss(spatial_flat.float()) if cov_w > 0 else torch.tensor(0.0, device=self.device)
             else:
-                var = variance_regularizer(all_pre.float(), min_std=vicreg_min_std) if var_w > 0 else torch.tensor(0.0, device=self.device)
-                cov = covariance_loss(all_pre.float()) if cov_w > 0 else torch.tensor(0.0, device=self.device)
+                # ★ FIX (v29): 用 gathered_pre（当前 batch，全梯度）而非 all_pre（含 detach bank）
+                # all_pre 中 bank 占 ~1024/1040 ≈ 99% 无梯度 → 方差梯度稀释 65×
+                # gathered_pre N=16, D=64 → 方差估计噪声但梯度完整，是 VICReg 原设计
+                var = variance_regularizer(gathered_pre.float(), min_std=vicreg_min_std) if var_w > 0 else torch.tensor(0.0, device=self.device)
+                cov = covariance_loss(gathered_pre.float()) if cov_w > 0 else torch.tensor(0.0, device=self.device)
             
             # ★ 新增：样本间 VICReg variance（在 gathered_pre 上计算）
             inter_var_w = getattr(t, 'inter_variance_weight', 0.0)
@@ -734,6 +754,7 @@ class DDPv13Trainer:
                 bank_size = self.memory_bank.size
                 step_msg = (f"  [Step {step}] recon={recon.item():.4f} "
                       f"consist={consist.item():.4f} "
+                      f"tc={temporal_loss.item():.4f} "
                       f"gap_t={gap_aware_temporal_loss.item():.4f} "
                       f"cls={cls.item():.4f} pid={patch_id_loss.item():.4f} "
                       f"var={var.item():.4f} cov={cov.item():.4f} "
