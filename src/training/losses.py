@@ -650,75 +650,43 @@ def temporal_magnitude_loss(
 
 
 # ────────────────────────────────────────────
-# 6b. Coding Rate Loss (MCR²)
+# 6b. Coding Rate Loss (MCR²，NPU-native 对角近似)
 # ────────────────────────────────────────────
 
-def _logdet_npu_safe(mat: torch.Tensor) -> torch.Tensor | None:
-    """NPU 安全的 log-determinant 计算（带梯度）。
-
-    Ascend NPU 不支持 torch.logdet（_linalg_slogdet.sign），直接 fallback CPU 会
-    在 backward 时耗尽宿主内存。依次尝试：
-      1. Cholesky：专为 PSD 矩阵设计，logdet = 2 * sum(log(diag(L)))
-      2. eigvalsh：对称矩阵实特征值，logdet = sum(log(lambda))
-      3. 返回 None（调用方跳过该 loss）
-    """
-    # 方法 1：Cholesky（最稳定，PSD 矩阵专用）
-    try:
-        L = torch.linalg.cholesky(mat)
-        return 2.0 * L.diagonal().clamp(min=1e-8).log().sum()
-    except Exception:
-        pass
-    # 方法 2：对称实特征值分解
-    try:
-        eigvals = torch.linalg.eigvalsh(mat)
-        return eigvals.clamp(min=1e-8).log().sum()
-    except Exception:
-        pass
-    return None
-
 def coding_rate_loss(embeddings: torch.Tensor, eps: float = 0.5) -> torch.Tensor:
-    """Maximal Coding Rate Reduction (MCR²) Loss.
+    """MCR² 编码率损失——对角协方差近似（完全 NPU-native）。
 
-    基于率失真理论，最大化整体编码率：
-    R(Z; eps) = 0.5 * log det(I + d/(N*eps²) * ZZ^T)
+    原始 MCR²：R(Z) = 0.5 * log det(I + α*C)，C = Z^T Z / N
+    对角近似：R_diag(Z) = 0.5 * sum_d log(1 + α * var_d)
 
-    对低秩构型（坍缩）施加无限惩罚，比VICReg的hinge variance更严格。
-    梯度 ∂logdet/∂C = C⁻¹，最弱维度获得最大梯度（自然均衡奇异值）。
+    对角近似的理由：
+    - 完整 logdet 需要 torch.linalg（Ascend NPU 不支持，fallback CPU 触发 TBE
+      状态机崩溃），对角版本仅用 pow/mean/log/sum，完全 NPU-native。
+    - 梯度方向：∂loss/∂z_id = -z_id * α / (N * (1 + α*var_d))，坍缩维度
+      (var_d→0) 梯度最大，饱和维度梯度趋零，与完整 MCR² 行为一致。
+    - 结合 decorrelation_loss（Barlow Twins）可补偿对角近似忽略的维度间相关项。
 
     Args:
-        embeddings: [N, D] pre-norm embedding
-        eps: 正则化参数（默认 0.5，比原 0.01 更稳定；0.01 在坍缩态 logdet 可能爆炸）
+        embeddings: [N, D] pre-norm embedding（通常为 all_pre，N≈1040）
+        eps: 正则化参数，默认 0.5
 
     Returns:
-        scalar loss, 负值（最大化编码率）
+        scalar loss，负值（越负越好，趋向最大编码率）
     """
     if embeddings.shape[0] < 2:
         return embeddings.new_tensor(0.0)
 
     N, D = embeddings.shape
-    # 中心化
-    emb_centered = embeddings - embeddings.mean(dim=0, keepdim=True)
-    # 协方差矩阵
-    cov = (emb_centered.T @ emb_centered) / N
-
-    I = torch.eye(D, device=embeddings.device, dtype=embeddings.dtype)
-    # 编码率：eps=0.5 时缩放因子 D/(N*0.25) ≈ 64/(1056*0.25) ≈ 0.24（all_pre 场景）
-    # 比 eps=0.01 的 ~256 小得多，数值更稳定
-    scale = D / (N * eps ** 2 + 1e-8)
-    mat = I + scale * cov
-    # 加微小 identity 扰动防止奇异（尤其在训练早期 embedding 接近零）
-    mat = mat + 1e-5 * I
-
-    # NPU 安全 logdet：torch.logdet 在 Ascend 上 fallback CPU 会 OOM。
-    # 优先 Cholesky（PSD 矩阵专用，最稳定），次选 eigvalsh（对称矩阵），最后 return 0。
-    logdet = _logdet_npu_safe(mat)
-    if logdet is None:
+    Z = embeddings - embeddings.mean(dim=0, keepdim=True)  # 中心化
+    # 列方差 [D]：var_d = ||Z_d||² / N
+    col_var = Z.pow(2).mean(dim=0)  # [D], NPU-native
+    # α = D / (N * eps²)，决定梯度强度
+    alpha = D / (N * eps ** 2 + 1e-8)
+    # -0.5 * sum_d log(1 + α * var_d)
+    loss = -0.5 * (1.0 + alpha * col_var).clamp(min=1e-8).log().sum()
+    if torch.isnan(loss) or torch.isinf(loss):
         return embeddings.new_tensor(0.0)
-
-    if torch.isnan(logdet) or torch.isinf(logdet):
-        return embeddings.new_tensor(0.0)
-
-    return -0.5 * logdet
+    return loss
 
 
 # ────────────────────────────────────────────
@@ -911,47 +879,35 @@ def inter_patch_infonce_loss(
 # ────────────────────────────────────────────
 
 def erank_maximization_loss(x: torch.Tensor) -> torch.Tensor:
-    """直接最大化 erank = exp(entropy(singular_values)).
+    """erank 最大化损失——列方差熵近似（完全 NPU-native）。
 
-    动机：
-    - Barlow Twins / decorrelation_loss 在 N < D 时（本项目 N=16, D=64）
-      协方差矩阵秩不足，梯度估计不稳定，无法有效防止维度坍缩。
-    - 此函数跳过协方差估计，直接在 SVD 奇异值空间最大化熵，
-      等价于最大化 erank，梯度在任何 N, D 组合下均有效。
+    原始实现使用 torch.linalg.svdvals，在 Ascend NPU 上 fallback CPU 会触发
+    TBE 状态机崩溃。此版本用「列方差」近似「奇异值²」，完全避免 linalg 调用。
 
     原理：
-    - x [N, D] → SVD → S [min(N,D)]（奇异值）
-    - p = S / sum(S)（归一化为概率分布）
-    - H = -sum(p * log(p))（奇异值熵）
-    - erank = exp(H)
-    - 返回 loss = max_H - H → 0 时 erank 最大（= N）
+    - x [N, D]，列 d 的方差 var_d ≈ lambda_d（第 d 个奇异值的平方，在列正交时精确）
+    - 归一化为概率分布，最大化信息熵 H = -sum(p * log(p))
+    - 等价于让所有维度方差相等（均匀分布 = 最大 erank）
 
-    梯度方向：
-    - 当 erank=2（两个大奇异值）: 梯度让最大奇异值缩小、最小奇异值增大
-    - 当 erank→N（理想均匀分布）: loss→0，梯度→0，自然停止
+    与精确 SVD 的差异：
+    - 精确 SVD：基于奇异值（全局正交化后），N=1040 时约等于列方差
+    - 对角近似：未正交化，有少量误差，但梯度方向一致（大方差维度被压缩）
+    - 结合 decorrelation_loss 可弥补正交化缺失的部分
 
     Args:
-        x: [N, D] 全局 pre-norm embedding（gathered_pre），N 通常=16, D=64
+        x: [N, D] pre-norm embedding（通常为 gathered_pre，N≈16 或 all_pre N≈1040）
 
     Returns:
-        scalar loss ≥ 0，最大值 = log(N)（完全坍缩时），0（理想时）
+        scalar loss ≥ 0，坍缩时大，均匀时 ≈ 0
     """
     N, D = x.shape
     if N < 2:
         return x.new_tensor(0.0)
 
-    x = x - x.mean(0, keepdim=True)  # 中心化
+    x = x - x.mean(0, keepdim=True)  # 中心化，NPU-native
+    col_var = x.pow(2).mean(dim=0).clamp(min=1e-8)  # [D]，列方差，NPU-native
+    probs = col_var / col_var.sum()  # 归一化
+    entropy = -(probs * probs.log()).sum()
+    max_entropy = math.log(float(D))  # 理想均匀时的最大熵
 
-    try:
-        # svdvals 只返回奇异值，比 full svd 占用更少内存，且 gradient 仍可传播
-        S = torch.linalg.svdvals(x)
-    except Exception:
-        return x.new_tensor(0.0)
-
-    S = S.clamp(min=1e-8)
-    p = S / S.sum()
-    entropy = -(p * p.log()).sum()
-    max_entropy = math.log(float(len(S)))  # log(min(N,D))
-
-    # 返回 (max - current)：当 erank=N 时 loss=0，坍缩时 loss>0
-    return torch.tensor(max_entropy, device=x.device, dtype=x.dtype) - entropy
+    return (max_entropy - entropy).clamp(min=0.0)
