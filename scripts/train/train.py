@@ -183,6 +183,8 @@ def main():
                 f"total={losses['total']:.4f} recon={losses['recon']:.4f} "
                 f"consist={losses['consist']:.4f} temporal={losses.get('temporal', 0.0):.4f} "
                 f"var={losses['var']:.4f} cov={losses['cov']:.4f} l2unif={losses['l2unif']:.4f} "
+                f"erank={losses.get('erank', 0.0):.2f} decorr={losses.get('decorr', 0.0):.4f} "
+                f"mcr2={losses.get('mcr2', 0.0):.4f} gap_t={losses.get('gap_t', 0.0):.4f} "
                 f"inter_var={inter_var:.4f} "
                 f"bank={bank_size}/512 active={active_dims}/128 std_mean={std_mean:.4f} "
                 f"lr={losses['lr']:.6f} | "
