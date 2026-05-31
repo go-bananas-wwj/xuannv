@@ -406,8 +406,7 @@ def eval_linear_probe(X: np.ndarray, y: np.ndarray,
         if task_type == "binary":
             clf = LogisticRegression(max_iter=300, n_jobs=4, random_state=42)
         else:
-            clf = LogisticRegression(max_iter=300, multi_class="multinomial",
-                                     solver="lbfgs", n_jobs=4, random_state=42)
+            clf = LogisticRegression(max_iter=300, solver="lbfgs", n_jobs=4, random_state=42)
         clf.fit(X_tr, y_tr)
         y_pred = clf.predict(X_te)
 
@@ -668,15 +667,13 @@ def main() -> None:
             print("    [跳过] 像素数不足")
             linear_results["dynamic_world"] = {"error": "no pixels"}
 
-    results["linear_probe"] = linear_results
-
     # ── 跳过 MLP 如果 --method linear ────────────────────────────────────────
     if args.method == "linear":
         print("\n[方式一完成，跳过 MLP 微调]")
-        # 保存结果
         out_file = output_dir / "eval_results.json"
+        out_data = {"linear_probe": linear_results, "erank": erank}
         with open(out_file, "w") as f:
-            json.dump(results, f, indent=2)
+            json.dump(out_data, f, indent=2)
         print(f"\n[保存] 结果已写入 {out_file}")
         return
 
@@ -704,6 +701,7 @@ def main() -> None:
         "n_test_patches": len(test_patches),
         "erank": erank,
         "spatial_map_shape": [D, H, W],
+        "linear_probe": linear_results,
     }
 
     # ── 任务 A：WorldCover ──────────────────────────────────────────────────
