@@ -32,23 +32,30 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-DATA_ROOT = Path("/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered")
+DEFAULT_DATA_ROOT = Path("/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered")
 
 TASKS = [
     ("worldcover",   "worldcover",   "static.tif",  10),
     ("jrc_water",    "jrc_water",    "static.tif",   2),
-    ("dynamic_world","dynamic_world","2025Q2.tif",   9),
+    ("dynamic_world","dynamic_world","static.tif",  12),
 ]
 
 LABEL_MAPPINGS: dict[str, dict[int, int]] = {
-    "worldcover": {10: 0, 30: 1, 40: 2, 50: 3, 60: 4, 80: 5, 90: 6},
+    "worldcover": {10: 0, 20: 1, 30: 2, 40: 3, 50: 4, 60: 5, 80: 6, 90: 7},
 }
 
 
 # ── 标签加载 ──────────────────────────────────────────────────────────────────
 
-def load_label(patch_id: str, label_dir: str, fname: str):
-    path = DATA_ROOT / label_dir / patch_id / fname
+def load_label(patch_id: str, label_dir: str, fname: str, data_root: Path):
+    path = data_root / label_dir / patch_id / fname
+    if not path.exists():
+        # 自动查找目录中的第一个 .tif 文件
+        patch_dir = data_root / label_dir / patch_id
+        if patch_dir.exists():
+            tifs = sorted([f for f in patch_dir.iterdir() if f.suffix.lower() == ".tif"])
+            if tifs:
+                path = tifs[0]
     if not path.exists():
         return None, None
     with rasterio.open(path) as src:
@@ -94,7 +101,7 @@ def knn_sklearn(X_train, y_train, X_test, k):
 
 def evaluate_task(
     task_name, label_dir, label_file, num_classes,
-    spatial_maps, patch_ids, device, k, backend, seed=42,
+    spatial_maps, patch_ids, device, k, backend, data_root, seed=42,
 ):
     """评估单个下游任务。
 
@@ -113,13 +120,19 @@ def evaluate_task(
     all_X, all_y, all_pidx = [], [], []
 
     for p_idx, pid in enumerate(patch_ids):
-        label, nodata = load_label(pid, label_dir, label_file)
+        label, nodata = load_label(pid, label_dir, label_file, data_root)
         if label is None:
             continue
         if label.shape != (H, W):
             label = resize_label(label, H, W)
+        # Dynamic World 浮点值四舍五入
+        if task_name == "dynamic_world":
+            label = np.rint(label).astype(np.int64)
         if mapping:
-            label = np.vectorize(lambda x: mapping.get(x, -1))(label)
+            mapped = np.full_like(label, -1, dtype=np.int64)
+            for k, v in mapping.items():
+                mapped[label == k] = v
+            label = mapped
             nodata = -1
         mask = (label >= 0) & (label < num_classes)
         if nodata is not None:
@@ -198,6 +211,8 @@ def main():
                     help="pytorch: torch.cdist KNN；sklearn: KNeighborsClassifier (仅 CPU)")
     pa.add_argument("--k",     type=int, default=5,  help="近邻数")
     pa.add_argument("--month", type=int, default=6,  help="使用第几月的 embedding (1-12)")
+    pa.add_argument("--data-root", type=str, default=None,
+                    help="数据根目录，默认使用哈尔滨路径")
     args = pa.parse_args()
 
     # 后端与设备一致性校验
@@ -211,6 +226,9 @@ def main():
         except ImportError:
             print("[警告] 未找到 torch_npu，回退到 CPU")
             args.device = "cpu"
+
+    data_root = Path(args.data_root) if args.data_root else DEFAULT_DATA_ROOT
+    print(f"[KNN] 数据根目录: {data_root}")
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -231,6 +249,7 @@ def main():
         report = evaluate_task(
             task_name, label_dir, label_file, num_classes,
             spatial_maps, patch_ids, args.device, args.k, args.backend,
+            data_root,
         )
         if report:
             all_reports[task_name] = report
