@@ -386,9 +386,9 @@ def download_patch_v2(args) -> dict:
             continue
 
         # S2 限制 items 数量（避免过多数据导致处理极慢）
-        if source == "s2" and len(items) > 15:
-            print(f"    [INFO] S2 patch_{patch_id:06d}: limiting items from {len(items)} to 15")
-            items = items[:15]
+        if source == "s2" and len(items) > 8:
+            print(f"    [INFO] S2 patch_{patch_id:06d}: limiting items from {len(items)} to 8")
+            items = items[:8]
 
         # === 2. 预签名所有 items（一次调用）===
         items = pre_sign_items(items)
@@ -441,12 +441,14 @@ def download_patch_v2(args) -> dict:
                             print(f"      [WARN] S1 item {item.id} failed: {e}")
                             continue
                 else:
-                    # S2 逐个 item 用 stackstac 处理
+                    # S2 小批量 stackstac（每批 3 个），平衡速度和稳定性
                     import stackstac
-                    for item in items_to_download:
+                    mini_batch = 3
+                    for mb_start in range(0, len(items_to_download), mini_batch):
+                        mb_items = items_to_download[mb_start:mb_start + mini_batch]
                         try:
                             stack = stackstac.stack(
-                                [item],
+                                mb_items,
                                 assets=assets,
                                 bounds_latlon=bbox,
                                 resolution=RESOLUTION_MAP[source],
@@ -455,28 +457,51 @@ def download_patch_v2(args) -> dict:
                                 epsg=epsg,
                                 fill_value=0,
                             )
-                            data = stack.compute()  # [1, band, y, x]
-                            data_np = np.asarray(data[0])  # [band, y, x]
-
-                            if data_np.shape[0] != len(assets):
-                                print(f"      [WARN] Band mismatch for S2 item {item.id}: expected {len(assets)}, got {data_np.shape[0]}")
-                                continue
-
-                            if np.all(data_np == 0):
-                                print(f"      [WARN] All-zero S2 data for {item.id}")
-                                continue
-
-                            if divide_10000:
-                                data_np = data_np.astype(np.float32) / 10000.0
-                            else:
-                                data_np = data_np.astype(np.uint16)
-
-                            dt = item.datetime
-                            date_str = dt.strftime("%Y%m%d") if dt else item.id.split("_")[-1][:8]
-                            batch_results[date_str] = data_np
+                            data = stack.compute()  # [time, band, y, x]
                         except Exception as e:
-                            print(f"      [WARN] S2 item {item.id} failed: {e}")
-                            continue
+                            err_str = str(e)
+                            if "403" in err_str or "HTTP response code" in err_str:
+                                print(f"      [RETRY] S2 mini-batch {mb_start} token expired, re-signing...")
+                                import planetary_computer as pc
+                                mb_items = [pc.sign(it) for it in mb_items]
+                                try:
+                                    stack = stackstac.stack(
+                                        mb_items,
+                                        assets=assets,
+                                        bounds_latlon=bbox,
+                                        resolution=RESOLUTION_MAP[source],
+                                        rescale=False,
+                                        dtype="float64",
+                                        epsg=epsg,
+                                        fill_value=0,
+                                    )
+                                    data = stack.compute()
+                                except Exception as e2:
+                                    print(f"      [WARN] S2 mini-batch {mb_start} re-sign failed: {e2}")
+                                    continue
+                            else:
+                                print(f"      [WARN] S2 mini-batch {mb_start} failed: {e}")
+                                continue
+
+                        for i, item in enumerate(mb_items):
+                            try:
+                                data_np = np.asarray(data[i])  # [band, y, x]
+                                if data_np.shape[0] != len(assets):
+                                    print(f"      [WARN] Band mismatch for S2 item {item.id}: expected {len(assets)}, got {data_np.shape[0]}")
+                                    continue
+                                if np.all(data_np == 0):
+                                    print(f"      [WARN] All-zero S2 data for {item.id}")
+                                    continue
+                                if divide_10000:
+                                    data_np = data_np.astype(np.float32) / 10000.0
+                                else:
+                                    data_np = data_np.astype(np.uint16)
+                                dt = item.datetime
+                                date_str = dt.strftime("%Y%m%d") if dt else item.id.split("_")[-1][:8]
+                                batch_results[date_str] = data_np
+                            except Exception as e:
+                                print(f"      [WARN] S2 item {item.id} failed: {e}")
+                                continue
             else:
                 batch_results = batch_download_stackstac(
                     items_to_download, source, bbox, epsg, divide_10000
