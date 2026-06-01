@@ -214,6 +214,7 @@ def main() -> None:
     restart_counts = {s: 0 for s in SOURCES}
     cooldown_until = {s: datetime.min for s in SOURCES}
     last_progress = {s: (None, None) for s in SOURCES}
+    completed_sources: set[str] = set()
     cycle = 0
 
     try:
@@ -225,12 +226,27 @@ def main() -> None:
             any_restarted = False
 
             for source, cfg in SOURCES.items():
+                if source in completed_sources:
+                    prog_cur, prog_total = latest_progress(cfg["log"])
+                    report_lines.append(
+                        f"  {source:8s} ✅ 已完成   | {prog_cur or '?'}/{prog_total or '?'} |"
+                    )
+                    continue
+
                 pid = read_pid(source)
                 alive = is_alive(pid)
                 mtime = log_mtime(cfg["log"])
                 prog_cur, prog_total = latest_progress(cfg["log"])
 
-                if not alive:
+                if prog_cur is not None and prog_total is not None and prog_cur >= prog_total and not alive:
+                    status = "✅ 已完成"
+                    reason = "进度已达上限，进程正常退出"
+                    completed_sources.add(source)
+                    try:
+                        os.remove(pidfile_path(source))
+                    except Exception:
+                        pass
+                elif not alive:
                     status = "🔴 丢失"
                     reason = f"PID={pid} 不存在"
                 elif mtime is None:
@@ -266,7 +282,7 @@ def main() -> None:
                 _log(f"周期 #{cycle} 状态报告")
                 for line in report_lines:
                     _log(line)
-                _log(f"重启历史: {restart_counts}")
+                _log(f"重启历史: {restart_counts} | 已完成: {sorted(completed_sources)}")
                 _log("-" * 50)
     finally:
         remove_watchdog_pid()
