@@ -361,9 +361,9 @@ def download_patch_v2(args) -> dict:
             continue
 
         # S2 限制 items 数量（避免过多数据导致处理极慢）
-        if source == "s2" and len(items) > 30:
-            print(f"    [INFO] S2 patch_{patch_id:06d}: limiting items from {len(items)} to 30")
-            items = items[:30]
+        if source == "s2" and len(items) > 15:
+            print(f"    [INFO] S2 patch_{patch_id:06d}: limiting items from {len(items)} to 15")
+            items = items[:15]
 
         # === 2. 预签名所有 items（一次调用）===
         items = pre_sign_items(items)
@@ -386,43 +386,72 @@ def download_patch_v2(args) -> dict:
 
         if items_to_download:
             if source in ("s1", "s2"):
-                # S1/S2 使用 odc.stac.load 批量处理（避免 stackstac + dask 多线程死锁）
-                import odc.stac
-                ds = odc.stac.load(
-                    items_to_download,
-                    bands=assets,
-                    bbox=bbox,
-                    resolution=RESOLUTION_MAP[source],
-                    crs=f"EPSG:{epsg}",
-                )
-                data = ds.compute()
+                # S1 使用 odc.stac.load 批量；S2 使用 stackstac 逐个 item（避免批量 compute 阻塞）
                 batch_results = {}
-                for i, item in enumerate(items_to_download):
-                    try:
-                        bands_list = []
-                        for band in assets:
-                            if band not in data.data_vars:
-                                raise ValueError(f"Band '{band}' missing")
-                            bands_list.append(np.asarray(data[band][i]))
-                        data_np = np.stack(bands_list, axis=0)
-
-                        # 全0检测
-                        if np.all(data_np == 0):
-                            print(f"      [WARN] All-zero data for {source} item {item.id}")
+                if source == "s1":
+                    import odc.stac
+                    ds = odc.stac.load(
+                        items_to_download,
+                        bands=assets,
+                        bbox=bbox,
+                        resolution=RESOLUTION_MAP[source],
+                        crs=f"EPSG:{epsg}",
+                    )
+                    data = ds.compute()
+                    for i, item in enumerate(items_to_download):
+                        try:
+                            bands_list = []
+                            for band in assets:
+                                if band not in data.data_vars:
+                                    raise ValueError(f"Band '{band}' missing")
+                                bands_list.append(np.asarray(data[band][i]))
+                            data_np = np.stack(bands_list, axis=0)
+                            if np.all(data_np == 0):
+                                print(f"      [WARN] All-zero S1 data for {item.id}")
+                                continue
+                            dt = item.datetime
+                            date_str = dt.strftime("%Y%m%d") if dt else item.id.split("_")[-1][:8]
+                            batch_results[date_str] = data_np
+                        except Exception as e:
+                            print(f"      [WARN] S1 item {item.id} failed: {e}")
                             continue
+                else:
+                    # S2 逐个 item 用 stackstac 处理
+                    import stackstac
+                    for item in items_to_download:
+                        try:
+                            stack = stackstac.stack(
+                                [item],
+                                assets=assets,
+                                bounds_latlon=bbox,
+                                resolution=RESOLUTION_MAP[source],
+                                rescale=False,
+                                dtype="float64",
+                                epsg=epsg,
+                                fill_value=0,
+                            )
+                            data = stack.compute()  # [1, band, y, x]
+                            data_np = np.asarray(data[0])  # [band, y, x]
 
-                        # 数据转换
-                        if divide_10000 and source == "s2":
-                            data_np = data_np.astype(np.float32) / 10000.0
-                        elif source == "s2":
-                            data_np = data_np.astype(np.uint16)
+                            if data_np.shape[0] != len(assets):
+                                print(f"      [WARN] Band mismatch for S2 item {item.id}: expected {len(assets)}, got {data_np.shape[0]}")
+                                continue
 
-                        dt = item.datetime
-                        date_str = dt.strftime("%Y%m%d") if dt else item.id.split("_")[-1][:8]
-                        batch_results[date_str] = data_np
-                    except Exception as e:
-                        print(f"      [WARN] {source} item {item.id} failed: {e}")
-                        continue
+                            if np.all(data_np == 0):
+                                print(f"      [WARN] All-zero S2 data for {item.id}")
+                                continue
+
+                            if divide_10000:
+                                data_np = data_np.astype(np.float32) / 10000.0
+                            else:
+                                data_np = data_np.astype(np.uint16)
+
+                            dt = item.datetime
+                            date_str = dt.strftime("%Y%m%d") if dt else item.id.split("_")[-1][:8]
+                            batch_results[date_str] = data_np
+                        except Exception as e:
+                            print(f"      [WARN] S2 item {item.id} failed: {e}")
+                            continue
             else:
                 batch_results = batch_download_stackstac(
                     items_to_download, source, bbox, epsg, divide_10000
