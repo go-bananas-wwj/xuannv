@@ -491,12 +491,13 @@ class DDPv13Trainer:
                 inter_decorr = decorrelation_loss(gathered_pre.float())
 
             # V23: 直接 erank 最大化（SVD 奇异值熵）
-            # N=16, D=64 → SVD 给出 16 个奇异值 → 最大化熵 → max erank=16
-            # loss = log(N) - H(singular_values)，坍缩时→log(N)，理想时→0
+            # ★ v39 FIX: 改在 all_pre（含 memory bank，N≈4112）上计算
+            #   之前用 gathered_pre（N=16），max erank=16 << D=64，推散力严重不足
+            #   改用 all_pre 后 N>>D，max erank≈64，直接优化列方差均匀分布
             erank_loss_w = getattr(t, 'erank_loss_weight', 0.0)
             erank_loss_val = torch.tensor(0.0, device=self.device)
-            if erank_loss_w > 0 and gathered_pre is not None and gathered_pre.shape[0] >= 2:
-                erank_loss_val = erank_maximization_loss(gathered_pre.float())
+            if erank_loss_w > 0 and all_pre is not None and all_pre.shape[0] >= 2:
+                erank_loss_val = erank_maximization_loss(all_pre.float())
 
             # V28: MCR² Coding Rate Loss — 直接 log-det 优化（绕过 VICReg 的 N<D 梯度上界问题）
             # 在 all_pre（含 memory bank，N >> D）上计算，保证协方差矩阵满秩
