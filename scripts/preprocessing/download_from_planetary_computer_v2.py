@@ -183,17 +183,42 @@ def batch_download_stackstac(
 
     for batch_start in range(0, len(items), batch_size):
         batch_items = items[batch_start:batch_start + batch_size]
-        stack = stackstac.stack(
-            batch_items,
-            assets=assets,
-            bounds_latlon=bbox,
-            resolution=resolution,
-            rescale=False,
-            dtype="float64",
-            epsg=epsg,
-            fill_value=0,
-        )
-        data = stack.compute()  # [time, band, y, x]
+        try:
+            stack = stackstac.stack(
+                batch_items,
+                assets=assets,
+                bounds_latlon=bbox,
+                resolution=resolution,
+                rescale=False,
+                dtype="float64",
+                epsg=epsg,
+                fill_value=0,
+            )
+            data = stack.compute()  # [time, band, y, x]
+        except Exception as e:
+            err_str = str(e)
+            if "403" in err_str or "HTTP response code" in err_str:
+                print(f"      [RETRY] Token expired for {source} batch {batch_start}, re-signing...")
+                import planetary_computer as pc
+                batch_items = [pc.sign(it) for it in batch_items]
+                try:
+                    stack = stackstac.stack(
+                        batch_items,
+                        assets=assets,
+                        bounds_latlon=bbox,
+                        resolution=resolution,
+                        rescale=False,
+                        dtype="float64",
+                        epsg=epsg,
+                        fill_value=0,
+                    )
+                    data = stack.compute()
+                except Exception as e2:
+                    print(f"      [WARN] {source} batch {batch_start} re-sign failed: {e2}")
+                    continue
+            else:
+                print(f"      [WARN] {source} batch {batch_start} failed: {e}")
+                continue
 
         for i, item in enumerate(batch_items):
             data_np = np.asarray(data[i])  # [band, y, x]
