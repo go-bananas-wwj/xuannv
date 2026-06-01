@@ -163,6 +163,19 @@ def batch_download_stackstac(
     assets = ASSET_MAP[source]
     resolution = RESOLUTION_MAP[source]
 
+    # 过滤掉缺少目标 assets 的 items（S1 EW 模式缺少 vv/vh，跳过）
+    valid_items = []
+    for item in items:
+        available = set(item.assets.keys())
+        if all(a in available for a in assets):
+            valid_items.append(item)
+        else:
+            missing = [a for a in assets if a not in available]
+            print(f"      [SKIP] {source} item {item.id} missing bands: {missing}")
+    items = valid_items
+    if not items:
+        return {}
+
     # 一次性 stack 所有 items
     stack = stackstac.stack(
         items,
@@ -388,7 +401,7 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--sources", nargs="+", default=["s2"],
                         choices=["s2", "s1", "landsat", "dem", "worldcover"])
-    parser.add_argument("--workers", type=int, default=2)
+    parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--date-start", default="2023-01-01")
     parser.add_argument("--date-end", default="2025-10-31")
     parser.add_argument("--no-divide-10000", action="store_true")
