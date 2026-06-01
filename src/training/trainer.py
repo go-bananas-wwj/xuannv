@@ -238,7 +238,20 @@ class DDPv13Trainer:
         self.model.module.bottleneck.kappa = kappa
         self.teacher.bottleneck.kappa = kappa
 
-        recon_w = t.reconstruction_weight
+        # ★ v40: Curriculum Learning — 先推散(epoch 0~N)，后注入语义(epoch N+)
+        curriculum_epochs = getattr(t, 'curriculum_epochs', 0)
+        if curriculum_epochs > 0:
+            alpha = min(1.0, epoch / max(curriculum_epochs, 1))  # 0 -> 1
+            recon_w = (1 - alpha) * getattr(t, 'curriculum_recon_weight', 0.0) + alpha * t.reconstruction_weight
+            pre_norm_uniform_w = (1 - alpha) * getattr(t, 'curriculum_pre_norm_uniform_weight', 3.0) + alpha * getattr(t, 'pre_norm_uniform_weight', 1.0)
+            erank_loss_w = (1 - alpha) * getattr(t, 'curriculum_erank_loss_weight', 1.0) + alpha * getattr(t, 'erank_loss_weight', 0.2)
+            if self.global_rank == 0 and step == 0:
+                print(f"[Curriculum] epoch={epoch} alpha={alpha:.2f} recon_w={recon_w:.3f} pre_norm_w={pre_norm_uniform_w:.2f} erank_w={erank_loss_w:.2f}")
+        else:
+            recon_w = t.reconstruction_weight
+            pre_norm_uniform_w = getattr(t, 'pre_norm_uniform_weight', 0.0)
+            erank_loss_w = getattr(t, 'erank_loss_weight', 0.0)
+
         consist_w = getattr(t, 'consistency_weight', 0.0)
         temporal_w = getattr(t, 'temporal_contrastive_weight', 0.0)
         temporal_gap_aware_w = getattr(t, 'temporal_gap_aware_weight', 0.0)
@@ -494,7 +507,7 @@ class DDPv13Trainer:
             # ★ v39 FIX: 改在 all_pre（含 memory bank，N≈4112）上计算
             #   之前用 gathered_pre（N=16），max erank=16 << D=64，推散力严重不足
             #   改用 all_pre 后 N>>D，max erank≈64，直接优化列方差均匀分布
-            erank_loss_w = getattr(t, 'erank_loss_weight', 0.0)
+            # ★ v40: 使用 curriculum 动态 erank_loss_w（已在 train_epoch 开头计算）
             erank_loss_val = torch.tensor(0.0, device=self.device)
             if erank_loss_w > 0 and all_pre is not None and all_pre.shape[0] >= 2:
                 erank_loss_val = erank_maximization_loss(all_pre.float())
@@ -511,7 +524,7 @@ class DDPv13Trainer:
             use_pre_norm_unif = getattr(t, 'use_pre_norm_uniform', False)
             use_spatial_raw_unif = getattr(t, 'use_spatial_raw_uniformity', False)
             l2_uniform_w = getattr(t, 'batch_uniformity_weight', 0.05)
-            pre_norm_uniform_w = getattr(t, 'pre_norm_uniform_weight', 0.0)
+            # ★ v40: pre_norm_uniform_w 已在 train_epoch 开头通过 curriculum 动态计算
 
             if use_spatial_raw_unif and pre_norm_uniform_w > 0:
                 # V13-explore: Spatial raw uniformity on pre_norm_map [B, D, H, W] — 完全绕过 GMP + L2
