@@ -26,6 +26,11 @@ from __future__ import annotations
 import sys; sys.stdout.reconfigure(line_buffering=True)
 
 import os
+# 清除代理环境变量，确保直连 Planetary Computer（国内可直连，避免消耗梯子流量）
+for proxy_key in ["http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]:
+    os.environ.pop(proxy_key, None)
+os.environ["no_proxy"] = "*"  # 禁用所有代理
+
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -104,6 +109,9 @@ def determine_utm_epsg(center_lon: float, center_lat: float) -> int:
 def _search_with_retry(catalog, source, bbox, date_start, date_end):
     """一次性搜索整个时间范围（带重试）"""
     collection = COLLECTION_MAP[source]
+    # WorldCover 2021 数据，强制使用 2021 年时间范围
+    if source == "worldcover":
+        date_start, date_end = "2021-01-01", "2021-12-31"
     kwargs = {
         "collections": [collection],
         "bbox": bbox,
