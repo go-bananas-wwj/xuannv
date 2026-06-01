@@ -90,9 +90,21 @@ def load_model_and_dataset(config_path, ckpt_path, device_str):
 
 # ── 单张 embedding 提取 ────────────────────────────────────────────────────
 
+def _center_crop_spatial(x: torch.Tensor, ratio: float) -> torch.Tensor:
+    """对空间特征图做中心裁剪. x: [..., H, W], ratio in (0, 1]."""
+    if ratio >= 1.0:
+        return x
+    *leading, H, W = x.shape
+    new_h = int(H * ratio)
+    new_w = int(W * ratio)
+    top = (H - new_h) // 2
+    left = (W - new_w) // 2
+    return x[..., top:top + new_h, left:left + new_w]
+
+
 @torch.no_grad()
 def extract_one(model, dataset, cfg, sample_map, device,
-                patch_id, year, month) -> np.ndarray | None:
+                patch_id, year, month, center_crop_ratio: float = 1.0) -> np.ndarray | None:
     key = (patch_id, year, month)
     if key not in sample_map:
         return None
@@ -117,6 +129,7 @@ def extract_one(model, dataset, cfg, sample_map, device,
         skip_decoder=True,
     )
     emb = F.normalize(out.embedding_map, p=2, dim=1)  # [1, D, H, W]
+    emb = _center_crop_spatial(emb, center_crop_ratio)
     return emb.squeeze(0).cpu().numpy()                 # [D, H, W]
 
 
@@ -139,19 +152,21 @@ def extract_all(args):
     patches = all_patches[start:end]
 
     months = DEFAULT_MONTHS
+    crop_ratio = getattr(args, 'center_crop_ratio', 1.0)
     print(f"[提取] GPU 分片 {args.gpu_idx}/{args.total_gpus} → "
-          f"patch {start}:{end} ({len(patches)} 个), {len(months)} 个月")
+          f"patch {start}:{end} ({len(patches)} 个), {len(months)} 个月"
+          f"{' (center_crop=' + str(crop_ratio) + ')' if crop_ratio < 1.0 else ''}")
 
     if args.format == "npy":
         _extract_npy(model, dataset, cfg, sample_map, device,
-                     patches, months, output_dir, args.gpu_idx)
+                     patches, months, output_dir, args.gpu_idx, crop_ratio)
     else:
         _extract_npz(model, dataset, cfg, sample_map, device,
-                     patches, months, output_dir, args.gpu_idx)
+                     patches, months, output_dir, args.gpu_idx, crop_ratio)
 
 
 def _extract_npy(model, dataset, cfg, sample_map, device,
-                 patches, months, output_dir, gpu_idx):
+                 patches, months, output_dir, gpu_idx, center_crop_ratio: float = 1.0):
     extracted = skipped = errors = 0
     records = []
 
@@ -163,7 +178,7 @@ def _extract_npy(model, dataset, cfg, sample_map, device,
                 skipped += 1
                 continue
             emb = extract_one(model, dataset, cfg, sample_map,
-                               device, pid, year, month)
+                               device, pid, year, month, center_crop_ratio)
             if emb is None:
                 continue
             np.save(out_fp, emb)
@@ -177,7 +192,7 @@ def _extract_npy(model, dataset, cfg, sample_map, device,
 
 
 def _extract_npz(model, dataset, cfg, sample_map, device,
-                 patches, months, output_dir, gpu_idx):
+                 patches, months, output_dir, gpu_idx, center_crop_ratio: float = 1.0):
     """提取并合并为 npz，格式与 knn_eval.py --embedding-file 兼容。
 
     spatial_maps: [N_patches, N_months, D, H, W]
@@ -192,7 +207,7 @@ def _extract_npz(model, dataset, cfg, sample_map, device,
         month_str = f"{year}-{month:02d}"
         print(f"  [{m_idx+1}/{n_months}] {month_str}...")
         for p_idx, pid in enumerate(tqdm(patches, desc=f"  {month_str}", leave=False)):
-            emb = extract_one(model, dataset, cfg, sample_map, device, pid, year, month)
+            emb = extract_one(model, dataset, cfg, sample_map, device, pid, year, month, center_crop_ratio)
             if emb is None:
                 continue
             if all_maps is None:
@@ -266,6 +281,8 @@ def main():
     pa.add_argument("--total-gpus",   type=int, default=1,  help="总分片数")
     pa.add_argument("--merge-only",   action="store_true",  help="仅执行合并，不提取")
     pa.add_argument("--merge-npy-dir", default="",          help="--merge-only 时的 npy 目录")
+    pa.add_argument("--center-crop-ratio", type=float, default=1.0,
+                    help="中心裁剪比例（默认 1.0 不裁剪，0.75 保留中心 75% 区域）")
     args = pa.parse_args()
 
     if args.merge_only:

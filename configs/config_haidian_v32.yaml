@@ -1,0 +1,207 @@
+# ============================================================
+# xuannv 海淀嵌入底座 v32 — P0 + P1（反坍缩 + 2D 位置编码）
+# 创建时间: 2026-06-01
+#
+# v32 相比 v31 的额外改动（P1）：
+#   1. use_2d_pos_enc: true（SpaceOperator 添加 2D Sincos PE）
+#   2. 评估时支持 center-crop-ratio 0.75 消除边缘不连续
+#
+# Soft-restart 起点：v25 best（epoch_best_epoch78.pt），erank=9.09
+# ============================================================
+
+experiment:
+  name: exp_v32_haidian_p0p1_2dpos_0601
+  seed: 42
+  output_dir: /workspace/outputs/exp_v32_haidian_p0p1_2dpos_0601
+
+data:
+  dataset_type: harbin_patches
+  manifest_path: /workspace/raw/haidian_train
+  stats_dir: /workspace/statistics/haidian_train
+  batch_size: 4
+  num_workers: 0
+  image_size: 128
+  max_frames: 24
+  num_samples: 320
+  num_classes: 11
+  input_dim: 6
+  metadata_dim: 4
+
+  # ★ 4 路输入（含天仪 SAR）
+  num_input_sources: 4
+  input_sources:
+    - s2
+    - s1
+    - landsat
+    - tianyi_sar
+
+  source_channels:
+    s2: 6
+    s1: 2
+    landsat: 6
+    tianyi_sar: 1
+
+  # 5 个目标源
+  num_target_sources: 6
+  target_sources:
+    - name: s2
+      loss_type: 0
+      sensor_src: s2
+      out_channels: 6
+    - name: s1
+      loss_type: 0
+      sensor_src: s1
+      out_channels: 2
+    - name: landsat
+      loss_type: 0
+      sensor_src: landsat
+      out_channels: 6
+    - name: dem
+      loss_type: 0
+      sensor_src: null
+      out_channels: 1
+    - name: worldcover
+      loss_type: 1
+      sensor_src: null
+      out_channels: 11
+    - name: dynamic_world
+      loss_type: 1        # CrossEntropy, io-lulc 9类
+      sensor_src: null
+      out_channels: 9
+
+  random_target_frame: true
+  spatial_augmentation: true
+  temporal_window_augmentation: true
+  temporal_window_prob: 0.5
+  temporal_window_min_frames: 4
+  temporal_window_max_frames: 24
+  preload: true
+
+  recon_mask_ratio: 0.85
+  recon_mask_patch_size: 16
+
+  filter_2025_monthly: false
+
+model:
+  input_dim: 6
+  stem_dim: 128
+  precision_dim: 128
+  time_dim: 256
+  space_dim: 256
+  embedding_dim: 64
+  time_code_dim: 64
+  window_code_dim: 64
+  relative_time_code_dim: 16
+  num_blocks: 8
+  num_heads: 8
+  vmf_kappa: 8000.0
+  bottleneck_noise_scale: 0.02
+  metadata_dim: 4
+  num_sensor_types: 16
+  gradient_checkpointing: true
+  per_source_decoders: true
+  decoder_hidden_mult: 1
+  skip_l2_norm_training: true
+
+  # ★ P1：启用 2D Sincos 位置编码
+  use_2d_pos_enc: true
+  pos_enc_2d_height: 8
+  pos_enc_2d_width: 8
+
+training:
+  epochs: 40
+  gradient_accumulation_steps: 2
+  lr: 0.00005
+  lr_min: 0.000001
+  weight_decay: 0.01
+  grad_clip_norm: 1.0
+
+  # ★★★ P0 核心改动：反坍缩超参数调整 ★★★
+  reconstruction_weight: 0.08
+  consistency_weight: 0.05          # v30: 0.15 → 0.05
+  classification_weight: 0.03
+
+  # 核心：欧氏空间 pre-norm uniformity
+  use_pre_norm_uniform: true
+  pre_norm_uniform_weight: 1.5
+  batch_uniformity_weight: 0.0
+
+  # ★ VICReg：P0 增强方差/协方差约束
+  use_spatial_vicreg: true
+  variance_weight: 1.0              # v30: 0.6 → 1.0
+  covariance_weight: 0.5            # v30: 0.1 → 0.5
+  vicreg_min_std: 1.0
+
+  # 辅助反坍缩
+  decorrelation_weight: 0.0
+  orthogonality_weight: 0.01
+
+  # 关闭复杂损失
+  inter_patch_infonce_weight: 0.0
+  inter_patch_infonce_temperature: 0.1
+  inter_variance_weight: 0.0
+  inter_variance_min_std: 0.3
+  inter_decorr_weight: 0.0
+  erank_loss_weight: 0.0
+  temporal_contrastive_weight: 0.1
+  temporal_cosine_pixel_weight: 0.0
+
+  # 关闭其他未验证损失
+  patch_id_loss_weight: 0.0
+  lmim_weight: 0.0
+  temporal_gap_aware_weight: 0.0
+  hyperspherical_uniform_weight: 0.0
+  spherical_variance_weight: 0.0
+  temporal_magnitude_weight: 0.0
+  pixel_change_supervision_weight: 0.0
+  change_consistency_weight: 0.0
+  # Memory Bank — P0：1024 → 2048
+  memory_bank_size: 2048
+  text_contrastive_weight: 0.0
+  vicreg_weight: 0.0
+  dino_weight: 0.0
+  koleo_weight: 0.0
+  pixel_temporal_info_nce_weight: 0.0
+  l2_temporal_weight: 0.0
+  ct_reconstruction_weight: 0.0
+  aux_classification_weight: 0.0
+  bottleneck_cls_weight: 0.0
+  encoder_uniform_weight: 0.0
+
+  # 源重建权重
+  source_recon_weights: [1.0, 1.0, 1.0, 0.02, 0.1, 0.1]
+
+  # Teacher-Student
+  teacher_momentum: 0.996
+  teacher_dropout_rate: 0.1
+  student_frame_drop_rate: 0.5
+  student_source_drop_rate: 0.3
+  student_front_drop_prob: 0.15
+  student_back_drop_prob: 0.15
+
+  # Kappa
+  kappa_start: 8000.0
+  kappa_end: 8000.0
+  kappa_warmup_epochs: 0
+
+  # 学习率调度
+  lr_schedule: cosine_no_restart
+  warmup_epochs: 3
+  recon_warmup_epochs: 0
+
+  max_steps_per_epoch: 200
+
+  # 保存
+  save_every: 10
+  save_best_balanced: true
+  best_balanced_uniform_min: 0.0
+  best_balanced_uniform_max: 0.3
+  early_stop_patience: 100
+
+  decoder_cond_dropout: 0.6
+  temporal_magnitude_temperature: 0.1
+  temporal_use_spatial_weight: true
+
+evaluation:
+  knn_k: 5
+  bootstrap_samples: 100

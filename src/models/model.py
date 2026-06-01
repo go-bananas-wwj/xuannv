@@ -88,6 +88,7 @@ class AEFModel(nn.Module):
             num_blocks=m.num_blocks,
             num_heads=m.num_heads,
             use_checkpoint=m.gradient_checkpointing,
+            use_2d_pos_enc=getattr(m, 'use_2d_pos_enc', False),
         )
 
         # 时间条件摘要

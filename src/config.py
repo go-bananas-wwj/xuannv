@@ -99,6 +99,10 @@ class ModelConfig:
     # 反坍缩
     skip_l2_norm_training: bool = True
     spatial_dropout_rate: float = 0.0
+    # P1: 2D Sincos 位置编码
+    use_2d_pos_enc: bool = False
+    pos_enc_2d_height: int = 8
+    pos_enc_2d_width: int = 8
 
 
 @dataclass

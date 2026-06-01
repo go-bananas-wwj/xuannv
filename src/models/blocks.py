@@ -40,6 +40,46 @@ class SinusoidalTimeEncoding(nn.Module):
 
 
 # ────────────────────────────────────────────
+# 0b. 2D Sincos Positional Encoding (P1)
+# ────────────────────────────────────────────
+
+def get_2d_sincos_pos_embed(embed_dim: int, grid_size_h: int, grid_size_w: int) -> torch.Tensor:
+    """生成 2D sincos 位置编码 [grid_size_h * grid_size_w, embed_dim].
+
+    参考 ViT / MAE 标准实现，y 方向和 x 方向各使用 embed_dim//2 维度，
+    最后 concat 在一起。
+    """
+    grid_h = torch.arange(grid_size_h, dtype=torch.float32)
+    grid_w = torch.arange(grid_size_w, dtype=torch.float32)
+    grid = torch.meshgrid(grid_h, grid_w, indexing='ij')
+    grid = torch.stack(grid, dim=0)           # [2, H, W]
+    grid = grid.reshape([2, 1, grid_size_h, grid_size_w])
+    pos_embed = _get_2d_sincos_pos_embed_from_grid(embed_dim, grid)
+    return pos_embed
+
+
+def _get_2d_sincos_pos_embed_from_grid(embed_dim: int, grid: torch.Tensor) -> torch.Tensor:
+    assert embed_dim % 2 == 0
+    emb_h = _get_1d_sincos_pos_embed_from_grid(embed_dim // 2, grid[0])
+    emb_w = _get_1d_sincos_pos_embed_from_grid(embed_dim // 2, grid[1])
+    emb = torch.cat([emb_h, emb_w], dim=1)    # [H*W, D]
+    return emb
+
+
+def _get_1d_sincos_pos_embed_from_grid(embed_dim: int, pos: torch.Tensor) -> torch.Tensor:
+    assert embed_dim % 2 == 0
+    omega = torch.arange(embed_dim // 2, dtype=torch.float32)
+    omega /= embed_dim / 2.
+    omega = 1.0 / (10000.0 ** omega)
+    pos = pos.reshape(-1)
+    out = torch.einsum('m,d->md', pos, omega)
+    emb_sin = torch.sin(out)
+    emb_cos = torch.cos(out)
+    emb = torch.cat([emb_sin, emb_cos], dim=1)
+    return emb
+
+
+# ────────────────────────────────────────────
 # 1. Learned Spatial Resampling
 # ────────────────────────────────────────────
 
@@ -414,12 +454,14 @@ class STPEncoder(nn.Module):
         num_blocks: int = 15,
         num_heads: int = 8,
         use_checkpoint: bool = False,
+        use_2d_pos_enc: bool = False,
     ) -> None:
         super().__init__()
         self.precision_dim = precision_dim
         self.time_dim = time_dim
         self.space_dim = space_dim
         self.use_checkpoint = use_checkpoint
+        self.use_2d_pos_enc = use_2d_pos_enc
 
         # 初始投影到三条路径的维度
         self.space_proj = nn.Conv2d(precision_dim, space_dim, kernel_size=1)
@@ -438,6 +480,9 @@ class STPEncoder(nn.Module):
         # 输出归一化
         num_groups = min(32, precision_dim // 4) if precision_dim >= 4 else 1
         self.norm = nn.GroupNorm(num_groups, precision_dim)
+
+        # P1: 2D 位置编码 buffer（lazy init）
+        self.register_buffer('pos_enc_2d', None)
 
     def forward(
         self,
@@ -477,6 +522,14 @@ class STPEncoder(nn.Module):
         space = space.reshape(B, T, self.space_dim, space_H, space_W)
         time = time.reshape(B, T, self.time_dim, time_H, time_W)
         precision = precision.reshape(B, T, self.precision_dim, H, W)
+
+        # P1: 2D Sincos 位置编码 — 加到 space path
+        if self.use_2d_pos_enc:
+            if self.pos_enc_2d is None or self.pos_enc_2d.shape[-2:] != (space_H, space_W):
+                pe = get_2d_sincos_pos_embed(self.space_dim, space_H, space_W)
+                # pe: [H*W, space_dim] -> [1, 1, space_dim, H, W]
+                self.pos_enc_2d = pe.T.reshape(1, 1, self.space_dim, space_H, space_W).to(space.device)
+            space = space + self.pos_enc_2d
 
         # ── 应用 STP blocks ──
         for block in self.blocks:
