@@ -27,6 +27,7 @@ from src.training.losses import (
     raw_uniformity_loss,
     hyperspherical_uniformity_loss,
     pairwise_cosine_diversity_loss,
+    aef_batch_uniformity_loss,
     consistency_loss,
     consistency_loss_spatial,
     variance_regularizer,
@@ -653,6 +654,12 @@ class DDPv13Trainer:
             if orth_w > 0:
                 orth = bottleneck_orthogonality_loss(self.model.module.bottleneck.to_embedding.weight)
 
+            # V35: AEF Batch Rotation Uniformity Loss
+            aef_uniform_w = getattr(t, 'aef_batch_uniformity_weight', 0.0)
+            aef_uniform = torch.tensor(0.0, device=self.device)
+            if aef_uniform_w > 0 and gathered_pre is not None and gathered_pre.shape[0] >= 2:
+                aef_uniform = aef_batch_uniformity_loss(gathered_pre.float())
+
             # LMIM: 潜在空间预测损失（替代像素重建的语义增强，来源：OlmoEarth/AnySat）
             lmim_w = getattr(t, 'lmim_weight', 0.0)
             lmim = torch.tensor(0.0, device=self.device)
@@ -674,6 +681,7 @@ class DDPv13Trainer:
                 + spherical_var_w * spherical_var
                 + decorr_w * decorr
                 + orth_w * orth
+                + aef_uniform_w * aef_uniform
                 + dummy_cls
                 + inter_var_w * inter_var
                 + inter_decorr_w * inter_decorr
@@ -687,7 +695,8 @@ class DDPv13Trainer:
                     print(f"  [WARNING] NaN/Inf total at step {step}, skipping.")
                     print(f"    recon={recon.item():.4f} consist={consist.item():.4f} temporal={temporal_loss.item():.4f} "
                           f"cls={cls.item():.4f} var={var.item():.4f} cov={cov.item():.4f} "
-                          f"decorr={decorr.item():.4f} l2unif={l2_uniform.item():.4f}")
+                          f"decorr={decorr.item():.4f} l2unif={l2_uniform.item():.4f} "
+                          f"aefunif={aef_uniform.item():.4f}")
                 self.optimizer.zero_grad()
                 continue
 
@@ -760,6 +769,7 @@ class DDPv13Trainer:
                       f"var={var.item():.4f} cov={cov.item():.4f} "
                       f"decorr={decorr.item():.4f} orth={orth.item():.4f} "
                       f"l2unif={l2_uniform.item():.4f} "
+                      f"aefunif={aef_uniform.item():.4f} "
                       f"erank_l={erank_loss_val.item():.4f} "
                       f"mcr2={coding_rate_val.item():.4f} "
                       f"infonce={inter_infonce.item():.4f} "

@@ -110,6 +110,34 @@ def pairwise_cosine_diversity_loss(embeddings: torch.Tensor) -> torch.Tensor:
     return gram[mask].mean()
 
 
+# ────────────────────────────────────────────
+# 1e. AEF Batch Rotation Uniformity Loss
+# ────────────────────────────────────────────
+
+def aef_batch_uniformity_loss(embeddings: torch.Tensor) -> torch.Tensor:
+    """AEF Batch Rotation Uniformity — 论文核心反坍缩方法.
+
+    原理:
+    - 将 batch 内的 embedding 与其 batch-rotated 版本配对
+    - 最小化 |u_i · u'_i|，由于球面上随机向量平均正交，这促进均匀分布
+    - 与 VICReg/covariance 的关键区别: 直接惩罚配对相似度，而非统计矩
+
+    论文参数: b = 0.005 ~ 0.05 (消融显示 b=0.005 部分任务最优, 0.05 最终训练值)
+    """
+    if embeddings.shape[0] < 2:
+        return embeddings.new_tensor(0.0)
+
+    # L2 归一化到单位球面（AEF 在 S^63 上计算）
+    u = F.normalize(embeddings, p=2, dim=1)
+
+    # Batch 维度旋转: 每个样本与下一个样本配对
+    u_rotated = torch.roll(u, shifts=1, dims=0)
+
+    # 点积绝对值: 越接近正交 → 损失越小
+    dots = (u * u_rotated).sum(dim=-1)  # [N]
+    return dots.abs().mean()
+
+
 def batch_uniformity_loss_l2(embeddings: torch.Tensor, dim_dropout: float = 0.1,
                                  max_samples: int = 512) -> torch.Tensor:
     """改进版 Batch Uniformity Loss — All-Pairs + 空间采样 + 维度 Dropout.

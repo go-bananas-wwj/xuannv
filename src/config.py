@@ -132,6 +132,8 @@ class TrainingConfig:
     variance_weight: float = 1.0
     covariance_weight: float = 0.1
     decorrelation_weight: float = 0.01
+    # V35: AEF Batch Rotation Uniformity
+    aef_batch_uniformity_weight: float = 0.0
     spatial_dropout_rate: float = 0.5
     bottleneck_cls_weight: float = 0.2
     aux_classification_weight: float = 0.1
