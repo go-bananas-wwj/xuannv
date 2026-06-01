@@ -1,0 +1,106 @@
+{
+  "region_name": "national_china",
+  "display_name": "全国采样（5000 patches）",
+  "crs": "EPSG:4326",
+  "bbox": {
+    "west": 73.675,
+    "south": 18.198,
+    "east": 135.026,
+    "north": 53.459
+  },
+  "time_range": {
+    "start": "2025-01-01",
+    "end": "2026-06-01"
+  },
+  "patch": {
+    "size_m": 1280,
+    "step_m": 1280,
+    "image_size_px": 128
+  },
+  "output_dir": "/workspace/raw/national_china/national_china",
+  "cloud_filtered_dir": "/workspace/raw/national_china/national_china_cloud_filtered",
+  "statistics_dir": "/workspace/statistics/national_china",
+  "sources": {
+    "s2": {
+      "enabled": true,
+      "download_source": "planetary_computer",
+      "collection": "sentinel-2-l2a",
+      "bands": ["B02", "B03", "B04", "B8A", "B11", "B12"],
+      "resolution_m": 10,
+      "cloud_filter": {
+        "enabled": true,
+        "max_per_month": 2,
+        "cloud_threshold": 0.3,
+        "s2_cloud_prob_max": 20
+      }
+    },
+    "s1": {
+      "enabled": true,
+      "download_source": "planetary_computer",
+      "collection": "sentinel-1-grd",
+      "bands": ["vv", "vh"],
+      "resolution_m": 10,
+      "cloud_filter": { "enabled": false }
+    },
+    "landsat": {
+      "enabled": true,
+      "download_source": "planetary_computer",
+      "collection": "landsat-c2-l2",
+      "bands": ["blue", "green", "red", "nir08", "swir16", "swir22"],
+      "resolution_m": 30,
+      "cloud_filter": {
+        "enabled": true,
+        "max_cloud_cover": 70
+      }
+    },
+    "dem": {
+      "enabled": true,
+      "download_source": "planetary_computer",
+      "collection": "cop-dem-glo-30",
+      "bands": ["data"],
+      "resolution_m": 30,
+      "cloud_filter": { "enabled": false }
+    },
+    "worldcover": {
+      "enabled": true,
+      "download_source": "planetary_computer",
+      "collection": "esa-worldcover",
+      "bands": ["map"],
+      "resolution_m": 10,
+      "resampling": "nearest",
+      "cloud_filter": { "enabled": false }
+    },
+    "dynamic_world": {
+      "enabled": true,
+      "download_source": "gee",
+      "collection": "GOOGLE/DYNAMICWORLD/V1",
+      "bands": ["label"],
+      "resolution_m": 10,
+      "resampling": "nearest",
+      "cloud_filter": { "enabled": false }
+    },
+    "jrc_water": {
+      "enabled": true,
+      "download_source": "gee",
+      "collection": "JRC/GSW1_4/MonthlyHistory",
+      "bands": ["water"],
+      "resolution_m": 30,
+      "resampling": "nearest",
+      "cloud_filter": { "enabled": false }
+    },
+    "sar": {
+      "enabled": false,
+      "comment": "全国采样暂无干涉 SAR 数据"
+    }
+  },
+  "credentials": {
+    "planetary_computer": {
+      "subscription_key_env": "PC_SDK_SUBSCRIPTION_KEY"
+    },
+    "gee": {
+      "credentials_path_env": "GEE_CREDENTIALS_PATH",
+      "service_account_env": "GEE_SERVICE_ACCOUNT"
+    }
+  },
+  "patches_meta_path": "/workspace/raw/national_china/patches_meta.json"
+}
