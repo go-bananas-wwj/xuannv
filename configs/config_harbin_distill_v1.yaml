@@ -125,9 +125,9 @@ training:
   consistency_weight: 0.0
   classification_weight: 0.03
 
-  decorrelation_weight: 5.0
+  decorrelation_weight: 8.0
   use_spatial_vicreg: true
-  variance_weight: 2.0
+  variance_weight: 4.0
   covariance_weight: 1.0
   vicreg_min_std: 1.0
   orthogonality_weight: 0.01
@@ -165,8 +165,8 @@ training:
   encoder_uniform_weight: 0.0
 
   # ── ★ OlmoEarth 蒸馏损失 ──
-  olmoearth_spatial_distill_weight: 2.0   # 核心: spatial token cosine alignment
-  olmoearth_global_distill_weight: 0.5    # 辅助: global vector alignment
+  olmoearth_spatial_distill_weight: 5.0   # 核心: spatial token cosine alignment
+  olmoearth_global_distill_weight: 1.0    # 辅助: global vector alignment
 
   # ── ★ 两阶段训练 ──
   # Stage 1 (epoch 0~9): 只训练投影头，让 projector 先对齐 teacher 空间
