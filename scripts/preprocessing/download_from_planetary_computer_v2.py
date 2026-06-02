@@ -410,42 +410,30 @@ def download_patch_v2(args) -> dict:
         failed_items = 0
 
         if items_to_download:
-            if source in ("s1", "s2"):
-                # S1 使用 odc.stac.load 批量；S2 使用 stackstac 逐个 item（避免批量 compute 阻塞）
-                batch_results = {}
-                if source == "s1":
-                    import odc.stac
-                    ds = odc.stac.load(
-                        items_to_download,
-                        bands=assets,
-                        bbox=bbox,
+            # 统一使用 mini-batch stackstac (batch=3) + 403 重试
+            import stackstac
+            batch_results = {}
+            mini_batch = 3
+            for mb_start in range(0, len(items_to_download), mini_batch):
+                mb_items = items_to_download[mb_start:mb_start + mini_batch]
+                try:
+                    stack = stackstac.stack(
+                        mb_items,
+                        assets=assets,
+                        bounds_latlon=bbox,
                         resolution=RESOLUTION_MAP[source],
-                        crs=f"EPSG:{epsg}",
+                        rescale=False,
+                        dtype="float64",
+                        epsg=epsg,
+                        fill_value=0,
                     )
-                    data = ds.compute()
-                    for i, item in enumerate(items_to_download):
-                        try:
-                            bands_list = []
-                            for band in assets:
-                                if band not in data.data_vars:
-                                    raise ValueError(f"Band '{band}' missing")
-                                bands_list.append(np.asarray(data[band][i]))
-                            data_np = np.stack(bands_list, axis=0)
-                            if np.all(data_np == 0):
-                                print(f"      [WARN] All-zero S1 data for {item.id}")
-                                continue
-                            dt = item.datetime
-                            date_str = dt.strftime("%Y%m%d") if dt else item.id.split("_")[-1][:8]
-                            batch_results[date_str] = data_np
-                        except Exception as e:
-                            print(f"      [WARN] S1 item {item.id} failed: {e}")
-                            continue
-                else:
-                    # S2 小批量 stackstac（每批 3 个），平衡速度和稳定性
-                    import stackstac
-                    mini_batch = 3
-                    for mb_start in range(0, len(items_to_download), mini_batch):
-                        mb_items = items_to_download[mb_start:mb_start + mini_batch]
+                    data = stack.compute()  # [time, band, y, x]
+                except Exception as e:
+                    err_str = str(e)
+                    if "403" in err_str or "HTTP response code" in err_str:
+                        print(f"      [RETRY] {source} mini-batch {mb_start} token expired, re-signing...")
+                        import planetary_computer as pc
+                        mb_items = [pc.sign(it) for it in mb_items]
                         try:
                             stack = stackstac.stack(
                                 mb_items,
@@ -457,55 +445,39 @@ def download_patch_v2(args) -> dict:
                                 epsg=epsg,
                                 fill_value=0,
                             )
-                            data = stack.compute()  # [time, band, y, x]
-                        except Exception as e:
-                            err_str = str(e)
-                            if "403" in err_str or "HTTP response code" in err_str:
-                                print(f"      [RETRY] S2 mini-batch {mb_start} token expired, re-signing...")
-                                import planetary_computer as pc
-                                mb_items = [pc.sign(it) for it in mb_items]
-                                try:
-                                    stack = stackstac.stack(
-                                        mb_items,
-                                        assets=assets,
-                                        bounds_latlon=bbox,
-                                        resolution=RESOLUTION_MAP[source],
-                                        rescale=False,
-                                        dtype="float64",
-                                        epsg=epsg,
-                                        fill_value=0,
-                                    )
-                                    data = stack.compute()
-                                except Exception as e2:
-                                    print(f"      [WARN] S2 mini-batch {mb_start} re-sign failed: {e2}")
-                                    continue
-                            else:
-                                print(f"      [WARN] S2 mini-batch {mb_start} failed: {e}")
-                                continue
+                            data = stack.compute()
+                        except Exception as e2:
+                            print(f"      [WARN] {source} mini-batch {mb_start} re-sign failed: {e2}")
+                            continue
+                    else:
+                        print(f"      [WARN] {source} mini-batch {mb_start} failed: {e}")
+                        continue
 
-                        for i, item in enumerate(mb_items):
-                            try:
-                                data_np = np.asarray(data[i])  # [band, y, x]
-                                if data_np.shape[0] != len(assets):
-                                    print(f"      [WARN] Band mismatch for S2 item {item.id}: expected {len(assets)}, got {data_np.shape[0]}")
-                                    continue
-                                if np.all(data_np == 0):
-                                    print(f"      [WARN] All-zero S2 data for {item.id}")
-                                    continue
-                                if divide_10000:
-                                    data_np = data_np.astype(np.float32) / 10000.0
-                                else:
-                                    data_np = data_np.astype(np.uint16)
-                                dt = item.datetime
-                                date_str = dt.strftime("%Y%m%d") if dt else item.id.split("_")[-1][:8]
-                                batch_results[date_str] = data_np
-                            except Exception as e:
-                                print(f"      [WARN] S2 item {item.id} failed: {e}")
-                                continue
-            else:
-                batch_results = batch_download_stackstac(
-                    items_to_download, source, bbox, epsg, divide_10000
-                )
+                for i, item in enumerate(mb_items):
+                    try:
+                        data_np = np.asarray(data[i])  # [band, y, x]
+                        if data_np.shape[0] != len(assets):
+                            print(f"      [WARN] Band mismatch for {source} item {item.id}: expected {len(assets)}, got {data_np.shape[0]}")
+                            continue
+                        if np.all(data_np == 0):
+                            print(f"      [WARN] All-zero {source} data for {item.id}")
+                            continue
+
+                        # 数据转换
+                        if divide_10000 and source == "s2":
+                            data_np = data_np.astype(np.float32) / 10000.0
+                        elif source == "s2":
+                            data_np = data_np.astype(np.uint16)
+                        elif source == "landsat":
+                            data_np = data_np.astype(np.float32) * 0.0000275 - 0.2
+                            data_np = np.clip(data_np, 0.0, 1.0)
+
+                        dt = item.datetime
+                        date_str = dt.strftime("%Y%m%d") if dt else item.id.split("_")[-1][:8]
+                        batch_results[date_str] = data_np
+                    except Exception as e:
+                        print(f"      [WARN] {source} item {item.id} failed: {e}")
+                        continue
 
             # 保存
             for date_str, data_np in batch_results.items():
