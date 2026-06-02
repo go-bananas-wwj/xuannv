@@ -120,6 +120,14 @@ def _search_with_retry(catalog, source, bbox, date_start, date_end):
     if source in ("s2", "landsat"):
         kwargs["query"] = {"eo:cloud_cover": {"lt": 20}}
 
+    # 限制每个 patch 的最大返回 items 数，防止数据密集区域 STAC 搜索超时
+    if source == "s1":
+        kwargs["max_items"] = 50
+    elif source == "landsat":
+        kwargs["max_items"] = 30
+    elif source == "s2":
+        kwargs["max_items"] = 15
+
     for attempt in range(3):
         try:
             search = catalog.search(**kwargs)

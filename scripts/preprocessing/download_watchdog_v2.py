@@ -113,9 +113,20 @@ def is_alive(pid: int | None) -> bool:
         return False
     try:
         os.kill(pid, 0)
-        return True
     except (OSError, ProcessLookupError):
         return False
+    # 检查是否为僵尸进程（子进程已退出但父进程未 wait）
+    try:
+        with open(f"/proc/{pid}/status", "r") as f:
+            for line in f:
+                if line.startswith("State:"):
+                    state = line.split()[1]
+                    if state == "Z":  # Zombie
+                        return False
+                    break
+    except Exception:
+        pass
+    return True
 
 
 def log_mtime(path: str) -> datetime | None:
@@ -247,8 +258,14 @@ def main() -> None:
                     except Exception:
                         pass
                 elif not alive:
+                    # 尝试回收僵尸进程，避免 PID 复用时误判
+                    if pid is not None:
+                        try:
+                            os.waitpid(pid, os.WNOHANG)
+                        except Exception:
+                            pass
                     status = "🔴 丢失"
-                    reason = f"PID={pid} 不存在"
+                    reason = f"PID={pid} 不存在或已死亡"
                 elif mtime is None:
                     status = "🔴 无日志"
                     reason = "日志文件不存在"
