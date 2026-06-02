@@ -56,6 +56,92 @@ def raw_uniformity_loss(embeddings: torch.Tensor) -> torch.Tensor:
 
 
 # ────────────────────────────────────────────
+# 1b. Batch Uniformity Loss — L2-normalized (V11 改进版)
+# ────────────────────────────────────────────
+
+def batch_uniformity_loss_l2(embeddings: torch.Tensor, dim_dropout: float = 0.1,
+                                 max_samples: int = 512) -> torch.Tensor:
+    """改进版 Batch Uniformity Loss — All-Pairs + 空间采样 + 维度 Dropout.
+
+    V11.1 实现 (当前最佳):
+    1. All-Pairs: 每个样本与 batch 中**所有其他样本**计算 |u_i · u_j|
+    2. 空间采样: 对 embedding_map [B,D,H,W] 随机采样最多 max_samples 个空间位置，
+       避免 OOM（全图 H*W=4096 时 all-pairs 矩阵达 16GB+）
+    3. chunk 分批: 进一步降低峰值内存
+    4. 维度 Dropout: 随机 mask 10% 维度后计算 dot product，增加鲁棒性
+    5. 值域 [0, 1]: 0=均匀分布, 1=完全坍缩
+
+    Args:
+        embeddings: [B, D] 或 [B, D, H, W]
+                   已经 L2 归一化，或在函数内部归一化
+        dim_dropout: 维度 dropout 比率 (默认 0.1)
+        max_samples: 最大采样空间位置数 (默认 512)
+
+    Returns:
+        scalar loss, 越小越好
+    """
+    if embeddings.shape[0] < 2:
+        return embeddings.new_tensor(0.0)
+
+    x = embeddings
+
+    # 处理 spatial embedding map [B, D, H, W]
+    if x.dim() == 4:
+        B, D, H, W = x.shape
+        # 展平空间: [B, D, H*W]
+        x = x.reshape(B, D, H * W)
+        # 随机采样空间位置（避免 OOM）
+        n_spatial = H * W
+        if n_spatial > max_samples:
+            indices = torch.randperm(n_spatial, device=x.device)[:max_samples]
+            x = x[:, :, indices]
+        # 转置为 [B, H*W, D] → 展平为 [B*H*W, D]
+        x = x.permute(0, 2, 1).reshape(-1, D)
+    elif x.dim() > 2:
+        # 其他高维情况，展平所有非 batch 维度
+        while x.dim() > 2:
+            B = x.shape[0]
+            D = x.shape[-1]
+            x = x.reshape(-1, D)
+
+    N, D = x.shape
+    if N < 2:
+        return x.new_tensor(0.0)
+
+    # L2 归一化（确保在球面上）
+    x = F.normalize(x, p=2, dim=-1)
+
+    # 维度 Dropout: 随机 mask 部分维度，增加配对多样性
+    if dim_dropout > 0 and x.requires_grad:
+        mask = torch.empty_like(x).bernoulli_(1 - dim_dropout)
+        if mask.sum() > 0:
+            x_dropped = x * mask
+            x_dropped = F.normalize(x_dropped, p=2, dim=-1)
+        else:
+            x_dropped = x
+    else:
+        x_dropped = x
+
+    # All-Pairs: 使用 chunk 分批计算所有 i≠j 的 |u_i · u_j|
+    chunk_size = min(1024, N)
+    total_loss = 0.0
+    n_pairs = 0
+
+    for i_start in range(0, N, chunk_size):
+        i_end = min(i_start + chunk_size, N)
+        chunk_i = x_dropped[i_start:i_end]  # [chunk, D]
+        sim = chunk_i @ x_dropped.T  # [chunk, N]
+        # 排除对角线
+        for local_i in range(i_end - i_start):
+            global_i = i_start + local_i
+            sim[local_i, global_i] = 0.0
+        total_loss += sim.abs().sum().item()
+        n_pairs += (i_end - i_start) * N - (i_end - i_start)
+
+    return torch.tensor(total_loss / max(n_pairs, 1), device=x.device, dtype=x.dtype)
+
+
+# ────────────────────────────────────────────
 # 2. Decorrelation Loss (Barlow Twins)
 # ────────────────────────────────────────────
 
@@ -461,8 +547,9 @@ def change_consistency_loss(
 
     # BCE Loss: change_score 应该预测图像差异
     # 用 img_diff_norm 作为 target (软标签，不是二值)
+    # ★ NPU bf16 不支持 BCE，fallback 到 fp32
     loss = F.binary_cross_entropy(
-        change_score.squeeze(1), img_diff_norm, reduction='none'
+        change_score.squeeze(1).float(), img_diff_norm.float(), reduction='none'
     )
     loss = (loss * change_mask).sum() / change_mask.sum().clamp(min=1.0)
     return loss

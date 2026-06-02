@@ -1,0 +1,481 @@
+#!/usr/bin/env python3
+"""
+V11 数据扩展脚本（并行加速版）— 下载黑龙江省其他城市遥感数据
+
+改进:
+  - 4 worker 多进程并行下载 patches
+  - 自动跳过已存在文件
+  - 每个 worker 独立 GEE 连接
+  - 实时进度条
+
+用法:
+    export HTTP_PROXY="http://127.0.0.1:7890"
+    export HTTPS_PROXY="http://127.0.0.1:7890"
+    python scripts/preprocessing/download_heilongjiang_v11_parallel.py \
+        --city daqing --max-patches 400 --workers 4
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import time
+import traceback
+from multiprocessing import Pool, Manager
+from pathlib import Path
+
+import numpy as np
+
+# ---------------------------------------------------------------------------
+# 代理配置
+# ---------------------------------------------------------------------------
+PROXY_URL = "http://127.0.0.1:7890"
+CREDENTIALS_PATH = "/workspace/ee-weijiewu0306-5dfc67102021.json"
+SERVICE_ACCOUNT = "xuannv-gee@ee-weijiewu0306-5dfc67102021.iam.gserviceaccount.com"
+
+# ---------------------------------------------------------------------------
+# 城市配置
+# ---------------------------------------------------------------------------
+CITIES = {
+    "qiqihar": {
+        "name": "齐齐哈尔",
+        "center": [123.918, 47.354],
+        "bbox_deg": [123.5, 47.0, 124.5, 47.7],
+        "patch_size_m": 1280,
+    },
+    "daqing": {
+        "name": "大庆",
+        "center": [125.0, 46.6],
+        "bbox_deg": [124.5, 46.2, 125.6, 47.0],
+        "patch_size_m": 1280,
+    },
+    "haidian": {
+        "name": "北京海淀",
+        "center": [116.3, 39.95],
+        "bbox_deg": [115.9, 39.7, 116.7, 40.2],
+        "patch_size_m": 1280,
+    },
+}
+
+DATE_START = "2023-01-01"
+DATE_END = "2025-10-31"
+S2_CLOUD_PROB_MAX = 20
+
+
+def get_utm_crs(lon: float, lat: float) -> str:
+    zone = int((lon + 180) / 6) + 1
+    epsg = 32600 + zone if lat >= 0 else 32700 + zone
+    return f"EPSG:{epsg}"
+
+
+def degree_bbox_to_utm_patches(bbox_deg, patch_size_m):
+    from pyproj import Transformer
+    w, s, e, n = bbox_deg
+    center_lon = (w + e) / 2
+    center_lat = (s + n) / 2
+    crs = get_utm_crs(center_lon, center_lat)
+    transformer = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
+    
+    corners_utm = list(zip(*transformer.transform([w, e, e, w], [s, s, n, n])))
+    left = min(x for x, y in corners_utm)
+    right = max(x for x, y in corners_utm)
+    bottom = min(y for x, y in corners_utm)
+    top = max(y for x, y in corners_utm)
+    
+    patches = []
+    patch_id = 0
+    x = left
+    while x + patch_size_m <= right + 1e-6:
+        y = bottom
+        while y + patch_size_m <= top + 1e-6:
+            cx = x + patch_size_m / 2
+            cy = y + patch_size_m / 2
+            lon, lat = transformer.transform(cx, cy, direction="INVERSE")
+            patches.append({
+                "id": patch_id,
+                "utm_bounds": [x, y, x + patch_size_m, y + patch_size_m],
+                "center_lonlat": [lon, lat],
+            })
+            patch_id += 1
+            y += patch_size_m
+        x += patch_size_m
+    return patches, crs
+
+
+def init_gee():
+    """在每个 worker 进程中初始化 GEE."""
+    import ee
+    os.environ["HTTP_PROXY"] = PROXY_URL
+    os.environ["HTTPS_PROXY"] = PROXY_URL
+    os.environ["http_proxy"] = PROXY_URL
+    os.environ["https_proxy"] = PROXY_URL
+    
+    credentials = ee.ServiceAccountCredentials(SERVICE_ACCOUNT, CREDENTIALS_PATH)
+    ee.Initialize(credentials)
+    return ee
+
+
+def export_image(image, region, output_path, bands, crs, scale, dtype="float32"):
+    """下载单张图像."""
+    try:
+        import urllib.request
+        img = image.select(bands)
+        url = img.getDownloadURL({
+            "region": region,
+            "crs": crs,
+            "scale": scale,
+            "format": "GEO_TIFF",
+        })
+        
+        proxy_handler = urllib.request.ProxyHandler({
+            "http": PROXY_URL,
+            "https": PROXY_URL,
+        })
+        opener = urllib.request.build_opener(proxy_handler)
+        urllib.request.install_opener(opener)
+        
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=300) as response:
+            data = response.read()
+        
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "wb") as f:
+            f.write(data)
+        return True
+    except Exception as e:
+        return False
+
+
+def download_patch_s2(args):
+    """Worker 函数: 下载单个 patch 的 S2 数据 (优化版: aggregate_array 批量获取元数据)."""
+    patch, city_name, output_root, crs = args
+    import ee
+    ee = init_gee()
+    
+    patch_id = patch["id"]
+    lon, lat = patch["center_lonlat"]
+    region = ee.Geometry.Point([lon, lat]).buffer(640).bounds()
+    patch_dir = Path(output_root) / city_name / "s2" / f"patch_{patch_id:06d}"
+    
+    collection = (
+        ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+        .filterBounds(region)
+        .filterDate(DATE_START, DATE_END)
+        .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", S2_CLOUD_PROB_MAX))
+    )
+    
+    n_images = collection.size().getInfo()
+    if n_images == 0:
+        return {"patch_id": patch_id, "source": "s2", "downloaded": 0, "skipped": 0, "status": "no_data"}
+    
+    # ★ 优化: 批量获取所有 image ID 和时间戳 (2 次 getInfo 替代 n 次)
+    img_ids = collection.aggregate_array("system:index").getInfo()
+    time_starts = collection.aggregate_array("system:time_start").getInfo()
+    
+    downloaded = 0
+    skipped = 0
+    
+    for idx, (img_id, ts_ms) in enumerate(zip(img_ids, time_starts)):
+        try:
+            date_str = time.strftime("%Y%m%d", time.gmtime(ts_ms / 1000))
+            out_path = patch_dir / f"{date_str}.tif"
+            
+            if out_path.exists():
+                skipped += 1
+                continue
+            
+            img = ee.Image(f"COPERNICUS/S2_SR_HARMONIZED/{img_id}")
+            scl = img.select("SCL")
+            mask = scl.eq(4).Or(scl.eq(5)).Or(scl.eq(6))
+            img_masked = img.updateMask(mask)
+            img_scaled = img_masked.divide(10000.0).clamp(0, 1)
+            
+            success = export_image(img_scaled, region, str(out_path), 
+                                   ["B2", "B3", "B4", "B5", "B6", "B7"], crs, 10)
+            if success:
+                downloaded += 1
+            else:
+                skipped += 1
+            
+            if (idx + 1) % 10 == 0:
+                time.sleep(0.5)
+        except Exception as e:
+            continue
+    
+    return {"patch_id": patch_id, "source": "s2", "downloaded": downloaded, 
+            "skipped": skipped, "status": "ok" if downloaded > 0 else "failed"}
+
+
+def download_patch_dem(args):
+    """Worker 函数: 下载单个 patch 的 DEM."""
+    patch, city_name, output_root, crs = args
+    import ee
+    ee = init_gee()
+    
+    patch_id = patch["id"]
+    lon, lat = patch["center_lonlat"]
+    region = ee.Geometry.Point([lon, lat]).buffer(640).bounds()
+    patch_dir = Path(output_root) / city_name / "dem" / f"patch_{patch_id:06d}"
+    out_path = patch_dir / "dem.tif"
+    
+    if out_path.exists():
+        return {"patch_id": patch_id, "source": "dem", "status": "skipped"}
+    
+    try:
+        dem = ee.Image("USGS/SRTMGL1_003").select("elevation")
+        success = export_image(dem, region, str(out_path), ["elevation"], crs, 30)
+        return {"patch_id": patch_id, "source": "dem", "status": "ok" if success else "failed"}
+    except Exception as e:
+        return {"patch_id": patch_id, "source": "dem", "status": "failed"}
+
+
+def download_patch_worldcover(args):
+    """Worker 函数: 下载单个 patch 的 WorldCover."""
+    patch, city_name, output_root, crs = args
+    import ee
+    ee = init_gee()
+    
+    patch_id = patch["id"]
+    lon, lat = patch["center_lonlat"]
+    region = ee.Geometry.Point([lon, lat]).buffer(640).bounds()
+    patch_dir = Path(output_root) / city_name / "worldcover" / f"patch_{patch_id:06d}"
+    out_path = patch_dir / "worldcover.tif"
+    
+    if out_path.exists():
+        return {"patch_id": patch_id, "source": "worldcover", "status": "skipped"}
+    
+    try:
+        wc = ee.ImageCollection("ESA/WorldCover/v200").first().select("Map")
+        success = export_image(wc, region, str(out_path), ["Map"], crs, 10)
+        return {"patch_id": patch_id, "source": "worldcover", "status": "ok" if success else "failed"}
+    except Exception as e:
+        return {"patch_id": patch_id, "source": "worldcover", "status": "failed"}
+
+
+def download_patch_s1(args):
+    """Worker 函数: 下载单个 patch 的 S1 (Sentinel-1 GRD) 数据 (优化版)."""
+    patch, city_name, output_root, crs = args
+    import ee
+    ee = init_gee()
+    
+    patch_id = patch["id"]
+    lon, lat = patch["center_lonlat"]
+    region = ee.Geometry.Point([lon, lat]).buffer(640).bounds()
+    patch_dir = Path(output_root) / city_name / "s1" / f"patch_{patch_id:06d}"
+    
+    collection = (
+        ee.ImageCollection("COPERNICUS/S1_GRD")
+        .filterBounds(region)
+        .filterDate(DATE_START, DATE_END)
+        .filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VV"))
+        .filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VH"))
+        .filter(ee.Filter.eq("instrumentMode", "IW"))
+    )
+    
+    n_images = collection.size().getInfo()
+    if n_images == 0:
+        return {"patch_id": patch_id, "source": "s1", "downloaded": 0, "skipped": 0, "status": "no_data"}
+    
+    # ★ 优化: 批量获取所有 image ID 和时间戳
+    img_ids = collection.aggregate_array("system:index").getInfo()
+    time_starts = collection.aggregate_array("system:time_start").getInfo()
+    
+    downloaded = 0
+    skipped = 0
+    
+    for idx, (img_id, ts_ms) in enumerate(zip(img_ids, time_starts)):
+        try:
+            date_str = time.strftime("%Y%m%d", time.gmtime(ts_ms / 1000))
+            out_path = patch_dir / f"{date_str}.tif"
+            
+            if out_path.exists():
+                skipped += 1
+                continue
+            
+            img = ee.Image(f"COPERNICUS/S1_GRD/{img_id}")
+            # VV/VH 线性值 -> dB: 10*log10(x) -> clip to [-30, 10]
+            vv = img.select("VV").clamp(1e-10, 1e10)
+            vh = img.select("VH").clamp(1e-10, 1e10)
+            img_db = ee.Image.cat([vv, vh]).log10().multiply(10).clamp(-30, 10)
+            
+            success = export_image(img_db, region, str(out_path), ["VV", "VH"], crs, 10)
+            if success:
+                downloaded += 1
+            else:
+                skipped += 1
+            
+            if (idx + 1) % 10 == 0:
+                time.sleep(0.5)
+        except Exception as e:
+            continue
+    
+    return {"patch_id": patch_id, "source": "s1", "downloaded": downloaded,
+            "skipped": skipped, "status": "ok" if downloaded > 0 else "failed"}
+
+
+def download_patch_landsat(args):
+    """Worker 函数: 下载单个 patch 的 Landsat 8/9 (C02/T1_L2) 数据 (优化版)."""
+    patch, city_name, output_root, crs = args
+    import ee
+    ee = init_gee()
+    
+    patch_id = patch["id"]
+    lon, lat = patch["center_lonlat"]
+    region = ee.Geometry.Point([lon, lat]).buffer(640).bounds()
+    patch_dir = Path(output_root) / city_name / "landsat" / f"patch_{patch_id:06d}"
+    
+    # Landsat 8 + 9 合并
+    l8 = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
+    l9 = ee.ImageCollection("LANDSAT/LC09/C02/T1_L2")
+    
+    def preprocess_landsat(img):
+        optical = img.select(["SR_B2", "SR_B3", "SR_B4", "SR_B5", "SR_B6", "SR_B7"])
+        scaled = optical.multiply(0.0000275).add(-0.2).clamp(0, 1)
+        # ★ 保留所有原始属性（避免 aggregate_array 丢失）
+        return scaled.copyProperties(img, img.propertyNames())
+    
+    def mask_clouds(img):
+        qa = img.select("QA_PIXEL")
+        cloud_mask = qa.bitwiseAnd(1 << 3).eq(0).And(qa.bitwiseAnd(1 << 4).eq(0))
+        return img.updateMask(cloud_mask)
+    
+    collection = (
+        l8.merge(l9)
+        .filterBounds(region)
+        .filterDate(DATE_START, DATE_END)
+        .map(mask_clouds)
+        .map(preprocess_landsat)
+    )
+    
+    n_images = collection.size().getInfo()
+    if n_images == 0:
+        return {"patch_id": patch_id, "source": "landsat", "downloaded": 0, "skipped": 0, "status": "no_data"}
+    
+    # ★ 优化: 批量获取所有 image ID、时间戳和卫星类型
+    img_ids = collection.aggregate_array("system:index").getInfo()
+    time_starts = collection.aggregate_array("system:time_start").getInfo()
+    spacecraft_ids = collection.aggregate_array("SPACECRAFT_ID").getInfo()
+    
+    downloaded = 0
+    skipped = 0
+    
+    for idx, (img_id, ts_ms, sc_id) in enumerate(zip(img_ids, time_starts, spacecraft_ids)):
+        try:
+            date_str = time.strftime("%Y%m%d", time.gmtime(ts_ms / 1000))
+            out_path = patch_dir / f"{date_str}.tif"
+            
+            if out_path.exists():
+                skipped += 1
+                continue
+            
+            # ★ 去掉 merge 添加的 "1_" 前缀
+            clean_id = img_id.split("_", 1)[1] if img_id.startswith("1_") else img_id
+            # 根据卫星类型构造完整路径
+            if clean_id.startswith("LC08"):
+                img = ee.Image(f"LANDSAT/LC08/C02/T1_L2/{clean_id}")
+            else:
+                img = ee.Image(f"LANDSAT/LC09/C02/T1_L2/{clean_id}")
+            
+            success = export_image(img, region, str(out_path),
+                                   ["SR_B2", "SR_B3", "SR_B4", "SR_B5", "SR_B6", "SR_B7"], crs, 30)
+            if success:
+                downloaded += 1
+            else:
+                skipped += 1
+            
+            if (idx + 1) % 10 == 0:
+                time.sleep(0.5)
+        except Exception as e:
+            continue
+    
+    return {"patch_id": patch_id, "source": "landsat", "downloaded": downloaded,
+            "skipped": skipped, "status": "ok" if downloaded > 0 else "failed"}
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--city", required=True, choices=list(CITIES.keys()))
+    parser.add_argument("--output-root", default="/workspace/raw/heilongjiang_new")
+    parser.add_argument("--max-patches", type=int, default=400)
+    parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--sources", nargs="+", default=["s2", "dem", "worldcover"])
+    args = parser.parse_args()
+    
+    city_cfg = CITIES[args.city]
+    print(f"\n{'='*60}")
+    print(f"[V11 Parallel Download] {city_cfg['name']}")
+    print(f"{'='*60}")
+    print(f"  Max patches: {args.max_patches}")
+    print(f"  Workers: {args.workers}")
+    print(f"  Sources: {args.sources}")
+    print(f"{'='*60}\n")
+    
+    patches, crs = degree_bbox_to_utm_patches(city_cfg["bbox_deg"], city_cfg["patch_size_m"])
+    if args.max_patches > 0:
+        patches = patches[:args.max_patches]
+    
+    # 保存元数据
+    meta_path = Path(args.output_root) / args.city / "patches_meta.json"
+    meta_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(meta_path, "w") as f:
+        json.dump({
+            "city": args.city, "city_name": city_cfg["name"],
+            "n_patches": len(patches), "patch_size_m": city_cfg["patch_size_m"],
+            "crs": crs, "date_start": DATE_START, "date_end": DATE_END,
+            "patches": patches,
+        }, f, indent=2)
+    print(f"Total patches: {len(patches)} (CRS: {crs})")
+    
+    # 并行下载每个源
+    for source in args.sources:
+        print(f"\n{'-'*50}")
+        print(f"[Downloading {source.upper()}] — {args.workers} workers")
+        print(f"{'-'*50}")
+        
+        if source == "s2":
+            worker_fn = download_patch_s2
+        elif source == "dem":
+            worker_fn = download_patch_dem
+        elif source == "worldcover":
+            worker_fn = download_patch_worldcover
+        elif source == "s1":
+            worker_fn = download_patch_s1
+        elif source == "landsat":
+            worker_fn = download_patch_landsat
+        else:
+            continue
+        
+        work_args = [(p, args.city, args.output_root, crs) for p in patches]
+        
+        start_time = time.time()
+        completed = 0
+        ok_count = 0
+        fail_count = 0
+        total_frames = 0
+        
+        with Pool(processes=args.workers) as pool:
+            for result in pool.imap_unordered(worker_fn, work_args):
+                completed += 1
+                if result.get("status") in ("ok", "skipped"):
+                    ok_count += 1
+                else:
+                    fail_count += 1
+                total_frames += result.get("downloaded", 0)
+                
+                if completed % 10 == 0 or completed == len(patches):
+                    elapsed = time.time() - start_time
+                    rate = completed / elapsed if elapsed > 0 else 0
+                    eta = (len(patches) - completed) / rate if rate > 0 else 0
+                    print(f"  [{completed}/{len(patches)}] {rate:.1f} patch/min, ETA: {eta/60:.1f}min, "
+                          f"ok={ok_count}, fail={fail_count}, frames={total_frames}")
+        
+        print(f"\n  {source} complete: {ok_count} ok, {fail_count} failed, {total_frames} frames")
+    
+    print(f"\n{'='*60}")
+    print("[ALL DONE]")
+    print(f"{'='*60}")
+
+
+if __name__ == "__main__":
+    main()

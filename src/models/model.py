@@ -44,6 +44,7 @@ class AEFOutput:
     aux_logits: torch.Tensor | None = None
     summary_pooled: torch.Tensor | None = None
     bottleneck_logits: torch.Tensor | None = None
+    dual_pre_w2: torch.Tensor | None = None  # [B, D, H, W] 第二窗口 pre_norm (用于 temporal loss)
 
 
 class AEFModel(nn.Module):
@@ -217,6 +218,10 @@ class AEFModel(nn.Module):
         target_metadata: torch.Tensor,
         target_loss_type: torch.Tensor | None = None,
         target_source_idx: torch.Tensor | None = None,
+        skip_decoder: bool = False,
+        dual_window: bool = False,
+        valid_start_w2: torch.Tensor | None = None,
+        valid_end_w2: torch.Tensor | None = None,
     ) -> AEFOutput:
         if source_type_ids is None:
             if source_frames.dim() == 6:
@@ -233,6 +238,18 @@ class AEFModel(nn.Module):
         # 瓶颈
         embedding_map, embedding, pre_norm, pre_norm_map = self.bottleneck(summary_map)
 
+        # V11 fix: Dual window 编码内联到同一 forward 中，避免 DDP 二次 forward 的
+        # "mark ready only once" 和 inplace operation 错误。
+        # 只编码 w2，不 backward 两次（所有梯度在同一 backward pass 中累积）。
+        dual_pre_w2 = None
+        if dual_window and valid_start_w2 is not None and valid_end_w2 is not None:
+            summary_w2, _, _ = self.encode_frames(
+                source_frames, source_timestamps_ms, source_frame_mask,
+                source_input_mask, source_type_ids, valid_start_w2, valid_end_w2,
+            )
+            _, _, _, pre_norm_map_w2 = self.bottleneck(summary_w2)
+            dual_pre_w2 = pre_norm_map_w2
+
         # Dummy 激活所有 sensor encoder 参数（避免 DDP 未使用参数报错）
         dummy_sensor = torch.tensor(0.0, device=source_frames.device)
         for encoder in self.sensor_encoder_bank.encoders.values():
@@ -240,8 +257,31 @@ class AEFModel(nn.Module):
                 dummy_sensor = dummy_sensor + p.sum() * 0.0
         summary_map = summary_map + dummy_sensor
 
-        # 解码
+        # 解码 (可选跳过，用于 dual-window forward 节省计算)
         B = summary_map.shape[0]
+        if skip_decoder:
+            # 返回 dummy 值，只保留 embedding 相关输出
+            num_classes = self.cfg.data.num_classes
+            num_tgt = self.cfg.data.num_target_sources
+            reconstructions = torch.zeros(B, num_tgt, max(self._per_source_out_channels),
+                                          *embedding_map.shape[2:], device=embedding_map.device, dtype=embedding_map.dtype)
+            logits = torch.zeros(B, num_classes, device=embedding_map.device, dtype=embedding_map.dtype)
+            aux_logits = torch.zeros(B, num_classes, device=embedding_map.device, dtype=embedding_map.dtype)
+            bottleneck_logits = torch.zeros(B, num_classes, device=embedding_map.device, dtype=embedding_map.dtype)
+            summary_pooled = summary_map.mean(dim=(-2, -1))
+            return AEFOutput(
+                embedding_map=embedding_map,
+                embedding=embedding,
+                reconstructions=reconstructions,
+                logits=logits,
+                pre_norm_embedding=pre_norm,
+                pre_norm_map=pre_norm_map,
+                aux_logits=aux_logits,
+                summary_pooled=summary_pooled,
+                bottleneck_logits=bottleneck_logits,
+                dual_pre_w2=dual_pre_w2,
+            )
+
         if target_relative_time.dim() == 1:
             target_relative_time = target_relative_time[:, None]
         if target_metadata.dim() == 2:
@@ -260,6 +300,17 @@ class AEFModel(nn.Module):
         flat_metadata = target_metadata.reshape(B * T_tgt, target_metadata.shape[-1])
 
         # 7 类目标分别解码
+        # V11: 静态目标 (dem=3, worldcover=4, jrc_water=6) 弱化时间编码
+        STATIC_SOURCE_IDS = {3, 4, 6}
+        flat_relative_modified = flat_relative.clone()
+        if target_source_idx is not None:
+            flat_src_idx = target_source_idx.reshape(B * T_tgt)
+            static_mask = torch.zeros(B * T_tgt, dtype=torch.bool, device=flat_map.device)
+            for sid in STATIC_SOURCE_IDS:
+                static_mask |= (flat_src_idx == sid)
+            if static_mask.any():
+                flat_relative_modified[static_mask] = flat_relative_modified[static_mask] * 0.1
+
         max_ch = max(self._per_source_out_channels)
         flat_recon = torch.zeros(B * T_tgt, max_ch, *flat_map.shape[2:], device=flat_map.device, dtype=flat_map.dtype)
 
@@ -269,7 +320,7 @@ class AEFModel(nn.Module):
             for src_id, dec in enumerate(self.per_source_decoders):
                 mask = (flat_src_idx == src_id)
                 if mask.any():
-                    out = dec(flat_map[mask], flat_window[mask], flat_relative[mask], flat_metadata[mask])
+                    out = dec(flat_map[mask], flat_window[mask], flat_relative_modified[mask], flat_metadata[mask])
                     out_ch = self._per_source_out_channels[src_id]
                     flat_recon[mask, :out_ch] = out.to(flat_recon.dtype)
                 # dummy loss to ensure decoder params always have gradients
@@ -277,7 +328,7 @@ class AEFModel(nn.Module):
                     dummy_dec = dummy_dec + p.sum() * 0.0
         else:
             # 默认: 全部用第一个 decoder
-            out = self.per_source_decoders[0](flat_map, flat_window, flat_relative, flat_metadata)
+            out = self.per_source_decoders[0](flat_map, flat_window, flat_relative_modified, flat_metadata)
             flat_recon[:, :self._per_source_out_channels[0]] = out.to(flat_recon.dtype)
             for p in self.per_source_decoders[0].parameters():
                 dummy_dec = dummy_dec + p.sum() * 0.0
@@ -301,6 +352,7 @@ class AEFModel(nn.Module):
             aux_logits=aux_logits,
             summary_pooled=summary_pooled,
             bottleneck_logits=bottleneck_logits,
+            dual_pre_w2=dual_pre_w2,
         )
 
     def encode_dual_window(
@@ -392,14 +444,10 @@ class AEFModel(nn.Module):
             source_input_mask, source_type_ids, valid_start_w2, valid_end_w2,
         )
 
-        # V10: bottleneck 显式差分
+        # V10: bottleneck 显式差分 (V11: 始终 L2-normalized)
         emb_w1, emb_w2, pre_w1, pre_w2, change_score, diff_feat = self.bottleneck.forward_dual_window(
             summary_w1, summary_w2
         )
 
-        # 推理时额外 L2 normalize
-        if not (self.training and self.bottleneck.skip_l2_training):
-            emb_w1 = F.normalize(emb_w1, p=2, dim=1)
-            emb_w2 = F.normalize(emb_w2, p=2, dim=1)
-
+        # V11: bottleneck 始终返回 L2-normalized embedding，无需额外处理
         return emb_w1, emb_w2, pre_w1, pre_w2, change_score, diff_feat
