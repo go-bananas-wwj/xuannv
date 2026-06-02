@@ -1,0 +1,209 @@
+# ==============================================================
+# xuannv 哈尔滨新区蒸馏训练 v1
+# OlmoEarth-Base (768D, 离线预计算) -> AEFModel (128D pre_norm, 64D emb)
+#
+# 核心设计:
+# 1. 离线蒸馏: OlmoEarth spatial tokens 预存为 .npz，训练时按 (patch, month) 查表
+# 2. 语义空间蒸馏损失: student distill_map (768D) cosine -> teacher tokens (768D)
+# 3. 保留 v41 防坍缩损失体系: Barlow Twins + VICReg + 重建 + 分类
+# 4. 两阶段训练: projector warmup (10ep) -> 全量微调 (110ep)
+#
+# 评估目标:
+#   WorldCover mIoU >= 0.30 (当前 GEN-v2=0.118, OlmoEarth=0.274)
+#   变化检测 AUC   >= 0.65  (保留 student 时序优势)
+# ==============================================================
+
+experiment:
+  name: harbin_distill_v1_olmoearth
+  seed: 42
+  output_dir: /workspace/outputs/harbin_distill/harbin_distill_v1_olmoearth
+
+data:
+  dataset_type: harbin_patches
+  manifest_path: /workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered
+  stats_dir: /workspace/statistics/harbin_scenes
+  batch_size: 4
+  num_workers: 4
+  image_size: 128
+  max_frames: 24
+  num_classes: 11
+  input_dim: 6
+  metadata_dim: 4
+
+  num_input_sources: 3
+  input_sources:
+    - s2
+    - s1
+    - landsat
+
+  source_channels:
+    s2: 6
+    s1: 2
+    landsat: 6
+
+  num_target_sources: 6
+  target_sources:
+    - name: s2
+      loss_type: 0
+      sensor_src: s2
+      out_channels: 6
+    - name: s1
+      loss_type: 0
+      sensor_src: s1
+      out_channels: 2
+    - name: landsat
+      loss_type: 0
+      sensor_src: landsat
+      out_channels: 6
+    - name: dem
+      loss_type: 0
+      sensor_src: null
+      out_channels: 1
+    - name: worldcover
+      loss_type: 1
+      sensor_src: null
+      out_channels: 11
+    - name: dynamic_world
+      loss_type: 1
+      sensor_src: null
+      out_channels: 9
+
+  # OlmoEarth 离线 teacher tokens 根目录 (每月有 spatial_tokens.npz + emb_all.npz)
+  olmoearth_tokens_root: /workspace/outputs/olmoearth_harbin
+
+  random_target_frame: true
+  spatial_augmentation: true
+  temporal_window_augmentation: true
+  temporal_window_prob: 0.5
+  temporal_window_min_frames: 4
+  temporal_window_max_frames: 24
+  preload: true
+
+  recon_mask_ratio: 0.85
+  recon_mask_patch_size: 16
+
+  filter_2025_monthly: false
+
+model:
+  input_dim: 6
+  stem_dim: 128
+  precision_dim: 128
+  time_dim: 256
+  space_dim: 256
+  embedding_dim: 64
+  time_code_dim: 64
+  window_code_dim: 64
+  relative_time_code_dim: 16
+  num_blocks: 8
+  num_heads: 8
+  vmf_kappa: 8000.0
+  bottleneck_noise_scale: 0.02
+  metadata_dim: 4
+  num_sensor_types: 16
+  gradient_checkpointing: true
+  per_source_decoders: true
+  decoder_hidden_mult: 1
+  skip_l2_norm_training: true
+  use_2d_pos_enc: false
+
+  # ★ 蒸馏投影头配置
+  use_distill_head: true        # 开启 OlmoEarthProjectionHead
+  distill_hidden_dim: 512       # 投影头中间层维度
+  distill_teacher_dim: 768      # OlmoEarth token 维度
+  distill_teacher_spatial_size: 32  # OlmoEarth token 空间分辨率
+
+training:
+  epochs: 2
+  gradient_accumulation_steps: 2
+  lr: 0.0001
+  lr_min: 0.000001
+  weight_decay: 0.01
+  grad_clip_norm: 1.0
+
+  # ── 保留损失 (来自 v41，防坍缩体系) ──
+  reconstruction_weight: 0.08
+  consistency_weight: 0.0
+  classification_weight: 0.03
+
+  decorrelation_weight: 5.0
+  use_spatial_vicreg: true
+  variance_weight: 2.0
+  covariance_weight: 1.0
+  vicreg_min_std: 1.0
+  orthogonality_weight: 0.01
+
+  # ── 关闭无效损失 ──
+  use_pre_norm_uniform: false
+  pre_norm_uniform_weight: 0.0
+  batch_uniformity_weight: 0.0
+  erank_loss_weight: 0.0
+  aef_batch_uniformity_weight: 0.0
+  inter_patch_infonce_weight: 0.0
+  inter_patch_infonce_temperature: 0.1
+  inter_variance_weight: 0.0
+  inter_variance_min_std: 0.3
+  inter_decorr_weight: 0.0
+  temporal_contrastive_weight: 0.0
+  temporal_cosine_pixel_weight: 0.0
+  patch_id_loss_weight: 0.0
+  lmim_weight: 0.0
+  temporal_gap_aware_weight: 0.0
+  hyperspherical_uniform_weight: 0.0
+  spherical_variance_weight: 0.0
+  temporal_magnitude_weight: 0.0
+  pixel_change_supervision_weight: 0.0
+  change_consistency_weight: 0.0
+  text_contrastive_weight: 0.0
+  vicreg_weight: 0.0
+  dino_weight: 0.0
+  koleo_weight: 0.0
+  pixel_temporal_info_nce_weight: 0.0
+  l2_temporal_weight: 0.0
+  ct_reconstruction_weight: 0.0
+  aux_classification_weight: 0.0
+  bottleneck_cls_weight: 0.0
+  encoder_uniform_weight: 0.0
+
+  # ── ★ OlmoEarth 蒸馏损失 ──
+  olmoearth_spatial_distill_weight: 2.0   # 核心: spatial token cosine alignment
+  olmoearth_global_distill_weight: 0.5    # 辅助: global vector alignment
+
+  # ── ★ 两阶段训练 ──
+  # Stage 1 (epoch 0~9): 只训练投影头，让 projector 先对齐 teacher 空间
+  # Stage 2 (epoch 10+): 全量微调，语义知识迁移到 backbone
+  distill_projector_warmup_epochs: 10
+
+  # ── 其他训练参数 ──
+  memory_bank_size: 4096
+  source_recon_weights: [1.0, 1.0, 1.0, 0.02, 0.1, 0.1]
+
+  teacher_momentum: 0.996
+  teacher_dropout_rate: 0.1
+  student_frame_drop_rate: 0.5
+  student_source_drop_rate: 0.3
+  student_front_drop_prob: 0.15
+  student_back_drop_prob: 0.15
+
+  kappa_start: 8000.0
+  kappa_end: 8000.0
+  kappa_warmup_epochs: 0
+
+  lr_schedule: cosine_no_restart
+  warmup_epochs: 10
+  recon_warmup_epochs: 0
+
+  max_steps_per_epoch: 5
+
+  save_every: 20
+  save_best_balanced: true
+  best_balanced_uniform_min: 0.0
+  best_balanced_uniform_max: 0.3
+  early_stop_patience: 100
+
+  decoder_cond_dropout: 0.6
+  temporal_magnitude_temperature: 0.1
+  temporal_use_spatial_weight: true
+
+evaluation:
+  knn_k: 5
+  bootstrap_samples: 100

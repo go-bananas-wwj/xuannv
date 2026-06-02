@@ -153,7 +153,9 @@ def main():
 
     total_epochs = cfg.training.epochs
     best_recon = float("inf")
+    best_miou = -1.0
     save_every = args.save_every if args.save_every is not None else getattr(cfg.training, "save_every", 20)
+    eval_every = getattr(cfg.training, "eval_every", 10)
     epoch_start_time = time.time()
     bank_size = 0
 
@@ -191,15 +193,28 @@ def main():
                 f"time={epoch_dt:.1f}s elapsed={int(elapsed//60)}m ETA={eta_str}"
             )
 
+        # 定期保存断点（覆盖式 epoch_last.pt，含 optimizer，用于 OOM 后续训）
         if (epoch + 1) % save_every == 0:
-            trainer.save_checkpoint(epoch + 1, losses)
+            trainer.save_checkpoint(epoch + 1, losses, tag="last")
 
-        # 基于 reconstruction loss 选 best
-        if losses["recon"] < best_recon:
-            best_recon = losses["recon"]
-            trainer.save_checkpoint(f"best_epoch{epoch + 1}", losses)
+        # ★ 下游探针评估（kNN: global embedding -> WorldCover 众数类别）
+        #   每次评估后存 best 权重，按 mIoU 仅保留最优 3 个
+        do_eval = ((epoch + 1) % eval_every == 0) or (epoch + 1 == total_epochs)
+        if do_eval:
+            metrics = trainer.evaluate_knn(dataloader, max_batches=64)  # 限制评估样本量(~256 patch)
+            if dist.is_initialized():
+                dist.barrier()
             if global_rank == 0:
-                logger.Print(f"  [Best] New best recon={best_recon:.4f} at epoch {epoch + 1}")
+                logger.Print(
+                    f"  [Eval] epoch {epoch + 1}: kNN acc={metrics['acc']:.4f} "
+                    f"mIoU={metrics['miou']:.4f}"
+                )
+                trainer.save_checkpoint(epoch + 1, losses, miou=metrics["miou"])
+                if metrics["miou"] > best_miou:
+                    best_miou = metrics["miou"]
+                    logger.Print(
+                        f"  [Best] New best mIoU={best_miou:.4f} at epoch {epoch + 1}"
+                    )
 
         if trainer.scheduler is not None:
             trainer.scheduler.step()

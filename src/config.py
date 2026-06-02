@@ -42,6 +42,8 @@ class DataConfig:
     # 方差加权采样
     variance_weighted: bool = False
     filter_2025_monthly: bool = False
+    # ★ OlmoEarth 离线 teacher tokens 根目录 (蒸馏用)
+    olmoearth_tokens_root: str = None
     source_channels: dict = field(default_factory=dict)
     merge_hr_into_lr: bool = False
     input_sources: list | None = None
@@ -103,6 +105,11 @@ class ModelConfig:
     use_2d_pos_enc: bool = False
     pos_enc_2d_height: int = 8
     pos_enc_2d_width: int = 8
+    # ★ OlmoEarth 蒸馏投影头
+    use_distill_head: bool = False
+    distill_hidden_dim: int = 512
+    distill_teacher_dim: int = 768
+    distill_teacher_spatial_size: int = 32
 
 
 @dataclass
@@ -220,6 +227,7 @@ class TrainingConfig:
     best_balanced_uniform_min: float = -0.6
     best_balanced_uniform_max: float = 0.3
     early_stop_patience: int = 150
+    eval_every: int = 10  # 每隔多少 epoch 跑一次 kNN 下游探针评估
     save_every: int = 50
     checkpoint_interval: int = 20
     # EMA Teacher
@@ -251,6 +259,10 @@ class TrainingConfig:
     # Memory Bank — 扩大 uniformity loss 的有效 batch
     # K 越大梯度越稳定，但 uniformity O(N²) 会变慢；建议 512-1024
     memory_bank_size: int = 512
+    # ★ OlmoEarth 离线蒸馏
+    olmoearth_spatial_distill_weight: float = 0.0
+    olmoearth_global_distill_weight: float = 0.0
+    distill_projector_warmup_epochs: int = 0
 
 
 @dataclass

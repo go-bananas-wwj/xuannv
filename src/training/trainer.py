@@ -229,6 +229,17 @@ class DDPv13Trainer:
     def train_epoch(self, epoch: int, dataloader: DataLoader) -> dict[str, float]:
         self.model.train()
         t = self.cfg.training
+        # ★ Projector Warmup: 前 N epoch 只训练投影头，冻结 backbone
+        warmup_ep = getattr(t, 'distill_projector_warmup_epochs', 0)
+        if warmup_ep > 0:
+            if epoch < warmup_ep:
+                for name, p in self.model.module.named_parameters():
+                    p.requires_grad_('distill_head' in name)
+            elif epoch == warmup_ep:
+                for p in self.model.module.parameters():
+                    p.requires_grad_(True)
+                if self.global_rank == 0:
+                    print(f'[Distill Stage2] epoch={epoch}: backbone 解冻，进入全量微调')
         accum_steps = getattr(t, "gradient_accumulation_steps", 2)
         loss_accum: dict[str, float] = {}
         n_steps = 0
@@ -677,6 +688,40 @@ class DDPv13Trainer:
             if lmim_w > 0 and student_out.pre_norm_map is not None and teacher_out.pre_norm_map is not None:
                 lmim = latent_mim_loss(student_out.pre_norm_map, teacher_out.pre_norm_map)
 
+            # OlmoEarth 蒸馏损失（空间 + 全局 cosine）
+            distill_spatial_w = getattr(t, 'olmoearth_spatial_distill_weight', 0.0)
+            distill_global_w = getattr(t, 'olmoearth_global_distill_weight', 0.0)
+            distill_spatial_val = torch.tensor(0.0, device=self.device)
+            distill_global_val = torch.tensor(0.0, device=self.device)
+            if (distill_spatial_w > 0 or distill_global_w > 0) and student_out.distill_map is not None:
+                teacher_tok = batch.get("teacher_spatial_tokens", None)
+                if teacher_tok is not None:
+                    teacher_tok = teacher_tok.to(self.device)  # (B, 32, 32, 768)
+                    teacher_raw = teacher_tok.permute(0, 3, 1, 2).float()  # (B, 768, 32, 32)
+                    student_map = student_out.distill_map.float()          # (B, 768, h, w) student 原生分辨率
+                    if distill_spatial_w > 0:
+                        # ── 空间蒸馏：把 teacher 池化到 student 原生分辨率，
+                        #    不再上采样 student（避免强迫 8x8 student 编造 32x32 细节）──
+                        if teacher_raw.shape[2:] != student_map.shape[2:]:
+                            teacher_sp = F.adaptive_avg_pool2d(teacher_raw, student_map.shape[2:])
+                        else:
+                            teacher_sp = teacher_raw
+                        # ★ 同时中心化 student 与 teacher：spatial loss 只对齐“空间结构”，
+                        #    DC（全局语义）分量交给 global loss，避免两个目标互相打架
+                        #    （此前 student 未中心化 → dist_sp 长期卡在 1.0 的根因）
+                        t_cent = teacher_sp - teacher_sp.mean(dim=(2, 3), keepdim=True)
+                        s_cent = student_map - student_map.mean(dim=(2, 3), keepdim=True)
+                        distill_spatial_val = (1.0 - F.cosine_similarity(s_cent, t_cent, dim=1, eps=1e-6)).mean()
+                    if distill_global_w > 0:
+                        # 优先使用 OlmoEarth 原生 global embedding（比 token 空间均值更具语义）
+                        teacher_global_ref = batch.get("teacher_global_emb", None)
+                        if teacher_global_ref is not None:
+                            teacher_global_ref = teacher_global_ref.to(self.device).float()  # (B, 768)
+                        else:
+                            teacher_global_ref = teacher_raw.mean(dim=(2, 3))  # (B, 768) 回退
+                        distill_global_val = (1.0 - F.cosine_similarity(
+                            student_out.distill_global.float(), teacher_global_ref, dim=1, eps=1e-6)).mean()
+
             total = (
                 recon_w * recon_warmup * recon
                 + consist_w * consist
@@ -699,6 +744,8 @@ class DDPv13Trainer:
                 + erank_loss_w * erank_loss_val
                 + coding_rate_w * coding_rate_val
                 + lmim_w * lmim
+                + distill_spatial_w * distill_spatial_val
+                + distill_global_w * distill_global_val
             )
 
             if torch.isnan(total) or torch.isinf(total):
@@ -766,6 +813,8 @@ class DDPv13Trainer:
                 "lmim": lmim.item(),
                 "gap_aware_temporal": gap_aware_temporal_loss.item(),
                 "coding_rate": coding_rate_val.item(),
+                "distill_spatial": distill_spatial_val.item(),
+                "distill_global": distill_global_val.item(),
             }.items():
                 loss_accum[k] = loss_accum.get(k, 0.0) + v
             n_steps += 1
@@ -792,6 +841,7 @@ class DDPv13Trainer:
                       f"spatial=[{active_dims}/{pre_norm_map.shape[1] if pre_norm_map is not None else pre_norm.shape[1]}:{std_mean:.4f}] "
                       f"inter=[{inter_active}/{pre_norm.shape[1]}:{inter_std_mean:.4f}] "
                       f"erank={erank:.1f} lmim={lmim.item():.4f} "
+                      f"dist_sp={distill_spatial_val.item():.4f} dist_gl={distill_global_val.item():.4f} "
                       f"perturb=[fd={perturb_stats['frame_drop_ratio']:.2f} "
                       f"sd={perturb_stats['source_drop_ratio']:.2f}] "
                       f"lr={lr:.6f}")
@@ -825,36 +875,145 @@ class DDPv13Trainer:
             return base_loss * weight_factor
         return base_loss
 
-    def save_checkpoint(self, epoch: int, losses: dict) -> None:
+    @torch.no_grad()
+    def evaluate_knn(self, dataloader: DataLoader, max_batches: int | None = None) -> dict:
+        """In-process kNN 探针评估：global embedding (64D) → patch-level WorldCover 众数类别.
+
+        衡量蒸馏后底座表征的可分性（acc / mIoU）。各 rank 收集自身分片，
+        all_gather_object 汇总到 rank0 计算，返回 {"acc", "miou"}（非 rank0 返回 0）。
+        """
+        was_training = self.model.training
+        self.model.eval()
+        embs: list = []
+        labels: list = []
+        import itertools
+        iterator = itertools.islice(dataloader, max_batches) if max_batches else dataloader
+        for batch in iterator:
+            batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v
+                     for k, v in batch.items()}
+            if "label" not in batch:
+                continue
+            with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=False):
+                has_dual = all(k in batch for k in ['valid_start_w1', 'valid_end_w1', 'valid_start_w2', 'valid_end_w2'])
+                out = self.model(
+                    source_frames=batch["source_frames"],
+                    source_timestamps_ms=batch["source_timestamps_ms"],
+                    source_frame_mask=batch["source_frame_mask"],
+                    source_input_mask=batch["source_input_mask"],
+                    source_type_ids=batch["source_type_ids"],
+                    valid_start_ms=batch["valid_start_w1"] if has_dual else batch["valid_start_ms"],
+                    valid_end_ms=batch["valid_end_w1"] if has_dual else batch["valid_end_ms"],
+                    target_relative_time=batch["target_relative_time"],
+                    target_metadata=batch["target_metadata"],
+                    target_loss_type=batch.get("target_loss_type"),
+                    target_source_idx=batch.get("target_source_idx"),
+                    target_valid_start_ms=batch.get("target_valid_start_ms"),
+                    target_valid_end_ms=batch.get("target_valid_end_ms"),
+                    dual_window=False,
+                )
+            emb = out.embedding.float()  # (B, 64)
+            emb = F.normalize(emb, dim=1)
+            embs.append(emb.cpu())
+            labels.append(batch["label"].cpu())
+
+        if was_training:
+            self.model.train()
+
+        if not embs:
+            return {"acc": 0.0, "miou": 0.0}
+        local_emb = torch.cat(embs, dim=0).numpy()
+        local_lab = torch.cat(labels, dim=0).numpy()
+
+        # 跨 rank 汇总
+        if self.world_size > 1 and dist.is_initialized():
+            gathered: list = [None] * self.world_size
+            dist.all_gather_object(gathered, (local_emb, local_lab))
+            if self.global_rank != 0:
+                return {"acc": 0.0, "miou": 0.0}
+            import numpy as np
+            all_emb = np.concatenate([g[0] for g in gathered], axis=0)
+            all_lab = np.concatenate([g[1] for g in gathered], axis=0)
+        else:
+            all_emb, all_lab = local_emb, local_lab
+
+        return self._knn_metric(all_emb, all_lab)
+
+    @staticmethod
+    def _knn_metric(emb, lab, k: int = 5, seed: int = 42) -> dict:
+        """patch-level kNN（cosine）train/test split → acc + mIoU."""
+        import numpy as np
+        n = len(emb)
+        if n < 4:
+            return {"acc": 0.0, "miou": 0.0}
+        rng = np.random.RandomState(seed)
+        perm = rng.permutation(n)
+        n_tr = n // 2
+        tr, te = perm[:n_tr], perm[n_tr:]
+        Xtr, ytr = emb[tr], lab[tr]
+        Xte, yte = emb[te], lab[te]
+        sim = Xte @ Xtr.T  # 已 L2 归一化
+        kk = min(k, len(tr))
+        topk = np.argpartition(-sim, kth=kk - 1, axis=1)[:, :kk]
+        preds = np.empty(len(te), dtype=lab.dtype)
+        for i, idx in enumerate(topk):
+            u, c = np.unique(ytr[idx], return_counts=True)
+            preds[i] = u[np.argmax(c)]
+        acc = float((preds == yte).mean())
+        classes = np.unique(np.concatenate([yte, preds]))
+        ious = []
+        for cls in classes:
+            inter = np.logical_and(preds == cls, yte == cls).sum()
+            union = np.logical_or(preds == cls, yte == cls).sum()
+            if union > 0:
+                ious.append(inter / union)
+        miou = float(np.mean(ious)) if ious else 0.0
+        return {"acc": acc, "miou": miou}
+
+    def save_checkpoint(self, epoch, losses: dict, miou: float | None = None,
+                        tag: str | None = None) -> None:
+        """保存 checkpoint.
+
+        - tag="last": 覆盖式断点 epoch_last.pt（含 optimizer，用于 OOM 后续训）
+        - miou 提供: best 权重 epoch_best_miou{miou}_ep{epoch}.pt，按 mIoU 仅保留最优 3 个
+        - 否则: 普通 epoch_{epoch}.pt
+        """
         if self.global_rank != 0:
             return
-        path = self.output_dir / f"epoch_{epoch}.pt"
+        import re
+        if tag == "last":
+            path = self.output_dir / "epoch_last.pt"
+        elif miou is not None:
+            path = self.output_dir / f"epoch_best_miou{miou:.4f}_ep{epoch}.pt"
+        else:
+            path = self.output_dir / f"epoch_{epoch}.pt"
         torch.save({
             "epoch": epoch,
             "model_state_dict": self.model.module.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
             "scaler_state_dict": self.scaler.state_dict() if self.scaler is not None else {},
             "losses": losses,
+            "miou": miou,
         }, path)
         print(f"[trainer] Saved checkpoint to {path}")
 
-        # 清理普通 checkpoint，只保留最近 3 个
+        # 清理普通 checkpoint（非 best/last），只保留最近 1 个
         ckpts = sorted(
-            [p for p in self.output_dir.glob("epoch_*.pt") if not p.name.startswith("epoch_best")],
+            [p for p in self.output_dir.glob("epoch_*.pt")
+             if not p.name.startswith("epoch_best") and p.name != "epoch_last.pt"],
             key=lambda p: p.stat().st_mtime
         )
-        for old_ckpt in ckpts[:-3]:
+        for old_ckpt in ckpts[:-1]:
             old_ckpt.unlink()
             print(f"[trainer] Removed old checkpoint: {old_ckpt}")
 
-        # 清理 best checkpoint，只保留最近 3 个
-        best_ckpts = sorted(
-            [p for p in self.output_dir.glob("epoch_best_*.pt")],
-            key=lambda p: p.stat().st_mtime
-        )
+        # ★ best 权重：按文件名内 mIoU 数值排序，只保留最优 3 个
+        def _miou_of(p):
+            m = re.search(r"miou([0-9.]+)_", p.name)
+            return float(m.group(1)) if m else -1.0
+        best_ckpts = sorted(self.output_dir.glob("epoch_best_miou*.pt"), key=_miou_of)
         for old_ckpt in best_ckpts[:-3]:
             old_ckpt.unlink()
-            print(f"[trainer] Removed old best checkpoint: {old_ckpt}")
+            print(f"[trainer] Removed lower-mIoU checkpoint: {old_ckpt.name}")
 
     def load_checkpoint(self, path: str) -> int:
         ckpt = torch.load(path, map_location=self.device, weights_only=False)

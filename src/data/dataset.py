@@ -244,6 +244,15 @@ class HarbinPatchDataset(Dataset):
         self._cache: dict[str, dict[str, tuple]] = {}
         if getattr(d, "preload", True):
             self._preload_all()
+
+        # ★ OlmoEarth teacher tokens 预加载到内存（避免每个 __getitem__ 重复读 ~1.3GB npz）
+        #   在主进程加载，DataLoader fork worker 时通过 COW 共享，不会按 worker 数翻倍。
+        self._teacher_tokens: dict[int, np.ndarray] = {}   # month -> (N, 32, 32, 768) fp16
+        self._teacher_global: dict[int, np.ndarray] = {}   # month -> (N, 768) fp32
+        self._teacher_tok_pid2row: dict[int, dict | None] = {}  # month -> {patch_id: row}
+        self._teacher_glb_pid2row: dict[int, dict | None] = {}  # month -> {patch_id: row}
+        self._teacher_months: list[int] = []
+        self._preload_teacher_tokens()
         
         # ★ V13: 构建月度样本索引
         self.monthly_samples = self._build_monthly_samples()
@@ -588,6 +597,88 @@ class HarbinPatchDataset(Dataset):
 
         return tif_files
 
+    def _preload_teacher_tokens(self) -> None:
+        """一次性把所有月份的 OlmoEarth teacher tokens 加载进内存（fp16）.
+
+        此前 `_load_teacher_tokens` 每次 __getitem__ 都 `np.load(...)["tokens"]`，
+        会把整份 ~1.3GB 数组读进内存再取一行，造成灾难性的 I/O / 内存抖动。
+        改为主进程预加载，worker fork 时通过 COW 共享。
+
+        ★ 关键：按 npz 自带的 patch_ids 建立 patch_id→行号 映射，
+        而不是假设 self.patches 的枚举顺序与 npz 行序一致
+        （否则 max_patches 随机采样 / 过滤会导致 teacher 张冠李戴）。
+        """
+        tokens_root = getattr(self.cfg.data, "olmoearth_tokens_root", None)
+        if tokens_root is None:
+            return
+        from pathlib import Path
+        root = Path(tokens_root)
+        if not root.exists():
+            return
+        for d in sorted(root.iterdir()):
+            if not (d.is_dir() and d.name.isdigit()):
+                continue
+            m = int(d.name)
+            tok_path = d / "spatial_tokens.npz"
+            if tok_path.exists():
+                try:
+                    zd = np.load(str(tok_path))
+                    self._teacher_tokens[m] = zd["tokens"].astype(np.float16)
+                    self._teacher_tok_pid2row[m] = {
+                        str(p): i for i, p in enumerate(zd["patch_ids"])
+                    } if "patch_ids" in zd.files else None
+                except Exception:
+                    continue
+            emb_path = d / "emb_all.npz"
+            if emb_path.exists():
+                try:
+                    ed = np.load(str(emb_path))
+                    if "embeddings" in ed.files:
+                        self._teacher_global[m] = ed["embeddings"].astype(np.float32)
+                        self._teacher_glb_pid2row[m] = {
+                            str(p): i for i, p in enumerate(ed["patch_ids"])
+                        } if "patch_ids" in ed.files else None
+                except Exception:
+                    pass
+        self._teacher_months = sorted(self._teacher_tokens.keys())
+        if self._teacher_months:
+            n = next(iter(self._teacher_tokens.values())).shape[0]
+            gb = sum(a.nbytes for a in self._teacher_tokens.values()) / 1e9
+            print(f"[Dataset] OlmoEarth teacher tokens 预加载: {len(self._teacher_months)} 个月, "
+                  f"{n} patches, {gb:.2f}GB (fp16, 内存常驻)")
+
+    def _load_teacher_tokens(self, patch_id: str, year: int, month: int) -> dict:
+        """从内存缓存取 OlmoEarth teacher tokens（蒸馏用）.
+
+        若未配置 / 无缓存，返回空 dict（训练照常进行）.
+        若请求月份不存在，自动选最近可用月份（避免 batch collate 时 key 不一致）.
+        按 patch_id 字符串匹配行号（顺序无关，安全）。
+        """
+        if not self._teacher_months:
+            return {}
+        # 最近可用月份（优先精确匹配）
+        if month in self._teacher_tokens:
+            am = month
+        else:
+            am = min(self._teacher_months, key=lambda a: abs(a - month))
+        result: dict = {}
+        toks = self._teacher_tokens.get(am)
+        if toks is not None:
+            pid2row = self._teacher_tok_pid2row.get(am)
+            row = pid2row.get(patch_id) if pid2row is not None else self._patch_to_idx.get(patch_id)
+            if row is not None and row < toks.shape[0]:
+                result["teacher_spatial_tokens"] = torch.from_numpy(
+                    np.ascontiguousarray(toks[row])
+                )  # (32, 32, 768) fp16
+        gemb = self._teacher_global.get(am)
+        if gemb is not None:
+            gpid2row = self._teacher_glb_pid2row.get(am)
+            grow = gpid2row.get(patch_id) if gpid2row is not None else self._patch_to_idx.get(patch_id)
+            if grow is not None and grow < gemb.shape[0]:
+                result["teacher_global_emb"] = torch.from_numpy(
+                    np.ascontiguousarray(gemb[grow])
+                )  # (768,) fp32
+        return result
     def _get_worldcover_label(self, patch_id: str) -> int:
         """从原始 WorldCover TIFF 提取 patch-level 众数类别标签."""
         try:
@@ -1143,4 +1234,5 @@ class HarbinPatchDataset(Dataset):
             "target_source_idx": torch.from_numpy(target_source_idx),
             "label": torch.tensor(patch_label, dtype=torch.long),
             "patch_index": torch.tensor(self._patch_to_idx.get(patch_id, 0), dtype=torch.long),
+            **self._load_teacher_tokens(patch_id, year, month_a),
         }

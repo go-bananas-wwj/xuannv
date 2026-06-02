@@ -47,6 +47,8 @@ class AEFOutput:
     dual_pre_w2: torch.Tensor | None = None  # [B, D, H, W] 第二窗口 pre_norm (用于 temporal loss)
     patch_id_logits: torch.Tensor | None = None  # [B*H*W, num_patches] 空间token级实例判别logits
     patch_id_spatial_hw: int = 1  # H*W 空间token数，供 trainer 扩展 labels
+    distill_map: 'torch.Tensor | None' = None     # [B, 768, 32, 32] 投影后的空间表征（蒸馏用）
+    distill_global: 'torch.Tensor | None' = None  # [B, 768] 投影后全局向量（蒸馏用）
 
 
 class AEFModel(nn.Module):
@@ -145,6 +147,17 @@ class AEFModel(nn.Module):
             self.patch_id_head: nn.Linear | None = nn.Linear(m.embedding_dim, patch_id_num)
         else:
             self.patch_id_head = None
+
+        # ★ OlmoEarth 蒸馏投影头（可选）
+        if getattr(m, 'use_distill_head', False):
+            from src.models.distill_head import OlmoEarthProjectionHead
+            self.distill_head: OlmoEarthProjectionHead | None = OlmoEarthProjectionHead(
+                in_dim=m.embedding_dim,  # pre_norm_map 维度 = embedding_dim（bottleneck 输出）
+                hidden_dim=getattr(m, 'distill_hidden_dim', 512),
+                out_dim=getattr(m, 'distill_teacher_dim', 768),
+            )
+        else:
+            self.distill_head = None
 
     def encode_frames(
         self,
@@ -413,6 +426,16 @@ class AEFModel(nn.Module):
             dummy_cls = dummy_cls  # head exists, logits computed
         reconstructions = reconstructions + dummy_cls.view(1, 1, 1, 1, 1)
 
+        # ★ OlmoEarth 蒸馏：student pre_norm_map → teacher 768D 空间
+        distill_map = None
+        distill_global = None
+        if self.distill_head is not None and pre_norm_map is not None:
+            # 保持 student 原生空间分辨率（如 8x8）。蒸馏时由 trainer 把 teacher
+            # 池化到该分辨率对齐，避免把 student 上采样到 32x32 去编造无法表达的细节。
+            _proj = self.distill_head(pre_norm_map)  # (B, 768, H, W) 原生分辨率
+            distill_map = _proj
+            distill_global = _proj.mean(dim=(2, 3))  # (B, 768)
+
         return AEFOutput(
             embedding_map=embedding_map,
             embedding=embedding,
@@ -426,6 +449,8 @@ class AEFModel(nn.Module):
             dual_pre_w2=dual_pre_w2,
             patch_id_logits=patch_id_logits,
             patch_id_spatial_hw=patch_id_spatial_hw,
+            distill_map=distill_map,
+            distill_global=distill_global,
         )
 
     def encode_dual_window(
