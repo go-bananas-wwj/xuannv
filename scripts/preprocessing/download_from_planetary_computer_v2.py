@@ -57,7 +57,7 @@ from rasterio.transform import from_bounds
 
 COLLECTION_MAP = {
     "s2": "sentinel-2-l2a",
-    "s1": "sentinel-1-grd",
+    "s1": "sentinel-1-rtc",  # GRD 数据目前缺少 CRS，改用 RTC（Radiometric Terrain Corrected）
     "landsat": "landsat-c2-l2",
     "dem": "cop-dem-glo-30",
     "worldcover": "esa-worldcover",
@@ -409,6 +409,11 @@ def download_patch_v2(args) -> dict:
             print(f"    [INFO] S2 patch_{patch_id:06d}: limiting items from {len(items)} to 8")
             items = items[:8]
 
+        # S1 限制 items 数量（避免无效数据导致 fallback 极慢）
+        if source == "s1" and len(items) > 8:
+            print(f"    [INFO] S1 patch_{patch_id:06d}: limiting items from {len(items)} to 8")
+            items = items[:8]
+
         # === 2. 预签名所有 items（一次调用）===
         items = pre_sign_items(items)
 
@@ -431,6 +436,28 @@ def download_patch_v2(args) -> dict:
         if items_to_download:
             # 统一使用 mini-batch stackstac (batch=3) + 403 重试
             import stackstac
+            from stackstac.rio_env import LayeredEnv
+
+            # 为 S1 设置更短的 GDAL HTTP 超时，避免无效 item 阻塞
+            gdal_env = None
+            if source == "s1":
+                gdal_env = LayeredEnv(
+                    always=dict(
+                        GDAL_HTTP_MULTIRANGE="YES",
+                        GDAL_HTTP_MERGE_CONSECUTIVE_RANGES="YES",
+                        GDAL_HTTP_TIMEOUT="10",
+                        GDAL_HTTP_MAX_RETRY="1",
+                        GDAL_HTTP_RETRY_DELAY="1",
+                    ),
+                    open=dict(
+                        GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR",
+                        VSI_CACHE=True,
+                    ),
+                    read=dict(
+                        VSI_CACHE=False,
+                    ),
+                )
+
             batch_results = {}
             mini_batch = 3
             for mb_start in range(0, len(items_to_download), mini_batch):
@@ -445,6 +472,7 @@ def download_patch_v2(args) -> dict:
                         dtype="float64",
                         epsg=epsg,
                         fill_value=0,
+                        gdal_env=gdal_env,
                     )
                     data = stack.compute()  # [time, band, y, x]
                 except Exception as e:
@@ -463,16 +491,54 @@ def download_patch_v2(args) -> dict:
                                 dtype="float64",
                                 epsg=epsg,
                                 fill_value=0,
+                                gdal_env=gdal_env,
                             )
                             data = stack.compute()
                         except Exception as e2:
                             print(f"      [WARN] {source} mini-batch {mb_start} re-sign failed: {e2}")
                             continue
+                    elif "'NoneType' object has no attribute 'to_epsg'" in err_str:
+                        # S1 某些 items 的 asset 缺少 CRS，fallback 也会失败，直接跳过 batch
+                        print(f"      [WARN] {source} mini-batch {mb_start} failed (missing CRS), skipping batch")
+                        continue
                     else:
                         print(f"      [WARN] {source} mini-batch {mb_start} failed: {e}")
-                        if source == "s1":
-                            import traceback
-                            traceback.print_exc()
+                        # Fallback: batch 失败时逐个尝试，避免一个坏 item 拖累整个 batch
+                        if source in ("s1", "landsat"):
+                            for single_item in mb_items:
+                                try:
+                                    single_stack = stackstac.stack(
+                                        [single_item],
+                                        assets=assets,
+                                        bounds_latlon=bbox,
+                                        resolution=RESOLUTION_MAP[source],
+                                        rescale=False,
+                                        dtype="float64",
+                                        epsg=epsg,
+                                        fill_value=0,
+                                        gdal_env=gdal_env,
+                                    )
+                                    single_data = single_stack.compute()
+                                    data_np = np.asarray(single_data[0])
+                                    if data_np.shape[0] != len(assets):
+                                        print(f"      [WARN] Band mismatch for {source} item {single_item.id}")
+                                        continue
+                                    if np.all(data_np == 0):
+                                        print(f"      [WARN] All-zero {source} data for {single_item.id}")
+                                        continue
+                                    if source == "s2" and divide_10000:
+                                        data_np = data_np.astype(np.float32) / 10000.0
+                                    elif source == "s2":
+                                        data_np = data_np.astype(np.uint16)
+                                    elif source == "landsat":
+                                        data_np = data_np.astype(np.float32) * 0.0000275 - 0.2
+                                        data_np = np.clip(data_np, 0.0, 1.0)
+                                    dt = single_item.datetime
+                                    date_str = dt.strftime("%Y%m%d") if dt else single_item.id.split("_")[-1][:8]
+                                    batch_results[date_str] = data_np
+                                except Exception as e2:
+                                    print(f"      [WARN] {source} item {single_item.id} fallback failed: {e2}")
+                                    continue
                         continue
 
                 for i, item in enumerate(mb_items):
