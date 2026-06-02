@@ -281,8 +281,12 @@ class DDPv13Trainer:
             max_steps = getattr(t, 'max_steps_per_epoch', None)
             effective_steps = min(len(dataloader), max_steps) if max_steps else len(dataloader)
             lr = get_cosine_lr(epoch, step, effective_steps, self.cfg)
+            scale = getattr(self.cfg.training, 'backbone_lr_scale', 1.0)
             for pg in self.optimizer.param_groups:
-                pg["lr"] = lr
+                if scale != 1.0 and pg.get("name") == "backbone":
+                    pg["lr"] = lr * scale
+                else:
+                    pg["lr"] = lr
 
             with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=False):
                 # Teacher forward

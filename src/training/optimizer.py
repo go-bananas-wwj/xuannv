@@ -9,10 +9,24 @@ from src.config import Config
 
 
 def build_optimizer(model: torch.nn.Module, cfg: Config) -> torch.optim.Optimizer:
-    """根据配置构建 AdamW 优化器."""
+    """根据配置构建 AdamW 优化器。
+
+    若 backbone_lr_scale < 1，将 distill_head 以外的参数单独设较低 LR，
+    以减缓 backbone 解冻后的表征坍塌。
+    """
     t = cfg.training
+    scale = getattr(t, 'backbone_lr_scale', 1.0)
+    if scale != 1.0:
+        backbone_params = [p for n, p in model.named_parameters() if 'distill_head' not in n]
+        head_params = [p for n, p in model.named_parameters() if 'distill_head' in n]
+        param_groups = [
+            {"params": backbone_params, "lr": t.lr * scale, "name": "backbone"},
+            {"params": head_params, "lr": t.lr, "name": "head"},
+        ]
+    else:
+        param_groups = [{"params": list(model.parameters()), "lr": t.lr, "name": "all"}]
     return torch.optim.AdamW(
-        model.parameters(),
+        param_groups,
         lr=t.lr,
         weight_decay=t.weight_decay,
     )

@@ -172,6 +172,7 @@ training:
   # Stage 1 (epoch 0~9): 只训练投影头，让 projector 先对齐 teacher 空间
   # Stage 2 (epoch 10+): 全量微调，语义知识迁移到 backbone
   distill_projector_warmup_epochs: 10
+  backbone_lr_scale: 0.1  # backbone LR = 1e-5，head LR = 1e-4，减缓解冻后坍塌
 
   # ── 其他训练参数 ──
   memory_bank_size: 4096

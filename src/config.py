@@ -263,6 +263,7 @@ class TrainingConfig:
     olmoearth_spatial_distill_weight: float = 0.0
     olmoearth_global_distill_weight: float = 0.0
     distill_projector_warmup_epochs: int = 0
+    backbone_lr_scale: float = 1.0  # backbone参数LR倍率，<1可减缓backbone解冻后的坍塌
 
 
 @dataclass
