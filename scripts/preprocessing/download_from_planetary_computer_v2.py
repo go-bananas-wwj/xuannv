@@ -132,7 +132,18 @@ def _search_with_retry(catalog, source, bbox, date_start, date_end):
         try:
             search = catalog.search(**kwargs)
             items = search.item_collection()
-            return list(items)
+            items = list(items)
+            # 修复 S1 items 缺少 proj:epsg 的问题（PC 使用 proj:code = "EPSG:4326"）
+            if source == "s1":
+                for item in items:
+                    if item.properties.get("proj:epsg") is None:
+                        proj_code = item.properties.get("proj:code")
+                        if proj_code and isinstance(proj_code, str) and proj_code.upper().startswith("EPSG:"):
+                            try:
+                                item.properties["proj:epsg"] = int(proj_code.split(":")[1])
+                            except ValueError:
+                                pass
+            return items
         except Exception as e:
             if attempt < 2:
                 wait = 5 + attempt * 5
@@ -459,6 +470,9 @@ def download_patch_v2(args) -> dict:
                             continue
                     else:
                         print(f"      [WARN] {source} mini-batch {mb_start} failed: {e}")
+                        if source == "s1":
+                            import traceback
+                            traceback.print_exc()
                         continue
 
                 for i, item in enumerate(mb_items):
