@@ -163,8 +163,11 @@ def knn_semantic_segmentation(embeddings: dict, dataset, month_idx: int = 4):
     for (pid, mi), emb in embeddings.items():
         if mi != month_idx:
             continue
-        # 加载 WorldCover label
-        label_path = data_root / "worldcover" / pid / "static.tif"
+        # 加载 WorldCover label（支持多区域 patch_id 格式）
+        label_dir = dataset._resolve_source_dir("worldcover", pid)
+        if label_dir is None:
+            continue
+        label_path = label_dir / "static.tif"
         if not label_path.exists():
             continue
         try:
@@ -300,12 +303,14 @@ def change_detection_auc(embeddings: dict, dataset):
             ea = embeddings.get((pid, after_mi))
             if eb is None or ea is None:
                 continue
+            # 处理多区域 patch_id 格式（如 harbin_patch_000000 -> patch_000000）
+            local_pid = pid.split('_', 1)[1] if '_' in pid and not pid.startswith('patch_') else pid
             # cosine distance (patch-level mean)
             eb_g = eb.mean(axis=(1, 2))  # [D]
             ea_g = ea.mean(axis=(1, 2))  # [D]
             cos_sim = np.dot(eb_g, ea_g) / (np.linalg.norm(eb_g) * np.linalg.norm(ea_g) + 1e-8)
             diffs.append(1.0 - cos_sim)
-            labels.append(1 if pid in changed_pids else 0)
+            labels.append(1 if local_pid in changed_pids else 0)
 
         if len(diffs) < 4 or sum(labels) == 0:
             continue
@@ -325,7 +330,7 @@ def change_detection_auc(embeddings: dict, dataset):
                                           embeddings[(pid, after_mi)].mean(axis=(1,2))])
                          for pid in dataset.patches
                          if (pid, before_mi) in embeddings and (pid, after_mi) in embeddings])
-            y = np.array([1 if pid in changed_pids else 0
+            y = np.array([1 if (pid.split('_', 1)[1] if '_' in pid and not pid.startswith('patch_') else pid) in changed_pids else 0
                          for pid in dataset.patches
                          if (pid, before_mi) in embeddings and (pid, after_mi) in embeddings])
             if len(np.unique(y)) > 1:
