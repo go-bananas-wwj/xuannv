@@ -993,15 +993,27 @@ class HarbinPatchDataset(Dataset):
             w2_end = float(ts_sorted[-1])
             return w1_start, w1_end, w2_start, w2_end
 
-        # 默认: 中点分割
+        # random_split: 随机中点分割（默认）
         if len(ts_sorted) >= 4:
+            # 随机选择分割点，确保两边至少有2个帧
+            split_min = 2
+            split_max = len(ts_sorted) - 2
+            if split_min <= split_max:
+                split_point = random.randint(split_min, split_max)
+            else:
+                split_point = len(ts_sorted) // 2
+            w1_start = float(ts_sorted[0])
+            w1_end = float(ts_sorted[split_point - 1])
+            w2_start = float(ts_sorted[split_point])
+            w2_end = float(ts_sorted[-1])
+        elif len(ts_sorted) >= 2:
             mid = len(ts_sorted) // 2
             w1_start = float(ts_sorted[0])
             w1_end = float(ts_sorted[mid - 1])
             w2_start = float(ts_sorted[mid])
             w2_end = float(ts_sorted[-1])
         else:
-            t = float(ts_sorted[0])
+            t = float(ts_sorted[0]) if ts_sorted else 1672531200000.0
             w1_start = w1_end = w2_start = w2_end = t
 
         return w1_start, w1_end, w2_start, w2_end

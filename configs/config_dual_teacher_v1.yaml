@@ -55,9 +55,12 @@ data:
   temporal_window_min_frames: 4
   temporal_window_prob: 0.5
   use_dual_teacher: true
+  cross_temporal: true
+  cross_temporal_prob: 0.5
+  cross_temporal_min_gap_months: 2
 experiment:
-  name: exp_dual_teacher_v2_olmoearth_only
-  output_dir: /workspace/outputs/exp_dual_teacher_v2
+  name: exp_dual_teacher_v2_restart
+  output_dir: /workspace/outputs/exp_dual_teacher_v2_restart
   seed: 42
 model:
   distill_hidden_dim: 512

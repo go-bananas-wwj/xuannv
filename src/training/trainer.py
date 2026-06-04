@@ -303,6 +303,9 @@ class DDPv13Trainer:
         consist_w = getattr(t, 'consistency_weight', 0.0)
         temporal_w = getattr(t, 'temporal_contrastive_weight', 0.0)
         temporal_gap_aware_w = getattr(t, 'temporal_gap_aware_weight', 0.0)
+        infonce_w = getattr(t, 'inter_patch_infonce_weight', 0.0)
+        lmim_w = getattr(t, 'lmim_weight', 0.0)
+        need_teacher = consist_w > 0 or temporal_w > 0 or temporal_gap_aware_w > 0 or infonce_w > 0 or lmim_w > 0
         coding_rate_w = getattr(t, 'coding_rate_weight', 0.0)
         use_l2_vicreg = getattr(t, 'use_l2_space_vicreg', False)
         uniform_w = getattr(t, 'batch_uniformity_weight', 0.0)
@@ -330,32 +333,35 @@ class DDPv13Trainer:
             t1 = time.time()
             use_bf16 = getattr(self.cfg.training, 'use_bf16', True)
             with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=use_bf16):
-                # Teacher forward
+                # Teacher forward (条件执行: 只有需要时才做)
                 has_dual = all(k in batch for k in ['valid_start_w1', 'valid_end_w1', 'valid_start_w2', 'valid_end_w2'])
-                # V13: empty cache before teacher forward to avoid OOM
-                # ★ FIX: 每 step 调用 empty_cache 导致严重性能下降和内存碎片化
-                # 改为每 100 step 调用一次
-                if hasattr(torch.npu, 'empty_cache') and step % 100 == 0:
-                    torch.npu.empty_cache()
-                with torch.no_grad():
-                    teacher_out = self.teacher(
-                        source_frames=batch["source_frames"],
-                        source_timestamps_ms=batch["source_timestamps_ms"],
-                        source_frame_mask=batch["source_frame_mask"],
-                        source_input_mask=batch["source_input_mask"],
-                        source_type_ids=batch["source_type_ids"],
-                        valid_start_ms=batch["valid_start_w1"] if has_dual else batch["valid_start_ms"],
-                        valid_end_ms=batch["valid_end_w1"] if has_dual else batch["valid_end_ms"],
-                        target_relative_time=batch["target_relative_time"],
-                        target_metadata=batch["target_metadata"],
-                        target_loss_type=batch.get("target_loss_type"),
-                        target_source_idx=batch.get("target_source_idx"),
-                        target_valid_start_ms=batch.get("target_valid_start_ms"),
-                        target_valid_end_ms=batch.get("target_valid_end_ms"),
-                        dual_window=has_dual,
-                        valid_start_w2=batch.get("valid_start_w2") if has_dual else None,
-                        valid_end_w2=batch.get("valid_end_w2") if has_dual else None,
-                    )
+                teacher_out = None
+                if need_teacher:
+                    # V13: empty cache before teacher forward to avoid OOM
+                    # ★ FIX: 每 step 调用 empty_cache 导致严重性能下降和内存碎片化
+                    # 改为每 100 step 调用一次
+                    if hasattr(torch.npu, 'empty_cache') and step % 100 == 0:
+                        torch.npu.empty_cache()
+                    with torch.no_grad():
+                        teacher_out = self.teacher(
+                            source_frames=batch["source_frames"],
+                            source_timestamps_ms=batch["source_timestamps_ms"],
+                            source_frame_mask=batch["source_frame_mask"],
+                            source_input_mask=batch["source_input_mask"],
+                            source_type_ids=batch["source_type_ids"],
+                            valid_start_ms=batch["valid_start_w1"] if has_dual else batch["valid_start_ms"],
+                            valid_end_ms=batch["valid_end_w1"] if has_dual else batch["valid_end_ms"],
+                            target_relative_time=batch["target_relative_time"],
+                            target_metadata=batch["target_metadata"],
+                            target_loss_type=batch.get("target_loss_type"),
+                            target_source_idx=batch.get("target_source_idx"),
+                            target_valid_start_ms=batch.get("target_valid_start_ms"),
+                            target_valid_end_ms=batch.get("target_valid_end_ms"),
+                            dual_window=has_dual,
+                            valid_start_w2=batch.get("valid_start_w2") if has_dual else None,
+                            valid_end_w2=batch.get("valid_end_w2") if has_dual else None,
+                            skip_decoder=True,
+                        )
 
                 # Student forward: 扰动输入
                 student_frames, student_frame_mask, student_input_mask, perturb_stats = _build_student_view(
@@ -448,7 +454,6 @@ class DDPv13Trainer:
                 # V19: Inter-Patch InfoNCE (NT-Xent) — 防止方向坍缩
                 # 不同patch的teacher(key)和student(query)作为正负样本对
                 # 对方向坍缩梯度强：完全坍缩时 loss=log(N)≈2.77（最大梯度）
-                infonce_w = getattr(t, 'inter_patch_infonce_weight', 0.0)
                 infonce_temp = getattr(t, 'inter_patch_infonce_temperature', 0.1)
                 inter_infonce = torch.tensor(0.0, device=self.device)
                 if infonce_w > 0:
@@ -711,7 +716,7 @@ class DDPv13Trainer:
             # LMIM: 潜在空间预测损失（替代像素重建的语义增强，来源：OlmoEarth/AnySat）
             lmim_w = getattr(t, 'lmim_weight', 0.0)
             lmim = torch.tensor(0.0, device=self.device)
-            if lmim_w > 0 and student_out.pre_norm_map is not None and teacher_out.pre_norm_map is not None:
+            if need_teacher and lmim_w > 0 and student_out.pre_norm_map is not None and teacher_out is not None and teacher_out.pre_norm_map is not None:
                 lmim = latent_mim_loss(student_out.pre_norm_map, teacher_out.pre_norm_map)
 
             # ── Teacher 1: AEF (64D) — 直接对齐 ──
