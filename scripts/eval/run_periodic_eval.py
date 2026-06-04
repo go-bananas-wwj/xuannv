@@ -41,6 +41,7 @@ sys.path.insert(0, "/workspace/xuannv")
 from src.config import load_config
 from src.models.model import AEFModel
 from src.data.dataset import HarbinPatchDataset
+from src.data.multi_region_dataset import MultiRegionPatchDataset
 
 # ── 默认配置 ──
 ANNOT_DIR = Path("/workspace/哈尔滨松北新区变化检测汇总文件/变化检测shp文件")
@@ -79,7 +80,10 @@ def load_model(config_path: str, checkpoint_path: str, device: str):
     cfg.data.preload = False
     cfg.data.num_workers = 0
 
-    dataset = HarbinPatchDataset(cfg=cfg)
+    if getattr(cfg.data, 'multi_region_manifest', None):
+        dataset = MultiRegionPatchDataset(cfg=cfg)
+    else:
+        dataset = HarbinPatchDataset(cfg=cfg)
     dataset.training = False
     dataset._spatial_augmentation = False
 
