@@ -662,8 +662,9 @@ class DDPv13Trainer:
                 # 有效秩（erank）监控 — 检测 embedding 空间坍缩
                 # 使用 all_pre（含 memory bank，N >> D=64），协方差矩阵满秩，可测真实维度利用率
                 # 范围：1（完全坍缩）→ D=embedding_dim（理想均匀），目标 > D/2 = 32
-                # ★ SPEED FIX: SVD 在 NPU 上每 step 0.45s，改为每 50 step 计算一次
-                if step % 50 == 0:
+                # ★ SPEED FIX: SVD 在 NPU 上每 step 0.45s，改为每 10 step 计算一次
+                #   (每 epoch 50 step → 计算 5 次，总开销 ~2.25s/epoch)
+                if step % 10 == 0:
                     try:
                         _z = all_pre.float()
                         _z = _z - _z.mean(dim=0)
