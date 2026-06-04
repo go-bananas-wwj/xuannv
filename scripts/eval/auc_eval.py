@@ -91,6 +91,7 @@ def load_model(config_path, ckpt_path, device):
     from src.config import load_config
     from src.models.model import AEFModel
     from src.data.dataset import HarbinPatchDataset
+    from src.data.multi_region_dataset import MultiRegionPatchDataset
 
     cfg = load_config(config_path)
     model = AEFModel(cfg).to(device)
@@ -98,8 +99,11 @@ def load_model(config_path, ckpt_path, device):
     model.load_state_dict(ckpt["model_state_dict"], strict=False)
     model.eval()
 
-    cfg.data.preload = False
-    dataset = HarbinPatchDataset(cfg)
+    cfg.data.preload = True
+    if getattr(cfg.data, 'multi_region_manifest', None):
+        dataset = MultiRegionPatchDataset(cfg)
+    else:
+        dataset = HarbinPatchDataset(cfg)
     dataset.training = False
     dataset._spatial_augmentation = False
     return model, dataset, cfg
@@ -128,21 +132,23 @@ def extract_embedding(model, dataset, patch_month_index, cfg,
     def _to(x):
         return x.unsqueeze(0).to(device)
 
-    out = model(
-        source_frames        = _to(item["source_frames"]),
-        source_timestamps_ms = _to(item["source_timestamps_ms"]),
-        source_frame_mask    = _to(item["source_frame_mask"]),
-        source_input_mask    = _to(item["source_input_mask"]),
-        source_type_ids      = _to(item["source_type_ids"]),
-        valid_start_ms       = torch.tensor([valid_start], dtype=torch.int64, device=device),
-        valid_end_ms         = torch.tensor([valid_end],   dtype=torch.int64, device=device),
-        target_relative_time = torch.zeros(1, cfg.data.num_target_sources, device=device),
-        target_metadata      = torch.zeros(1, cfg.data.num_target_sources,
-                                           cfg.data.metadata_dim, device=device),
-        skip_decoder=True,
-    )
+    use_bf16 = getattr(cfg.training, 'use_bf16', True)
+    with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=use_bf16):
+        out = model(
+            source_frames        = _to(item["source_frames"]),
+            source_timestamps_ms = _to(item["source_timestamps_ms"]),
+            source_frame_mask    = _to(item["source_frame_mask"]),
+            source_input_mask    = _to(item["source_input_mask"]),
+            source_type_ids      = _to(item["source_type_ids"]),
+            valid_start_ms       = torch.tensor([valid_start], dtype=torch.int64, device=device),
+            valid_end_ms         = torch.tensor([valid_end],   dtype=torch.int64, device=device),
+            target_relative_time = torch.zeros(1, cfg.data.num_target_sources, device=device),
+            target_metadata      = torch.zeros(1, cfg.data.num_target_sources,
+                                               cfg.data.metadata_dim, device=device),
+            skip_decoder=True,
+        )
     emb = out.pre_norm_map if use_pre_norm else out.embedding_map  # [1, D, H, W]
-    emb = F.normalize(emb, p=2, dim=1)
+    emb = F.normalize(emb.float(), p=2, dim=1)
     return emb.squeeze(0).cpu().numpy()   # [D, H, W]
 
 
