@@ -118,6 +118,7 @@ class ModelConfig:
 @dataclass
 class TrainingConfig:
     epochs: int = 400
+    max_steps_per_epoch: int | None = None
     gradient_accumulation_steps: int = 1
     lr: float = 5e-5
     weight_decay: float = 0.01
