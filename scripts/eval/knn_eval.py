@@ -47,19 +47,26 @@ LABEL_MAPPINGS: dict[str, dict[int, int]] = {
 
 # ── 标签加载 ──────────────────────────────────────────────────────────────────
 
-def load_label(patch_id: str, label_dir: str, fname: str, data_root: Path):
-    path = data_root / label_dir / patch_id / fname
-    if not path.exists():
-        # 自动查找目录中的第一个 .tif 文件
-        patch_dir = data_root / label_dir / patch_id
-        if patch_dir.exists():
-            tifs = sorted([f for f in patch_dir.iterdir() if f.suffix.lower() == ".tif"])
-            if tifs:
-                path = tifs[0]
-    if not path.exists():
-        return None, None
-    with rasterio.open(path) as src:
-        return src.read(1), src.nodata
+def load_label(patch_id: str, label_dir: str, fname: str, data_roots: list[Path]):
+    # 处理多区域 patch_id 格式（如 haidian_patch_000000 -> patch_000000）
+    local_id = patch_id.split('_', 1)[1] if '_' in patch_id and not patch_id.startswith('patch_') else patch_id
+    for data_root in data_roots:
+        candidates = [
+            data_root / label_dir / patch_id / fname,
+            data_root / label_dir / local_id / fname,
+        ]
+        for path in candidates:
+            if path.exists():
+                with rasterio.open(path) as src:
+                    return src.read(1), src.nodata
+            # 自动查找目录中的第一个 .tif 文件
+            patch_dir = path.parent
+            if patch_dir.exists():
+                tifs = sorted([f for f in patch_dir.iterdir() if f.suffix.lower() == ".tif"])
+                if tifs:
+                    with rasterio.open(tifs[0]) as src:
+                        return src.read(1), src.nodata
+    return None, None
 
 
 def resize_label(label: np.ndarray, h: int, w: int) -> np.ndarray:
@@ -101,7 +108,7 @@ def knn_sklearn(X_train, y_train, X_test, k):
 
 def evaluate_task(
     task_name, label_dir, label_file, num_classes,
-    spatial_maps, patch_ids, device, k, backend, data_root, seed=42,
+    spatial_maps, patch_ids, device, k, backend, data_roots, seed=42,
 ):
     """评估单个下游任务。
 
@@ -120,7 +127,7 @@ def evaluate_task(
     all_X, all_y, all_pidx = [], [], []
 
     for p_idx, pid in enumerate(patch_ids):
-        label, nodata = load_label(pid, label_dir, label_file, data_root)
+        label, nodata = load_label(pid, label_dir, label_file, data_roots)
         if label is None:
             continue
         if label.shape != (H, W):
@@ -227,8 +234,14 @@ def main():
             print("[警告] 未找到 torch_npu，回退到 CPU")
             args.device = "cpu"
 
-    data_root = Path(args.data_root) if args.data_root else DEFAULT_DATA_ROOT
-    print(f"[KNN] 数据根目录: {data_root}")
+    if args.data_root:
+        data_roots = [Path(p.strip()) for p in args.data_root.split(',')]
+    else:
+        data_roots = [
+            DEFAULT_DATA_ROOT,
+            Path("/workspace/raw/haidian_train/haidian"),
+        ]
+    print(f"[KNN] 数据根目录: {data_roots}")
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -249,7 +262,7 @@ def main():
         report = evaluate_task(
             task_name, label_dir, label_file, num_classes,
             spatial_maps, patch_ids, args.device, args.k, args.backend,
-            data_root,
+            data_roots,
         )
         if report:
             all_reports[task_name] = report

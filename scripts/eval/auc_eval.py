@@ -195,8 +195,22 @@ def main():
 
     # ── Patch-month 索引 ──────────────────────────────────────────────────
     patch_month_index: dict[tuple, int] = {}
+    local_to_full: dict[str, str] = {}  # 用于 grid local_id -> dataset full_id
     for idx, (pid, year, month) in enumerate(dataset.monthly_samples):
         patch_month_index[(pid, year, month)] = idx
+        if '_' in pid and not pid.startswith('patch_'):
+            local_id = pid.split('_', 1)[1]
+            local_to_full[local_id] = pid
+
+    def _resolve_pid(local_pid: str) -> str | None:
+        """将 grid 中的 local patch_id 解析为 dataset 中的 full patch_id."""
+        if local_pid in local_to_full:
+            return local_to_full[local_pid]
+        # 如果 dataset 中本身就是 local_id（单区域场景）
+        for full_pid in dataset.patches:
+            if full_pid == local_pid:
+                return full_pid
+        return None
 
     # ── 按 period 评估 ────────────────────────────────────────────────────
     all_scores, all_labels = [], []
@@ -217,16 +231,20 @@ def main():
 
         p_scores, p_labels, p_ch, p_unch = [], [], [], []
 
-        for pid in sorted(annotated_pids):
+        for local_pid in sorted(annotated_pids):
+            full_pid = _resolve_pid(local_pid)
+            if full_pid is None:
+                print(f"  [跳过] {local_pid} ({period}): 在 dataset 中找不到对应 patch")
+                continue
             try:
                 eb = extract_embedding(model, dataset, patch_month_index, cfg,
-                                       pid, pinfo["before"][0], pinfo["before"][1],
+                                       full_pid, pinfo["before"][0], pinfo["before"][1],
                                        args.device, use_pre_norm)
                 ea = extract_embedding(model, dataset, patch_month_index, cfg,
-                                       pid, pinfo["after"][0], pinfo["after"][1],
+                                       full_pid, pinfo["after"][0], pinfo["after"][1],
                                        args.device, use_pre_norm)
             except Exception as e:
-                print(f"  [跳过] {pid} ({period}): {e}")
+                print(f"  [跳过] {local_pid} -> {full_pid} ({period}): {e}")
                 continue
 
             D, H, W = eb.shape
