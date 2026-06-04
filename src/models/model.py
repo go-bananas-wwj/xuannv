@@ -375,6 +375,7 @@ class AEFModel(nn.Module):
 
         if target_source_idx is not None:
             flat_src_idx = target_source_idx.reshape(B * T_tgt)
+            dummy_dec = torch.tensor(0.0, device=flat_map.device, dtype=flat_map.dtype)
             for src_id, dec in enumerate(self.per_source_decoders):
                 mask = (flat_src_idx == src_id)
                 if mask.any():
@@ -386,6 +387,17 @@ class AEFModel(nn.Module):
                     )
                     out_ch = self._per_source_out_channels[src_id]
                     flat_recon[mask, :out_ch] = out.to(flat_recon.dtype)
+                else:
+                    # Dummy forward to ensure decoder params receive grad (DDP find_unused=False safety)
+                    # Use a single zero sample to keep overhead minimal
+                    _z = torch.zeros(1, flat_map.shape[1], flat_map.shape[2], flat_map.shape[3],
+                                     device=flat_map.device, dtype=flat_map.dtype)
+                    _w = torch.zeros(1, cond_window.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                    _r = torch.zeros(1, cond_reltime.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                    _m = torch.zeros(1, cond_meta.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                    _ = dec(_z, window_code=_w, relative_time=_r, metadata=_m)
+                    dummy_dec = dummy_dec + _.sum() * 0.0
+            flat_recon = flat_recon + dummy_dec.view(1, 1, 1, 1)
         else:
             # 默认: 全部用第一个 decoder
             out = self.per_source_decoders[0](
