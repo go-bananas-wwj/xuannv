@@ -87,8 +87,8 @@ model:
   window_code_dim: 32
 training:
   aef_batch_uniformity_weight: 0.0
-  aef_global_distill_weight: 0.0
-  aef_spatial_distill_weight: 0.0
+  aef_global_distill_weight: 0.25
+  aef_spatial_distill_weight: 0.5
   aux_classification_weight: 0.0
   backbone_lr_scale: 0.1
   batch_uniformity_weight: 0.0
