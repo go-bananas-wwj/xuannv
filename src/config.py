@@ -44,6 +44,9 @@ class DataConfig:
     filter_2025_monthly: bool = False
     # ★ OlmoEarth 离线 teacher tokens 根目录 (蒸馏用)
     olmoearth_tokens_root: str = None
+    # ★ AEF 嵌入目录 (双教师蒸馏用)
+    aef_embed_dir: str = None
+    use_dual_teacher: bool = False
     source_channels: dict = field(default_factory=dict)
     merge_hr_into_lr: bool = False
     input_sources: list | None = None
@@ -214,15 +217,7 @@ class TrainingConfig:
     kappa_end: float = 500.0
     kappa_warmup_epochs: int = 100
     # 其他
-    vicreg_weight: float = 0.0
-    koleo_weight: float = 0.0
-    ct_reconstruction_weight: float = 0.0
-    dino_weight: float = 0.0
-    teacher_momentum: float = 0.996
-    save_every: int = 20
-    max_steps_per_epoch: int = 0  # 0 = 不限制，使用全部数据
-    expander_dim: int = 0
-    # 检查点
+    # 检查点与评估
     save_best_balanced: bool = True
     best_balanced_uniform_min: float = -0.6
     best_balanced_uniform_max: float = 0.3
@@ -230,17 +225,10 @@ class TrainingConfig:
     eval_every: int = 10  # 每隔多少 epoch 跑一次 kNN 下游探针评估
     save_every: int = 50
     checkpoint_interval: int = 20
-    # EMA Teacher
-    teacher_momentum: float = 0.996
-    # DINO
-    dino_weight: float = 0.0
     # VICReg + KoLeo
-    vicreg_weight: float = 0.0
-    koleo_weight: float = 0.0
     vicreg_lambda_var: float = 1.0
     vicreg_lambda_cov: float = 0.04
     vicreg_temporal_dropout: float = 0.15
-    expander_dim: int = 0
     # 跨时相掩码重建
     ct_reconstruction_weight: float = 0.0
     # LMIM：潜在空间掩码预测损失（OlmoEarth/AnySat JEPA 风格）
@@ -264,6 +252,14 @@ class TrainingConfig:
     olmoearth_global_distill_weight: float = 0.0
     distill_projector_warmup_epochs: int = 0
     backbone_lr_scale: float = 1.0  # backbone参数LR倍率，<1可减缓backbone解冻后的坍塌
+    # ★ AEF (AlphaEarth Foundations) 离线蒸馏 — 64D 直接对齐
+    aef_spatial_distill_weight: float = 0.0
+    aef_global_distill_weight: float = 0.0
+    # ★ 双教师 Curriculum 学习
+    use_curriculum: bool = False
+    curriculum_epochs: int = 0
+    curriculum_start_weight: float = 0.3
+    curriculum_end_weight: float = 1.0
 
 
 @dataclass

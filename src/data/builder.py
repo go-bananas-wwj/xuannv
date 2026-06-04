@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 
 from src.config import Config
 from src.data.dataset import HarbinPatchDataset
+from src.data.multi_region_dataset import MultiRegionPatchDataset
 
 
 def build_dataloader(
@@ -14,7 +15,7 @@ def build_dataloader(
     world_size: int = 1,
     rank: int = 0,
 ) -> DataLoader:
-    """构建 HarbinPatchDataset 的 DataLoader.
+    """构建 HarbinPatchDataset / MultiRegionPatchDataset 的 DataLoader.
 
     Args:
         cfg: 项目配置.
@@ -26,7 +27,10 @@ def build_dataloader(
     Returns:
         PyTorch DataLoader.
     """
-    dataset = HarbinPatchDataset(cfg)
+    if getattr(cfg.data, 'multi_region_manifest', None):
+        dataset = MultiRegionPatchDataset(cfg)
+    else:
+        dataset = HarbinPatchDataset(cfg)
     dataset.training = training
     # 透传 non_overlap 参数 (如果 config 中显式设置)
     if training:

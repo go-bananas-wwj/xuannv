@@ -16,6 +16,7 @@ V12 核心:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import random
 import sys
@@ -175,20 +176,18 @@ def main():
         if hasattr(trainer, 'memory_bank'):
             bank_size = trainer.memory_bank.size
 
+        # ========== 精简 Epoch 日志（只显示关键指标） ==========
         if global_rank == 0:
-            bank_size = int(losses.get('bank', 0))
-            active_dims = int(losses.get('active_dims', 0))
-            std_mean = losses.get('std_mean', 0.0)
-            inter_var = losses.get('inter_var', 0.0)
+            aef_sp = losses.get('aef_sp', 0.0)
+            aef_gl = losses.get('aef_gl', 0.0)
+            olmo_sp = losses.get('olmo_sp', 0.0)
+            olmo_gl = losses.get('olmo_gl', 0.0)
             logger.Print(
                 f"[{time.strftime('%H:%M:%S')}] Epoch {epoch + 1:03d}/{cfg.training.epochs} | "
-                f"total={losses['total']:.4f} recon={losses['recon']:.4f} "
-                f"consist={losses['consist']:.4f} temporal={losses.get('temporal', 0.0):.4f} "
-                f"var={losses['var']:.4f} cov={losses['cov']:.4f} l2unif={losses['l2unif']:.4f} "
-                f"erank={losses.get('erank', 0.0):.2f} decorr={losses.get('decorr', 0.0):.4f} "
-                f"mcr2={losses.get('mcr2', 0.0):.4f} gap_t={losses.get('gap_t', 0.0):.4f} "
-                f"inter_var={inter_var:.4f} "
-                f"bank={bank_size}/512 active={active_dims}/128 std_mean={std_mean:.4f} "
+                f"total={losses['total']:.3f} recon={losses['recon']:.3f} cls={losses.get('cls', 0.0):.3f} "
+                f"var={losses['var']:.3f} cov={losses['cov']:.3f} l2unif={losses['l2unif']:.3f} "
+                f"erank={losses.get('erank', 0.0):.1f} "
+                f"aef=[sp={aef_sp:.3f},gl={aef_gl:.3f}] olmo=[sp={olmo_sp:.3f},gl={olmo_gl:.3f}] "
                 f"lr={losses['lr']:.6f} | "
                 f"time={epoch_dt:.1f}s elapsed={int(elapsed//60)}m ETA={eta_str}"
             )
@@ -215,6 +214,49 @@ def main():
                     logger.Print(
                         f"  [Best] New best mIoU={best_miou:.4f} at epoch {epoch + 1}"
                     )
+
+        # ★ 完整下游任务评估（每 eval_every epoch 运行）
+        #   包括: kNN 语义分割 mIoU + 变化检测 AUC
+        do_full_eval = ((epoch + 1) % eval_every == 0) or (epoch + 1 == total_epochs)
+        if do_full_eval:
+            ckpt_path = Path(cfg.experiment.output_dir) / f"epoch_{epoch + 1}.pt"
+            if global_rank == 0:
+                # 先保存普通 checkpoint（供评估脚本加载）
+                trainer.save_checkpoint(epoch + 1, losses)
+                eval_json_path = Path(cfg.experiment.output_dir) / f"eval_epoch_{epoch + 1}.json"
+                eval_script = Path(__file__).parent.parent / "eval" / "run_periodic_eval.py"
+                cmd = (
+                    f"cd /workspace/xuannv && source activate xuannv && "
+                    f"python {eval_script} "
+                    f"--config {args.config} "
+                    f"--checkpoint {ckpt_path} "
+                    f"--output {eval_json_path} "
+                    f"--device npu:{local_rank} "
+                    f"--skip-cd"
+                )
+                logger.Print(f"  [FullEval] Running downstream evaluation for epoch {epoch + 1}...")
+                import subprocess
+                try:
+                    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=600)
+                except subprocess.TimeoutExpired:
+                    logger.Print(f"  [FullEval] Timeout after 600s, skipping")
+                    result = None
+                if result is not None and result.returncode == 0:
+                    try:
+                        with open(eval_json_path) as f:
+                            eval_res = json.load(f)
+                        knn = eval_res.get("knn", {})
+                        logger.Print(
+                            f"  [FullEval] epoch {epoch + 1}: "
+                            f"pixel-kNN mIoU={knn.get('mIoU', 0):.4f} OA={knn.get('OA', 0):.4f} "
+                            f"({eval_res.get('elapsed_seconds', 0):.1f}s)"
+                        )
+                    except Exception as e:
+                        logger.Print(f"  [FullEval] Error reading results: {e}")
+                else:
+                    logger.Print(f"  [FullEval] Failed: {result.stderr[:200]}")
+            if dist.is_initialized():
+                dist.barrier()
 
         if trainer.scheduler is not None:
             trainer.scheduler.step()

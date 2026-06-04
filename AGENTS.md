@@ -2,16 +2,17 @@
 
 ## ⚠️ 强制规则（每次任务开始前必读）
 
-1. **与用户交流必须使用中文回复**
-2. **每次修改后必须执行**: `git add -A && git commit -m "描述" && git push origin main`（当前分支 `v12-clean-dynamic`）
-3. **禁止使用 nohup 运行训练**，必须使用 `tmux`（nohup 会在会话断开时 kill torchrun DDP 进程）
-4. **启动训练/推理前检查 NPU 占用**: `npu-smi info`
-5. **所有文件操作限制在 `/workspace/xuannv/` 内**
-6. **`archive/` 目录为废弃代码，只读参考，不得修改**
-7. **训练出现 NaN/Inf**: 先检查 loss weight 是否过高，不要删除 checkpoint
-8. **不要修改 `manifest_path`**: 已指向 `/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered`
-9. **不要修改 `filter_2025_monthly`**: 当前所有配置均为 `false`
-10. **全量训练必须使用全部 424 个 patch**，`data.num_samples: 424`
+1. **与用户交流必须使用中文回复**。
+2. **每次修改后必须执行**: `git add -A && git commit -m "描述" && git push origin v12-clean-dynamic`（当前活跃分支为 `v12-clean-dynamic`，**不要**推送到 `main`）。
+3. **禁止使用 `nohup` 运行训练**，必须使用 `tmux`（`nohup` 会在会话断开时 kill `torchrun` DDP 子进程）。
+4. **启动训练/推理前检查 NPU 占用**: `npu-smi info`。
+5. **所有文件操作限制在 `/workspace/xuannv/` 内**。
+6. **`archive/` 目录为废弃代码，只读参考，不得修改**。
+7. **训练出现 NaN/Inf**: 先检查 loss weight 是否过高，不要删除 checkpoint；必要时执行 dummy backward 保持 DDP 同步。
+8. **不要修改 `manifest_path`**: 已指向 `/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered`。
+9. **不要修改 `filter_2025_monthly`**: 当前所有配置均为 `false`。
+10. **全量训练必须使用全部 424 个 patch**，即 `data.num_samples: 424`（若使用多区域混合训练，则按 manifest 实际 patch 数配置）。
+11. **运行环境**: `conda activate xuannv`，Python 3.11，torch 2.1.0 + torch_npu 2.1.0.post18。
 
 ---
 
@@ -19,33 +20,34 @@
 
 **xuannv**（包名 `xuannv`，版本 `0.1.0`）是 AlphaEarth Foundations (AEF) 的独立改进版，核心目标：
 
-- 生成一次 embedding 能满足多个下游任务（变化检测、土地覆盖分类、水体识别等）
-- 解决 embedding 坍缩，提升时间敏感性
+- 生成一次 embedding 能满足多个下游任务（变化检测、土地覆盖分类、水体识别等）。
+- 解决 embedding 坍缩，提升时间敏感性。
 
 **核心设计决策**:
-- 输入只有 `S2`、`S1`、`Landsat` 三类时序图像；`DEM`/`WorldCover`/`Dynamic World`/`JRC Water` 仅作重建目标
-- 训练时 `VMFBottleneck` skip L2 norm，在 pre-norm 空间计算反坍缩损失；推理时恢复标准 L2 + VMF 噪声
-- 不重叠双窗口 + 时序对比损失提升时间区分能力
+- **输入**只有 `S2`、`S1`、`Landsat` 三类时序图像；`DEM`/`WorldCover`/`Dynamic World`/`JRC Water` 仅作重建目标，不进入 encoder。
+- **训练时** `VMFBottleneck` skip L2 norm，在 pre-norm 欧氏空间计算反坍缩损失（绕过 L2 Jacobian 梯度屏障）；**推理时**恢复标准 L2 + VMF 噪声，保证 embedding 分布在单位球面上。
+- **不重叠双窗口** + 时序对比损失（hinge loss）提升时间区分能力。
+- **双教师蒸馏**（可选）：同时蒸馏 AEF（64D）与 OlmoEarth（768D）的知识，通过投影头对齐。
 
-**硬件**: 8 × Huawei Ascend 910B4 NPU，`hccl` 后端，`torch 2.1.0 + torch_npu 2.1.0.post18`，conda 环境 `xuannv`（Python 3.11）
+**硬件**: 8 × Huawei Ascend 910B4 NPU，`hccl` 后端。
 
 ---
 
 ## 技术栈与构建系统
 
 ### 依赖管理
-- **构建工具**: `setuptools>=61.0`（`pyproject.toml` 定义）
-- **安装命令**: `pip install -e .`（在 `/workspace/xuannv` 下执行）
-- **核心依赖**: `torch>=2.0`, `numpy`, `rasterio`, `geopandas`, `pyyaml`
-- **运行环境**: conda `xuannv`，Python 3.11.15
+- **构建工具**: `setuptools>=61.0`（`pyproject.toml` 定义）。
+- **安装命令**: `pip install -e .`（在 `/workspace/xuannv` 下执行）。
+- **核心依赖**: `torch>=2.0`, `numpy`, `rasterio`, `geopandas`, `pyyaml`。
+- **运行环境**: conda `xuannv`，Python 3.11.15。
 
 ### NPU 适配要点
-- 所有 `.cuda()` → `.npu()`
-- 所有 `torch.cuda` → `torch.npu`
-- 所有 `torch.autocast(device_type="cuda")` → `torch.autocast(device_type="npu")`
-- DDP 后端 `backend="nccl"` → `backend="hccl"`
-- 所有训练/推理脚本必须 `import torch_npu`
-- 设备选择统一走 `src.utils.device.get_device`
+- 所有 `.cuda()` → `.npu()`。
+- 所有 `torch.cuda` → `torch.npu`。
+- 所有 `torch.autocast(device_type="cuda")` → `torch.autocast(device_type="npu")`。
+- DDP 后端 `backend="nccl"` → `backend="hccl"`。
+- 所有训练/推理脚本必须 `import torch_npu`。
+- 设备选择统一走 `src.utils.device.get_device`（优先 NPU）。
 
 ---
 
@@ -55,14 +57,17 @@
 xuannv/
 ├── pyproject.toml              # 包配置（setuptools，极简）
 ├── configs/
-│   └── config.yaml             # 活跃训练配置（Round 9 基线）
-├── src/                        # 核心源码（包名 xuannv，但实际通过 sys.path 直接 import src）
+│   └── config.yaml             # 活跃训练配置（支持 _base_ 继承）
+│   └── config_dual_teacher_v1.yaml
+│   └── config_haidian_v*.yaml
+│   └── multi_region_manifest.json
+├── src/                        # 核心源码（包名 xuannv，实际通过 sys.path 直接 import src）
 │   ├── config.py               # YAML → dataclass 配置加载（支持 _base_ 继承）
 │   ├── data/
 │   │   ├── dataset.py          # HarbinPatchDataset（月度采样，3输入/7目标，内存预加载）
+│   │   ├── multi_region_dataset.py  # 多区域混合数据集（Haidian + Harbin）
 │   │   ├── transforms.py       # 归一化、TIFF 读取、时间戳解析
-│   │   ├── builder.py          # DataLoader 工厂（DistributedSampler）
-│   │   └── multi_region_dataset.py  # 多区域混合数据集
+│   │   └── builder.py          # DataLoader 工厂（DistributedSampler）
 │   ├── models/
 │   │   ├── model.py            # AEFModel 主模型 + AEFOutput dataclass
 │   │   ├── bottleneck.py       # VMFBottleneck（skip_l2_norm_training 核心）
@@ -71,10 +76,11 @@ xuannv/
 │   │   ├── decoders.py         # ContinuousDecoder / CategoricalDecoder（逐像素 MLP）
 │   │   ├── heads.py            # ChangeDetectionHeadV1/V2/V3（轻量下游头）
 │   │   ├── downstream_heads.py # PixelMLPHead / PixelConvHead
+│   │   ├── distill_head.py     # OlmoEarth 蒸馏投影头
 │   │   └── time_encoding.py    # TimeCode / WindowCode / RelativeTimeCode
 │   ├── training/
 │   │   ├── trainer.py          # DDPv13Trainer（唯一活跃训练器）
-│   │   ├── losses.py           # 全部损失函数（raw_uniformity, VICReg, temporal 等）
+│   │   ├── losses.py           # 全部损失函数（raw_uniformity, VICReg, temporal, distill 等）
 │   │   ├── optimizer.py        # AdamW + cosine warmup 调度
 │   │   ├── loops.py            # 重建损失辅助
 │   │   ├── memory_bank.py      # EmbeddingMemoryBank
@@ -97,40 +103,66 @@ xuannv/
 │   │   ├── auc_eval.py         # 变化检测 AUC 评估
 │   │   ├── pipeline.py         # 完整评估流水线
 │   │   ├── evaluate_cd_v2.py   # CD Head 评估
+│   │   ├── run_periodic_eval.py # 周期完整下游评估（由 train.py 子进程调用）
 │   │   └── fewshot_*.py        # Few-Shot 评估脚本
+│   ├── distill/
+│   │   └── generate_olmoearth_tokens_ddp.py  # OlmoEarth token 生成（8卡 DDP）
+│   │   └── download_aef_*.py   # AEF 嵌入下载/生成脚本
 │   ├── preprocessing/
 │   │   ├── compute_statistics.py   # 计算 mean/std 统计量
 │   │   └── filter_cloudy_frames.py # S2 云筛选
 │   ├── test_smoke.py           # 冒烟测试（验证月度采样+前向+损失）
-│   ├── monitor_training.py     # 训练监控脚本
-│   └── ablation/               # 消融实验脚本
-├── preprocessing/              # 数据预处理独立模块
+│   ├── profile_train_step.py   # 单卡 step profiling
+│   └── visualize/              # 可视化脚本
+├── preprocessing/              # 数据预处理独立模块（与训练代码解耦）
 │   ├── run.py                  # 预处理统一入口
-│   ├── pipelines/              # 流水线编排
+│   ├── pipelines/              # 流水线编排（patchify, statistics, manifest）
 │   ├── downloaders/            # GEE / PlanetaryComputer / 本地导入
 │   ├── processors/             # S2/S1/Landsat 后处理
 │   ├── utils/                  # geo / tiff / logging 工具
 │   └── viz/                    # 可视化
 ├── archive/                    # 废弃代码（只读参考，不得修改）
-├── docs/                       # 项目文档（含 BUG_FIX_LOG.md）
-└── data/                       # 运行时数据输出（change_masks, embeddings, labels）
+├── docs/                       # 项目文档（含 BUG_FIX_LOG.md、业务/专利/参考文献）
+├── data/                       # 运行时数据输出（change_masks, embeddings, labels）
+└── out/                        # 评估结果输出
 ```
+
+---
+
+## 配置系统
+
+配置采用 **YAML + Python dataclass**，入口为 `src.config.load_config`。
+
+- **继承机制**: YAML 中可使用 `_base_: xxx.yaml` 进行配置继承，子配置覆盖父配置。
+- **五大区块**: `experiment` / `data` / `model` / `training` / `evaluation`。
+- **关键字段示例**:
+  - `data.num_samples`: patch 总数（哈尔滨 424，海淀 320）。
+  - `data.target_sources`: 列出 7 个重建目标及其 `loss_type`（0=连续/L1，1=分类/CE）。
+  - `model.skip_l2_norm_training`: `true` 为当前默认（pre-norm 空间训练）。
+  - `training.*_weight`: 大量损失权重开关，按需启用。
 
 ---
 
 ## 模型关键接口
 
-**`AEFModel.forward`** 主要参数:
+### `AEFModel.forward` 主要参数
 `source_frames`, `source_timestamps_ms`, `source_frame_mask`, `source_input_mask`, `source_type_ids`, `valid_start_ms`, `valid_end_ms`, `target_relative_time`, `target_metadata`, `skip_decoder`, `dual_window`
 
-**`AEFOutput`** 关键字段:
-`embedding_map`, `embedding`, `pre_norm_embedding`, `pre_norm_map`, `reconstructions`, `dual_pre_w2`, `patch_id_logits`
+### `AEFOutput` 关键字段
+- `embedding_map`: `[B, D, H, W]` — 推理时 L2 归一化后的空间 embedding。
+- `embedding`: `[B, D]` — 全局平均后的 embedding。
+- `pre_norm_embedding`: `[B, D]` — L2 norm 前的原始幅度向量（反坍缩损失在此计算）。
+- `pre_norm_map`: `[B, D, H, W]` — 空间 pre-norm embedding。
+- `reconstructions`: `[B, T_tgt, C, H, W]` — 各源重建输出。
+- `dual_pre_w2`: `[B, D, H, W]` — 第二窗口 pre_norm（用于 temporal loss）。
+- `distill_map` / `distill_global`: 投影后的 768D 空间/全局向量（蒸馏用）。
+- `patch_id_logits`: 实例判别头输出（打破坍缩用）。
 
-**双窗口编码**:
+### 双窗口编码
 - `encode_dual_window(...)` → `(emb_w1, emb_w2, pre_w1, pre_w2)`
 - `encode_dual_window_explicit_diff(...)` → 额外返回 `change_score, diff_feat`
 
-**推理引擎**:
+### 推理引擎
 ```python
 from src.inference.engine import load_backbone
 model, dataset, cfg = load_backbone(
@@ -142,91 +174,44 @@ model, dataset, cfg = load_backbone(
 
 ---
 
-## 常用命令速查
-
-```bash
-# 环境激活
-conda activate xuannv
-cd /workspace/xuannv
-
-# 启动训练（tmux 内执行）
-torchrun --nproc_per_node=4 scripts/train/train.py \
-    --config configs/config.yaml --save-every 20 --warmup-epochs 10
-
-# 恢复训练
-torchrun --nproc_per_node=4 scripts/train/train.py \
-    --config configs/config.yaml --resume /workspace/outputs/.../epoch_best_xxx.pt
-
-# 软重启（跨域迁移：加载权重，重置训练进度）
-torchrun --nproc_per_node=4 scripts/train/train.py \
-    --config configs/config.yaml --soft-restart /workspace/outputs/.../epoch_40.pt
-
-# 冒烟测试
-python scripts/test_smoke.py
-
-# 变化检测 AUC 评估
-python scripts/eval/auc_eval.py \
-    --config configs/config.yaml --checkpoint /workspace/outputs/.../epoch_40.pt
-
-# KNN 下游评估（需先提取 embedding）
-python scripts/eval/knn_eval.py \
-    --embedding-file /path/to/patch_embeddings.npz --output-dir out/ --device npu:0
-
-# 一站式评估（提取 + KNN + AUC）
-bash scripts/eval/launch_eval.sh \
-    --checkpoint /workspace/outputs/.../epoch_40.pt --mode all
-
-# 提取 embedding（7 卡并行）
-bash scripts/eval/launch_eval.sh \
-    --checkpoint /workspace/outputs/.../epoch_40.pt --mode extract --total-gpus 7
-
-# 统计数据计算
-python scripts/preprocessing/compute_statistics.py  # 哈尔滨默认路径
-
-# 云筛选
-python scripts/preprocessing/filter_cloudy_frames.py \
-    --max-per-month 2 --cloud-threshold 0.3 --workers 16
-
-# 预处理流水线
-python preprocessing/run.py \
-    --config preprocessing/configs/harbin.json \
-    --steps patchify,download,cloud_filter,process,statistics
-
-# 清理数据集缓存（约 26-32 GB/实验）
-find /workspace/outputs -name "dataset_cache_*.pt" -delete
-
-# Git 同步
-git add -A && git commit -m "描述" && git push origin v12-clean-dynamic
-```
-
----
-
 ## 训练系统
 
 ### 训练入口
-
 - **活跃脚本**: `scripts/train/train.py`
 - **活跃训练器**: `src/training/trainer.py`（类名 `DDPv13Trainer`，保留旧名以兼容 checkpoint）
-- **活跃配置**: `configs/config.yaml`
+- **活跃配置**: `configs/config.yaml` 或 `configs/config_dual_teacher_v1.yaml` 等
+
+### 核心机制
+- **Teacher-Student EMA**: Teacher 为 Student 的 EMA 副本（momentum ~0.996），不参与梯度更新。
+- **Student 扰动**: 每 step 对 Student 输入做源级 drop、帧级 drop、前后截断（向量化实现，避免 GPU→CPU 同步）。
+- **梯度累积**: 通过 `gradient_accumulation_steps` 配置。
+- **Memory Bank**: 扩大 uniformity / VICReg 的有效 batch（默认大小 512）。
+- **双教师蒸馏（可选）**:
+  - AEF Teacher: 64D 直接对齐（cosine distance）。
+  - OlmoEarth Teacher: 768D 通过 `distill_head` 投影后对齐。
+  - 支持 Curriculum 学习：蒸馏权重从 `curriculum_start_weight` 渐进到 `curriculum_end_weight`。
+- **Projector Warmup**: `distill_projector_warmup_epochs` 可在前 N 个 epoch 仅训练投影头，冻结 backbone。
 
 ### 损失函数速查 (`src/training/losses.py`)
 
-| 函数 | 用途 |
-|------|------|
-| `raw_uniformity_loss` | 欧氏空间 uniformity，自适应 t=2/D |
-| `batch_uniformity_loss_l2` | L2 空间 uniformity + 空间采样 + 维度 Dropout |
-| `hyperspherical_uniformity_loss` | 球面 uniformity，直接防方向坍缩 |
-| `pairwise_cosine_diversity_loss` | 均值两两余弦，坍缩时梯度非零 |
-| `decorrelation_loss` | Barlow Twins 去相关 |
-| `variance_regularizer` / `covariance_loss` | VICReg 方差/协方差正则 |
-| `bottleneck_orthogonality_loss` | Conv1×1 权重正交约束 |
-| `temporal_contrastive_loss` | 双窗口 hinge loss（纯斥力） |
-| `gap_aware_temporal_cosine_loss` | 根据时间 gap 动态设定 target margin |
-| `reconstruction_loss` | 掩码 L1（连续）/ CE（分类） |
-| `inter_patch_infonce_loss` | Inter-Patch InfoNCE (NT-Xent) |
-| `erank_maximization_loss` | SVD 奇异值熵最大化 |
-| `coding_rate_loss` | MCR² log-det 优化 |
-| `latent_mim_loss` | 潜在空间掩码预测（LMIM） |
+| 函数 | 用途 | 计算空间 |
+|------|------|----------|
+| `raw_uniformity_loss` | 欧氏空间 uniformity，自适应 t=2/D | pre-norm |
+| `batch_uniformity_loss_l2` | L2 空间 uniformity + 空间采样 + 维度 Dropout | L2-normed |
+| `hyperspherical_uniformity_loss` | 球面 uniformity，直接防方向坍缩 | L2-normed |
+| `pairwise_cosine_diversity_loss` | 均值两两余弦，坍缩时梯度非零 | L2-normed |
+| `decorrelation_loss` | Barlow Twins 去相关 | pre-norm / gathered |
+| `variance_regularizer` / `covariance_loss` | VICReg 方差/协方差正则 | pre-norm |
+| `bottleneck_orthogonality_loss` | Conv1×1 权重正交约束 | 权重矩阵 |
+| `temporal_contrastive_loss` | 双窗口 hinge loss（纯斥力） | pre-norm |
+| `gap_aware_temporal_cosine_loss` | 根据时间 gap 动态设定 target margin | pre-norm |
+| `reconstruction_loss` | 掩码 L1（连续）/ CE（分类） | 像素空间 |
+| `inter_patch_infonce_loss` | Inter-Patch InfoNCE (NT-Xent) | pre-norm |
+| `erank_maximization_loss` | 列方差熵最大化（SVD 替代，NPU-native） | pre-norm |
+| `coding_rate_loss` | MCR² log-det 对角近似（NPU-native） | pre-norm |
+| `latent_mim_loss` | 潜在空间掩码预测（LMIM） | pre-norm map |
+| `pixel_change_supervision_loss` | 像素级变化弱监督 | pre-norm map |
+| `aef_batch_uniformity_loss` | AEF 循环移位 batch uniformity | L2-normed |
 
 ### 训练监控指标
 
@@ -242,7 +227,7 @@ git add -A && git commit -m "描述" && git push origin v12-clean-dynamic
 | `active_dims` | 64/64 | < 50 → 维度坍缩 |
 | `std_mean` | > 0.60 | < 0.50 → 方差不足 |
 
-调试 AUC 低时，优先检查：① `temporal_contrastive_loss` 是否生效 ② 双窗口数据是否正确生成 ③ `raw_unif` 是否正常
+调试 AUC 低时，优先检查：① `temporal_contrastive_loss` 是否生效 ② 双窗口数据是否正确生成 ③ `raw_unif` 是否正常。
 
 ### tmux 训练管理
 
@@ -297,12 +282,15 @@ python scripts/eval/auc_eval.py \
     --config configs/config.yaml --checkpoint xxx.pt --device npu:0
 ```
 
-**AUC 目标**: > 0.7 及格，> 0.8 良好，> 0.85 优秀
+**AUC 目标**: > 0.7 及格，> 0.8 良好，> 0.85 优秀。
 
 **注意事项**:
-- `ASCEND_RT_VISIBLE_DEVICES=X` 时 PyTorch 内必须用 `npu:0`
-- WorldCover 标签是 ESA 编码（10,30,40...），`knn_eval.py` 内已自动映射到 0-based
-- JRC Water `knn_eval.py` 已过滤 `label >= num_classes` 的无效值
+- `ASCEND_RT_VISIBLE_DEVICES=X` 时 PyTorch 内必须用 `npu:0`。
+- WorldCover 标签是 ESA 编码（10,30,40...），`knn_eval.py` 内已自动映射到 0-based。
+- JRC Water `knn_eval.py` 已过滤 `label >= num_classes` 的无效值。
+
+### 周期完整下游评估（训练内嵌）
+`train.py` 每 `eval_every` 个 epoch 会自动调用 `scripts/eval/run_periodic_eval.py`，执行像素级 kNN mIoU + 变化检测 AUC 等完整评估，结果写入 `eval_epoch_{N}.json`。
 
 ---
 
@@ -311,7 +299,7 @@ python scripts/eval/auc_eval.py \
 ### 训练数据路径
 
 ```
-/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered/  ← 当前使用
+/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered/  ← 哈尔滨主数据
     ├── s2/          (~22帧/patch，云筛选后)
     ├── s1 → ../harbin_scenes/s1
     ├── landsat → ../harbin_scenes/landsat
@@ -319,10 +307,12 @@ python scripts/eval/auc_eval.py \
     ├── worldcover → ...
     └── ...
 
-/workspace/statistics/harbin_scenes/{source}_stats.json     ← 归一化统计量（7个文件）
+/workspace/raw/haidian_train/haidian/                     ← 海淀数据（多区域训练用）
+/workspace/statistics/harbin_scenes/{source}_stats.json   ← 归一化统计量（7个文件）
+/workspace/statistics/haidian_train/{source}_stats.json   ← 海淀统计量
 ```
 
-### 各源帧数
+### 各源帧数（哈尔滨）
 
 | 源 | Patch 数 | 均值帧数 | 备注 |
 |----|---------|---------|------|
@@ -346,17 +336,15 @@ python scripts/eval/auc_eval.py \
 ## 开发规范
 
 ### Python 代码风格
-
-- 所有 Python 文件顶部使用 `from __future__ import annotations`
-- 类型注解完整（PEP 484）
-- 模块内注释使用中文
-- 设备选择统一走 `src.utils.device.get_device`
-- Checkpoint 统一走 `src.utils.checkpoint.load_checkpoint / save_checkpoint`
-- 训练脚本顶部设置 `torch.set_num_threads(4)`
-- 使用 `black` / `ruff` 风格（虽未在 CI 中强制，但保持一致的缩进与引号）
+- 所有 Python 文件顶部使用 `from __future__ import annotations`。
+- 类型注解完整（PEP 484）。
+- 模块内注释使用中文。
+- 设备选择统一走 `src.utils.device.get_device`。
+- Checkpoint 统一走 `src.utils.checkpoint.load_checkpoint / save_checkpoint`。
+- 训练脚本顶部设置 `torch.set_num_threads(4)`。
+- 使用 `black` / `ruff` 风格（虽未在 CI 中强制，但保持一致的缩进与引号）。
 
 ### 实验输出目录命名
-
 格式：`{前缀}_{版本}_{实验名}_{MMDD}`
 
 | 前缀 | 含义 |
@@ -368,12 +356,11 @@ python scripts/eval/auc_eval.py \
 
 示例：`exp_v13_temporal_contrastive_0601`
 
-**禁止**：`xuannv_v2_expA`（项目名前缀重复）、无日期后缀
+**禁止**: `xuannv_v2_expA`（项目名前缀重复）、无日期后缀。
 
 ### 文档命名
-
-- 文件名必须包含日期后缀，格式 `YYYYMMDD`，例如 `BUG_FIX_20260527.md`
-- 完成的计划文档归档到 `archive/docs/legacy/`
+- 文件名必须包含日期后缀，格式 `YYYYMMDD`，例如 `BUG_FIX_20260527.md`。
+- 完成的计划文档归档到 `archive/docs/legacy/`。
 
 ---
 
@@ -385,6 +372,7 @@ python scripts/eval/auc_eval.py \
 2. **快速验证配置**: `configs/config_v27_quick_diag.yaml` 等 `quick_diag` 配置，使用 `max_steps_per_epoch: 20` 在数分钟内验证训练流程。
 3. **max_patches 采样**: 在 `DataConfig` 中设置 `max_patches: 10` 可快速验证数据集逻辑。
 4. **AUC / KNN 评估**: 作为端到端集成测试，验证 embedding 质量是否退化。
+5. **Profiling**: `scripts/profile_train_step.py` 用于定位单卡 step 耗时瓶颈。
 
 **测试执行示例**:
 ```bash
@@ -401,18 +389,18 @@ torchrun --nproc_per_node=2 scripts/train/train.py \
 ## 部署与运行架构
 
 ### 训练部署
-- **分布式**: `torchrun` + `hccl` 后端，推荐 4–8 卡 NPU
-- **内存**: 数据集预加载后约 26–32 GB/实验（缓存文件位于 `/workspace/outputs/.cache_shared/`）
-- **持久化**: Checkpoint 保存到 `/workspace/outputs/{experiment_name}/`
+- **分布式**: `torchrun` + `hccl` 后端，推荐 4–8 卡 NPU。
+- **内存**: 数据集预加载后约 26–32 GB/实验（缓存文件位于 `/workspace/outputs/.cache_shared/`）。
+- **持久化**: Checkpoint 保存到 `/workspace/outputs/{experiment_name}/`。
 
 ### 推理部署
-- 单卡即可运行 embedding 提取与评估
-- `scripts/eval/launch_eval.sh` 支持 7 卡并行提取（每卡处理 1/7 patches）
-- 推理必须显式设置 `ASCEND_RT_VISIBLE_DEVICES=X`，且 PyTorch 内使用 `npu:0`
+- 单卡即可运行 embedding 提取与评估。
+- `scripts/eval/launch_eval.sh` 支持 7 卡并行提取（每卡处理 1/7 patches）。
+- 推理必须显式设置 `ASCEND_RT_VISIBLE_DEVICES=X`，且 PyTorch 内使用 `npu:0`。
 
 ### 数据预处理部署
-- `preprocessing/run.py` 为独立入口，不依赖训练环境初始化
-- 输出到 `/workspace/raw/` 和 `/workspace/statistics/`，与训练代码解耦
+- `preprocessing/run.py` 为独立入口，不依赖训练环境初始化。
+- 输出到 `/workspace/raw/` 和 `/workspace/statistics/`，与训练代码解耦。
 
 ---
 
@@ -454,4 +442,4 @@ if gdf.crs.to_epsg() != 32652:
 
 ---
 
-*最后更新: 2026-06-01*
+*最后更新: 2026-06-04*

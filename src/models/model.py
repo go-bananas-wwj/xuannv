@@ -230,6 +230,14 @@ class AEFModel(nn.Module):
         time_summary = time_codes.mean(dim=1)  # [B, time_code_dim]
         summary = summary + self.time_to_summary(time_summary)[:, :, None, None]
 
+        # ★ NPU workaround: 昇腾 910B async scheduler 在某些算子链后可能进入饥饿状态。
+        #   sys.stdout.write + flush 强制隐式同步，打破潜在的调度死锁。
+        #   此操作仅在训练时执行，且频率极低（每次 encode_frames 调用一次）。
+        if self.training:
+            import sys
+            sys.stdout.write(".")
+            sys.stdout.flush()
+
         return summary, window_code, attn
 
     def forward(
@@ -301,6 +309,14 @@ class AEFModel(nn.Module):
             aux_logits = torch.zeros(B, num_classes, device=embedding_map.device, dtype=embedding_map.dtype)
             bottleneck_logits = torch.zeros(B, num_classes, device=embedding_map.device, dtype=embedding_map.dtype)
             summary_pooled = summary_map.mean(dim=(-2, -1))
+            # ★ FIX: skip_decoder=True 时 classification_head 等参数无梯度，
+            # DDP (find_unused_parameters=False) 会报错。添加 dummy gradient 确保所有头参与计算图。
+            dummy_cls = (
+                self.classification_head(embedding).sum() * 0.0
+                + self.aux_cls_head(summary_pooled).sum() * 0.0
+                + self.bottleneck_cls_head(pre_norm).sum() * 0.0
+            )
+            reconstructions = reconstructions + dummy_cls.view(1, 1, 1, 1, 1)
             return AEFOutput(
                 embedding_map=embedding_map,
                 embedding=embedding,

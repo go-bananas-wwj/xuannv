@@ -253,6 +253,7 @@ class HarbinPatchDataset(Dataset):
         self._teacher_glb_pid2row: dict[int, dict | None] = {}  # month -> {patch_id: row}
         self._teacher_months: list[int] = []
         self._preload_teacher_tokens()
+        self._preload_aef_embeddings()
         
         # ★ V13: 构建月度样本索引
         self.monthly_samples = self._build_monthly_samples()
@@ -283,8 +284,8 @@ class HarbinPatchDataset(Dataset):
                     ts = label_to_timestamp_ms(tf.stem)
                     if ts > 0:
                         dt = datetime.fromtimestamp(ts / 1000)
-                        # ★ 严格 2025-only
-                        if dt.year == 2025:
+                        # ★ 支持 2025-2026 年月度数据
+                        if dt.year in (2025, 2026):
                             month_groups[(dt.year, dt.month)].append(ts)
             
             months = sorted(month_groups.keys())
@@ -520,6 +521,30 @@ class HarbinPatchDataset(Dataset):
             return self._cache[patch_id][source_name]
         return self._load_input_frames_impl(patch_id, source_name)
 
+    def _select_bands(self, data: np.ndarray, source_name: str) -> np.ndarray:
+        """跨区域波段对齐 — 根据数据源选择统一的波段子集.
+        
+        Haidian S2: 6 bands = [B02, B03, B04, B05, B06, B07]
+        Harbin  S2: 12 bands (PC标准), 取 [B02, B03, B04, B05, B06, B07] = idx [1,2,3,4,5,6]
+        
+        Haidian Landsat: 6 bands = [red(B4), green(B3), blue(B2), nir08(B5), swir16(B6), lwir11(B10)]
+        Harbin  Landsat: 11 bands (PC标准), 取对应 idx [3,2,1,4,5,9]
+        """
+        n = data.shape[0]
+        if source_name == "s2":
+            if n == 12:
+                return data[[1, 2, 3, 4, 5, 6]]  # B02-B07
+            elif n > 6:
+                return data[:6]
+        elif source_name == "landsat":
+            if n == 11:
+                # PC顺序: B1 B2 B3 B4 B5 B6 B7 B8 B9 B10 B11
+                # 目标:    red(B4) green(B3) blue(B2) nir08(B5) swir16(B6) lwir11(B10)
+                return data[[3, 2, 1, 4, 5, 9]]
+            elif n > 6:
+                return data[:6]
+        return data
+
     def _load_input_frames_impl(self, patch_id: str, source_name: str) -> tuple[np.ndarray, np.ndarray]:
         """从磁盘加载一个输入源的所有帧."""
         source_dir = self._resolve_source_dir(source_name, patch_id)
@@ -547,9 +572,10 @@ class HarbinPatchDataset(Dataset):
                 stem = path.stem
                 if "Q" in stem.upper():
                     return False
-                if len(stem) == 8 and stem.isdigit() and stem.startswith("2025"):
+                if len(stem) == 8 and stem.isdigit():
+                    year = int(stem[:4])
                     month = int(stem[4:6])
-                    return 4 <= month <= 10
+                    return year in (2025, 2026) and 1 <= month <= 12
                 return False
             tif_files = [f for f in tif_files if _is_valid_monthly_2025(f)]
 
@@ -561,6 +587,8 @@ class HarbinPatchDataset(Dataset):
             data = read_tif(tif_path, self.image_size)
             if data is None:
                 continue
+            # ★ 跨区域波段对齐
+            data = self._select_bands(data, source_name)
             data = self._normalize(data, source_name)
 
             if hr_name and stem in hr_files:
@@ -607,6 +635,8 @@ class HarbinPatchDataset(Dataset):
         ★ 关键：按 npz 自带的 patch_ids 建立 patch_id→行号 映射，
         而不是假设 self.patches 的枚举顺序与 npz 行序一致
         （否则 max_patches 随机采样 / 过滤会导致 teacher 张冠李戴）。
+        
+        ★ 键格式: year*100 + month，避免 2025-01 与 2026-01 冲突。
         """
         tokens_root = getattr(self.cfg.data, "olmoearth_tokens_root", None)
         if tokens_root is None:
@@ -615,16 +645,25 @@ class HarbinPatchDataset(Dataset):
         root = Path(tokens_root)
         if not root.exists():
             return
+        # 遍历月份目录：直接子目录是 2025 年月份，2026/ 子目录下是 2026 年月份
+        month_dirs = []
         for d in sorted(root.iterdir()):
-            if not (d.is_dir() and d.name.isdigit()):
+            if not d.is_dir():
                 continue
-            m = int(d.name)
+            if d.name == "2026":
+                for sub in sorted(d.iterdir()):
+                    if sub.is_dir() and sub.name.isdigit():
+                        month_dirs.append((2026, int(sub.name), sub))
+            elif d.name.isdigit() and len(d.name) <= 2:
+                month_dirs.append((2025, int(d.name), d))
+        for year, m, d in month_dirs:
+            key = year * 100 + m
             tok_path = d / "spatial_tokens.npz"
             if tok_path.exists():
                 try:
                     zd = np.load(str(tok_path))
-                    self._teacher_tokens[m] = zd["tokens"].astype(np.float16)
-                    self._teacher_tok_pid2row[m] = {
+                    self._teacher_tokens[key] = zd["tokens"].astype(np.float16)
+                    self._teacher_tok_pid2row[key] = {
                         str(p): i for i, p in enumerate(zd["patch_ids"])
                     } if "patch_ids" in zd.files else None
                 except Exception:
@@ -634,8 +673,8 @@ class HarbinPatchDataset(Dataset):
                 try:
                     ed = np.load(str(emb_path))
                     if "embeddings" in ed.files:
-                        self._teacher_global[m] = ed["embeddings"].astype(np.float32)
-                        self._teacher_glb_pid2row[m] = {
+                        self._teacher_global[key] = ed["embeddings"].astype(np.float32)
+                        self._teacher_glb_pid2row[key] = {
                             str(p): i for i, p in enumerate(ed["patch_ids"])
                         } if "patch_ids" in ed.files else None
                 except Exception:
@@ -647,20 +686,75 @@ class HarbinPatchDataset(Dataset):
             print(f"[Dataset] OlmoEarth teacher tokens 预加载: {len(self._teacher_months)} 个月, "
                   f"{n} patches, {gb:.2f}GB (fp16, 内存常驻)")
 
+    def _preload_aef_embeddings(self) -> None:
+        """预加载 AEF (AlphaEarth Foundations) 64D 嵌入.
+        
+        AEF 嵌入按 patch 存储为 .npy 文件:
+            aef_embed_dir/{patch_id}.npy  -> (64, H, W) float32
+        """
+        aef_dir = getattr(self.cfg.data, "aef_embed_dir", None)
+        if aef_dir is None:
+            return
+        from pathlib import Path
+        root = Path(aef_dir)
+        if not root.exists():
+            return
+        
+        self._aef_embeds: dict[str, np.ndarray] = {}
+        loaded = 0
+        for patch_id in self.patches:
+            pid = patch_id["patch_id"] if isinstance(patch_id, dict) else str(patch_id)
+            fpath = root / f"{pid}.npy"
+            if fpath.exists():
+                try:
+                    self._aef_embeds[pid] = np.load(fpath).astype(np.float32)
+                    loaded += 1
+                except Exception:
+                    pass
+        if loaded > 0:
+            print(f"[Dataset] AEF 嵌入预加载: {loaded}/{len(self.patches)} patches")
+    
+    def _load_aef_embedding(self, patch_id: str) -> dict:
+        """加载 AEF 64D 嵌入（双教师蒸馏用）.
+        
+        返回:
+            {"aef_spatial_emb": (64, H, W) tensor, "aef_global_emb": (64,) tensor}
+        """
+        emb = self._aef_embeds.get(patch_id) if hasattr(self, "_aef_embeds") else None
+        if emb is None:
+            return {}
+        # emb: (64, H, W)
+        result = {}
+        # 空间嵌入
+        result["aef_spatial_emb"] = torch.from_numpy(np.ascontiguousarray(emb))
+        # 全局嵌入 (空间平均)
+        result["aef_global_emb"] = torch.from_numpy(np.ascontiguousarray(emb.mean(axis=(1, 2))))
+        return result
+
     def _load_teacher_tokens(self, patch_id: str, year: int, month: int) -> dict:
         """从内存缓存取 OlmoEarth teacher tokens（蒸馏用）.
 
-        若未配置 / 无缓存，返回空 dict（训练照常进行）.
+        若未配置 / 无缓存，返回占位 tensor（训练照常进行）.
         若请求月份不存在，自动选最近可用月份（避免 batch collate 时 key 不一致）.
         按 patch_id 字符串匹配行号（顺序无关，安全）。
         """
         if not self._teacher_months:
-            return {}
-        # 最近可用月份（优先精确匹配）
-        if month in self._teacher_tokens:
-            am = month
+            return {
+                "teacher_spatial_tokens": torch.zeros((32, 32, 768), dtype=torch.float16),
+                "teacher_global_emb": torch.zeros((768,), dtype=torch.float32),
+            }
+        # 键格式: year*100 + month
+        req_key = year * 100 + month
+        # 优先精确匹配
+        if req_key in self._teacher_tokens:
+            am = req_key
         else:
-            am = min(self._teacher_months, key=lambda a: abs(a - month))
+            # 找同一年中最近的月份
+            same_year_keys = [k for k in self._teacher_months if k // 100 == year]
+            if same_year_keys:
+                am = min(same_year_keys, key=lambda a: abs(a - req_key))
+            else:
+                am = min(self._teacher_months, key=lambda a: abs(a - req_key))
         result: dict = {}
         toks = self._teacher_tokens.get(am)
         if toks is not None:
@@ -678,6 +772,11 @@ class HarbinPatchDataset(Dataset):
                 result["teacher_global_emb"] = torch.from_numpy(
                     np.ascontiguousarray(gemb[grow])
                 )  # (768,) fp32
+        # ★ FIX: 确保所有样本有相同的键，避免 collate 失败
+        if "teacher_spatial_tokens" not in result:
+            result["teacher_spatial_tokens"] = torch.zeros((32, 32, 768), dtype=torch.float16)
+        if "teacher_global_emb" not in result:
+            result["teacher_global_emb"] = torch.zeros((768,), dtype=torch.float32)
         return result
     def _get_worldcover_label(self, patch_id: str) -> int:
         """从原始 WorldCover TIFF 提取 patch-level 众数类别标签."""
@@ -1235,4 +1334,5 @@ class HarbinPatchDataset(Dataset):
             "label": torch.tensor(patch_label, dtype=torch.long),
             "patch_index": torch.tensor(self._patch_to_idx.get(patch_id, 0), dtype=torch.long),
             **self._load_teacher_tokens(patch_id, year, month_a),
+            **self._load_aef_embedding(patch_id),
         }

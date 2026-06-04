@@ -62,11 +62,7 @@ def _build_student_view(
     front_drop_prob: float,
     back_drop_prob: float,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, dict[str, float]]:
-    """构建 Student 的扰动输入视图 — 对齐 AEF 原文 S2.2.5.
-
-    ★ v41 FIX: 完全向量化改写，消除所有 GPU→CPU 同步（.item() 调用）。
-       原实现每 step 触发数百次同步，训练速度下降 10-100 倍。
-    """
+    """构建 Student 的扰动输入视图 — 对齐 AEF 原文 S2.2.5."""
     frames = source_frames.clone()
     frame_mask = source_frame_mask.clone()
     input_mask = source_input_mask.clone()
@@ -82,41 +78,47 @@ def _build_student_view(
 
     # Stage 1: 源级别 drop (AEF: S2 永不 drop, S1/Landsat 30%)
     if source_drop_rate > 0:
-        drop = torch.rand(B, S, device=device) < source_drop_rate
-        drop[:, 0] = False  # S2 永不 drop
-        input_mask = input_mask & ~drop
+        for s_idx in range(S):
+            if s_idx == 0:
+                continue
+            drop = torch.rand(B, device=device) < source_drop_rate
+            input_mask[drop, s_idx] = False
         stats["source_drop_ratio"] = float((~input_mask).float().mean().item())
-        all_false = ~input_mask.any(dim=1)
-        input_mask[all_false, 0] = True
+        for batch_index in range(B):
+            if not input_mask[batch_index].any():
+                input_mask[batch_index, 0] = True
 
     # Stage 2: 三种策略选一种
     strat = torch.randint(0, 3, (1,)).item()
 
     if strat == 0:
-        # 向量化：每源独立 drop 概率
-        frac = torch.where(torch.arange(S, device=device) == 0, 0.5, 0.3)
-        drop_mask = torch.rand(B, S, T, device=device) < frac[None, :, None]
-        drop_mask = drop_mask & input_mask[:, :, None] & source_frame_mask
-        frame_mask = frame_mask & ~drop_mask
+        for s_idx in range(S):
+            frac = 0.5 if s_idx == 0 else 0.3
+            for b in range(B):
+                if not input_mask[b, s_idx]:
+                    continue
+                drops = torch.rand(T, device=device) < frac
+                frame_mask[b, s_idx, drops] = False
         stats["frame_drop_ratio"] = float((~frame_mask & source_frame_mask).float().mean().item())
 
     elif strat in (1, 2):
-        # 向量化：按时间戳排序，保留前半或后半有效帧
-        ts_masked = source_timestamps_ms.clone().float()
-        ts_masked[~source_frame_mask] = float('inf')
-        sorted_idx = ts_masked.argsort(dim=2).float()  # (B, S, T) — float32 for NPU
-        valid_count = source_frame_mask.sum(dim=2).long()  # (B, S)
-        keep_count = (valid_count / 2).long().clamp(min=1)
-
-        rank = torch.argsort(sorted_idx, dim=2)  # 每个原始索引在排序后序列中的位置
-        if strat == 1:
-            keep_mask = rank < keep_count[:, :, None]
-        else:
-            keep_mask = rank >= (valid_count - keep_count)[:, :, None]
-
-        keep_mask = keep_mask & source_frame_mask & input_mask[:, :, None]
-        frame_mask = frame_mask & keep_mask
-
+        for b in range(B):
+            for s_idx in range(S):
+                if not input_mask[b, s_idx]:
+                    continue
+                valid_ts = [t for t in range(T) if source_frame_mask[b, s_idx, t]]
+                if len(valid_ts) <= 1:
+                    continue
+                ts_vals = [source_timestamps_ms[b, s_idx, t].item() for t in valid_ts]
+                sorted_pairs = sorted(zip(ts_vals, valid_ts))
+                mid_idx = len(sorted_pairs) // 2
+                if strat == 1:
+                    keep_ts = set(t for _, t in sorted_pairs[:mid_idx])
+                else:
+                    keep_ts = set(t for _, t in sorted_pairs[mid_idx:])
+                for t in range(T):
+                    if t not in keep_ts:
+                        frame_mask[b, s_idx, t] = False
         if strat == 1:
             stats["back_cut_ratio"] = 0.25
         else:
@@ -124,24 +126,30 @@ def _build_student_view(
 
     # Stage 3: 截断前后段
     if front_drop_prob > 0 or back_drop_prob > 0:
-        ts_masked = source_timestamps_ms.clone().float()
-        ts_masked[~frame_mask] = float('inf')
-        sorted_idx = ts_masked.argsort(dim=2).float()  # float32 for NPU
-        valid_count = frame_mask.sum(dim=2).long()
-
-        do_front = (torch.rand(B, S, device=device) < front_drop_prob) if front_drop_prob > 0 else torch.zeros(B, S, dtype=torch.bool, device=device)
-        do_back = (torch.rand(B, S, device=device) < back_drop_prob) if back_drop_prob > 0 else torch.zeros(B, S, dtype=torch.bool, device=device)
-
-        front_cut = torch.where(do_front & (valid_count > 1), (valid_count / 4).long().clamp(min=1), 0)
-        back_cut = torch.where(do_back & (valid_count > 1), (valid_count / 4).long().clamp(min=1), 0)
-
-        rank = torch.argsort(sorted_idx, dim=2)
-        keep_mask = (rank >= front_cut[:, :, None]) & (rank < (valid_count - back_cut)[:, :, None])
-        keep_mask = keep_mask & frame_mask
-        frame_mask = keep_mask
-
-        stats["front_cut_ratio"] = float(do_front.float().mean().item())
-        stats["back_cut_ratio"] = float(do_back.float().mean().item())
+        batch_size = frame_mask.shape[0]
+        time_steps = frame_mask.shape[2]
+        front_hits = 0
+        back_hits = 0
+        for b in range(batch_size):
+            for s in range(frame_mask.shape[1]):
+                valid_ts = [t for t in range(time_steps) if frame_mask[b, s, t]]
+                if len(valid_ts) <= 1:
+                    continue
+                ts_sorted = sorted(valid_ts, key=lambda t: source_timestamps_ms[b, s, t].item())
+                front_cut = 0
+                if front_drop_prob > 0 and torch.rand(1).item() < front_drop_prob:
+                    front_cut = max(1, len(ts_sorted) // 4)
+                    front_hits += 1
+                back_cut = 0
+                if back_drop_prob > 0 and torch.rand(1).item() < back_drop_prob:
+                    back_cut = max(1, len(ts_sorted) // 4)
+                    back_hits += 1
+                keep_ts = set(ts_sorted[front_cut:len(ts_sorted)-back_cut])
+                for t in range(time_steps):
+                    if t not in keep_ts:
+                        frame_mask[b, s, t] = False
+        stats["front_cut_ratio"] = front_hits / max(batch_size * frame_mask.shape[1], 1)
+        stats["back_cut_ratio"] = back_hits / max(batch_size * frame_mask.shape[1], 1)
 
     return frames, frame_mask, input_mask, stats
 
@@ -159,7 +167,7 @@ class DDPv13Trainer:
         # Student 模型
         self.model = AEFModel(cfg).to(self.device)
         self.model = DistributedDataParallel(
-            self.model, device_ids=[local_rank], find_unused_parameters=False
+            self.model, device_ids=[local_rank], find_unused_parameters=True
         )
 
         # EMA Teacher
@@ -208,27 +216,14 @@ class DDPv13Trainer:
         for p_t, p_s in zip(self.teacher.parameters(), self.model.module.parameters()):
             p_t.data.mul_(m).add_(p_s.data, alpha=1 - m)
 
-    def _all_gather_diff(self, tensor: torch.Tensor) -> torch.Tensor:
-        """可微 all_gather: 收集所有 rank 的 tensor 并在 dim=0 拼接.
-
-        与 dist.all_gather 不同，此版本保留梯度回传路径，
-        使依赖跨 rank 聚合张量的损失（VICReg、erank 等）在多卡下正常提供梯度。
-        """
-        if not dist.is_initialized() or self.world_size <= 1:
-            return tensor
-        from torch.distributed.nn.functional import all_gather as _diff_all_gather
-        gathered = _diff_all_gather(tensor)
-        return torch.cat(gathered, dim=0)
-
     def _reduce_loss_dict(self, loss_dict: dict) -> dict:
         if not dist.is_initialized() or self.world_size <= 1:
             return loss_dict
         reduced = {}
         for k, v in loss_dict.items():
             t = torch.tensor(v, device=self.device)
-            # NPU 兼容性: 某些驱动不支持 ReduceOp.AVG，使用 SUM + 手动除法
-            dist.all_reduce(t, op=dist.ReduceOp.SUM)
-            reduced[k] = t.item() / self.world_size
+            dist.all_reduce(t, op=dist.ReduceOp.AVG)
+            reduced[k] = t.item()
         return reduced
 
     def train_epoch(self, epoch: int, dataloader: DataLoader) -> dict[str, float]:
@@ -316,9 +311,7 @@ class DDPv13Trainer:
                 # Teacher forward
                 has_dual = all(k in batch for k in ['valid_start_w1', 'valid_end_w1', 'valid_start_w2', 'valid_end_w2'])
                 # V13: empty cache before teacher forward to avoid OOM
-                # ★ FIX: 每 step 调用 empty_cache 导致严重性能下降和内存碎片化
-                # 改为每 100 step 调用一次
-                if hasattr(torch.npu, 'empty_cache') and step % 100 == 0:
+                if hasattr(torch.npu, 'empty_cache'):
                     torch.npu.empty_cache()
                 with torch.no_grad():
                     teacher_out = self.teacher(
@@ -492,7 +485,12 @@ class DDPv13Trainer:
             
             # V13: skip NaN/Inf check (fixed in model.encode_frames fallback)
             
-            gathered_pre = self._all_gather_diff(pre_norm)
+            if dist.is_initialized() and self.world_size > 1:
+                gathered_pre = [torch.zeros_like(pre_norm) for _ in range(self.world_size)]
+                dist.all_gather(gathered_pre, pre_norm)
+                gathered_pre = torch.cat(gathered_pre, dim=0)
+            else:
+                gathered_pre = pre_norm
 
             # Memory Bank: 扩大 pre-norm 有效 batch
             self.memory_bank.enqueue(gathered_pre.detach())
@@ -512,7 +510,10 @@ class DDPv13Trainer:
             use_spatial_vicreg = getattr(t, 'use_spatial_vicreg', False)
             gathered_spatial_map = pre_norm_map
             if use_spatial_vicreg and pre_norm_map is not None:
-                gathered_spatial_map = self._all_gather_diff(pre_norm_map)
+                if dist.is_initialized() and self.world_size > 1:
+                    gathered_maps = [torch.zeros_like(pre_norm_map) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_maps, pre_norm_map)
+                    gathered_spatial_map = torch.cat(gathered_maps, dim=0)
                 # [B_total, D, H, W] → [B_total*H*W, D]
                 spatial_flat = gathered_spatial_map.permute(0, 2, 3, 1).reshape(-1, gathered_spatial_map.shape[1])
                 var = variance_regularizer(spatial_flat.float(), min_std=vicreg_min_std) if var_w > 0 else torch.tensor(0.0, device=self.device)
@@ -567,7 +568,12 @@ class DDPv13Trainer:
 
             if use_spatial_raw_unif and pre_norm_uniform_w > 0:
                 # V13-explore: Spatial raw uniformity on pre_norm_map [B, D, H, W] — 完全绕过 GMP + L2
-                gathered_map_unif = self._all_gather_diff(pre_norm_map)
+                if dist.is_initialized() and self.world_size > 1:
+                    gathered_map_unif = [torch.zeros_like(pre_norm_map) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_map_unif, pre_norm_map)
+                    gathered_map_unif = torch.cat(gathered_map_unif, dim=0)
+                else:
+                    gathered_map_unif = pre_norm_map
                 # [B, D, H, W] → [B*H*W, D]
                 spatial_flat_unif = gathered_map_unif.permute(0, 2, 3, 1).reshape(-1, gathered_map_unif.shape[1])
                 l2_uniform = raw_uniformity_loss(spatial_flat_unif.float())
@@ -582,12 +588,22 @@ class DDPv13Trainer:
             elif use_spatial_unif and l2_uniform_w > 0:
                 # Spatial uniformity on embedding_map [B, D, H, W]
                 emb_map = student_out.embedding_map  # [B, D, H, W]
-                gathered_map = self._all_gather_diff(emb_map)
+                if dist.is_initialized() and self.world_size > 1:
+                    gathered_map = [torch.zeros_like(emb_map) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_map, emb_map)
+                    gathered_map = torch.cat(gathered_map, dim=0)
+                else:
+                    gathered_map = emb_map
                 l2_uniform = batch_uniformity_loss_l2(gathered_map.float())
             else:
                 # Standard L2 uniformity on embedding vector
                 embedding = student_out.embedding  # [B, D]
-                gathered_l2 = self._all_gather_diff(embedding)
+                if dist.is_initialized() and self.world_size > 1:
+                    gathered_l2 = [torch.zeros_like(embedding) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_l2, embedding)
+                    gathered_l2 = torch.cat(gathered_l2, dim=0)
+                else:
+                    gathered_l2 = embedding
                 l2_uniform = batch_uniformity_loss_l2(gathered_l2.float()) if l2_uniform_w > 0 else torch.tensor(0.0, device=self.device)
 
             # ★ 球面 Uniformity Loss — 双级别：像素级 + 全局平均级
@@ -607,7 +623,12 @@ class DDPv13Trainer:
                     perm = torch.randperm(H_s * W_s, device=self.device)[:n_px]
                     flat_px = pre_norm_map_s.permute(0, 2, 3, 1).reshape(B_s, H_s * W_s, D_s)
                     sampled_px = flat_px[:, perm, :].reshape(B_s * n_px, D_s)  # [B*n_px, D]
-                    gathered_px = self._all_gather_diff(sampled_px)
+                    if dist.is_initialized() and self.world_size > 1:
+                        gathered_px = [torch.zeros_like(sampled_px) for _ in range(self.world_size)]
+                        dist.all_gather(gathered_px, sampled_px)
+                        gathered_px = torch.cat(gathered_px, dim=0)
+                    else:
+                        gathered_px = sampled_px
                     hsph_pixel = hyperspherical_uniformity_loss(gathered_px.float())
                 else:
                     hsph_pixel = torch.tensor(0.0, device=self.device)
@@ -615,7 +636,12 @@ class DDPv13Trainer:
                 # Part B: 全局平均级 — 使用 pairwise cosine（坍缩时梯度非零，与 Wang-Isola 相比更稳健）
                 # ★ 关键修复: Wang-Isola 在完全坍缩时 zi-zj≈0 → 梯度≈0（无法逃脱陷阱）
                 #             pairwise_cosine 梯度 = 其他样本均值方向，坍缩时非零 ✓
-                gathered_global = self._all_gather_diff(pre_norm)
+                if dist.is_initialized() and self.world_size > 1:
+                    gathered_global = [torch.zeros_like(pre_norm) for _ in range(self.world_size)]
+                    dist.all_gather(gathered_global, pre_norm)
+                    gathered_global = torch.cat(gathered_global, dim=0)
+                else:
+                    gathered_global = pre_norm
                 hsph_global = pairwise_cosine_diversity_loss(gathered_global.float())
 
                 # 两级别加权合并
@@ -649,19 +675,14 @@ class DDPv13Trainer:
                 # 有效秩（erank）监控 — 检测 embedding 空间坍缩
                 # 使用 all_pre（含 memory bank，N >> D=64），协方差矩阵满秩，可测真实维度利用率
                 # 范围：1（完全坍缩）→ D=embedding_dim（理想均匀），目标 > D/2 = 32
-                # ★ SPEED FIX: SVD 在 NPU 上每 step 0.45s，改为每 50 step 计算一次
-                if step % 50 == 0:
-                    try:
-                        _z = all_pre.float()
-                        _z = _z - _z.mean(dim=0)
-                        _svs = torch.linalg.svdvals(_z.T @ _z)
-                        _p = _svs / (_svs.sum() + 1e-9)
-                        erank = torch.exp(-(_p * (_p + 1e-9).log()).sum()).item()
-                    except Exception:
-                        erank = 0.0
-                    self._last_erank = erank
-                else:
-                    erank = getattr(self, '_last_erank', 0.0)
+                try:
+                    _z = all_pre.float()
+                    _z = _z - _z.mean(dim=0)
+                    _svs = torch.linalg.svdvals(_z.T @ _z)
+                    _p = _svs / (_svs.sum() + 1e-9)
+                    erank = torch.exp(-(_p * (_p + 1e-9).log()).sum()).item()
+                except Exception:
+                    erank = 0.0
 
                 # ★ 新增：样本间多样性诊断
                 inter_std = torch.sqrt(gathered_pre.var(dim=0, unbiased=False) + 1e-6)
@@ -785,16 +806,9 @@ class DDPv13Trainer:
 
             if torch.isnan(total) or torch.isinf(total):
                 if self.global_rank == 0 and step % 10 == 0:
-                    print(f"  [WARNING] NaN/Inf total at step {step}, doing dummy backward.")
-                # ★ FIX: 必须执行 dummy backward 以保持 DDP all_reduce 同步
-                # 直接 continue 会导致缺失 backward 的 rank 不参与 all_reduce → DDP 死锁
-                dummy_sync = total * 0.0
-                if self.scaler is not None:
-                    self.scaler.scale(dummy_sync).backward()
-                else:
-                    dummy_sync.backward()
+                    print(f"  [WARNING] NaN/Inf total at step {step}, skipping.")
                 self.optimizer.zero_grad()
-                # 继续执行后续梯度累积逻辑（不 step），保持所有 rank 同步
+                continue
 
             total = total / accum_steps
             if self.scaler is not None:
@@ -825,10 +839,7 @@ class DDPv13Trainer:
                     else:
                         self.optimizer.step()
                     self.optimizer.zero_grad()
-                    # ★ FIX: update_teacher 移入 else 分支
-                    # 只有成功执行 optimizer.step() 的 rank 才更新 teacher
-                    # 防止不同 rank 的 teacher 因 has_nan_grad 差异而 diverge
-                    self.update_teacher()
+                self.update_teacher()
                 
                 # V13: weight health check (silent)
                 # for name, p in self.model.named_parameters():
@@ -851,11 +862,11 @@ class DDPv13Trainer:
                 loss_accum[k] = loss_accum.get(k, 0.0) + v
             n_steps += 1
 
-            # ========== 精简 Step 日志（每 10 步或最后一步打印） ==========
+            # ========== 精简 Step 日志（每 20 步或最后一步打印） ==========
             if self.global_rank == 0:
-                print_interval = 10
+                print_interval = max(1, len(dataloader) // 10)  # 每 epoch 约 10 条
                 if step == 0 or step == len(dataloader) - 1 or step % print_interval == 0:
-                    step_msg = (f"\n[Step {step:3d}/{len(dataloader)}] "
+                    step_msg = (f"  [Step {step:3d}/{len(dataloader)}] "
                           f"total={total.item()*accum_steps:.3f} "
                           f"recon={recon.item():.3f} cls={cls.item():.3f} "
                           f"var={var.item():.3f} cov={cov.item():.3f} "
@@ -869,17 +880,13 @@ class DDPv13Trainer:
                         self.log_file.write(step_msg + "\n")
                         self.log_file.flush()
 
-        loss_accum = {k: v / max(n_steps, 1) for k, v in loss_accum.items()}
-        # ★ FIX: temporal 损失需要在平均化之前累加，否则记录的是最后一步的值
-        if temporal_w > 0:
-            loss_accum["temporal"] = loss_accum.get("temporal", 0.0) / max(n_steps, 1)
-        else:
-            loss_accum["temporal"] = 0.0
+        loss_accum = {k: v / n_steps for k, v in loss_accum.items()}
         loss_accum = self._reduce_loss_dict(loss_accum)
         loss_accum["lr"] = lr
         # 添加 epoch 级别诊断指标
         # ★ FIX: 不再用 memory bank 计算 active（bank 可能包含历史坍缩嵌入）
         # 保留 step 累加的平均 active_dims 和 std_mean（已在 loss_accum 中）
+        loss_accum["temporal"] = temporal_loss.item() if temporal_w > 0 else 0.0
         loss_accum["bank"] = float(self.memory_bank.size)
         return loss_accum
 
@@ -942,13 +949,10 @@ class DDPv13Trainer:
         if was_training:
             self.model.train()
 
-        import numpy as np
         if not embs:
-            local_emb = np.array([], dtype=np.float32).reshape(0, 0)
-            local_lab = np.array([], dtype=np.int64)
-        else:
-            local_emb = torch.cat(embs, dim=0).numpy()
-            local_lab = torch.cat(labels, dim=0).numpy()
+            return {"acc": 0.0, "miou": 0.0}
+        local_emb = torch.cat(embs, dim=0).numpy()
+        local_lab = torch.cat(labels, dim=0).numpy()
 
         # 跨 rank 汇总
         if self.world_size > 1 and dist.is_initialized():
@@ -956,14 +960,10 @@ class DDPv13Trainer:
             dist.all_gather_object(gathered, (local_emb, local_lab))
             if self.global_rank != 0:
                 return {"acc": 0.0, "miou": 0.0}
-            valid = [g for g in gathered if g[0].shape[0] > 0]
-            if not valid:
-                return {"acc": 0.0, "miou": 0.0}
-            all_emb = np.concatenate([g[0] for g in valid], axis=0)
-            all_lab = np.concatenate([g[1] for g in valid], axis=0)
+            import numpy as np
+            all_emb = np.concatenate([g[0] for g in gathered], axis=0)
+            all_lab = np.concatenate([g[1] for g in gathered], axis=0)
         else:
-            if local_emb.shape[0] == 0:
-                return {"acc": 0.0, "miou": 0.0}
             all_emb, all_lab = local_emb, local_lab
 
         return self._knn_metric(all_emb, all_lab)
@@ -1020,7 +1020,6 @@ class DDPv13Trainer:
             "epoch": epoch,
             "model_state_dict": self.model.module.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
-            "scheduler_state_dict": self.scheduler.state_dict() if self.scheduler is not None else {},
             "scaler_state_dict": self.scaler.state_dict() if self.scaler is not None else {},
             "losses": losses,
             "miou": miou,
@@ -1047,7 +1046,7 @@ class DDPv13Trainer:
             print(f"[trainer] Removed lower-mIoU checkpoint: {old_ckpt.name}")
 
     def load_checkpoint(self, path: str) -> int:
-        ckpt = torch.load(path, map_location=self.device, weights_only=True)
+        ckpt = torch.load(path, map_location=self.device, weights_only=False)
         missing, unexpected = self.model.module.load_state_dict(ckpt["model_state_dict"], strict=False)
         if missing and self.global_rank == 0:
             print(f"[load_checkpoint] Missing keys: {len(missing)}")
@@ -1066,12 +1065,6 @@ class DDPv13Trainer:
         if "scaler_state_dict" in ckpt:
             if self.scaler is not None and "scaler_state_dict" in ckpt:
                 self.scaler.load_state_dict(ckpt["scaler_state_dict"])
-        if "scheduler_state_dict" in ckpt and self.scheduler is not None:
-            try:
-                self.scheduler.load_state_dict(ckpt["scheduler_state_dict"])
-            except ValueError as e:
-                if self.global_rank == 0:
-                    print(f"[load_checkpoint] Scheduler mismatch: {e}")
         epoch = ckpt.get("epoch", 0)
         if not isinstance(epoch, int):
             import re
