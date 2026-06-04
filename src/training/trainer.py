@@ -856,8 +856,10 @@ class DDPv13Trainer:
             # ========== Step 日志（每个 step 都打印） ==========
             if self.global_rank == 0:
                 print_interval = 1
-                if step == 0 or step == len(dataloader) - 1 or step % print_interval == 0:
-                    step_msg = (f"\n[Step {step:3d}/{len(dataloader)}] "
+                max_steps_now = getattr(t, 'max_steps_per_epoch', None)
+                step_total = min(len(dataloader), max_steps_now) if max_steps_now else len(dataloader)
+                if step == 0 or step == step_total - 1 or step % print_interval == 0:
+                    step_msg = (f"\n[Step {step:3d}/{step_total}] "
                           f"total={total.item()*accum_steps:.3f} "
                           f"recon={recon.item():.3f} cls={cls.item():.3f} "
                           f"var={var.item():.3f} cov={cov.item():.3f} "
