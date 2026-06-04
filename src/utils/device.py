@@ -2,7 +2,12 @@
 from __future__ import annotations
 
 import torch
-import torch_npu
+
+# torch_npu 为可选导入，仅在 NPU 环境可用
+try:
+    import torch_npu
+except ImportError:
+    torch_npu = None
 
 
 def get_device(prefer_npu: bool = True, device_str: str | None = None) -> torch.device:
@@ -17,8 +22,10 @@ def get_device(prefer_npu: bool = True, device_str: str | None = None) -> torch.
     """
     if device_str is not None:
         return torch.device(device_str)
-    if prefer_npu and torch.npu.is_available():
+    if prefer_npu and torch_npu is not None and hasattr(torch, "npu") and torch.npu.is_available():
         return torch.device("npu:0")
+    if torch.cuda.is_available():
+        return torch.device("cuda:0")
     return torch.device("cpu")
 
 

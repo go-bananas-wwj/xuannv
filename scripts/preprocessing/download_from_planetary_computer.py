@@ -60,8 +60,8 @@ from rasterio.transform import from_bounds
 # 全局 STAC Catalog（每个 worker 线程独立连接更稳定）
 # ---------------------------------------------------------------------------
 
-DATE_START = "2023-01-01"
-DATE_END = "2025-10-31"
+DATE_START = "2026-01-01"
+DATE_END = "2026-05-31"
 
 COLLECTION_MAP = {
     "s2": "sentinel-2-l2a",
@@ -268,7 +268,7 @@ def download_patch(args) -> dict:
 
     for source in sources:
         t0 = time.time()
-        patch_dir = Path(output_root) / city_name / source / f"patch_{patch_id:06d}"
+        patch_dir = Path(output_root) / source / f"patch_{patch_id:06d}"
         patch_dir.mkdir(parents=True, exist_ok=True)
 
         items = search_items(catalog, source, bbox, date_start, date_end)
