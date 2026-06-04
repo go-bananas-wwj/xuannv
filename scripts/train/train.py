@@ -137,6 +137,24 @@ def main():
         rank=global_rank,
     )
 
+    if global_rank == 0:
+        ds = dataloader.dataset
+        logger.Print("\n[Dataset Info]")
+        logger.Print(f"  Dataset type: {type(ds).__name__}")
+        logger.Print(f"  Total patches: {getattr(ds, 'num_samples', len(getattr(ds, 'patches', [])))}")
+        logger.Print(f"  Monthly samples: {len(getattr(ds, 'monthly_samples', []))}")
+        logger.Print(f"  Batch size (per GPU): {cfg.data.batch_size}")
+        logger.Print(f"  World size: {world_size}")
+        logger.Print(f"  Effective batch: {cfg.data.batch_size * world_size}")
+        logger.Print(f"  Num workers: {getattr(cfg.data, 'num_workers', 0)}")
+        logger.Print(f"  Preload: {getattr(cfg.data, 'preload', False)}")
+        logger.Print(f"  Max frames: {getattr(cfg.data, 'max_frames', 'N/A')}")
+        logger.Print(f"  Max steps/epoch: {getattr(cfg.training, 'max_steps_per_epoch', 'N/A (full pass)')}")
+        logger.Print(f"  Multi-region manifest: {getattr(cfg.data, 'multi_region_manifest', 'N/A')}")
+        logger.Print(f"  Input sources: {getattr(cfg.data, 'input_sources', 'N/A')}")
+        logger.Print(f"  Target sources: {[t.get('name', t) for t in getattr(cfg.data, 'target_sources', [])]}")
+        logger.Print("=" * 70)
+
     # Trainer（传入同一 ts，确保 step 日志与启动日志写入同一文件）
     trainer = DDPv13Trainer(cfg, local_rank=local_rank, log_ts=ts)
 
