@@ -233,6 +233,8 @@ class DDPv13Trainer:
 
     def train_epoch(self, epoch: int, dataloader: DataLoader) -> dict[str, float]:
         self.model.train()
+        if self.global_rank == 0:
+            print(f"\n{'='*60}\n[Epoch {epoch}] START\n{'='*60}")
         t = self.cfg.training
         # ★ Projector Warmup: 前 N epoch 只训练投影头，冻结 backbone
         warmup_ep = getattr(t, 'distill_projector_warmup_epochs', 0)
@@ -851,9 +853,9 @@ class DDPv13Trainer:
                 loss_accum[k] = loss_accum.get(k, 0.0) + v
             n_steps += 1
 
-            # ========== 精简 Step 日志（每 10 步或最后一步打印） ==========
+            # ========== Step 日志（每个 step 都打印） ==========
             if self.global_rank == 0:
-                print_interval = 10
+                print_interval = 1
                 if step == 0 or step == len(dataloader) - 1 or step % print_interval == 0:
                     step_msg = (f"\n[Step {step:3d}/{len(dataloader)}] "
                           f"total={total.item()*accum_steps:.3f} "
