@@ -255,9 +255,9 @@ def main():
                 logger.Print(f"  [FullEval] Running downstream evaluation for epoch {epoch + 1}...")
                 import subprocess
                 try:
-                    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=600)
+                    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=7200)
                 except subprocess.TimeoutExpired:
-                    logger.Print(f"  [FullEval] Timeout after 600s, skipping")
+                    logger.Print(f"  [FullEval] Timeout after 7200s, skipping")
                     result = None
                 if result is not None and result.returncode == 0:
                     try:
