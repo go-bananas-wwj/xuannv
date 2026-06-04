@@ -95,15 +95,15 @@ training:
   consistency_weight: 0.0
   covariance_weight: 0.05
   ct_reconstruction_weight: 0.0
-  curriculum_end_weight: 1.0
-  curriculum_epochs: 5
-  curriculum_start_weight: 0.5
+  curriculum_end_weight: 0.5
+  curriculum_epochs: 10
+  curriculum_start_weight: 0.3
   decorrelation_weight: 0.1
   dino_weight: 0.0
   distill_projector_warmup_epochs: 0
   encoder_uniform_weight: 0.0
   epochs: 80
-  erank_loss_weight: 0.5
+  erank_loss_weight: 1.0
   eval_every: 10
   max_steps_per_epoch: 50
   grad_clip_norm: 1.0
@@ -122,14 +122,14 @@ training:
   lr_min: 1.0e-06
   lr_schedule: cosine_no_restart
   memory_bank_size: 2048
-  olmoearth_global_distill_weight: 0.5
-  olmoearth_spatial_distill_weight: 1.0
+  olmoearth_global_distill_weight: 0.2
+  olmoearth_spatial_distill_weight: 0.5
   orthogonality_weight: 0.0
   patch_id_loss_weight: 0.3
   patch_id_num_patches: 744
   pixel_change_supervision_weight: 0.0
   pixel_temporal_info_nce_weight: 0.0
-  pre_norm_uniform_weight: 2.0
+  pre_norm_uniform_weight: 3.0
   recon_warmup_epochs: 0
   reconstruction_weight: 0.05
   save_interval: 5
