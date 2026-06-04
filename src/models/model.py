@@ -230,13 +230,8 @@ class AEFModel(nn.Module):
         time_summary = time_codes.mean(dim=1)  # [B, time_code_dim]
         summary = summary + self.time_to_summary(time_summary)[:, :, None, None]
 
-        # ★ NPU workaround: 昇腾 910B async scheduler 在某些算子链后可能进入饥饿状态。
-        #   sys.stdout.write + flush 强制隐式同步，打破潜在的调度死锁。
-        #   此操作仅在训练时执行，且频率极低（每次 encode_frames 调用一次）。
-        if self.training:
-            import sys
-            sys.stdout.write(".")
-            sys.stdout.flush()
+        # ★ NPU workaround removed: 昇腾 910B async scheduler 问题已通过其他方式解决。
+        #   原 sys.stdout.write 造成日志污染，且未证实有效。
 
         return summary, window_code, attn
 
