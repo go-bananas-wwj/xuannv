@@ -244,8 +244,8 @@ def main():
                 eval_json_path = Path(cfg.experiment.output_dir) / f"eval_epoch_{epoch + 1}.json"
                 eval_script = Path(__file__).parent.parent / "eval" / "run_periodic_eval.py"
                 cmd = (
-                    f"cd /workspace/xuannv && source activate xuannv && "
-                    f"python {eval_script} "
+                    f"cd /workspace/xuannv && "
+                    f"{sys.executable} {eval_script} "
                     f"--config {args.config} "
                     f"--checkpoint {ckpt_path} "
                     f"--output {eval_json_path} "
