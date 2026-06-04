@@ -240,6 +240,10 @@ class DDPv13Trainer:
 
     def train_epoch(self, epoch: int, dataloader: DataLoader) -> dict[str, float]:
         self.model.train()
+        # ★ FIX: 每个 epoch 开始时清空 memory bank，防止历史坍缩样本污染当前 epoch
+        self.memory_bank.queue.zero_()
+        self.memory_bank.ptr = 0
+        self.memory_bank.size = 0
         if self.global_rank == 0:
             print(f"\n{'='*60}\n[Epoch {epoch}] START\n{'='*60}")
         t = self.cfg.training
