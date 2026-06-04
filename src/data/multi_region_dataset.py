@@ -45,6 +45,16 @@ class MultiRegionPatchDataset(HarbinPatchDataset):
         
         # 更新父类的patches列表
         self.patches = self.all_patch_ids
+        
+        # ★ 应用 max_patches 采样（父类已处理，但此处被覆盖需重新应用）
+        max_patches = getattr(cfg.data, 'max_patches', None)
+        if max_patches and isinstance(max_patches, int) and max_patches > 0:
+            if len(self.patches) > max_patches:
+                import random
+                rng = random.Random(getattr(cfg.experiment, 'seed', 42) + 12345)
+                self.patches = rng.sample(self.patches, max_patches)
+                print(f"[Dataset] Randomly sampled {max_patches} patches for fast validation")
+        
         self.num_samples = len(self.patches)
         
         # ★ 重建月度样本索引（父类初始化时只用了第一个区域）
