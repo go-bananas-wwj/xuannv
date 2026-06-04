@@ -77,7 +77,7 @@ def month_to_window(year: int, month: int) -> tuple[int, int]:
 def load_model(config_path: str, checkpoint_path: str, device: str):
     """加载模型和评估数据集."""
     cfg = load_config(config_path)
-    cfg.data.preload = False
+    cfg.data.preload = True
     cfg.data.num_workers = 0
 
     if getattr(cfg.data, 'multi_region_manifest', None):
@@ -124,19 +124,21 @@ def extract_embeddings(model, dataset, cfg, device, months=None):
             def _to(x):
                 return x.unsqueeze(0).to(device)
 
-            out = model(
-                source_frames=_to(item["source_frames"]),
-                source_timestamps_ms=_to(item["source_timestamps_ms"]),
-                source_frame_mask=_to(item["source_frame_mask"]),
-                source_input_mask=_to(item["source_input_mask"]),
-                source_type_ids=_to(item["source_type_ids"]),
-                valid_start_ms=torch.tensor([vs], dtype=torch.int64, device=device),
-                valid_end_ms=torch.tensor([ve], dtype=torch.int64, device=device),
-                target_relative_time=torch.zeros(1, cfg.data.num_target_sources, device=device),
-                target_metadata=torch.zeros(1, cfg.data.num_target_sources, cfg.data.metadata_dim, device=device),
-                skip_decoder=True,
-            )
-            emb = F.normalize(out.embedding_map, p=2, dim=1)  # [1, D, H, W]
+            use_bf16 = getattr(cfg.training, 'use_bf16', True)
+            with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=use_bf16):
+                out = model(
+                    source_frames=_to(item["source_frames"]),
+                    source_timestamps_ms=_to(item["source_timestamps_ms"]),
+                    source_frame_mask=_to(item["source_frame_mask"]),
+                    source_input_mask=_to(item["source_input_mask"]),
+                    source_type_ids=_to(item["source_type_ids"]),
+                    valid_start_ms=torch.tensor([vs], dtype=torch.int64, device=device),
+                    valid_end_ms=torch.tensor([ve], dtype=torch.int64, device=device),
+                    target_relative_time=torch.zeros(1, cfg.data.num_target_sources, device=device),
+                    target_metadata=torch.zeros(1, cfg.data.num_target_sources, cfg.data.metadata_dim, device=device),
+                    skip_decoder=True,
+                )
+            emb = F.normalize(out.embedding_map.float(), p=2, dim=1)  # [1, D, H, W]
             results[(pid, mi)] = emb.squeeze(0).cpu().numpy()  # [D, H, W]
 
     print(f"  [Extract] {len(results)} embeddings ({time.time()-t0:.1f}s)")
