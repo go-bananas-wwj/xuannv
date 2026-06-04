@@ -387,16 +387,15 @@ class AEFModel(nn.Module):
                     )
                     out_ch = self._per_source_out_channels[src_id]
                     flat_recon[mask, :out_ch] = out.to(flat_recon.dtype)
-                else:
-                    # Dummy forward to ensure decoder params receive grad (DDP find_unused=False safety)
-                    # Use a single zero sample to keep overhead minimal
-                    _z = torch.zeros(1, flat_map.shape[1], flat_map.shape[2], flat_map.shape[3],
-                                     device=flat_map.device, dtype=flat_map.dtype)
-                    _w = torch.zeros(1, cond_window.shape[1], device=flat_map.device, dtype=flat_map.dtype)
-                    _r = torch.zeros(1, cond_reltime.shape[1], device=flat_map.device, dtype=flat_map.dtype)
-                    _m = torch.zeros(1, cond_meta.shape[1], device=flat_map.device, dtype=flat_map.dtype)
-                    _ = dec(_z, window_code=_w, relative_time=_r, metadata=_m)
-                    dummy_dec = dummy_dec + _.sum() * 0.0
+                # 始终执行 dummy forward，确保所有 decoder 参数在每次 iteration 中都被 DDP 检测到
+                # 使用极小非零系数 (1e-12) 防止梯度被 PyTorch 优化掉
+                _z = torch.zeros(1, flat_map.shape[1], flat_map.shape[2], flat_map.shape[3],
+                                 device=flat_map.device, dtype=flat_map.dtype)
+                _w = torch.zeros(1, cond_window.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                _r = torch.zeros(1, cond_reltime.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                _m = torch.zeros(1, cond_meta.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                _out = dec(_z, window_code=_w, relative_time=_r, metadata=_m)
+                dummy_dec = dummy_dec + _out.sum() * 1e-12
             flat_recon = flat_recon + dummy_dec.view(1, 1, 1, 1)
         else:
             # 默认: 全部用第一个 decoder
@@ -407,6 +406,17 @@ class AEFModel(nn.Module):
                 metadata=cond_meta,
             )
             flat_recon[:, :self._per_source_out_channels[0]] = out.to(flat_recon.dtype)
+            # 对剩余 decoder 执行 dummy forward，确保 DDP 所有参数参与梯度
+            dummy_dec = torch.tensor(0.0, device=flat_map.device, dtype=flat_map.dtype)
+            for src_id, dec in enumerate(self.per_source_decoders[1:], start=1):
+                _z = torch.zeros(1, flat_map.shape[1], flat_map.shape[2], flat_map.shape[3],
+                                 device=flat_map.device, dtype=flat_map.dtype)
+                _w = torch.zeros(1, cond_window.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                _r = torch.zeros(1, cond_reltime.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                _m = torch.zeros(1, cond_meta.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                _out = dec(_z, window_code=_w, relative_time=_r, metadata=_m)
+                dummy_dec = dummy_dec + _out.sum() * 1e-12
+            flat_recon = flat_recon + dummy_dec.view(1, 1, 1, 1)
 
         # ★ 新增: bilinear upsample 回到原始分辨率 (128x128)
         if dec_h != self.image_size or dec_w != self.image_size:
