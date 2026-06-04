@@ -158,7 +158,7 @@ class DDPv13Trainer:
 
         # Student 模型
         self.model = AEFModel(cfg).to(self.device)
-        find_unused = getattr(cfg.training, 'find_unused_parameters', True)
+        find_unused = getattr(cfg.training, 'find_unused_parameters', False)
         self.model = DistributedDataParallel(
             self.model, device_ids=[local_rank], find_unused_parameters=find_unused
         )
