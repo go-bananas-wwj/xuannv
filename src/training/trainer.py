@@ -173,9 +173,15 @@ class DDPv13Trainer:
         self.optimizer = build_optimizer(self.model.module, cfg)
         self.scheduler = build_scheduler(self.optimizer, cfg)
 
-        # GradScaler
-        # V13: 禁用 scaler，fp32 训练不需要
-        self.scaler = None
+        # GradScaler — V42: 支持 bf16 混合精度加速
+        use_bf16 = getattr(cfg.training, 'use_bf16', True)
+        if use_bf16:
+            from torch.npu.amp import GradScaler
+            self.scaler = GradScaler()
+            if self.global_rank == 0:
+                print("[Trainer] BF16 mixed precision enabled (GradScaler)")
+        else:
+            self.scaler = None
 
         # 输出目录
         self.output_dir = Path(cfg.experiment.output_dir)
@@ -297,12 +303,14 @@ class DDPv13Trainer:
         uniform_w = getattr(t, 'batch_uniformity_weight', 0.0)
         recon_warmup = min(1.0, (epoch + 1) / max(getattr(t, 'recon_warmup_epochs', 10), 1))
 
-        import itertools
+        import itertools, time
         max_steps = getattr(t, 'max_steps_per_epoch', None)
         iterator = itertools.islice(dataloader, max_steps) if max_steps else dataloader
         for step, batch in enumerate(iterator):
+            t0 = time.time()
             batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v
                      for k, v in batch.items()}
+            t_data = time.time() - t0
 
             max_steps = getattr(t, 'max_steps_per_epoch', None)
             effective_steps = min(len(dataloader), max_steps) if max_steps else len(dataloader)
@@ -314,7 +322,9 @@ class DDPv13Trainer:
                 else:
                     pg["lr"] = lr
 
-            with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=False):
+            t1 = time.time()
+            use_bf16 = getattr(self.cfg.training, 'use_bf16', True)
+            with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=use_bf16):
                 # Teacher forward
                 has_dual = all(k in batch for k in ['valid_start_w1', 'valid_end_w1', 'valid_start_w2', 'valid_end_w2'])
                 # V13: empty cache before teacher forward to avoid OOM
@@ -372,10 +382,10 @@ class DDPv13Trainer:
                     target_source_idx=batch.get("target_source_idx"),
                     target_valid_start_ms=batch.get("target_valid_start_ms"),
                     target_valid_end_ms=batch.get("target_valid_end_ms"),
-                    # V28 fix: student 不跑 dual_window（避免 HBM OOM）
-                    # W2 目标用 teacher_out.dual_pre_w2（EMA，已在 no_grad 内）
                     dual_window=False,
                 )
+                t_forward = time.time() - t1
+                t2 = time.time()
 
                 # Reconstruction
                 recon = self._compute_recon_loss(student_out.reconstructions, batch)
@@ -799,6 +809,8 @@ class DDPv13Trainer:
                 # 继续执行后续梯度累积逻辑（不 step），保持所有 rank 同步
 
             total = total / accum_steps
+            t_loss = time.time() - t2
+            t3 = time.time()
             if self.scaler is not None:
                 self.scaler.scale(total).backward()
             else:
@@ -827,14 +839,10 @@ class DDPv13Trainer:
                     else:
                         self.optimizer.step()
                     self.optimizer.zero_grad()
-                    # ★ FIX: update_teacher 移入 else 分支
-                    # 只有成功执行 optimizer.step() 的 rank 才更新 teacher
-                    # 防止不同 rank 的 teacher 因 has_nan_grad 差异而 diverge
                     self.update_teacher()
                 
-                # V13: weight health check (silent)
-                # for name, p in self.model.named_parameters():
-                #     if p is not None and (torch.isnan(p).any() or torch.isinf(p).any()):
+            t_backward = time.time() - t3
+            t_step = time.time() - t0
 
             # ========== 精简损失累加（只保留关键指标） ==========
             for k, v in {
@@ -867,7 +875,8 @@ class DDPv13Trainer:
                           f"erank={erank:.1f} "
                           f"aef=[sp={aef_spatial_val.item():.3f},gl={aef_global_val.item():.3f}] "
                           f"olmo=[sp={olmo_spatial_val.item():.3f},gl={olmo_global_val.item():.3f}] "
-                          f"lr={lr:.6f}")
+                          f"lr={lr:.6f} "
+                          f"[t={t_step:.2f}s data={t_data:.2f} fwd={t_forward:.2f} loss={t_loss:.2f} bwd={t_backward:.2f}]")
                     print(step_msg)
                     if self.log_file:
                         self.log_file.write(step_msg + "\n")
@@ -920,7 +929,8 @@ class DDPv13Trainer:
                      for k, v in batch.items()}
             if "label" not in batch:
                 continue
-            with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=False):
+            use_bf16_eval = getattr(self.cfg.training, 'use_bf16', True)
+            with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=use_bf16_eval):
                 has_dual = all(k in batch for k in ['valid_start_w1', 'valid_end_w1', 'valid_start_w2', 'valid_end_w2'])
                 out = self.model(
                     source_frames=batch["source_frames"],
