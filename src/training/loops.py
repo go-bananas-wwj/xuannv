@@ -43,6 +43,8 @@ def compute_recon_loss(
         # 有效 batch 样本
         valid_b = target_mask[:, t_idx].bool() if target_mask is not None else torch.ones(B, dtype=torch.bool)
         if not valid_b.any():
+            # ★ DDP safety: dummy loss ensures decoder parameters always have gradients
+            total_loss = total_loss + predictions[:, t_idx].sum() * 0.0
             continue
 
         pred_t = predictions[valid_b, t_idx]   # [Bv, C, H, W]
