@@ -115,20 +115,22 @@ def extract_one(model, dataset, cfg, sample_map, device,
     def _to(x):
         return x.unsqueeze(0).to(device)
 
-    out = model(
-        source_frames        = _to(item["source_frames"]),
-        source_timestamps_ms = _to(item["source_timestamps_ms"]),
-        source_frame_mask    = _to(item["source_frame_mask"]),
-        source_input_mask    = _to(item["source_input_mask"]),
-        source_type_ids      = _to(item["source_type_ids"]),
-        valid_start_ms       = torch.tensor([vs], dtype=torch.int64, device=device),
-        valid_end_ms         = torch.tensor([ve], dtype=torch.int64, device=device),
-        target_relative_time = torch.zeros(1, cfg.data.num_target_sources, device=device),
-        target_metadata      = torch.zeros(1, cfg.data.num_target_sources,
-                                           cfg.data.metadata_dim, device=device),
-        skip_decoder=True,
-    )
-    emb = F.normalize(out.embedding_map, p=2, dim=1)  # [1, D, H, W]
+    use_bf16 = getattr(cfg.training, 'use_bf16', True)
+    with torch.autocast(device_type="npu", dtype=torch.bfloat16, enabled=use_bf16):
+        out = model(
+            source_frames        = _to(item["source_frames"]),
+            source_timestamps_ms = _to(item["source_timestamps_ms"]),
+            source_frame_mask    = _to(item["source_frame_mask"]),
+            source_input_mask    = _to(item["source_input_mask"]),
+            source_type_ids      = _to(item["source_type_ids"]),
+            valid_start_ms       = torch.tensor([vs], dtype=torch.int64, device=device),
+            valid_end_ms         = torch.tensor([ve], dtype=torch.int64, device=device),
+            target_relative_time = torch.zeros(1, cfg.data.num_target_sources, device=device),
+            target_metadata      = torch.zeros(1, cfg.data.num_target_sources,
+                                               cfg.data.metadata_dim, device=device),
+            skip_decoder=True,
+        )
+    emb = F.normalize(out.embedding_map.float(), p=2, dim=1)  # [1, D, H, W]
     emb = _center_crop_spatial(emb, center_crop_ratio)
     return emb.squeeze(0).cpu().numpy()                 # [D, H, W]
 
