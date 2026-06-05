@@ -255,7 +255,7 @@ def main():
 
             D, H, W = eb.shape
             changed_mask = np.zeros((H, W), dtype=bool)
-            bounds = patch_bounds[pid]
+            bounds = patch_bounds[local_pid]
             minx, miny, maxx, maxy = bounds
             for geom in changes:
                 if not box(minx, miny, maxx, maxy).intersects(geom):
