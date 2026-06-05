@@ -169,4 +169,4 @@ training:
   vicreg_weight: 0.0
   warmup_epochs: 10
   coding_rate_weight: 0.1
-  max_steps_per_epoch: 200
+  max_steps_per_epoch: 25
