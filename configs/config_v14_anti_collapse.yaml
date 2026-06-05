@@ -98,7 +98,7 @@ model:
   skip_l2_norm_training: true
   use_2d_pos_enc: false
   use_classification_head: true
-  use_distill_head: true              # 保留投影头结构（权重为0时不计算）
+  use_distill_head: false             # ★ 关闭 OlmoEarth 投影头（避免 DDP 未使用参数报错）
   use_metadata: true
   use_sensor_embedding: true
   window_code_dim: 32
