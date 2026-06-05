@@ -87,8 +87,9 @@ def evaluate_period(global_mean, patch_ids, period_info, changed_pids, patch_bou
     Returns:
         dict with cosine_auc, lr_auc, n_positive, n_negative
     """
-    before_month = period_info["before"] - 1  # 0-based index
-    after_month = period_info["after"] - 1
+    # embedding 月份从 2025-04 开始，index offset = 4
+    before_month = period_info["before"] - 4
+    after_month = period_info["after"] - 4
     
     # 构建特征和标签
     X_cosine = []   # cosine distance
@@ -98,7 +99,9 @@ def evaluate_period(global_mean, patch_ids, period_info, changed_pids, patch_bou
     
     for p_idx, pid in enumerate(patch_ids):
         pid_str = str(pid)
-        if pid_str not in patch_bounds:
+        # 处理多区域 patch_id 格式（如 harbin_patch_000000 -> patch_000000）
+        local_pid = pid_str.split('_', 1)[1] if '_' in pid_str and not pid_str.startswith('patch_') else pid_str
+        if local_pid not in patch_bounds:
             continue
         
         emb_before = global_mean[p_idx, before_month]  # [D]
@@ -111,7 +114,7 @@ def evaluate_period(global_mean, patch_ids, period_info, changed_pids, patch_bou
         # LR feature
         feat = np.concatenate([emb_before, emb_after])  # [2D]
         
-        label = 1 if pid_str in changed_pids else 0
+        label = 1 if local_pid in changed_pids else 0
         
         X_cosine.append(cos_dist)
         X_lr.append(feat)
