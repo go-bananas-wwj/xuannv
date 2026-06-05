@@ -228,16 +228,17 @@ def knn_semantic_segmentation(embeddings: dict, dataset, month_idx: int = 4):
     Xte, yte = X[perm[n_tr_px:]], y[perm[n_tr_px:]]
 
     # kNN (cosine) — NPU 加速
+    # 注意：X 已经是 L2 归一化，cosine_sim = Xb @ Xtr_t.T，避免 torch.cdist 在 NPU 上分配巨量中间内存
     k = 5
     device = torch.device("npu:0" if torch.npu.is_available() else "cpu")
     Xtr_t = torch.from_numpy(Xtr).to(device)
     ytr_t = torch.from_numpy(ytr).long().to(device)
-    batch = 4096
+    batch = 2048
     preds = []
     for i in range(0, len(Xte), batch):
         Xb = torch.from_numpy(Xte[i:i+batch]).to(device)
-        dist = torch.cdist(Xb, Xtr_t)
-        _, idx = dist.topk(min(k, len(Xtr)), largest=False, dim=1)
+        sim = Xb @ Xtr_t.T  # [batch, Ntr]
+        _, idx = sim.topk(min(k, len(Xtr)), largest=True, dim=1)
         nbr = ytr_t[idx]
         for j in range(nbr.shape[0]):
             vals, counts = torch.unique(nbr[j], return_counts=True)
