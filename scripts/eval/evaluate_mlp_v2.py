@@ -27,7 +27,10 @@ sys.path.insert(0, "/workspace/xuannv")
 
 from src.models.downstream_heads import PixelMLPHead, PixelConvHead, focal_loss
 
-DATA_ROOT = Path("/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered")
+DATA_ROOTS = [
+    Path("/workspace/raw/harbin"),
+    Path("/workspace/raw/haidian_train/haidian"),
+]
 
 TASKS = [
     ("worldcover", "worldcover", "static.tif", 7),   # 实际7类
@@ -45,13 +48,24 @@ LABEL_MAPPINGS = {
 
 
 def load_label(patch_id: str, label_dir: str, fname: str):
-    path = DATA_ROOT / label_dir / patch_id / fname
-    if not path.exists():
-        return None, None
-    with rasterio.open(path) as src:
-        label = src.read(1)
-        nodata = src.nodata
-    return label, nodata
+    # 处理多区域 patch_id 格式（如 haidian_patch_000000 -> patch_000000）
+    local_id = patch_id.split('_', 1)[1] if '_' in patch_id and not patch_id.startswith('patch_') else patch_id
+    for data_root in DATA_ROOTS:
+        # 先尝试原始 patch_id
+        path = data_root / label_dir / patch_id / fname
+        if path.exists():
+            with rasterio.open(path) as src:
+                label = src.read(1)
+                nodata = src.nodata
+            return label, nodata
+        # 再尝试 local_id
+        path = data_root / label_dir / local_id / fname
+        if path.exists():
+            with rasterio.open(path) as src:
+                label = src.read(1)
+                nodata = src.nodata
+            return label, nodata
+    return None, None
 
 
 def resize_label(label: np.ndarray, target_h: int, target_w: int) -> np.ndarray:

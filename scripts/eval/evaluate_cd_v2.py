@@ -179,8 +179,14 @@ def main():
     # 加载 embedding
     print("[CD] 加载 embedding...")
     data = np.load(args.embedding_file)
-    global_mean = data["global_mean"]  # [424, 12, D]
-    patch_ids = data["patch_ids"]      # [424]
+    if "global_mean" in data:
+        global_mean = data["global_mean"]  # [N, M, D]
+    else:
+        # 从 spatial_maps 计算 global_mean
+        spatial_maps = data["spatial_maps"]  # [N, M, D, H, W]
+        global_mean = spatial_maps.mean(axis=(3, 4))  # [N, M, D]
+        print(f"      从 spatial_maps 计算 global_mean")
+    patch_ids = data["patch_ids"]      # [N]
     print(f"      形状: {global_mean.shape}")
     
     # 加载 patch 边界
