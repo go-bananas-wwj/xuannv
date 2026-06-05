@@ -1052,13 +1052,13 @@ class DDPv13Trainer:
         }, path)
         print(f"[trainer] Saved checkpoint to {path}")
 
-        # 清理普通 checkpoint（非 best/last），只保留最近 1 个
+        # 清理普通 checkpoint（非 best/last），只保留最近 3 个
         ckpts = sorted(
             [p for p in self.output_dir.glob("epoch_*.pt")
              if not p.name.startswith("epoch_best") and p.name != "epoch_last.pt"],
             key=lambda p: p.stat().st_mtime
         )
-        for old_ckpt in ckpts[:-1]:
+        for old_ckpt in ckpts[:-3]:
             old_ckpt.unlink()
             print(f"[trainer] Removed old checkpoint: {old_ckpt}")
 
