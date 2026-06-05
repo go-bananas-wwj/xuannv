@@ -46,7 +46,7 @@ while true; do
       
       # 运行 AUC 评估（最快，单卡即可）
       echo "[$(date)] 开始 AUC 评估..."
-      python scripts/eval/auc_eval.py \
+      /root/miniconda3/envs/xuannv/bin/python scripts/eval/auc_eval.py \
         --config "$CONFIG" \
         --checkpoint "$LATEST_CKPT" \
         --device "$DEVICE" \
