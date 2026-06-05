@@ -519,7 +519,12 @@ class HarbinPatchDataset(Dataset):
         """带缓存的输入帧加载."""
         if patch_id in self._cache and source_name in self._cache[patch_id]:
             return self._cache[patch_id][source_name]
-        return self._load_input_frames_impl(patch_id, source_name)
+        result = self._load_input_frames_impl(patch_id, source_name)
+        # ★ 评估时多区域数据集可能未预加载，缓存按需读取避免重复磁盘 I/O
+        if patch_id not in self._cache:
+            self._cache[patch_id] = {}
+        self._cache[patch_id][source_name] = result
+        return result
 
     def _select_bands(self, data: np.ndarray, source_name: str) -> np.ndarray:
         """跨区域波段对齐 — 根据数据源选择统一的波段子集.

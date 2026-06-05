@@ -113,6 +113,9 @@ def extract_embeddings(model, dataset, cfg, device, months=None):
     results = {}
     t0 = time.time()
 
+    from tqdm import tqdm
+    n_total = sum(1 for pid in dataset.patches for mi, (year, month) in enumerate(months) if (pid, year, month) in sample_map)
+    pbar = tqdm(total=n_total, desc="[Extract] embeddings")
     for pid in dataset.patches:
         for mi, (year, month) in enumerate(months):
             key = (pid, year, month)
@@ -140,6 +143,8 @@ def extract_embeddings(model, dataset, cfg, device, months=None):
                 )
             emb = F.normalize(out.embedding_map.float(), p=2, dim=1)  # [1, D, H, W]
             results[(pid, mi)] = emb.squeeze(0).cpu().numpy()  # [D, H, W]
+            pbar.update(1)
+    pbar.close()
 
     print(f"  [Extract] {len(results)} embeddings ({time.time()-t0:.1f}s)")
     return results
