@@ -46,12 +46,14 @@ while true; do
       
       # 运行 AUC 评估（最快，单卡即可）
       echo "[$(date)] 开始 AUC 评估..."
+      EVAL_DIR="$CHECKPOINT_DIR/eval_epoch_${EPOCH_NUM}"
+      mkdir -p "$EVAL_DIR"
       /root/miniconda3/envs/xuannv/bin/python scripts/eval/auc_eval.py \
         --config "$CONFIG" \
         --checkpoint "$LATEST_CKPT" \
         --device "$DEVICE" \
-        --output-dir "$CHECKPOINT_DIR/eval_epoch_${EPOCH_NUM}" \
-        2>&1 | tee "$CHECKPOINT_DIR/eval_epoch_${EPOCH_NUM}/auc.log" || echo "[警告] AUC 评估失败"
+        --output "$EVAL_DIR/auc_results.json" \
+        2>&1 | tee "$EVAL_DIR/auc.log" || echo "[警告] AUC 评估失败"
       
       echo "[$(date)] Epoch $EPOCH_NUM 评估完成"
       echo ""
