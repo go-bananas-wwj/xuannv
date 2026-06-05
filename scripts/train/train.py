@@ -210,9 +210,11 @@ def main():
                 f"time={epoch_dt:.1f}s elapsed={int(elapsed//60)}m ETA={eta_str}"
             )
 
-        # 定期保存断点（覆盖式 epoch_last.pt，含 optimizer，用于 OOM 后续训）
+        # 定期保存断点（覆盖式 epoch_last.pt + 普通 epoch_{epoch}.pt，含 optimizer，用于 OOM 后续训）
         if (epoch + 1) % save_every == 0:
             trainer.save_checkpoint(epoch + 1, losses, tag="last")
+            # 同时保存普通 checkpoint，保留最近 3 个（由 trainer.save_checkpoint 自动清理）
+            trainer.save_checkpoint(epoch + 1, losses)
 
         # ★ 下游探针评估（kNN: global embedding -> WorldCover 众数类别）
         #   每次评估后存 best 权重，按 mIoU 仅保留最优 3 个
