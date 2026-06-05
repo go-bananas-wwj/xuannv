@@ -67,11 +67,15 @@ def load_model_and_dataset(config_path, ckpt_path, device_str):
     from src.config import load_config
     from src.models.model import AEFModel
     from src.data.dataset import HarbinPatchDataset
+    from src.data.multi_region_dataset import MultiRegionPatchDataset
 
     cfg = load_config(config_path)
     cfg.data.preload = False
 
-    dataset = HarbinPatchDataset(cfg=cfg)
+    if getattr(cfg.data, 'multi_region_manifest', None):
+        dataset = MultiRegionPatchDataset(cfg)
+    else:
+        dataset = HarbinPatchDataset(cfg=cfg)
     device  = torch.device(device_str)
 
     model = AEFModel(cfg=cfg).to(device)
