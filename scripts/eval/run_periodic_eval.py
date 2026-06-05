@@ -222,18 +222,21 @@ def knn_semantic_segmentation(embeddings: dict, dataset, month_idx: int = 4):
     Xtr, ytr = X[perm[:n_tr_px]], y[perm[:n_tr_px]]
     Xte, yte = X[perm[n_tr_px:]], y[perm[n_tr_px:]]
 
-    # kNN (cosine) — batch 预测避免内存爆炸
+    # kNN (cosine) — NPU 加速
     k = 5
-    batch = 2048
+    device = torch.device("npu:0" if torch.npu.is_available() else "cpu")
+    Xtr_t = torch.from_numpy(Xtr).to(device)
+    ytr_t = torch.from_numpy(ytr).long().to(device)
+    batch = 4096
     preds = []
     for i in range(0, len(Xte), batch):
-        Xb = Xte[i:i+batch]
-        sim = Xb @ Xtr.T  # [B, Ntr]
-        topk_idx = np.argpartition(-sim, kth=min(k, len(Xtr))-1, axis=1)[:, :k]
-        for idx in topk_idx:
-            labels = ytr[idx]
-            u, c = np.unique(labels, return_counts=True)
-            preds.append(u[np.argmax(c)])
+        Xb = torch.from_numpy(Xte[i:i+batch]).to(device)
+        dist = torch.cdist(Xb, Xtr_t)
+        _, idx = dist.topk(min(k, len(Xtr)), largest=False, dim=1)
+        nbr = ytr_t[idx]
+        for j in range(nbr.shape[0]):
+            vals, counts = torch.unique(nbr[j], return_counts=True)
+            preds.append(vals[counts.argmax()].item())
     preds = np.array(preds)
 
     # 计算 OA 和 mIoU
