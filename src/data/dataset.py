@@ -57,6 +57,11 @@ def _preload_patch_worker(args: tuple) -> tuple[str, dict, int]:
     n_cached = 0
 
     def _resolve(source_name: str, pid: str) -> Path | None:
+        # 新结构: patch_id / source_name
+        source_dir = data_root / pid / source_name
+        if source_dir.exists():
+            return source_dir
+        # 旧结构: source_name / patch_id
         source_dir = data_root / source_name / pid
         if source_dir.exists():
             return source_dir
@@ -330,15 +335,16 @@ class HarbinPatchDataset(Dataset):
 
     def _compute_sample_weights(self) -> None:
         """基于 S2 空间方差计算采样权重."""
-        s2_dir = self.data_root / "s2"
-        if not s2_dir.exists():
-            return
         variances = []
         for pid in self.patches:
-            patch_s2 = s2_dir / pid
+            # 新结构: patch_id / s2
+            patch_s2 = self.data_root / pid / "s2"
             if not patch_s2.exists():
-                variances.append(0.0)
-                continue
+                # 旧结构: s2 / patch_id
+                patch_s2 = self.data_root / "s2" / pid
+                if not patch_s2.exists():
+                    variances.append(0.0)
+                    continue
             frame_vars = []
             for tif in sorted(patch_s2.glob("*.tif")):
                 data = read_tif(tif, self.image_size)
@@ -499,10 +505,16 @@ class HarbinPatchDataset(Dataset):
 
     def _resolve_source_dir(self, source_name: str, patch_id: str) -> Path | None:
         """解析数据源目录，支持 data_root 的直接子目录嵌套结构.
-        
-        优先查找 data_root / source_name / patch_id，
-        若不存在则在 data_root 的直接子目录中搜索.
+
+        优先查找新结构 data_root / patch_id / source_name，
+        再回退旧结构 data_root / source_name / patch_id，
+        若都不存在则在 data_root 的直接子目录中搜索.
         """
+        # 新结构: patch_id / source_name
+        source_dir = self.data_root / patch_id / source_name
+        if source_dir.exists():
+            return source_dir
+        # 旧结构: source_name / patch_id
         source_dir = self.data_root / source_name / patch_id
         if source_dir.exists():
             return source_dir
@@ -1240,7 +1252,11 @@ class HarbinPatchDataset(Dataset):
                     target_source_idx[t_idx] = t_idx
                     target_relative_time[t_idx] = 0.5
                 else:
-                    src_dir = self.data_root / tgt_name / patch_id
+                    # 新结构: patch_id / tgt_name
+                    src_dir = self.data_root / patch_id / tgt_name
+                    if not src_dir.exists():
+                        # 旧结构: tgt_name / patch_id
+                        src_dir = self.data_root / tgt_name / patch_id
                     if src_dir.exists():
                         tif_files = sorted(src_dir.glob("*.tif"))
                         if tif_files:

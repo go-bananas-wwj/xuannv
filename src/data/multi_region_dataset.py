@@ -99,15 +99,24 @@ class MultiRegionPatchDataset(HarbinPatchDataset):
         source_roots = info.get('source_roots', {})
         if source_name in source_roots:
             override_root = Path(source_roots[source_name])
+            # 新结构
+            src_dir = override_root / patch_id / source_name
+            if src_dir.exists():
+                return src_dir
+            # 旧结构
             src_dir = override_root / source_name / patch_id
             if src_dir.exists():
                 return src_dir
 
-        # 标准路径: data_root / source_name / patch_id
+        # 标准路径: 新结构 data_root / patch_id / source_name
+        src_dir = region_root / patch_id / source_name
+        if src_dir.exists():
+            return src_dir
+        # 旧结构: data_root / source_name / patch_id
         src_dir = region_root / source_name / patch_id
         if src_dir.exists():
             return src_dir
-        
+
         # 回退：在 data_root 的直接子目录中搜索
         for sub_dir in region_root.iterdir():
             if not sub_dir.is_dir():
@@ -115,7 +124,7 @@ class MultiRegionPatchDataset(HarbinPatchDataset):
             candidate = sub_dir / source_name / patch_id
             if candidate.exists():
                 return candidate
-        
+
         return None
     
     def _preload_teacher_tokens(self) -> None:
