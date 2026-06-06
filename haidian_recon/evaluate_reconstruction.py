@@ -113,9 +113,12 @@ def evaluate_reconstruction(checkpoint_path: str, config_path: str, num_samples:
                 pred = output["reconstructions"][source_name].cpu().numpy()
                 target = batch[source_name].cpu().numpy()
 
-                # 计算每个batch element的PSNR/SSIM
+                # 计算每个batch element的PSNR/SSIM（跳过无效样本）
+                valid_mask = batch.get("valid_mask")
                 B, T, C, H, W = pred.shape
                 for b in range(B):
+                    if valid_mask is not None and not valid_mask[b].item():
+                        continue
                     for t in range(T):
                         for c in range(C):
                             p = pred[b, t, c]
@@ -204,6 +207,10 @@ def visualize_reconstruction(checkpoint_path: str, config_path: str, output_dir:
                 break
 
             batch = {k: v.to(device) if isinstance(v, torch.Tensor) else None for k, v in batch.items()}
+            valid_mask = batch.get("valid_mask")
+            if valid_mask is not None and not valid_mask[0].item():
+                continue
+
             masked_batch, mask_info = masking(batch)
             output = model(masked_batch, mask_info)
 
