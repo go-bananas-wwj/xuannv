@@ -9,9 +9,9 @@
 5. **所有文件操作限制在 `/workspace/xuannv/` 内**。
 6. **`archive/` 目录为废弃代码，只读参考，不得修改**。
 7. **训练出现 NaN/Inf**: 先检查 loss weight 是否过高，不要删除 checkpoint；必要时执行 dummy backward 保持 DDP 同步。
-8. **不要修改 `manifest_path`**: 已指向 `/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered`。
+8. **不要修改 `manifest_path`**: 哈尔滨配置已指向 `/workspace/xuannv/data_raw/harbin/scenes`，海淀配置已指向 `/workspace/xuannv/data_raw/haidian/scenes`。
 9. **不要修改 `filter_2025_monthly`**: 当前所有配置均为 `false`。
-10. **全量训练必须使用全部 424 个 patch**，即 `data.num_samples: 424`（若使用多区域混合训练，则按 manifest 实际 patch 数配置）。
+10. **全量训练必须使用全部 patch**（哈尔滨 424 个，海淀 320 个），即 `data.num_samples` 按实际区域配置（若使用多区域混合训练，则按 manifest 实际 patch 数配置）。
 11. **运行环境**: `conda activate xuannv`，Python 3.11，torch 2.1.0 + torch_npu 2.1.0.post18。
 
 ---
@@ -131,8 +131,10 @@ xuannv/
 ├── archive/                    # 废弃代码（只读参考，不得修改）
 │   └── src/training/vicreg_loss.py  # 旧版 VICReg 损失（已归档）
 ├── docs/                       # 项目文档（含 BUG_FIX_LOG.md、业务/专利/参考文献）
-├── data/                       # 运行时数据输出（change_masks, embeddings, labels）
-└── out/                        # 评估结果输出
+├── data_raw/                   # 原始训练数据（哈尔滨/海淀/北京/全国）
+├── statistics/                 # 各区域归一化统计量（未纳入 git）
+├── outputs/                    # 训练输出、评估结果、缓存（未纳入 git）
+└── out/                        # 部分评估脚本的历史输出目录（未纳入 git）
 ```
 
 **注意**：
@@ -314,18 +316,21 @@ python scripts/eval/auc_eval.py \
 ### 训练数据路径
 
 ```
-/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered/  ← 哈尔滨主数据
+/workspace/xuannv/data_raw/harbin/scenes/            ← 哈尔滨主数据（424 patches）
     ├── s2/          (~22帧/patch，云筛选后)
-    ├── s1 → ../harbin_scenes/s1
-    ├── landsat → ../harbin_scenes/landsat
-    ├── dem → ../harbin_scenes/dem
-    ├── worldcover → ...
-    └── ...
+    ├── s1/
+    ├── landsat/
+    ├── dem/
+    ├── worldcover/
+    ├── dynamic_world/
+    └── jrc_water/
 
-/workspace/raw/haidian_train/haidian/                     ← 海淀数据（多区域训练用）
-/workspace/statistics/harbin_scenes/{source}_stats.json   ← 归一化统计量（7个文件）
-/workspace/statistics/haidian_train/{source}_stats.json   ← 海淀统计量
+/workspace/xuannv/data_raw/haidian/scenes/           ← 海淀数据（320 patches，多区域训练用）
+/workspace/xuannv/statistics/harbin/{source}_stats.json   ← 哈尔滨归一化统计量
+/workspace/xuannv/statistics/haidian/{source}_stats.json  ← 海淀归一化统计量
 ```
+
+**注意**: `/workspace/xuannv/data_raw/` 与 `/workspace/xuannv/statistics/` 为本地目录（已纳入 `.gitignore`），并非 `/workspace/raw/` 共享路径。训练配置中的 `manifest_path` 均指向 `data_raw/` 下的子目录。
 
 ### 各源帧数（哈尔滨）
 
@@ -416,14 +421,14 @@ torchrun --nproc_per_node=2 scripts/train/train.py \
 ### 数据预处理部署
 - `preprocessing/run.py` 为独立入口，不依赖训练环境初始化。
 - 配置为 JSON 格式（`preprocessing/configs/harbin.json` 等）。
-- 输出到 `/workspace/raw/` 和 `/workspace/statistics/`，与训练代码解耦。
+- 输出到 `data_raw/` 和 `statistics/` 目录下，与训练代码解耦。
 
 ---
 
 ## 安全与运维注意事项
 
 1. **Git 安全**: 禁止直接 `git push --force` 或 `git reset --hard`；所有修改通过常规 commit 提交到 `v12-clean-dynamic` 分支。
-2. **数据安全**: `/workspace/raw/` 和 `/workspace/statistics/` 为共享只读数据目录，训练脚本不应写入。
+2. **数据安全**: `data_raw/` 和 `statistics/` 为本地数据目录，受 `.gitignore` 保护；训练脚本不应意外覆盖。
 3. **NPU 资源**: 训练前必须执行 `npu-smi info` 确认空闲卡；禁止在未确认的情况下占用全部 8 卡。
 4. **缓存管理**: 数据集缓存（`dataset_cache_*.pt`）会累积占用大量磁盘空间，定期清理旧实验缓存。
 5. **Checkpoint 清理**: `DDPv13Trainer.save_checkpoint` 会自动保留最近 3 个普通 checkpoint 和 3 个 best checkpoint，无需手动干预。
