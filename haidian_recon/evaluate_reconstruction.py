@@ -65,7 +65,7 @@ def evaluate_reconstruction(checkpoint_path: str, config_path: str, num_samples:
         use_gradient_checkpointing=False,
     ).to(device)
 
-    ckpt = torch.load(checkpoint_path, map_location=device)
+    ckpt = torch.load(checkpoint_path, map_location="cpu")
     state = ckpt.get("model_state_dict", ckpt)
     model.load_state_dict(state, strict=True)
     model.eval()
@@ -175,7 +175,7 @@ def visualize_reconstruction(checkpoint_path: str, config_path: str, output_dir:
         use_gradient_checkpointing=False,
     ).to(device)
 
-    ckpt = torch.load(checkpoint_path, map_location=device)
+    ckpt = torch.load(checkpoint_path, map_location="cpu")
     model.load_state_dict(ckpt.get("model_state_dict", ckpt), strict=True)
     model.eval()
 
