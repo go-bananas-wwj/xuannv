@@ -22,14 +22,14 @@ sys.path.insert(0, "/workspace/xuannv")
 REGIONS = {
     "harbin": {
         "bounds": [126.0, 45.0, 128.5, 46.5],
-        "patches_meta": "/workspace/xuannv/data_raw/olmoearth_harbin/patches_meta.json",
-        "output_dir": "/workspace/xuannv/data_raw/aef_embeddings/harbin_2025_patches",
+        "patches_meta": "/workspace/xuannv/data_raw/harbin/olmoearth/patches_meta.json",
+        "output_dir": "/workspace/xuannv/data_raw/harbin/aef_embeddings/harbin_2025_patches",
         "crs": "EPSG:32650",
     },
     "haidian": {
         "bounds": [116.0, 39.5, 116.5, 40.2],
-        "patches_meta": "/workspace/xuannv/data_raw/olmoearth_haidian/patches_meta.json",
-        "output_dir": "/workspace/xuannv/data_raw/aef_embeddings/haidian_2025_patches",
+        "patches_meta": "/workspace/xuannv/data_raw/haidian/olmoearth/patches_meta.json",
+        "output_dir": "/workspace/xuannv/data_raw/haidian/aef_embeddings/haidian_2025_patches",
         "crs": "EPSG:32650",
     },
 }
@@ -152,7 +152,7 @@ def merge_and_crop(files: list, region_name: str, year: int, output_dir: Path):
     print("[合并] 打开 COG 文件...")
     for f in files:
         # 使用 VRT 如果存在，否则用 COG
-        cog_path = Path(f['url'].replace('https://data.source.coop/', '/workspace/xuannv/data_raw/aef_embeddings/cache/'))
+        cog_path = Path(f['url'].replace('https://data.source.coop/', '/workspace/xuannv/data_raw/aef/'))
         vrt_path = cog_path.with_suffix('.vrt')
         
         if vrt_path.exists():

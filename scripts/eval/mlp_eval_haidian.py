@@ -58,7 +58,7 @@ except ImportError:
 
 # ── 数据路径 ─────────────────────────────────────────────────────────────────
 
-HAIDIAN_ROOT = Path("/workspace/xuannv/data_raw/haidian_train")
+HAIDIAN_ROOT = Path("/workspace/xuannv/data_raw/haidian/scenes")
 
 # ── 标注配置 ─────────────────────────────────────────────────────────────────
 

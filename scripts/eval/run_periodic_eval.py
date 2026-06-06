@@ -163,7 +163,7 @@ def knn_semantic_segmentation(embeddings: dict, dataset, month_idx: int = 4):
     from PIL import Image
     import rasterio
 
-    data_root = Path(dataset.data_root) if hasattr(dataset, 'data_root') else Path("/workspace/xuannv/data_raw/haidian_train")
+    data_root = Path(dataset.data_root) if hasattr(dataset, 'data_root') else Path("/workspace/xuannv/data_raw/haidian/scenes")
 
     # 收集所有 patch 的 embedding 和 label
     X_list, y_list = [], []

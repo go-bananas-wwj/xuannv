@@ -35,8 +35,8 @@
 
 | 区域 | Patches | 数据根目录 | 统计目录 |
 |------|---------|-----------|----------|
-| 海淀 (haidian) | 320 | `/workspace/raw/haidian_train/haidian` | `/workspace/statistics/haidian_train` |
-| 哈尔滨 (harbin) | 424 | `/workspace/raw/harbin_newarea_olmoearth` | (manifest 中配置) |
+| 海淀 (haidian) | 320 | `/workspace/xuannv/data_raw/haidian/scenes` | `/workspace/statistics/haidian` |
+| 哈尔滨 (harbin) | 424 | `/workspace/xuannv/data_raw/harbin_newarea_olmoearth` | (manifest 中配置) |
 | **合计** | **744** | — | — |
 
 ### 3.2 月度样本
@@ -53,8 +53,8 @@
 |------|------|--------|---------|
 | OlmoEarth Haidian | `/workspace/outputs/olmoearth_haidian/` | 17 | 320 |
 | OlmoEarth Harbin | `/workspace/outputs/olmoearth_harbin/` | 17 | 424 |
-| AEF Haidian | `/workspace/raw/aef_embeddings/haidian_2025_patches/` | — | 320 |
-| AEF Harbin | `/workspace/raw/aef_embeddings/harbin_2025_patches/` | — | 424 |
+| AEF Haidian | `/workspace/xuannv/data_raw/haidian/aef_embeddings/haidian_2025_patches/` | — | 320 |
+| AEF Harbin | `/workspace/xuannv/data_raw/harbin/aef_embeddings/harbin_2025_patches/` | — | 424 |
 
 **OlmoEarth Token 加载**: 17 个月，12,648 patches，~19.89GB (fp16 内存常驻)
 

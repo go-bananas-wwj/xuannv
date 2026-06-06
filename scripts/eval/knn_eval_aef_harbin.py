@@ -99,7 +99,7 @@ def evaluate_knn(embeddings, labels, mapping=None, k=5, sample_pixels=10000):
 
 def main():
     embedding_path = "/workspace/xuannv/outputs/aef_official_embeddings/aef_harbin_2025.npz"
-    data_root = Path("/workspace/xuannv/data_raw/harbin_scenes")
+    data_root = Path("/workspace/xuannv/data_raw/harbin/scenes")
     output_path = "/workspace/xuannv/outputs/aef_official_embeddings/knn_aef_harbin.json"
     k = 5
     sample_pixels = 10000

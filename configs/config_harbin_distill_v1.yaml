@@ -20,8 +20,8 @@ experiment:
 
 data:
   dataset_type: harbin_patches
-  manifest_path: /workspace/xuannv/data_raw/harbin_scenes
-  stats_dir: /workspace/xuannv/statistics/harbin_scenes
+  manifest_path: /workspace/xuannv/data_raw/harbin/scenes
+  stats_dir: /workspace/xuannv/statistics/harbin
   batch_size: 4
   num_workers: 4
   image_size: 128

@@ -1,5 +1,5 @@
 data:
-  aef_embed_dir: /workspace/xuannv/data_raw/aef_embeddings/haidian_2025_patches
+  aef_embed_dir: /workspace/xuannv/data_raw/haidian/aef_embeddings/haidian_2025_patches
   batch_size: 2
   dataset_type: harbin_patches
   image_size: 128
@@ -9,7 +9,7 @@ data:
   - s1
   - landsat
   - tianyi_sar
-  manifest_path: /workspace/xuannv/data_raw/haidian_train
+  manifest_path: /workspace/xuannv/data_raw/haidian/scenes
   max_frames: 24
   metadata_dim: 4
   num_classes: 11
@@ -28,7 +28,7 @@ data:
     s2: 6
     tianyi_sar: 1
   spatial_augmentation: true
-  stats_dir: /workspace/xuannv/statistics/haidian_train
+  stats_dir: /workspace/xuannv/statistics/haidian
   target_sources:
   - loss_type: 0
     name: s2

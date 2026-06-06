@@ -9,7 +9,7 @@
   - landsat  : landsat-c2-l2    11 波段(OlmoEarth顺序 B8 B1..B11); L2 SR 仅 8 个可用,其余填0
   - worldcover: esa-worldcover    1 波段 (静态)
   - dem      : cop-dem-glo-30     1 波段 (静态, OlmoEarth 的 srtm)
-输出: /workspace/xuannv/data_raw/olmoearth_harbin/<模态>/patch_XXXXXX/<日期或static>.tif
+输出: /workspace/xuannv/data_raw/harbin/olmoearth/<模态>/patch_XXXXXX/<日期或static>.tif
       uint16(光学/分类) 或 float32(SAR/DEM), lzw 压缩, 与现有数据隔离。
 
 借鉴 run_download.py: token 过期重签重试 / 搜索退避重试 / 全零校验。
@@ -44,7 +44,7 @@ from rasterio.transform import from_bounds
 from pyproj import Transformer
 
 PATCHES_META = "/workspace/xuannv_show/data/harbin/patches_meta.json"
-OUT_ROOT     = Path("/workspace/xuannv/data_raw/olmoearth_harbin")
+OUT_ROOT     = Path("/workspace/xuannv/data_raw/harbin/olmoearth")
 CRS = "EPSG:32652"
 DATE_START = "2025-01-01"
 DATE_END   = date.today().isoformat()   # 2026-06-02

@@ -283,7 +283,7 @@ rm -rf /tmp/s2_novdec_raw /tmp/s2_novdec_filtered
 ```bash
 python scripts/preprocessing/compute_statistics.py \
     --data-dir /workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered \
-    --output-dir /workspace/statistics/harbin_scenes \
+    --output-dir /workspace/statistics/harbin \
     --sources s2
 ```
 

@@ -3,7 +3,7 @@
 
 复用 download_olmoearth_multimodal.py 核心逻辑，仅修改区域配置。
 
-区域: /workspace/xuannv/data_raw/olmoearth_haidian/patches_meta.json 的 320 patch (EPSG:32650, 1280m/128px)
+区域: /workspace/xuannv/data_raw/haidian/olmoearth/patches_meta.json 的 320 patch (EPSG:32650, 1280m/128px)
 时间: 2025-01-01 ~ 今天
 模态(全部 Planetary Computer):
   - s2       : sentinel-2-l2a   12 波段 [B02 B03 B04 B08 | B05 B06 B07 B8A B11 B12 | B01 B09]
@@ -11,7 +11,7 @@
   - landsat  : landsat-c2-l2    11 波段(OlmoEarth顺序 B8 B1..B11); L2 SR 仅 8 个可用,其余填0
   - worldcover: esa-worldcover    1 波段 (静态)
   - dem      : cop-dem-glo-30     1 波段 (静态, OlmoEarth 的 srtm)
-输出: /workspace/xuannv/data_raw/olmoearth_haidian/<模态>/patch_XXXXXX/<日期或static>.tif
+输出: /workspace/xuannv/data_raw/haidian/olmoearth/<模态>/patch_XXXXXX/<日期或static>.tif
 
 用法:
   conda run -n xuannv python scripts/distill/download_haidian_olmoearth.py --limit 2 --sources s2 s1
@@ -40,8 +40,8 @@ import rasterio
 from rasterio.transform import from_bounds
 from pyproj import Transformer
 
-PATCHES_META = "/workspace/xuannv/data_raw/olmoearth_haidian/patches_meta.json"
-OUT_ROOT     = Path("/workspace/xuannv/data_raw/olmoearth_haidian")
+PATCHES_META = "/workspace/xuannv/data_raw/haidian/olmoearth/patches_meta.json"
+OUT_ROOT     = Path("/workspace/xuannv/data_raw/haidian/olmoearth")
 CRS = "EPSG:32650"
 DATE_START = "2025-01-01"
 DATE_END   = date.today().isoformat()

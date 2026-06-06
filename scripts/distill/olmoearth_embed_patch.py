@@ -22,7 +22,7 @@ from olmoearth_pretrain.datatypes import MaskedOlmoEarthSample
 from olmoearth_pretrain.data.normalize import Normalizer, Strategy
 from olmoearth_pretrain.data.constants import Modality
 
-RAW = "/workspace/xuannv/data_raw/olmoearth_harbin"
+RAW = "/workspace/xuannv/data_raw/harbin/olmoearth"
 META = "/workspace/xuannv_show/data/harbin/patches_meta.json"
 # 时序模态: 取整年均匀采样 T 景
 TEMPORAL = ["s2", "s1", "landsat"]

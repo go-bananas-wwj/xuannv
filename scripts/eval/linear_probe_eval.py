@@ -55,8 +55,8 @@ TASKS = [
 ]
 
 DATA_ROOTS = [
-    Path("/workspace/xuannv/data_raw/harbin_scenes"),
-    Path("/workspace/xuannv/data_raw/haidian_train"),
+    Path("/workspace/xuannv/data_raw/harbin/scenes"),
+    Path("/workspace/xuannv/data_raw/haidian/scenes"),
 ]
 
 

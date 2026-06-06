@@ -506,7 +506,7 @@ class HarbinPatchDataset(Dataset):
         source_dir = self.data_root / source_name / patch_id
         if source_dir.exists():
             return source_dir
-        # 在 data_root 的直接子目录中搜索（兼容 harbin_scenes/harbin/s2/patch_*）
+        # 在 data_root 的直接子目录中搜索（兼容 harbin/scenes/s2/patch_*）
         for sub_dir in self.data_root.iterdir():
             if not sub_dir.is_dir():
                 continue

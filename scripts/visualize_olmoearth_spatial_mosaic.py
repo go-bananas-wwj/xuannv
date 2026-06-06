@@ -24,7 +24,7 @@ sys.path.insert(0, "/workspace/xuannv")
 REGIONS = {
     "haidian": {
         "tokens_root": "/workspace/xuannv/outputs/olmoearth_haidian",
-        "meta": "/workspace/xuannv/data_raw/olmoearth_haidian/patches_meta.json",
+        "meta": "/workspace/xuannv/data_raw/haidian/olmoearth/patches_meta.json",
         "n_patches": 320,
     },
     "harbin": {

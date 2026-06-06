@@ -10,8 +10,8 @@ experiment:
 
 data:
   dataset_type: harbin_patches
-  manifest_path: /workspace/xuannv/data_raw/haidian_train
-  stats_dir: /workspace/xuannv/statistics/haidian_train
+  manifest_path: /workspace/xuannv/data_raw/haidian/scenes
+  stats_dir: /workspace/xuannv/statistics/haidian
   batch_size: 4
   num_workers: 0
   image_size: 128

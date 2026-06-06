@@ -23,13 +23,13 @@ sys.path.insert(0, "/workspace/xuannv")
 REGIONS = {
     "harbin": {
         "bounds": [126.0, 45.0, 128.5, 46.5],
-        "patches_meta": "/workspace/xuannv/data_raw/olmoearth_harbin/patches_meta.json",
+        "patches_meta": "/workspace/xuannv/data_raw/harbin/olmoearth/patches_meta.json",
         "output_dir": "/workspace/xuannv/data_raw/aef_embeddings/harbin_2024_patches",
         "crs": "EPSG:32650",
     },
     "haidian": {
         "bounds": [116.0, 39.5, 116.5, 40.2],
-        "patches_meta": "/workspace/xuannv/data_raw/olmoearth_haidian/patches_meta.json",
+        "patches_meta": "/workspace/xuannv/data_raw/haidian/olmoearth/patches_meta.json",
         "output_dir": "/workspace/xuannv/data_raw/aef_embeddings/haidian_2024_patches",
         "crs": "EPSG:32650",
     },

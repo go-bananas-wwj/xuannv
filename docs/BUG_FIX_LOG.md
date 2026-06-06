@@ -75,7 +75,7 @@ if source_name == "jrc_water":
 | `src/data/dataset.py` `__getitem__` non-cache 分支 | jrc_water read_tif 后 `-128 → NaN`，normalize，`has_nan=True` → nearest resize |
 | `src/data/dataset.py` `_resize_to_target` | 新增 `has_nan` 参数，含 NaN 时用 nearest 避免扩散 |
 | `src/data/dataset.py` 顶层 `_preload_patch` | 同 `_preload_all` 处理 |
-| `statistics/harbin_scenes/jrc_water_stats.json` | 重新计算，排除 -128：mean=-32.76→27.20, std=75.53→30.07 |
+| `statistics/harbin/jrc_water_stats.json` | 重新计算，排除 -128：mean=-32.76→27.20, std=75.53→30.07 |
 
 ### 关键设计决策
 

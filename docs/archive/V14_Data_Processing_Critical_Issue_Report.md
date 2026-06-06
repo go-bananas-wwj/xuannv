@@ -229,7 +229,7 @@ python scripts/preprocessing/compute_statistics.py
 
 ```python
 import json
-with open("/workspace/statistics/harbin_scenes/s2_stats.json") as f:
+with open("/workspace/statistics/harbin/s2_stats.json") as f:
     stats = json.load(f)
 print(f"S2 Band 0: mean={stats['band_0']['mean']:.4f}, std={stats['band_0']['std']:.4f}")
 # 预期: mean≈0.82, std≈0.03 (log后的值)

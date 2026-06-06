@@ -32,7 +32,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-DEFAULT_DATA_ROOT = Path("/workspace/xuannv/data_raw/harbin_scenes")
+DEFAULT_DATA_ROOT = Path("/workspace/xuannv/data_raw/harbin/scenes")
 
 TASKS = [
     ("worldcover",   "worldcover",   "static.tif",  10),
@@ -239,7 +239,7 @@ def main():
     else:
         data_roots = [
             DEFAULT_DATA_ROOT,
-            Path("/workspace/xuannv/data_raw/haidian_train"),
+            Path("/workspace/xuannv/data_raw/haidian/scenes"),
         ]
     print(f"[KNN] 数据根目录: {data_roots}")
 

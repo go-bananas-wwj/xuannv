@@ -6,7 +6,7 @@ data:
   dataset_type: harbin_patches
   image_size: 128
   input_dim: 6
-  manifest_path: /workspace/xuannv/data_raw/harbin_scenes
+  manifest_path: /workspace/xuannv/data_raw/harbin/scenes
   max_frames: 32
   metadata_dim: 4
   num_classes: 11
@@ -21,7 +21,7 @@ data:
     s1: 2
     s2: 6
   spatial_augmentation: true
-  stats_dir: /workspace/xuannv/statistics/harbin_scenes
+  stats_dir: /workspace/xuannv/statistics/harbin
   target_sources:
   - loss_type: 0
     name: s2

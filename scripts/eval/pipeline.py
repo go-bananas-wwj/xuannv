@@ -472,8 +472,8 @@ def load_label_direct(patch_id, label_type):
     """直接读取标签文件."""
     if label_type == "worldcover":
         paths = [
-            f"/workspace/xuannv/data_raw/harbin_scenes_scenes/worldcover/{patch_id}/static.tif",
-            f"/workspace/xuannv/data_raw/harbin_scenes/worldcover/{patch_id}/static.tif",
+            f"/workspace/xuannv/data_raw/harbin/scenes/worldcover/{patch_id}/static.tif",
+            f"/workspace/xuannv/data_raw/harbin/scenes/worldcover/{patch_id}/static.tif",
         ]
         for path in paths:
             try:
@@ -490,7 +490,7 @@ def load_label_direct(patch_id, label_type):
 
     elif label_type == "dynamic_world":
         # Dynamic World 是时序数据，使用第一个可用季度文件作为静态标签
-        base = f"/workspace/xuannv/data_raw/harbin_scenes/dynamic_world/{patch_id}"
+        base = f"/workspace/xuannv/data_raw/harbin/scenes/dynamic_world/{patch_id}"
         try:
             files = sorted([f for f in os.listdir(base) if f.endswith('.tif')])
             if files:
@@ -507,8 +507,8 @@ def load_label_direct(patch_id, label_type):
 
     elif label_type == "jrc_water":
         paths = [
-            f"/workspace/xuannv/data_raw/harbin_scenes_scenes/jrc_water/{patch_id}/static.tif",
-            f"/workspace/xuannv/data_raw/harbin_scenes/jrc_water/{patch_id}/static.tif",
+            f"/workspace/xuannv/data_raw/harbin/scenes/jrc_water/{patch_id}/static.tif",
+            f"/workspace/xuannv/data_raw/harbin/scenes/jrc_water/{patch_id}/static.tif",
         ]
         for path in paths:
             try:
@@ -523,7 +523,7 @@ def load_label_direct(patch_id, label_type):
         return None
 
     elif label_type == "osm_buildings":
-        path = f"/workspace/xuannv/data_raw/harbin_scenes_scenes/osm_buildings/{patch_id}/static.tif"
+        path = f"/workspace/xuannv/data_raw/harbin/scenes/osm_buildings/{patch_id}/static.tif"
         try:
             with rasterio.open(path) as src:
                 data = src.read(1)

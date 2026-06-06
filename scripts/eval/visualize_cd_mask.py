@@ -64,7 +64,7 @@ def parse_args():
     p.add_argument("--period", default="all", choices=["june", "aug", "September", "October", "all"])
     p.add_argument("--annot-dir", default="/workspace/哈尔滨松北新区变化检测汇总文件/变化检测shp文件")
     p.add_argument("--grid", default="/workspace/index/harbin/grid/harbin_grid.geojson")
-    p.add_argument("--s2-root", default="/workspace/xuannv/data_raw/harbin_scenes/s2")
+    p.add_argument("--s2-root", default="/workspace/xuannv/data_raw/harbin/scenes/s2")
     p.add_argument("--output-dir", default="evaluation/results/cd_viz")
     p.add_argument("--max-patches", type=int, default=20, help="最多可视化 patch 数量")
     p.add_argument("--dpi", type=int, default=150)

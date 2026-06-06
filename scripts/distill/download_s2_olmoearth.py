@@ -42,8 +42,8 @@ sys.path.insert(0, str(_REPO))
 # OlmoEarth SENTINEL2_L2A 波段顺序（PC 资产名）
 OLMO_S2_BANDS = ["B02","B03","B04","B08","B05","B06","B07","B8A","B11","B12","B01","B09"]
 
-PATCHES_META = "/workspace/xuannv/data_raw/harbin_scenes_scenes/patches_meta.json"
-EXIST_S2_DIR = Path("/workspace/xuannv/data_raw/harbin_scenes/s2")
+PATCHES_META = "/workspace/xuannv/data_raw/harbin/scenes/patches_meta.json"
+EXIST_S2_DIR = Path("/workspace/xuannv/data_raw/harbin/scenes/s2")
 OUT_DIR      = Path("/workspace/xuannv/data_raw/phase1_harbin/harbin_olmoearth/s2")
 CRS = "EPSG:32652"
 RES = 10

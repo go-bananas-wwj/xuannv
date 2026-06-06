@@ -8,7 +8,7 @@ S2 云筛选预处理脚本
 4. 将筛选后的帧复制到新目录，保持原有结构
 
 输出:
-  /workspace/xuannv/data_raw/harbin_scenes_scenes/harbin_scenes_cloud_filtered/s2/patch_xxxx/YYYYMMDD.tif
+  /workspace/xuannv/data_raw/harbin/scenes/s2_cloud_filtered/patch_xxxx/YYYYMMDD.tif
 """
 import sys
 sys.path.insert(0, "/workspace/xuannv")
@@ -104,8 +104,8 @@ def process_patch(args):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--src", default="/workspace/xuannv/data_raw/harbin_scenes_scenes/harbin_scenes/s2")
-    parser.add_argument("--out", default="/workspace/xuannv/data_raw/harbin_scenes_scenes/harbin_scenes_cloud_filtered/s2")
+    parser.add_argument("--src", default="/workspace/xuannv/data_raw/harbin/scenes/s2")
+    parser.add_argument("--out", default="/workspace/xuannv/data_raw/harbin/scenes/s2_cloud_filtered")
     parser.add_argument("--max-per-month", type=int, default=1, help="每月最多保留几张")
     parser.add_argument("--cloud-threshold", type=float, default=0.3, help="cloud_score 阈值，高于此认为 cloudy")
     parser.add_argument("--workers", type=int, default=16)

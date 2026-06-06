@@ -18,7 +18,7 @@ from olmoearth_pretrain.datatypes import MaskedOlmoEarthSample
 from olmoearth_pretrain.data.normalize import Normalizer, Strategy
 from olmoearth_pretrain.data.constants import Modality
 
-RAW   = "/workspace/xuannv/data_raw/olmoearth_harbin"
+RAW   = "/workspace/xuannv/data_raw/harbin/olmoearth"
 META  = "/workspace/xuannv_show/data/harbin/patches_meta.json"
 OUT   = "/workspace/xuannv/outputs/olmoearth_harbin/june"
 MOD2OE = {"s2": Modality.SENTINEL2_L2A, "s1": Modality.SENTINEL1,

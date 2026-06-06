@@ -21,8 +21,8 @@ data:
   # ★ 指向 haidian_train 根目录（不是 /haidian 子目录），
   #   这样 dataset.py 能在直接子目录找到 tianyi_sar/，
   #   同时通过一层嵌套搜索找到 haidian/s2/, haidian/s1/ 等
-  manifest_path: /workspace/xuannv/data_raw/haidian_train
-  stats_dir: /workspace/xuannv/statistics/haidian_train
+  manifest_path: /workspace/xuannv/data_raw/haidian/scenes
+  stats_dir: /workspace/xuannv/statistics/haidian
   batch_size: 2
   num_workers: 0
   image_size: 128

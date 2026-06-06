@@ -18,8 +18,8 @@ from olmoearth_pretrain.datatypes import MaskedOlmoEarthSample
 from olmoearth_pretrain.data.normalize import Normalizer, Strategy
 from olmoearth_pretrain.data.constants import Modality
 
-RAW  = "/workspace/xuannv/data_raw/olmoearth_haidian"
-META = "/workspace/xuannv/data_raw/olmoearth_haidian/patches_meta.json"
+RAW  = "/workspace/xuannv/data_raw/haidian/olmoearth"
+META = "/workspace/xuannv/data_raw/haidian/olmoearth/patches_meta.json"
 OUT  = "/workspace/xuannv/outputs/olmoearth_haidian"
 computed   = Normalizer(Strategy.COMPUTED)
 predefined = Normalizer(Strategy.PREDEFINED)

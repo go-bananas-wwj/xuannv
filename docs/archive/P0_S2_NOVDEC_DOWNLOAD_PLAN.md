@@ -165,7 +165,7 @@ python scripts/preprocessing/filter_cloudy_frames.py \
 ```bash
 python scripts/preprocessing/compute_statistics.py \
     --data-dir /workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered \
-    --output-dir /workspace/statistics/harbin_scenes \
+    --output-dir /workspace/statistics/harbin \
     --sources s2
 ```
 

@@ -73,7 +73,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 
 EVAL_DIR = Path("/workspace/xuannv/outputs/exp_v2_D_7target_7card_100ep_0521/evaluation")
-DATA_ROOT = Path("/workspace/xuannv/data_raw/harbin_scenes")
+DATA_ROOT = Path("/workspace/xuannv/data_raw/harbin/scenes")
 
 # 加载 embedding
 print("[KNN] 加载 embedding...")
