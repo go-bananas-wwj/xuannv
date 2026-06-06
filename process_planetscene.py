@@ -69,12 +69,12 @@ def process_patch_date(
     target_res: float | None = None,
 ) -> bool:
     """处理单个 patch 单个日期: 拼接瓦片并裁剪."""
+    if not tiles:
+        return False
+
     patch_id = f"patch_{patch['id']:06d}"
     patch_bounds = patch["utm_bounds"]  # [left, bottom, right, top]
     date_str = tiles[0]["date_str"]
-
-    if not tiles:
-        return False
 
     # 打开所有瓦片
     datasets = []
@@ -88,15 +88,23 @@ def process_patch_date(
     if not datasets:
         return False
 
+    # 自定义 merge 方法：重叠区域取均值，减少不同卫星辐射差异
+    def mean_merge(merged_data, new_data, merged_mask, new_mask, index, **kw):
+        valid_new = ~new_mask
+        valid_merged = ~merged_mask
+        overlap = valid_new & valid_merged
+        # 重叠区域取平均
+        merged_data[overlap] = (merged_data[overlap] + new_data[overlap]) / 2.0
+        # 新区域直接复制
+        merged_data[valid_new & ~overlap] = new_data[valid_new & ~overlap]
+
     # 拼接覆盖 patch 区域的镶嵌图
-    # 先计算 patch 区域的 window
     try:
-        # merge 所有瓦片（内存友好的小块）
-        # 为了节省内存，我们只 merge 覆盖 patch bounds 的区域
         mosaic, mosaic_transform = merge(
             datasets,
             bounds=tuple(patch_bounds),
-            resampling=rasterio.enums.Resampling.nearest,
+            resampling=rasterio.enums.Resampling.bilinear,
+            method=mean_merge,
         )
     except Exception as e:
         print(f"  拼接失败: {e}")
@@ -183,8 +191,16 @@ def visualize_patch(patch_dir: Path, out_png: Path) -> None:
             rgb = src.read([3, 2, 1])  # PlanetScope: B, G, R, NIR -> 取 R, G, B (bands 3,2,1?)
             # PlanetScope 波段: 1=Blue, 2=Green, 3=Red, 4=NIR
             # 所以 RGB = bands 3, 2, 1
-            rgb = np.clip(rgb / np.percentile(rgb, 98) * 255, 0, 255).astype(np.uint8)
-            rgb = np.transpose(rgb, (1, 2, 0))
+            # 逐波段计算 2%-98% percentile 拉伸
+            stretched = np.empty_like(rgb, dtype=np.uint8)
+            for i in range(3):
+                band = rgb[i].astype(np.float32)
+                p2 = np.percentile(band, 2)
+                p98 = np.percentile(band, 98)
+                if p98 <= p2:
+                    p98 = p2 + 1
+                stretched[i] = np.clip((band - p2) / (p98 - p2) * 255, 0, 255).astype(np.uint8)
+            rgb = np.transpose(stretched, (1, 2, 0))
             ax.imshow(rgb)
             ax.set_title(tif_path.stem)
             ax.axis("off")
