@@ -7,11 +7,11 @@
 
 用法示例:
     # PyTorch + NPU
-    python knn_eval.py --embedding-file patch_embeddings.npz --output-dir eval_results/ \
+    python knn_eval.py --embedding-file patch_embeddings.npz --output-dir evaluation/results/ \
         --device npu:0 --backend pytorch
 
     # sklearn CPU
-    python knn_eval.py --embedding-file patch_embeddings.npz --output-dir eval_results/ \
+    python knn_eval.py --embedding-file patch_embeddings.npz --output-dir evaluation/results/ \
         --device cpu --backend sklearn
 """
 from __future__ import annotations

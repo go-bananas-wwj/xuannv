@@ -4,8 +4,8 @@
 核心改进: 将变化 mask 叠加到 S2 RGB 原图上，可直观验证对齐精度.
 
 用法:
-    python visualize_cd_mask.py --period june --output-dir eval_results/cd_viz
-    python visualize_cd_mask.py --period all --output-dir eval_results/cd_viz
+    python visualize_cd_mask.py --period june --output-dir evaluation/results/cd_viz
+    python visualize_cd_mask.py --period all --output-dir evaluation/results/cd_viz
 """
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ def parse_args():
     p.add_argument("--annot-dir", default="/workspace/哈尔滨松北新区变化检测汇总文件/变化检测shp文件")
     p.add_argument("--grid", default="/workspace/index/harbin/grid/harbin_grid.geojson")
     p.add_argument("--s2-root", default="/workspace/xuannv/data_raw/harbin_scenes/s2")
-    p.add_argument("--output-dir", default="eval_results/cd_viz")
+    p.add_argument("--output-dir", default="evaluation/results/cd_viz")
     p.add_argument("--max-patches", type=int, default=20, help="最多可视化 patch 数量")
     p.add_argument("--dpi", type=int, default=150)
     return p.parse_args()

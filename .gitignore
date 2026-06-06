@@ -16,7 +16,6 @@ build/
 # Data / Outputs
 /workspace/outputs/
 outputs/
-/data/
 !/src/data/
 *.npy
 *.tif
@@ -26,9 +25,10 @@ outputs/
 data_raw/
 statistics/
 outputs/
-eval_data/
-eval_results/
+evaluation/data/
+evaluation/results/
 logs/
+cache/
 
 # IDE
 .vscode/
