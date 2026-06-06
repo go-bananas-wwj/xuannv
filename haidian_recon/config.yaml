@@ -14,7 +14,7 @@ model:
   mlp_ratio: 4.0
   output_dim: 64
   dropout: 0.1
-  use_gradient_checkpointing: true
+  use_gradient_checkpointing: false
 
 masking:
   modality_probs: [0.1, 0.25, 0.25, 0.4]
