@@ -264,7 +264,9 @@ def main():
                     for x in range(W):
                         px = minx + (x + 0.5) / W * (maxx - minx)
                         py = maxy - (y + 0.5) / H * (maxy - miny)
-                        if geom.contains(box(px, py, px, py)):
+                        # 使用 Point + buffer(1m) 避免边界问题，比零面积 box 更稳健
+                        from shapely.geometry import Point
+                        if geom.buffer(1.0).contains(Point(px, py)):
                             changed_mask[y, x] = True
 
             dist_map = 1.0 - np.sum(eb * ea, axis=0)  # cosine distance [H, W]
