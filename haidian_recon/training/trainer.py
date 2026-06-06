@@ -47,7 +47,7 @@ class HRETrainer:
         ).to(self.device)
 
         if world_size > 1:
-            self.model = DDP(self.model, device_ids=[local_rank], find_unused_parameters=False)
+            self.model = DDP(self.model, device_ids=[local_rank], find_unused_parameters=True)
 
         # Masking
         self.masking = FourLayerMask(
