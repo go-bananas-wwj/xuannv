@@ -23,14 +23,14 @@ sys.path.insert(0, "/workspace/xuannv")
 REGIONS = {
     "harbin": {
         "bounds": [126.0, 45.0, 128.5, 46.5],
-        "patches_meta": "/workspace/raw/harbin_newarea_olmoearth/patches_meta.json",
-        "output_dir": "/workspace/raw/aef_embeddings/harbin_2024_patches",
+        "patches_meta": "/workspace/xuannv/data_raw/olmoearth_harbin/patches_meta.json",
+        "output_dir": "/workspace/xuannv/data_raw/aef_embeddings/harbin_2024_patches",
         "crs": "EPSG:32650",
     },
     "haidian": {
         "bounds": [116.0, 39.5, 116.5, 40.2],
-        "patches_meta": "/workspace/raw/haidian_olmoearth/patches_meta.json",
-        "output_dir": "/workspace/raw/aef_embeddings/haidian_2024_patches",
+        "patches_meta": "/workspace/xuannv/data_raw/olmoearth_haidian/patches_meta.json",
+        "output_dir": "/workspace/xuannv/data_raw/aef_embeddings/haidian_2024_patches",
         "crs": "EPSG:32650",
     },
 }
@@ -133,7 +133,7 @@ def main():
     region = REGIONS[args.region]
     
     if args.action in ("download", "both"):
-        output_tif = Path(f"/workspace/raw/aef_embeddings/aef_{args.region}_{args.year}.tif")
+        output_tif = Path(f"/workspace/xuannv/data_raw/aef_embeddings/aef_{args.region}_{args.year}.tif")
         output_tif.parent.mkdir(parents=True, exist_ok=True)
         download_aef_gee(args.region, args.year, output_tif)
         print("\n[下一步] 请从 Google Drive 下载文件后运行:")
@@ -141,7 +141,7 @@ def main():
     
     if args.action in ("crop", "both"):
         if args.aef_tif is None:
-            args.aef_tif = Path(f"/workspace/raw/aef_embeddings/aef_{args.region}_{args.year}.tif")
+            args.aef_tif = Path(f"/workspace/xuannv/data_raw/aef_embeddings/aef_{args.region}_{args.year}.tif")
         if not args.aef_tif.exists():
             print(f"[错误] 找不到 AEF 文件: {args.aef_tif}")
             print("[提示] 先运行 --action download 获取文件")

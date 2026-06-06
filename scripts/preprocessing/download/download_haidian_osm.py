@@ -2,7 +2,7 @@
 """下载海淀区OSM数据"""
 import os
 
-OUTPUT_DIR = "/workspace/raw/haidian/osm"
+OUTPUT_DIR = "/workspace/xuannv/data_raw/haidian/osm"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 BBOX = (116.05, 39.88, 116.38, 40.15)  # left, bottom, right, top

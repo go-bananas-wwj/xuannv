@@ -19,8 +19,8 @@ def load_auc(experiment_dir):
 
 def main():
     experiments = {
-        "v14 (broken)": "/workspace/outputs/exp_v14_anti_collapse_0605",
-        "v15 (fix)": "/workspace/outputs/exp_v15_fixed_temporal_0606",
+        "v14 (broken)": "/workspace/xuannv/outputs/exp_v14_anti_collapse_0605",
+        "v15 (fix)": "/workspace/xuannv/outputs/exp_v15_fixed_temporal_0606",
     }
     
     print("=" * 60)

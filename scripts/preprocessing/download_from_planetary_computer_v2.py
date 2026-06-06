@@ -17,8 +17,8 @@ Planetary Computer 批量下载脚本 v2（优化版）
 
 用法:
     python download_from_planetary_computer_v2.py \
-        --patches /workspace/raw/national_china/patches_meta.json \
-        --output /workspace/raw/national_china \
+        --patches /workspace/xuannv/data_raw/national_china/patches_meta.json \
+        --output /workspace/xuannv/data_raw/national_china \
         --sources s2 --workers 16 \
         --date-start 2025-01-01 --date-end 2026-06-01
 """

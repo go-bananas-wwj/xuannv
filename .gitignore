@@ -22,6 +22,14 @@ outputs/
 *.tif
 *.tiff
 
+# Large data directories (migrated from /workspace/raw/, /workspace/outputs/, /workspace/statistics/)
+data_raw/
+statistics/
+outputs/
+eval_data/
+eval_results/
+logs/
+
 # IDE
 .vscode/
 .idea/

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """多时相全局嵌入提取 — 用于变化检测 AUC 评估。
 对 4 / 6 / 8 / 9 / 10 月各选最近一景，提取 project_and_aggregate 全局 768D 向量。
-输出: /workspace/outputs/olmoearth_harbin/{MM}/emb_all.npz  (424, 768)
+输出: /workspace/xuannv/outputs/olmoearth_harbin/{MM}/emb_all.npz  (424, 768)
 """
 from __future__ import annotations
 import sys, os, glob, json, argparse
@@ -18,9 +18,9 @@ from olmoearth_pretrain.datatypes import MaskedOlmoEarthSample
 from olmoearth_pretrain.data.normalize import Normalizer, Strategy
 from olmoearth_pretrain.data.constants import Modality
 
-RAW  = "/workspace/raw/harbin_newarea_olmoearth"
+RAW  = "/workspace/xuannv/data_raw/olmoearth_harbin"
 META = "/workspace/xuannv_show/data/harbin/patches_meta.json"
-OUT  = "/workspace/outputs/olmoearth_harbin"
+OUT  = "/workspace/xuannv/outputs/olmoearth_harbin"
 computed   = Normalizer(Strategy.COMPUTED)
 predefined = Normalizer(Strategy.PREDEFINED)
 H = 128

@@ -7,11 +7,11 @@
 
 用法示例:
     # PyTorch + NPU
-    python knn_eval.py --embedding-file patch_embeddings.npz --output-dir out/ \
+    python knn_eval.py --embedding-file patch_embeddings.npz --output-dir eval_results/ \
         --device npu:0 --backend pytorch
 
     # sklearn CPU
-    python knn_eval.py --embedding-file patch_embeddings.npz --output-dir out/ \
+    python knn_eval.py --embedding-file patch_embeddings.npz --output-dir eval_results/ \
         --device cpu --backend sklearn
 """
 from __future__ import annotations
@@ -32,7 +32,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-DEFAULT_DATA_ROOT = Path("/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered")
+DEFAULT_DATA_ROOT = Path("/workspace/xuannv/data_raw/harbin_scenes")
 
 TASKS = [
     ("worldcover",   "worldcover",   "static.tif",  10),
@@ -239,7 +239,7 @@ def main():
     else:
         data_roots = [
             DEFAULT_DATA_ROOT,
-            Path("/workspace/raw/haidian_train/haidian"),
+            Path("/workspace/xuannv/data_raw/haidian_train"),
         ]
     print(f"[KNN] 数据根目录: {data_roots}")
 

@@ -1,6 +1,6 @@
 import re
 
-log_path = '/workspace/outputs/exp_dual_teacher_v3/train_20260604_160818.log'
+log_path = '/workspace/xuannv/outputs/exp_dual_teacher_v3/train_20260604_160818.log'
 pattern = r'\[(\d{2}:\d{2}:\d{2})\] Epoch (\d{3})/\d+ \| total=([\-\d.]+) recon=([\-\d.]+) cls=([\-\d.]+) var=([\-\d.]+) cov=([\-\d.]+) l2unif=([\-\d.]+) erank=([\-\d.]+) aef=\[sp=([\-\d.]+),gl=([\-\d.]+)\] olmo=\[sp=([\-\d.]+),gl=([\-\d.]+)\] lr=([\-\d.]+)'
 
 evals = []

@@ -3,7 +3,7 @@
 
 用法:
     python download_osm_chunks.py --grid /workspace/index/harbin/grid/harbin_grid.geojson \
-        --output-dir /workspace/raw/osm_labels_harbin --classes building,road,water --chunks 4
+        --output-dir /workspace/xuannv/data_raw/osm_labels --classes building,road,water --chunks 4
 """
 from __future__ import annotations
 

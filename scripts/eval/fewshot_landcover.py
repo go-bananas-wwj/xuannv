@@ -34,7 +34,7 @@ def find_experiment_files(exp_id: int):
         raise ValueError(f"Config not found for exp{exp_id}")
     config_path = config_candidates[0]
 
-    dirs = glob.glob(f"/workspace/outputs/round7_exp{exp_id}_*")
+    dirs = glob.glob(f"/workspace/xuannv/outputs/round7_exp{exp_id}_*")
     if not dirs:
         raise ValueError(f"Output dir not found for exp{exp_id}")
     exp_dir = dirs[0]
@@ -384,7 +384,7 @@ def main():
     }
 
     if args.output is None:
-        args.output = f"/workspace/outputs/round7_downstream_eval/exp{args.experiment}_landcover_fewshot.json"
+        args.output = f"/workspace/xuannv/outputs/round7_downstream_eval/exp{args.experiment}_landcover_fewshot.json"
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     with open(args.output, "w") as f:
         json.dump(output_data, f, indent=2, ensure_ascii=False)

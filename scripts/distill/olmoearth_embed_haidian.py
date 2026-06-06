@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """海淀区多时相全局嵌入提取 — 用于蒸馏训练。
 对 4 / 6 / 8 / 9 / 10 月各选最近一景，提取 project_and_aggregate 全局 768D 向量。
-输出: /workspace/outputs/olmoearth_haidian/{MM}/emb_all.npz  (320, 768)
+输出: /workspace/xuannv/outputs/olmoearth_haidian/{MM}/emb_all.npz  (320, 768)
 """
 from __future__ import annotations
 import sys, os, glob, json, argparse
@@ -18,9 +18,9 @@ from olmoearth_pretrain.datatypes import MaskedOlmoEarthSample
 from olmoearth_pretrain.data.normalize import Normalizer, Strategy
 from olmoearth_pretrain.data.constants import Modality
 
-RAW  = "/workspace/raw/haidian_olmoearth"
-META = "/workspace/raw/haidian_olmoearth/patches_meta.json"
-OUT  = "/workspace/outputs/olmoearth_haidian"
+RAW  = "/workspace/xuannv/data_raw/olmoearth_haidian"
+META = "/workspace/xuannv/data_raw/olmoearth_haidian/patches_meta.json"
+OUT  = "/workspace/xuannv/outputs/olmoearth_haidian"
 computed   = Normalizer(Strategy.COMPUTED)
 predefined = Normalizer(Strategy.PREDEFINED)
 H = 128

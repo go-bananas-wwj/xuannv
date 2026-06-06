@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 GRID_PATH = Path("/workspace/index/harbin/grid/harbin_grid.geojson")
-PRED_DIR = Path("/workspace/outputs/aef_qwen_v2/patch_predictions")
-OUTPUT_DIR = Path("/workspace/outputs/aef_qwen_v2/visualization/06_regional_change_maps")
+PRED_DIR = Path("/workspace/xuannv/outputs/aef_qwen_v2/patch_predictions")
+OUTPUT_DIR = Path("/workspace/xuannv/outputs/aef_qwen_v2/visualization/06_regional_change_maps")
 
 PERIODS = [
     "2025-04~2025-06",

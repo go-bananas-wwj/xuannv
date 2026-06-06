@@ -505,7 +505,7 @@ def download_worldcover_for_patch(
 def main():
     parser = argparse.ArgumentParser(description="下载黑龙江省城市遥感数据")
     parser.add_argument("--city", required=True, choices=list(CITIES.keys()), help="目标城市")
-    parser.add_argument("--output-root", default="/workspace/raw/heilongjiang_new", help="输出根目录")
+    parser.add_argument("--output-root", default="/workspace/xuannv/data_raw/heilongjiang_new", help="输出根目录")
     parser.add_argument("--max-patches", type=int, default=0, help="最大 patch 数量（0=全部）")
     parser.add_argument("--workers", type=int, default=4, help="并行下载数")
     parser.add_argument("--sources", nargs="+", default=["s2", "s1", "landsat", "dem", "worldcover"],

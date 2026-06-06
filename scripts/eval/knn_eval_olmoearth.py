@@ -104,9 +104,9 @@ def evaluate_knn(embeddings: dict, labels: dict, mapping=None, k=5, sample_pixel
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--embedding", default="/workspace/outputs/olmoearth_harbin/eval/olmoearth_harbin_emb32.npz")
-    p.add_argument("--data-root", default="/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered")
-    p.add_argument("--output",    default="/workspace/outputs/olmoearth_harbin/eval/knn_olmoearth.json")
+    p.add_argument("--embedding", default="/workspace/xuannv/outputs/olmoearth_harbin/eval/olmoearth_harbin_emb32.npz")
+    p.add_argument("--data-root", default="/workspace/xuannv/data_raw/harbin_scenes")
+    p.add_argument("--output",    default="/workspace/xuannv/outputs/olmoearth_harbin/eval/knn_olmoearth.json")
     p.add_argument("--k",         type=int, default=5)
     p.add_argument("--sample",    type=int, default=10000)
     args = p.parse_args()

@@ -15,7 +15,7 @@ from pathlib import Path
 
 # ─────────────────────── 配置区 ───────────────────────
 BASE_PATH   = "/海淀区sar/玄女底座"
-LOCAL_DEST  = "/workspace/raw/haidian_sar"
+LOCAL_DEST  = "/workspace/xuannv/data_raw/haidian_sar"
 LOG_FILE    = f"{LOCAL_DEST}/watchdog.log"
 THREADS     = 10
 STALL_TIMEOUT = 600   # 10分钟无进度判定卡死

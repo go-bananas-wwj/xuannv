@@ -36,7 +36,7 @@ preprocessing/run.py — 数据预处理统一入口
     1. GEE 需提前设置环境变量 GEE_CREDENTIALS_PATH + GEE_SERVICE_ACCOUNT
        或运行 earthengine authenticate
     2. Planetary Computer 需设置 PC_SDK_SUBSCRIPTION_KEY（可免费申请）
-    3. 本脚本只修改 /workspace/raw/ 和 /workspace/statistics/，不影响训练代码
+    3. 本脚本只修改 /workspace/xuannv/data_raw/ 和 /workspace/xuannv/statistics/，不影响训练代码
 """
 from __future__ import annotations
 

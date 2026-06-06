@@ -61,9 +61,9 @@
     "_total_patches_approx": 2700,
     "_note": "合并全部4个SAR点位覆盖范围，门头沟~朝阳~海淀~丰台"
   },
-  "output_dir": "/workspace/raw/phase2_haidian/haidian_scenes",
-  "cloud_filtered_dir": "/workspace/raw/phase2_haidian/haidian_scenes_cloud_filtered",
-  "statistics_dir": "/workspace/statistics/haidian_scenes",
+  "output_dir": "/workspace/xuannv/data_raw/phase2_haidian/haidian_scenes",
+  "cloud_filtered_dir": "/workspace/xuannv/data_raw/phase2_haidian/haidian_scenes_cloud_filtered",
+  "statistics_dir": "/workspace/xuannv/statistics/haidian_scenes",
   "sources": {
     "s2": {
       "enabled": true,
@@ -156,7 +156,7 @@
         "input",
         "reconstruction_target"
       ],
-      "local_raw_dir": "/workspace/raw/haidian_sar",
+      "local_raw_dir": "/workspace/xuannv/data_raw/haidian_sar",
       "local_format": "sar_slc_zip",
       "product_types": [
         "SLC",

@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 
 REGIONS = {
-    "haidian": "/workspace/outputs/olmoearth_haidian",
-    "harbin": "/workspace/outputs/olmoearth_harbin",
+    "haidian": "/workspace/xuannv/outputs/olmoearth_haidian",
+    "harbin": "/workspace/xuannv/outputs/olmoearth_harbin",
 }
 
 
@@ -86,22 +86,22 @@ def visualize_two_months(region: str, month_a: str, month_b: str, out_path: str)
 
 
 if __name__ == "__main__":
-    os.makedirs("/workspace/outputs/olmoearth_viz", exist_ok=True)
+    os.makedirs("/workspace/xuannv/outputs/olmoearth_viz", exist_ok=True)
 
     # Haidian: 01 (冬季) vs 07 (夏季) — 应该有显著季节差异
     visualize_two_months(
         "haidian", "01", "07",
-        "/workspace/outputs/olmoearth_viz/haidian_01_vs_07.png"
+        "/workspace/xuannv/outputs/olmoearth_viz/haidian_01_vs_07.png"
     )
 
     # Harbin: 01 (冬季) vs 07 (夏季) — 应该有显著季节差异
     visualize_two_months(
         "harbin", "01", "07",
-        "/workspace/outputs/olmoearth_viz/harbin_01_vs_07.png"
+        "/workspace/xuannv/outputs/olmoearth_viz/harbin_01_vs_07.png"
     )
 
     # Haidian: 2025-04 vs 2026-04 — 跨年同月对比
     visualize_two_months(
         "haidian", "04", "2026/04",
-        "/workspace/outputs/olmoearth_viz/haidian_2025_vs_2026_apr.png"
+        "/workspace/xuannv/outputs/olmoearth_viz/haidian_2025_vs_2026_apr.png"
     )

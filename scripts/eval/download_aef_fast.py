@@ -216,9 +216,9 @@ def process_region(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--haidian-meta", default="/workspace/xuannv/patches_meta.json")
-    parser.add_argument("--harbin-meta", default="/workspace/raw/harbin_scenes/patches_meta.json")
+    parser.add_argument("--harbin-meta", default="/workspace/xuannv/data_raw/harbin_scenes_scenes/patches_meta.json")
     parser.add_argument("--index", default="/tmp/aef_index.parquet")
-    parser.add_argument("--output-dir", default="/workspace/outputs/aef_official_embeddings")
+    parser.add_argument("--output-dir", default="/workspace/xuannv/outputs/aef_official_embeddings")
     parser.add_argument("--year", type=int, default=2025)
     parser.add_argument("--haidian-only", action="store_true")
     parser.add_argument("--harbin-only", action="store_true")

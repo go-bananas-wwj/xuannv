@@ -11,7 +11,7 @@
     python generate_national_patches.py \
         --n-patches 5000 \
         --patch-size-m 1280 \
-        --output /workspace/raw/national_china/patches_meta.json
+        --output /workspace/xuannv/data_raw/national_china/patches_meta.json
 """
 from __future__ import annotations
 

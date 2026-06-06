@@ -9,9 +9,9 @@
 
     # 自定义数据目录
     python scripts/preprocessing/compute_statistics.py \
-        --data-root /workspace/raw/phase2_heilongjiang/daqing \
+        --data-root /workspace/xuannv/data_raw/phase2_heilongjiang/daqing \
         --s2-dir s2_cloud_filtered \
-        --output-dir /workspace/statistics/daqing \
+        --output-dir /workspace/xuannv/statistics/daqing \
         --workers 16
 """
 from __future__ import annotations
@@ -98,11 +98,11 @@ def compute_source_stats(data_root: Path, source_name: str, s2_dir: str,
 
 def main():
     pa = argparse.ArgumentParser(description="计算数据源通道统计量")
-    pa.add_argument("--data-root",    default="/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered",
+    pa.add_argument("--data-root",    default="/workspace/xuannv/data_raw/harbin_scenes",
                     help="数据根目录")
     pa.add_argument("--s2-dir",       default="s2",
                     help="S2 子目录名（云筛选后可能是 s2_cloud_filtered）")
-    pa.add_argument("--output-dir",   default="/workspace/statistics/harbin_scenes",
+    pa.add_argument("--output-dir",   default="/workspace/xuannv/statistics/harbin_scenes",
                     help="统计量 JSON 输出目录")
     pa.add_argument("--max-patches",  type=int, default=50,
                     help="每源最多采样多少个 patch（统计量对样本数不敏感）")

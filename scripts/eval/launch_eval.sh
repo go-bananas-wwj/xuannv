@@ -13,11 +13,11 @@
 # 示例:
 #   # 完整评估
 #   bash scripts/eval/launch_eval.sh \
-#     --checkpoint /workspace/outputs/exp_v13_0601/epoch_40.pt
+#     --checkpoint /workspace/xuannv/outputs/exp_v13_0601/epoch_40.pt
 #
 #   # 仅 AUC（已有 embedding）
 #   bash scripts/eval/launch_eval.sh \
-#     --checkpoint /workspace/outputs/exp_v13_0601/epoch_40.pt \
+#     --checkpoint /workspace/xuannv/outputs/exp_v13_0601/epoch_40.pt \
 #     --mode auc --skip-extract
 
 set -euo pipefail

@@ -15,9 +15,9 @@ from olmoearth_pretrain.datatypes import MaskedOlmoEarthSample
 from olmoearth_pretrain.data.normalize import Normalizer, Strategy
 from olmoearth_pretrain.data.constants import Modality
 
-RAW  = "/workspace/raw/harbin_newarea_olmoearth"
+RAW  = "/workspace/xuannv/data_raw/olmoearth_harbin"
 META = "/workspace/xuannv_show/data/harbin/patches_meta.json"
-OUT  = "/workspace/outputs/olmoearth_harbin/june"
+OUT  = "/workspace/xuannv/outputs/olmoearth_harbin/june"
 computed   = Normalizer(Strategy.COMPUTED)
 predefined = Normalizer(Strategy.PREDEFINED)
 H = 128   # 输入尺寸 (=patch_size*32)

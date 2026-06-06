@@ -68,7 +68,7 @@ def check_log(log_file: Path):
         return 0
 
 if __name__ == "__main__":
-    log_dir = Path("/workspace/outputs/exp_v14_anti_collapse_0605")
+    log_dir = Path("/workspace/xuannv/outputs/exp_v14_anti_collapse_0605")
     if not log_dir.exists():
         print(f"[ERROR] Output directory not found: {log_dir}")
         sys.exit(1)

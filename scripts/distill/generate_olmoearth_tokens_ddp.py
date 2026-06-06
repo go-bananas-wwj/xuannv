@@ -59,15 +59,15 @@ import rasterio
 # ---------------------------------------------------------------------------
 REGIONS = {
     "haidian": {
-        "raw": "/workspace/raw/haidian_olmoearth",
-        "meta": "/workspace/raw/haidian_olmoearth/patches_meta.json",
-        "out": "/workspace/outputs/olmoearth_haidian",
+        "raw": "/workspace/xuannv/data_raw/olmoearth_haidian",
+        "meta": "/workspace/xuannv/data_raw/olmoearth_haidian/patches_meta.json",
+        "out": "/workspace/xuannv/outputs/olmoearth_haidian",
         "meta_is_list": True,
     },
     "harbin": {
-        "raw": "/workspace/raw/harbin_newarea_olmoearth",
+        "raw": "/workspace/xuannv/data_raw/olmoearth_harbin",
         "meta": "/workspace/xuannv_show/data/harbin/patches_meta.json",
-        "out": "/workspace/outputs/olmoearth_harbin",
+        "out": "/workspace/xuannv/outputs/olmoearth_harbin",
         "meta_is_list": True,
     },
 }

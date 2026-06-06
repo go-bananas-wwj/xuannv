@@ -4,7 +4,7 @@ import os
 import requests
 from tqdm import tqdm
 
-OUTPUT_DIR = "/workspace/raw/haidian/dem"
+OUTPUT_DIR = "/workspace/xuannv/data_raw/haidian/dem"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Copernicus DEM 30m via AWS Open Data

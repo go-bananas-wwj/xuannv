@@ -15,7 +15,7 @@
     python scripts/preprocessing/download_watchdog.py
 
     # 后台运行
-nohup python scripts/preprocessing/download_watchdog.py > /workspace/raw/national_china/watchdog.log 2>&1 &
+nohup python scripts/preprocessing/download_watchdog.py > /workspace/xuannv/data_raw/national_china/watchdog.log 2>&1 &
 
 监控指标:
     - 日志更新时间: 超过 15 分钟无更新 → 触发重启
@@ -42,7 +42,7 @@ STALL_THRESHOLD_MIN = 15      # 超过 N 分钟无进度视为卡死
 RESTART_COOLDOWN_MIN = 3      # 重启后冷却时间（分钟），避免频繁重启
 REPORT_INTERVAL_MIN = 10      # 进度报告间隔（分钟）
 
-NATIONAL_ROOT = Path("/workspace/raw/national_china")
+NATIONAL_ROOT = Path("/workspace/xuannv/data_raw/national_china")
 SESSIONS = {
     "national_download": {
         "label": "S2",

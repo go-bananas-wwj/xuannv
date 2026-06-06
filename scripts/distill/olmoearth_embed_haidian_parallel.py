@@ -2,8 +2,8 @@
 """海淀区 OlmoEarth 嵌入并行提取（8卡NPU）。
 同时提取 spatial_tokens (32,32,768) 和 global_emb (768)。
 输出:
-  /workspace/outputs/olmoearth_haidian/{MM}/spatial_tokens.npz  (N,32,32,768)
-  /workspace/outputs/olmoearth_haidian/{MM}/emb_all.npz         (N,768)
+  /workspace/xuannv/outputs/olmoearth_haidian/{MM}/spatial_tokens.npz  (N,32,32,768)
+  /workspace/xuannv/outputs/olmoearth_haidian/{MM}/emb_all.npz         (N,768)
 """
 from __future__ import annotations
 import sys, os, glob, json, argparse
@@ -23,9 +23,9 @@ from olmoearth_pretrain.data.normalize import Normalizer, Strategy
 from olmoearth_pretrain.data.constants import Modality
 import rasterio
 
-RAW  = "/workspace/raw/haidian_olmoearth"
-META = "/workspace/raw/haidian_olmoearth/patches_meta.json"
-OUT  = "/workspace/outputs/olmoearth_haidian"
+RAW  = "/workspace/xuannv/data_raw/olmoearth_haidian"
+META = "/workspace/xuannv/data_raw/olmoearth_haidian/patches_meta.json"
+OUT  = "/workspace/xuannv/outputs/olmoearth_haidian"
 
 computed   = Normalizer(Strategy.COMPUTED)
 predefined = Normalizer(Strategy.PREDEFINED)

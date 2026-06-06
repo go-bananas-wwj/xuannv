@@ -4,18 +4,18 @@
 用法示例:
     # 基本监控（只读日志，不干预）
     python scripts/monitor_training.py \
-        --output-dir /workspace/outputs/exp_v2_E_pure_recon_7card_100ep_0523 \
+        --output-dir /workspace/xuannv/outputs/exp_v2_E_pure_recon_7card_100ep_0523 \
         --interval 300
 
     # 带 tmux 进程存活检查
     python scripts/monitor_training.py \
-        --output-dir /workspace/outputs/exp_v2_E_pure_recon_7card_100ep_0523 \
+        --output-dir /workspace/xuannv/outputs/exp_v2_E_pure_recon_7card_100ep_0523 \
         --tmux-session expE_train \
         --interval 300
 
     # 自动恢复模式（检测到崩溃时自动 resume）
     python scripts/monitor_training.py \
-        --output-dir /workspace/outputs/exp_v2_E_pure_recon_7card_100ep_0523 \
+        --output-dir /workspace/xuannv/outputs/exp_v2_E_pure_recon_7card_100ep_0523 \
         --tmux-session expE_train \
         --auto-restart \
         --config configs/xuannv_v2_expE_pure_recon.yaml \

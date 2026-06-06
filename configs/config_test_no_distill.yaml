@@ -1,5 +1,5 @@
 data:
-  aef_embed_dir: /workspace/raw/aef_embeddings/haidian_2025_patches
+  aef_embed_dir: /workspace/xuannv/data_raw/aef_embeddings/haidian_2025_patches
   batch_size: 2
   dataset_type: harbin_patches
   image_size: 128
@@ -9,7 +9,7 @@ data:
   - s1
   - landsat
   - tianyi_sar
-  manifest_path: /workspace/raw/haidian_train
+  manifest_path: /workspace/xuannv/data_raw/haidian_train
   max_frames: 24
   metadata_dim: 4
   num_classes: 11
@@ -17,7 +17,7 @@ data:
   num_samples: 320
   num_target_sources: 6
   num_workers: 0
-  olmoearth_tokens_root: /workspace/outputs/olmoearth_haidian
+  olmoearth_tokens_root: /workspace/xuannv/outputs/olmoearth_haidian
   preload: true
   random_target_frame: true
   recon_mask_patch_size: 16
@@ -28,7 +28,7 @@ data:
     s2: 6
     tianyi_sar: 1
   spatial_augmentation: true
-  stats_dir: /workspace/statistics/haidian_train
+  stats_dir: /workspace/xuannv/statistics/haidian_train
   target_sources:
   - loss_type: 0
     name: s2
@@ -54,7 +54,7 @@ data:
     name: dynamic_world
     out_channels: 9
     sensor_src: null
-  teacher_embed_dir: /workspace/outputs/olmoearth_haidian
+  teacher_embed_dir: /workspace/xuannv/outputs/olmoearth_haidian
   temporal_window_augmentation: true
   temporal_window_max_frames: 24
   temporal_window_min_frames: 4
@@ -62,7 +62,7 @@ data:
   use_dual_teacher: true
 experiment:
   name: exp_dual_teacher_v1_aef_olmoearth
-  output_dir: /workspace/outputs/exp_dual_teacher_v1
+  output_dir: /workspace/xuannv/outputs/exp_dual_teacher_v1
   seed: 42
 model:
   distill_hidden_dim: 512

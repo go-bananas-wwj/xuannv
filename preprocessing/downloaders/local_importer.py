@@ -1,6 +1,6 @@
 """本地 SAR 数据导入器。
 
-处理 /workspace/raw/haidian_sar/ 下的干涉 SAR ZIP 产品，流程：
+处理 /workspace/xuannv/data_raw/haidian_sar/ 下的干涉 SAR ZIP 产品，流程：
     1. 扫描所有 ZIP 文件，解析时间戳与极化信息
     2. 解压 → 尝试读取振幅 TIFF（若含 GeoTIFF）或生成振幅图像
     3. 从影像范围确定所属 patch，裁剪到 patch_bounds

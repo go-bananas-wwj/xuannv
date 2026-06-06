@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """生成 OlmoEarth spatial tokens 的空间拼接可视化图 (类似 AEF viz).
 
-类似 /workspace/raw/aef_embeddings/haidian_2025_visualization.png:
+类似 /workspace/xuannv/data_raw/aef_embeddings/haidian_2025_visualization.png:
 - 每个 patch 取 tokens 前 3 个 channel 作为 RGB (per-patch normalized)
 - 按 UTM 网格位置拼接成全局 mosaic
 - 支持 Haidian (320 patches) 和 Harbin (424 patches)
@@ -23,12 +23,12 @@ sys.path.insert(0, "/workspace/xuannv")
 
 REGIONS = {
     "haidian": {
-        "tokens_root": "/workspace/outputs/olmoearth_haidian",
-        "meta": "/workspace/raw/haidian_olmoearth/patches_meta.json",
+        "tokens_root": "/workspace/xuannv/outputs/olmoearth_haidian",
+        "meta": "/workspace/xuannv/data_raw/olmoearth_haidian/patches_meta.json",
         "n_patches": 320,
     },
     "harbin": {
-        "tokens_root": "/workspace/outputs/olmoearth_harbin",
+        "tokens_root": "/workspace/xuannv/outputs/olmoearth_harbin",
         "meta": "/workspace/xuannv_show/data/harbin/patches_meta.json",
         "n_patches": 424,
     },
@@ -138,7 +138,7 @@ def main():
     meta_dict = load_meta(cfg["meta"])
 
     month_name = args.month.replace("/", "_")
-    out = args.out or f"/workspace/outputs/olmoearth_viz/{args.region}_olmoearth_{month_name}_mosaic.png"
+    out = args.out or f"/workspace/xuannv/outputs/olmoearth_viz/{args.region}_olmoearth_{month_name}_mosaic.png"
     Path(out).parent.mkdir(parents=True, exist_ok=True)
 
     render_mosaic(tokens, patch_ids, meta_dict, out, scale=args.scale)

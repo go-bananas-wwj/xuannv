@@ -14,15 +14,15 @@
 experiment:
   name: haidian_v1_improved
   seed: 42
-  output_dir: /workspace/outputs/exp_v1_haidian_stats_fix_0530_v23
+  output_dir: /workspace/xuannv/outputs/exp_v1_haidian_stats_fix_0530_v23
 
 data:
   dataset_type: harbin_patches
   # ★ 指向 haidian_train 根目录（不是 /haidian 子目录），
   #   这样 dataset.py 能在直接子目录找到 tianyi_sar/，
   #   同时通过一层嵌套搜索找到 haidian/s2/, haidian/s1/ 等
-  manifest_path: /workspace/raw/haidian_train
-  stats_dir: /workspace/statistics/haidian_train
+  manifest_path: /workspace/xuannv/data_raw/haidian_train
+  stats_dir: /workspace/xuannv/statistics/haidian_train
   batch_size: 2
   num_workers: 0
   image_size: 128

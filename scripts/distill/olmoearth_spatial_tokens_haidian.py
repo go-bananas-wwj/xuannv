@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """预计算海淀区所有月份的 OlmoEarth spatial tokens (fast_pass=True).
-输出: /workspace/outputs/olmoearth_haidian/{MM}/spatial_tokens.npz  shape=(320, 32, 32, 768)
+输出: /workspace/xuannv/outputs/olmoearth_haidian/{MM}/spatial_tokens.npz  shape=(320, 32, 32, 768)
 """
 from __future__ import annotations
 import sys, os, glob, json
@@ -18,9 +18,9 @@ from olmoearth_pretrain.data.normalize import Normalizer, Strategy
 from olmoearth_pretrain.data.constants import Modality
 import rasterio
 
-RAW  = "/workspace/raw/haidian_olmoearth"
-META = "/workspace/raw/haidian_olmoearth/patches_meta.json"
-OUT  = "/workspace/outputs/olmoearth_haidian"
+RAW  = "/workspace/xuannv/data_raw/olmoearth_haidian"
+META = "/workspace/xuannv/data_raw/olmoearth_haidian/patches_meta.json"
+OUT  = "/workspace/xuannv/outputs/olmoearth_haidian"
 
 computed   = Normalizer(Strategy.COMPUTED)
 predefined = Normalizer(Strategy.PREDEFINED)

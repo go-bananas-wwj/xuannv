@@ -5,7 +5,7 @@
     cd /workspace/xuannv
     python scripts/visualize/inspect_training_data.py \
         --config configs/qwen_v4_cd_upgrade.yaml \
-        --output /workspace/outputs/aef_qwen_v4_cd_upgrade/training_data_inspection.png \
+        --output /workspace/xuannv/outputs/aef_qwen_v4_cd_upgrade/training_data_inspection.png \
         --num-patches 5
 """
 from __future__ import annotations
@@ -289,7 +289,7 @@ def inspect_batch(batch, output_path: Path, num_patches: int):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/qwen_v4_cd_upgrade.yaml")
-    parser.add_argument("--output", type=str, default="/workspace/outputs/aef_qwen_v4_cd_upgrade/training_data_inspection.png")
+    parser.add_argument("--output", type=str, default="/workspace/xuannv/outputs/aef_qwen_v4_cd_upgrade/training_data_inspection.png")
     parser.add_argument("--num-patches", type=int, default=5, help="可视化的 patch 数量")
     parser.add_argument("--seed", type=int, default=None)
     args = parser.parse_args()

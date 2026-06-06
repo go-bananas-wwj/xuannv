@@ -11,7 +11,7 @@ from typing import Any
 class ExperimentConfig:
     name: str = "aef_qwen_v1"
     seed: int = 42
-    output_dir: str = "/workspace/outputs/aef_qwen_v1"
+    output_dir: str = "/workspace/xuannv/outputs/aef_qwen_v1"
 
 
 @dataclass

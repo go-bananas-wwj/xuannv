@@ -10,7 +10,7 @@
 6. 可视化: t-SNE/UMAP embedding 分布
 
 用法:
-    python multi_dim_eval.py --experiment-dir /workspace/outputs/exp_v15_fixed_temporal_0606
+    python multi_dim_eval.py --experiment-dir /workspace/xuannv/outputs/exp_v15_fixed_temporal_0606
 """
 from __future__ import annotations
 

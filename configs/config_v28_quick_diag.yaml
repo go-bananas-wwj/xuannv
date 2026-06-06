@@ -36,12 +36,12 @@
 experiment:
   name: exp_v28_haidian_rank_temporal_0531
   seed: 42
-  output_dir: /workspace/outputs/quick_v28_diag
+  output_dir: /workspace/xuannv/outputs/quick_v28_diag
 
 data:
   dataset_type: harbin_patches
-  manifest_path: /workspace/raw/haidian_train
-  stats_dir: /workspace/statistics/haidian_train
+  manifest_path: /workspace/xuannv/data_raw/haidian_train
+  stats_dir: /workspace/xuannv/statistics/haidian_train
   batch_size: 4
   num_workers: 0
   image_size: 128

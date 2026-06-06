@@ -29,9 +29,9 @@
       "rows": 17
     }
   },
-  "output_dir": "/workspace/raw/phase2_harbin_newarea/harbin_newarea_scenes",
-  "cloud_filtered_dir": "/workspace/raw/phase2_harbin_newarea/harbin_newarea_scenes_cloud_filtered",
-  "statistics_dir": "/workspace/statistics/harbin_newarea_scenes",
+  "output_dir": "/workspace/xuannv/data_raw/phase2_harbin_newarea/harbin_newarea_scenes",
+  "cloud_filtered_dir": "/workspace/xuannv/data_raw/phase2_harbin_newarea/harbin_newarea_scenes_cloud_filtered",
+  "statistics_dir": "/workspace/xuannv/statistics/harbin_newarea_scenes",
   "sources": {
     "s2": {
       "enabled": true,

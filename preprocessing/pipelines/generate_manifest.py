@@ -9,7 +9,7 @@ manifest 格式:
             "data_root"   : str,          # 默认数据根，通常为 cloud_filtered_dir
             "stats_dir"   : str,          # 统计量目录
             "source_roots": {             # 可选：per-source 数据根覆盖
-                "sar": "/workspace/raw/phase2_haidian/haidian_scenes"
+                "sar": "/workspace/xuannv/data_raw/phase2_haidian/haidian_scenes"
             },
             "sources"     : ["s2","s1",...],  # 该区域实际存在的源
             "patches"     : ["patch_000000", ...]

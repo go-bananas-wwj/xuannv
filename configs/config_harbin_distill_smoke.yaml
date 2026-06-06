@@ -16,12 +16,12 @@
 experiment:
   name: harbin_distill_v1_olmoearth
   seed: 42
-  output_dir: /workspace/outputs/harbin_distill/harbin_distill_v1_olmoearth
+  output_dir: /workspace/xuannv/outputs/harbin_distill/harbin_distill_v1_olmoearth
 
 data:
   dataset_type: harbin_patches
-  manifest_path: /workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered
-  stats_dir: /workspace/statistics/harbin_scenes
+  manifest_path: /workspace/xuannv/data_raw/harbin_scenes
+  stats_dir: /workspace/xuannv/statistics/harbin_scenes
   batch_size: 4
   num_workers: 4
   image_size: 128
@@ -69,7 +69,7 @@ data:
       out_channels: 9
 
   # OlmoEarth 离线 teacher tokens 根目录 (每月有 spatial_tokens.npz + emb_all.npz)
-  olmoearth_tokens_root: /workspace/outputs/olmoearth_harbin
+  olmoearth_tokens_root: /workspace/xuannv/outputs/olmoearth_harbin
 
   random_target_frame: true
   spatial_augmentation: true

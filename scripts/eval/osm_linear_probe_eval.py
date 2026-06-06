@@ -4,8 +4,8 @@
 用法:
     python osm_linear_probe_eval.py \
         --config configs/config_v17_fix_collapse.yaml \
-        --checkpoint /workspace/outputs/exp_v17_fix_collapse_0606/epoch_5.pt \
-        --osm-root /workspace/raw/osm_labels_harbin \
+        --checkpoint /workspace/xuannv/outputs/exp_v17_fix_collapse_0606/epoch_5.pt \
+        --osm-root /workspace/xuannv/data_raw/osm_labels \
         --device npu:0 --epochs 30 --max-patches 100
 """
 from __future__ import annotations
@@ -37,7 +37,7 @@ def parse_args():
     p = argparse.ArgumentParser(description="OSM标签像素级线性探测评估")
     p.add_argument("--config", required=True)
     p.add_argument("--checkpoint", required=True)
-    p.add_argument("--osm-root", default="/workspace/raw/osm_labels_harbin")
+    p.add_argument("--osm-root", default="/workspace/xuannv/data_raw/osm_labels")
     p.add_argument("--device", default="npu:0")
     p.add_argument("--epochs", type=int, default=30)
     p.add_argument("--lr", type=float, default=0.01)

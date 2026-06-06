@@ -2,7 +2,7 @@
 # 下载完成后校验脚本：对比网盘 vs 本地文件数
 # 用法: bash scripts/verify_download.sh
 
-DEST="/workspace/raw/haidian_sar"
+DEST="/workspace/xuannv/data_raw/haidian_sar"
 REPORT="$DEST/verify_report.txt"
 
 echo "========================================"  | tee "$REPORT"

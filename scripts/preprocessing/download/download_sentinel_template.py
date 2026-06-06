@@ -19,10 +19,10 @@ COPERNICUS_USER = "YOUR_USERNAME"
 COPERNICUS_PASS = "YOUR_PASSWORD"
 
 # 2. AOI 文件路径
-AOI_PATH = "/workspace/raw/haidian/aoi/haidian_aoi.geojson"
+AOI_PATH = "/workspace/xuannv/data_raw/haidian/aoi/haidian_aoi.geojson"
 
 # 3. 输出目录
-OUTPUT_DIR = "/workspace/raw/haidian/s1"  # 或 s2
+OUTPUT_DIR = "/workspace/xuannv/data_raw/haidian/s1"  # 或 s2
 
 # 4. 时间范围
 START_DATE = date(2025, 1, 1)
@@ -66,7 +66,7 @@ def download_s2():
         cloudcoverpercentage=(0, 70)  # 云量 < 70%
     )
     print(f"Found {len(products)} S2 products")
-    out_dir = "/workspace/raw/haidian/s2"
+    out_dir = "/workspace/xuannv/data_raw/haidian/s2"
     os.makedirs(out_dir, exist_ok=True)
     api.download_all(products, directory_path=out_dir)
     print("S2 download complete!")

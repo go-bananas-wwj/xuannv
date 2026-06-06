@@ -4,7 +4,7 @@ import os
 import requests
 from tqdm import tqdm
 
-OUTPUT_BASE = "/workspace/raw/haidian"
+OUTPUT_BASE = "/workspace/xuannv/data_raw/haidian"
 
 def download_file(url, out_path, desc=""):
     os.makedirs(os.path.dirname(out_path), exist_ok=True)

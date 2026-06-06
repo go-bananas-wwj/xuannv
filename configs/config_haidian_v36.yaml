@@ -9,12 +9,12 @@
 experiment:
   name: exp_v36_haidian_aef_uniform_05_v28_0601
   seed: 42
-  output_dir: /workspace/outputs/exp_v36_haidian_aef_uniform_05_v28_0601
+  output_dir: /workspace/xuannv/outputs/exp_v36_haidian_aef_uniform_05_v28_0601
 
 data:
   dataset_type: harbin_patches
-  manifest_path: /workspace/raw/haidian_train
-  stats_dir: /workspace/statistics/haidian_train
+  manifest_path: /workspace/xuannv/data_raw/haidian_train
+  stats_dir: /workspace/xuannv/statistics/haidian_train
   batch_size: 4
   num_workers: 0
   image_size: 128

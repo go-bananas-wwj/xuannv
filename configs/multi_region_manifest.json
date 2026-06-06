@@ -1,9 +1,9 @@
 {
   "haidian": {
-    "data_root": "/workspace/raw/haidian_train/haidian",
-    "stats_dir": "/workspace/statistics/haidian_train",
-    "aef_embed_dir": "/workspace/raw/aef_embeddings/haidian_2025_patches",
-    "olmoearth_tokens_root": "/workspace/outputs/olmoearth_haidian",
+    "data_root": "/workspace/xuannv/data_raw/haidian_train",
+    "stats_dir": "/workspace/xuannv/statistics/haidian_train",
+    "aef_embed_dir": "/workspace/xuannv/data_raw/aef_embeddings/haidian_2025_patches",
+    "olmoearth_tokens_root": "/workspace/xuannv/outputs/olmoearth_haidian",
     "patches": [
       "patch_000000",
       "patch_000001",
@@ -335,10 +335,10 @@
     ]
   },
   "harbin": {
-    "data_root": "/workspace/raw/harbin_newarea_olmoearth",
-    "stats_dir": "/workspace/statistics/harbin_scenes",
-    "aef_embed_dir": "/workspace/raw/aef_embeddings/harbin_2025_patches",
-    "olmoearth_tokens_root": "/workspace/outputs/olmoearth_harbin",
+    "data_root": "/workspace/xuannv/data_raw/olmoearth_harbin",
+    "stats_dir": "/workspace/xuannv/statistics/harbin_scenes",
+    "aef_embed_dir": "/workspace/xuannv/data_raw/aef_embeddings/harbin_2025_patches",
+    "olmoearth_tokens_root": "/workspace/xuannv/outputs/olmoearth_harbin",
     "patches": [
       "patch_000000",
       "patch_000001",

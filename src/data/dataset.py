@@ -392,7 +392,7 @@ class HarbinPatchDataset(Dataset):
             "|".join(cache_inputs).encode()
         ).hexdigest()[:16]
         # 共享缓存目录（每个实验独立文件，无竞争）
-        shared_cache_dir = Path("/workspace/outputs/.cache_shared")
+        shared_cache_dir = Path("/workspace/xuannv/outputs/.cache_shared")
         shared_cache_dir.mkdir(parents=True, exist_ok=True)
         cache_file = shared_cache_dir / f"dataset_cache_{cache_key}.pt"
 

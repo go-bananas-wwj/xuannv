@@ -1,7 +1,7 @@
 #!/bin/bash
 # 全国数据下载进度监控脚本
-BASE="/workspace/raw/national_china/national_china"
-LOG="/workspace/raw/national_china/download_progress_monitor.log"
+BASE="/workspace/xuannv/data_raw/national_china/national_china"
+LOG="/workspace/xuannv/data_raw/national_china/download_progress_monitor.log"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 进度检查" >> "$LOG"
 
@@ -13,7 +13,7 @@ for src in s1 landsat; do
     tifs_30m=$(find "$dir" -name "*.tif" -mmin -30 2>/dev/null | wc -l)
     
     # 检查进程
-    pidfile="/workspace/raw/national_china/download_${src}_v2.pid"
+    pidfile="/workspace/xuannv/data_raw/national_china/download_${src}_v2.pid"
     if [ -f "$pidfile" ]; then
       pid=$(cat "$pidfile")
       if kill -0 "$pid" 2>/dev/null; then
@@ -33,7 +33,7 @@ done
 for src in s1 landsat; do
   dir="$BASE/$src"
   tifs_30m=$(find "$dir" -name "*.tif" -mmin -30 2>/dev/null | wc -l)
-  pidfile="/workspace/raw/national_china/download_${src}_v2.pid"
+  pidfile="/workspace/xuannv/data_raw/national_china/download_${src}_v2.pid"
   if [ -f "$pidfile" ]; then
     pid=$(cat "$pidfile")
     if kill -0 "$pid" 2>/dev/null && [ "$tifs_30m" -eq 0 ]; then

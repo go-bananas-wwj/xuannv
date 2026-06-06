@@ -6,7 +6,7 @@ from src.training.losses import batch_uniformity_loss_l2, variance_regularizer
 
 cfg = load_config('configs/xuannv_v12_clean.yaml')
 model = AEFModel(cfg)
-ckpt = torch.load('/workspace/outputs/xuannv_v13_monthly/epoch_best_epoch5.pt', map_location='cpu', weights_only=False)
+ckpt = torch.load('/workspace/xuannv/outputs/xuannv_v13_monthly/epoch_best_epoch5.pt', map_location='cpu', weights_only=False)
 model.load_state_dict(ckpt['model_state_dict'], strict=False)
 model.eval()
 

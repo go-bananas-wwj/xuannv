@@ -4,7 +4,7 @@
 支持对多区域分别计算，输出到各区域独立的 statistics_dir。
 
 输出格式（与训练代码完全兼容）:
-    /workspace/statistics/{region_name}/{source}_stats.json
+    /workspace/xuannv/statistics/{region_name}/{source}_stats.json
     {
         "n_channels": 6,
         "channel_0": {"mean": 0.123, "std": 0.045},

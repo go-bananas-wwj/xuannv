@@ -9,18 +9,18 @@
 推荐用法（先用 extract_embeddings.py 提取，再用 NPZ 评估，最快）：
     # 1. 先提取（eval_v25 tmux 中已运行）
     python scripts/eval/extract_embeddings.py --config configs/config_haidian_v25.yaml \\
-        --checkpoint epoch_best_epoch78.pt --output-dir out/eval_v25_0531/ --format npz
+        --checkpoint epoch_best_epoch78.pt --output-dir eval_results/eval_v25_0531/ --format npz
 
     # 2. 再评估（CPU 即可，秒级完成）
     python scripts/eval/mlp_eval_haidian.py \\
         --embedding-file out/eval_v25_0531/patch_embeddings_shard0.npz \\
-        --output-dir out/eval_v25_0531/mlp/
+        --output-dir eval_results/eval_v25_0531/mlp/
 
 内联提取用法（首次 NPU JIT 编译约 5-10 分钟）：
     python scripts/eval/mlp_eval_haidian.py \\
         --config configs/config_haidian_v25.yaml \\
         --checkpoint epoch_best_epoch78.pt --device npu:0 \\
-        --output-dir out/eval_v25_0531/mlp/
+        --output-dir eval_results/eval_v25_0531/mlp/
 """
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ except ImportError:
 
 # ── 数据路径 ─────────────────────────────────────────────────────────────────
 
-HAIDIAN_ROOT = Path("/workspace/raw/haidian_train/haidian")
+HAIDIAN_ROOT = Path("/workspace/xuannv/data_raw/haidian_train")
 
 # ── 标注配置 ─────────────────────────────────────────────────────────────────
 
@@ -538,7 +538,7 @@ def main() -> None:
     parser.add_argument("--checkpoint", default=None)
     parser.add_argument("--device", default="npu:0",
                         help="MLP 训练设备（cpu/npu:0）；内联提取时也用于模型推理")
-    parser.add_argument("--output-dir", default="out/eval_v25_0531/mlp/")
+    parser.add_argument("--output-dir", default="eval_results/eval_v25_0531/mlp/")
     parser.add_argument("--train-ratio", type=float, default=0.8)
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--seed", type=int, default=42)

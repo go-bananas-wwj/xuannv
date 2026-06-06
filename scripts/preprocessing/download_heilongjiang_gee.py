@@ -215,7 +215,7 @@ def main():
     parser.add_argument("--start-date", default="2023-01-01")
     parser.add_argument("--end-date", default="2025-12-31")
     parser.add_argument("--max-per-month", type=int, default=4)
-    parser.add_argument("--out-dir", default="/workspace/raw/heilongjiang_new")
+    parser.add_argument("--out-dir", default="/workspace/xuannv/data_raw/heilongjiang_new")
     parser.add_argument("--workers", type=int, default=1, help="GEE 建议单线程避免限流")
     args = parser.parse_args()
 

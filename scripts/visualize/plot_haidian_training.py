@@ -21,7 +21,7 @@ from pathlib import Path
 
 
 def main():
-    output_dir = Path('/workspace/outputs/exp_v2_haidian_baseline_8card_100ep')
+    output_dir = Path('/workspace/xuannv/outputs/exp_v2_haidian_baseline_8card_100ep')
     save_dir = output_dir / 'visualization'
     save_dir.mkdir(exist_ok=True)
 

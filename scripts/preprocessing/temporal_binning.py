@@ -13,8 +13,8 @@
 
 用法:
     python temporal_binning.py \
-        --input-dir /workspace/raw/national_china/national_china/s2 \
-        --output-dir /workspace/raw/national_china/national_china/s2_binned \
+        --input-dir /workspace/xuannv/data_raw/national_china/national_china/s2 \
+        --output-dir /workspace/xuannv/data_raw/national_china/national_china/s2_binned \
         --bin-days 11 \
         --start-date 2025-01-01 \
         --end-date 2026-06-01

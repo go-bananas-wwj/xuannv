@@ -28,8 +28,8 @@ import rasterio
 from pathlib import Path
 from sklearn.metrics import accuracy_score
 
-DATA_ROOT = Path("/workspace/raw/phase1_harbin/harbin_scenes_cloud_filtered")
-EVAL_DIR = Path("/workspace/outputs/exp_v2_D_7target_7card_100ep_0521/evaluation")
+DATA_ROOT = Path("/workspace/xuannv/data_raw/harbin_scenes")
+EVAL_DIR = Path("/workspace/xuannv/outputs/exp_v2_D_7target_7card_100ep_0521/evaluation")
 
 TASKS = [
     ("worldcover", "worldcover", "static.tif", 10),

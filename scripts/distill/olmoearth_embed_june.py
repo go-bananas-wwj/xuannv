@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """全区6月份嵌入生成 + 地图可视化。
 策略: 每个patch取6月份(2025-06-xx)景, 若缺则取最近日期。
-输出: /workspace/outputs/olmoearth_harbin/june/emb_all.npz + june_map.png
+输出: /workspace/xuannv/outputs/olmoearth_harbin/june/emb_all.npz + june_map.png
 """
 from __future__ import annotations
 import sys, os
@@ -18,9 +18,9 @@ from olmoearth_pretrain.datatypes import MaskedOlmoEarthSample
 from olmoearth_pretrain.data.normalize import Normalizer, Strategy
 from olmoearth_pretrain.data.constants import Modality
 
-RAW   = "/workspace/raw/harbin_newarea_olmoearth"
+RAW   = "/workspace/xuannv/data_raw/olmoearth_harbin"
 META  = "/workspace/xuannv_show/data/harbin/patches_meta.json"
-OUT   = "/workspace/outputs/olmoearth_harbin/june"
+OUT   = "/workspace/xuannv/outputs/olmoearth_harbin/june"
 MOD2OE = {"s2": Modality.SENTINEL2_L2A, "s1": Modality.SENTINEL1,
            "landsat": Modality.LANDSAT}
 computed  = Normalizer(Strategy.COMPUTED)

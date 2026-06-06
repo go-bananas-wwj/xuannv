@@ -22,12 +22,12 @@
 experiment:
   name: exp_v24_haidian_prenorm_0530
   seed: 42
-  output_dir: /workspace/outputs/exp_v24_haidian_prenorm_0530
+  output_dir: /workspace/xuannv/outputs/exp_v24_haidian_prenorm_0530
 
 data:
   dataset_type: harbin_patches
-  manifest_path: /workspace/raw/haidian_train
-  stats_dir: /workspace/statistics/haidian_train
+  manifest_path: /workspace/xuannv/data_raw/haidian_train
+  stats_dir: /workspace/xuannv/statistics/haidian_train
   batch_size: 4
   num_workers: 0
   image_size: 128

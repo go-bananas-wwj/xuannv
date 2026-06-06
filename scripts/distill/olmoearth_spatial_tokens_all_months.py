@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """预计算所有月份的 OlmoEarth spatial tokens (fast_pass=True).
-输出: /workspace/outputs/olmoearth_harbin/{MM}/spatial_tokens.npz  shape=(424, 32, 32, 768)
+输出: /workspace/xuannv/outputs/olmoearth_harbin/{MM}/spatial_tokens.npz  shape=(424, 32, 32, 768)
 已有: 06 月 → 跳过 (已在 june/ 目录下)
 """
 from __future__ import annotations
@@ -19,13 +19,13 @@ from olmoearth_pretrain.data.normalize import Normalizer, Strategy
 from olmoearth_pretrain.data.constants import Modality
 import rasterio
 
-RAW  = "/workspace/raw/harbin_newarea_olmoearth"
+RAW  = "/workspace/xuannv/data_raw/olmoearth_harbin"
 META = "/workspace/xuannv_show/data/harbin/patches_meta.json"
-OUT  = "/workspace/outputs/olmoearth_harbin"
+OUT  = "/workspace/xuannv/outputs/olmoearth_harbin"
 
 # June spatial tokens 已存在于旧路径，复制到标准路径
-JUNE_SRC = "/workspace/outputs/olmoearth_harbin/june/spatial_tokens.npz"
-JUNE_DST = "/workspace/outputs/olmoearth_harbin/06/spatial_tokens.npz"
+JUNE_SRC = "/workspace/xuannv/outputs/olmoearth_harbin/june/spatial_tokens.npz"
+JUNE_DST = "/workspace/xuannv/outputs/olmoearth_harbin/06/spatial_tokens.npz"
 
 computed   = Normalizer(Strategy.COMPUTED)
 predefined = Normalizer(Strategy.PREDEFINED)

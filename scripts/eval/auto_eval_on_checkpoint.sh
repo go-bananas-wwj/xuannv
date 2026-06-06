@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # auto_eval_on_checkpoint.sh — 当新 checkpoint 保存时自动评估
-# 用法: bash scripts/eval/auto_eval_on_checkpoint.sh --config configs/config_v14_anti_collapse.yaml --output-dir /workspace/outputs/exp_v14_anti_collapse_0605
+# 用法: bash scripts/eval/auto_eval_on_checkpoint.sh --config configs/config_v14_anti_collapse.yaml --output-dir /workspace/xuannv/outputs/exp_v14_anti_collapse_0605
 
 set -euo pipefail
 

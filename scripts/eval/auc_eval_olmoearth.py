@@ -19,9 +19,9 @@ from sklearn.metrics import roc_auc_score
 
 ANNOT_DIR = Path("/workspace/哈尔滨松北新区变化检测汇总文件/变化检测shp文件")
 GRID      = Path("/workspace/index/harbin/grid/harbin_grid.geojson")
-EMB_ROOT  = Path("/workspace/outputs/olmoearth_harbin")
+EMB_ROOT  = Path("/workspace/xuannv/outputs/olmoearth_harbin")
 META_FILE = Path("/workspace/xuannv_show/data/harbin/patches_meta.json")
-OUT_FILE  = Path("/workspace/outputs/olmoearth_harbin/eval/auc_olmoearth.json")
+OUT_FILE  = Path("/workspace/xuannv/outputs/olmoearth_harbin/eval/auc_olmoearth.json")
 
 PERIODS = {
     "june":      (4,  6,  "june.shp"),

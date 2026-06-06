@@ -10,8 +10,8 @@ Phase 5: 二值分割 Few-Shot 评估 (JRC Water + OSM Buildings)
 用法:
     python scripts/eval/full_evaluation_pipeline.py \
         --config configs/round8_single_exp1.yaml \
-        --checkpoint /workspace/outputs/round8_single_exp1/epoch_19.pt \
-        --output /workspace/outputs/round8_single_exp1/eval_results.json \
+        --checkpoint /workspace/xuannv/outputs/round8_single_exp1/epoch_19.pt \
+        --output /workspace/xuannv/outputs/round8_single_exp1/eval_results.json \
         --device npu:0
 """
 from __future__ import annotations
@@ -472,8 +472,8 @@ def load_label_direct(patch_id, label_type):
     """直接读取标签文件."""
     if label_type == "worldcover":
         paths = [
-            f"/workspace/raw/harbin_scenes/worldcover/{patch_id}/static.tif",
-            f"/workspace/raw/harbin/worldcover/{patch_id}/static.tif",
+            f"/workspace/xuannv/data_raw/harbin_scenes_scenes/worldcover/{patch_id}/static.tif",
+            f"/workspace/xuannv/data_raw/harbin_scenes/worldcover/{patch_id}/static.tif",
         ]
         for path in paths:
             try:
@@ -490,7 +490,7 @@ def load_label_direct(patch_id, label_type):
 
     elif label_type == "dynamic_world":
         # Dynamic World 是时序数据，使用第一个可用季度文件作为静态标签
-        base = f"/workspace/raw/harbin/dynamic_world/{patch_id}"
+        base = f"/workspace/xuannv/data_raw/harbin_scenes/dynamic_world/{patch_id}"
         try:
             files = sorted([f for f in os.listdir(base) if f.endswith('.tif')])
             if files:
@@ -507,8 +507,8 @@ def load_label_direct(patch_id, label_type):
 
     elif label_type == "jrc_water":
         paths = [
-            f"/workspace/raw/harbin_scenes/jrc_water/{patch_id}/static.tif",
-            f"/workspace/raw/harbin/jrc_water/{patch_id}/static.tif",
+            f"/workspace/xuannv/data_raw/harbin_scenes_scenes/jrc_water/{patch_id}/static.tif",
+            f"/workspace/xuannv/data_raw/harbin_scenes/jrc_water/{patch_id}/static.tif",
         ]
         for path in paths:
             try:
@@ -523,7 +523,7 @@ def load_label_direct(patch_id, label_type):
         return None
 
     elif label_type == "osm_buildings":
-        path = f"/workspace/raw/harbin_scenes/osm_buildings/{patch_id}/static.tif"
+        path = f"/workspace/xuannv/data_raw/harbin_scenes_scenes/osm_buildings/{patch_id}/static.tif"
         try:
             with rasterio.open(path) as src:
                 data = src.read(1)

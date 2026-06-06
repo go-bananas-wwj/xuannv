@@ -60,7 +60,7 @@ def degree_bbox_to_utm_patches(bbox_deg, patch_size_m):
 
 
 def main():
-    base = Path("/workspace/raw/phase2_heilongjiang")
+    base = Path("/workspace/xuannv/data_raw/phase2_heilongjiang")
     base.mkdir(parents=True, exist_ok=True)
 
     for city, cfg in CITIES.items():

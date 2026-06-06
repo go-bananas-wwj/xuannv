@@ -7,7 +7,7 @@
 用法:
     python linear_probe_eval.py \
         --config configs/config_v17_fix_collapse.yaml \
-        --checkpoint /workspace/outputs/exp_v17_fix_collapse_0606/epoch_5.pt \
+        --checkpoint /workspace/xuannv/outputs/exp_v17_fix_collapse_0606/epoch_5.pt \
         --device npu:0 --epochs 50 --lr 0.01
 """
 from __future__ import annotations
@@ -55,8 +55,8 @@ TASKS = [
 ]
 
 DATA_ROOTS = [
-    Path("/workspace/raw/harbin"),
-    Path("/workspace/raw/haidian_train/haidian"),
+    Path("/workspace/xuannv/data_raw/harbin_scenes"),
+    Path("/workspace/xuannv/data_raw/haidian_train"),
 ]
 
 

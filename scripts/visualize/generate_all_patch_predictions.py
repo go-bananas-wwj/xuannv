@@ -16,9 +16,9 @@ import numpy as np
 from src.inference.engine import load_cd_head, run_change_detection
 from src.utils.device import get_device
 
-EMBEDDING_DIR = Path("/workspace/outputs/aef_qwen_v2/monthly_embeddings_2025")
-HEAD_PATH = Path("/workspace/outputs/aef_qwen_v2/monthly_cd_head/best_cv_fold0_v3_ohem_head.pt")
-OUTPUT_DIR = Path("/workspace/outputs/aef_qwen_v2/patch_predictions")
+EMBEDDING_DIR = Path("/workspace/xuannv/outputs/aef_qwen_v2/monthly_embeddings_2025")
+HEAD_PATH = Path("/workspace/xuannv/outputs/aef_qwen_v2/monthly_cd_head/best_cv_fold0_v3_ohem_head.pt")
+OUTPUT_DIR = Path("/workspace/xuannv/outputs/aef_qwen_v2/patch_predictions")
 
 PERIODS = {
     "2025-04~2025-06": ("2025-04", "2025-06"),

@@ -17,7 +17,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # 配置
 # ---------------------------------------------------------------------------
-WORKSPACE = "/workspace/raw/national_china"
+WORKSPACE = "/workspace/xuannv/data_raw/national_china"
 SCRIPT = "/workspace/xuannv/scripts/preprocessing/download_from_planetary_computer_v2.py"
 PYTHON = "/root/miniconda3/envs/xuannv/bin/python"
 

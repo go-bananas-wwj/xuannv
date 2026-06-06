@@ -4,7 +4,7 @@
 set -e
 
 CONFIG="configs/config_v14_anti_collapse.yaml"
-CKPT_DIR="/workspace/outputs/exp_v14_anti_collapse_0605"
+CKPT_DIR="/workspace/xuannv/outputs/exp_v14_anti_collapse_0605"
 DEVICE="npu:0"
 
 # 找到最新的 best checkpoint

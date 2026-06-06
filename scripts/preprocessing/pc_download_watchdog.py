@@ -10,7 +10,7 @@ Planetary Computer 下载看门狗 V2
 用法:
     python scripts/preprocessing/pc_download_watchdog.py
     # 或后台循环运行:
-    nohup bash -c 'while true; do python scripts/preprocessing/pc_download_watchdog.py; sleep 900; done' > /workspace/outputs/pc_watchdog.log 2>&1 &
+    nohup bash -c 'while true; do python scripts/preprocessing/pc_download_watchdog.py; sleep 900; done' > /workspace/xuannv/outputs/pc_watchdog.log 2>&1 &
 """
 
 import subprocess
@@ -24,28 +24,28 @@ from pathlib import Path
 # 配置
 # ---------------------------------------------------------------------------
 
-LOG_FILE = Path("/workspace/outputs/pc_download_watchdog.log")
-STATE_FILE = Path("/workspace/outputs/pc_download_watchdog_state.json")
-DATA_ROOT = Path("/workspace/raw/phase2_heilongjiang")
+LOG_FILE = Path("/workspace/xuannv/outputs/pc_download_watchdog.log")
+STATE_FILE = Path("/workspace/xuannv/outputs/pc_download_watchdog_state.json")
+DATA_ROOT = Path("/workspace/xuannv/data_raw/phase2_heilongjiang")
 
 # Session 注册表：session 名 -> 启动命令
 # 注意：命令中不需要包含 tmux 相关部分，看门狗会自动包装
 SESSION_REGISTRY = {
     # 海淀
-    "pc_haidian_s2": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources s2 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
-    "pc_haidian_s1": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources s1 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
-    "pc_haidian_landsat": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources landsat --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
-    "pc_haidian_dem": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources dem --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
-    "pc_haidian_worldcover": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources worldcover --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_haidian_s2": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/xuannv/data_raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/xuannv/data_raw/phase2_heilongjiang --sources s2 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_haidian_s1": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/xuannv/data_raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/xuannv/data_raw/phase2_heilongjiang --sources s1 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_haidian_landsat": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/xuannv/data_raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/xuannv/data_raw/phase2_heilongjiang --sources landsat --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_haidian_dem": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/xuannv/data_raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/xuannv/data_raw/phase2_heilongjiang --sources dem --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_haidian_worldcover": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/xuannv/data_raw/phase2_heilongjiang/haidian/patches_meta.json --output /workspace/xuannv/data_raw/phase2_heilongjiang --sources worldcover --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
     # 大庆
-    "pc_daqing_s2": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources s2 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
-    "pc_daqing_s1": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources s1 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
-    "pc_daqing_landsat": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources landsat --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
-    "pc_daqing_dem": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources dem --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
-    "pc_daqing_worldcover": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources worldcover --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_daqing_s2": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/xuannv/data_raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/xuannv/data_raw/phase2_heilongjiang --sources s2 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_daqing_s1": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/xuannv/data_raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/xuannv/data_raw/phase2_heilongjiang --sources s1 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_daqing_landsat": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/xuannv/data_raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/xuannv/data_raw/phase2_heilongjiang --sources landsat --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_daqing_dem": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/xuannv/data_raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/xuannv/data_raw/phase2_heilongjiang --sources dem --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_daqing_worldcover": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/xuannv/data_raw/phase2_heilongjiang/daqing/patches_meta.json --output /workspace/xuannv/data_raw/phase2_heilongjiang --sources worldcover --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
     # 齐齐哈尔（DEM/WorldCover 已完成，只需 S2 + Landsat）
-    "pc_qiqihar_s2": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/qiqihar/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources s2 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
-    "pc_qiqihar_landsat": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/raw/phase2_heilongjiang/qiqihar/patches_meta.json --output /workspace/raw/phase2_heilongjiang --sources landsat --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_qiqihar_s2": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/xuannv/data_raw/phase2_heilongjiang/qiqihar/patches_meta.json --output /workspace/xuannv/data_raw/phase2_heilongjiang --sources s2 --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
+    "pc_qiqihar_landsat": "python -u scripts/preprocessing/download_from_planetary_computer.py --patches /workspace/xuannv/data_raw/phase2_heilongjiang/qiqihar/patches_meta.json --output /workspace/xuannv/data_raw/phase2_heilongjiang --sources landsat --date-start 2023-01-01 --date-end 2025-10-31 --workers 2",
 }
 
 # 文件数量停滞检测配置
@@ -169,7 +169,7 @@ def create_session(session: str, cmd: str):
     tmux_cmd = (
         f"bash -c 'source /root/miniconda3/etc/profile.d/conda.sh && "
         f"conda activate xuannv && cd /workspace/xuannv && {cmd}' "
-        f"2>&1 | tee -a /workspace/outputs/{session}.log"
+        f"2>&1 | tee -a /workspace/xuannv/outputs/{session}.log"
     )
 
     try:

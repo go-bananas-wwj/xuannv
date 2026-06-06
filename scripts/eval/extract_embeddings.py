@@ -10,16 +10,16 @@
 用法:
     # 单设备提取（npz 格式，供下游评估）
     python extract_embeddings.py --config configs/config.yaml \\
-        --checkpoint epoch_40.pt --output-dir out/embeddings/
+        --checkpoint epoch_40.pt --output-dir eval_results/embeddings/
 
     # 7 卡并行（每张卡跑一段，npy 格式）
     ASCEND_RT_VISIBLE_DEVICES=0 python extract_embeddings.py \\
         --config configs/config.yaml --checkpoint epoch_40.pt \\
-        --output-dir out/embeddings/ --gpu-idx 0 --total-gpus 7 --format npy
+        --output-dir eval_results/embeddings/ --gpu-idx 0 --total-gpus 7 --format npy
 
     # 合并 npy 结果为 npz（所有分片完成后）
     python extract_embeddings.py --merge-npy-dir out/embeddings/ \\
-        --output-dir out/ --merge-only
+        --output-dir eval_results/ --merge-only
 """
 from __future__ import annotations
 

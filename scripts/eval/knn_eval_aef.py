@@ -159,9 +159,9 @@ def evaluate_knn(
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--embedding", default="/workspace/outputs/aef_official_embeddings/aef_haidian_2025.npz")
-    parser.add_argument("--data-root", default="/workspace/raw/phase2_heilongjiang/haidian")
-    parser.add_argument("--output", default="/workspace/outputs/aef_official_embeddings/knn_aef_haidian.json")
+    parser.add_argument("--embedding", default="/workspace/xuannv/outputs/aef_official_embeddings/aef_haidian_2025.npz")
+    parser.add_argument("--data-root", default="/workspace/xuannv/data_raw/phase2_heilongjiang/haidian")
+    parser.add_argument("--output", default="/workspace/xuannv/outputs/aef_official_embeddings/knn_aef_haidian.json")
     parser.add_argument("--k", type=int, default=5)
     parser.add_argument("--sample-pixels", type=int, default=5000)
     args = parser.parse_args()

@@ -17,7 +17,7 @@ from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-RAW_DIR = Path("/workspace/raw/harbin_scenes")
+RAW_DIR = Path("/workspace/xuannv/data_raw/harbin_scenes_scenes")
 OSM_PATH = RAW_DIR / "osm_buildings_raw.geojson"
 OUT_DIR = RAW_DIR / "osm_buildings"
 WORLDCOVER_DIR = RAW_DIR / "worldcover"

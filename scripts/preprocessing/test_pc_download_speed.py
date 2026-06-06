@@ -15,7 +15,7 @@ import numpy as np
 # ---------------------------------------------------------------------------
 # 配置
 # ---------------------------------------------------------------------------
-PATCH_META = Path("/workspace/raw/heilongjiang_new/qiqihar/patches_meta.json")
+PATCH_META = Path("/workspace/xuannv/data_raw/heilongjiang_new/qiqihar/patches_meta.json")
 OUTPUT_LOG = Path("/workspace/xuannv/pc_speed_test_result.json")
 
 # 选一个 patch（齐齐哈尔中心区域，urban + rural 混合）

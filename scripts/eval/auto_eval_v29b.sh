@@ -3,7 +3,7 @@
 # 训练占用所有 8 张 NPU，只有训练结束后才能进行 NPU 推理
 
 set -e
-OUTDIR=/workspace/outputs/exp_v29b_haidian_tc_simple_0601
+OUTDIR=/workspace/xuannv/outputs/exp_v29b_haidian_tc_simple_0601
 CONFIG=configs/config_haidian_v29b.yaml
 LOG=$OUTDIR/v29b_train.log
 EVAL_LOG=$OUTDIR/auto_eval.log

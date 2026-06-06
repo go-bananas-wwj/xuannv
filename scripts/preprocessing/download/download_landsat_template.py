@@ -26,7 +26,7 @@ START_DATE = "2025-01-01"
 END_DATE = "2026-05-31"
 
 # 4. 输出目录
-OUTPUT_DIR = "/workspace/raw/haidian/landsat"
+OUTPUT_DIR = "/workspace/xuannv/data_raw/haidian/landsat"
 # =================================================
 
 def download_landsat():

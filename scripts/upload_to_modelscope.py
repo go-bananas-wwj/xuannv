@@ -10,7 +10,7 @@ from modelscope.hub.api import HubApi
 
 TOKEN    = "ms-399d1804-1cb3-446a-a3f7-dfc4dc70d977"
 REPO_ID  = "WeijieWu/haidian_sar_2025"
-SRC_ROOT = "/workspace/raw/haidian_sar"
+SRC_ROOT = "/workspace/xuannv/data_raw/haidian_sar"
 LOG_FILE = f"{SRC_ROOT}/upload.log"
 WORKERS  = 8
 

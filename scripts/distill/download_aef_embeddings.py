@@ -321,7 +321,7 @@ def main():
     parser.add_argument("--region", choices=["harbin", "haidian"], required=True)
     parser.add_argument("--year", type=int, default=2024, choices=[2018,2019,2020,2021,2022,2023,2024])
     parser.add_argument("--method", choices=["gee", "cog"], default="cog", help="下载方式")
-    parser.add_argument("--output-dir", type=Path, default=Path("/workspace/raw/aef_embeddings"))
+    parser.add_argument("--output-dir", type=Path, default=Path("/workspace/xuannv/data_raw/aef_embeddings"))
     parser.add_argument("--crop-to-patches", action="store_true", help="裁剪到 patch 级别")
     parser.add_argument("--patches-meta", type=Path, default=None, help="patches_meta.json 路径")
     parser.add_argument("--target-crs", default="EPSG:32650", help="目标 CRS")

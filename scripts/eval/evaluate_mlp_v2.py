@@ -28,8 +28,8 @@ sys.path.insert(0, "/workspace/xuannv")
 from src.models.downstream_heads import PixelMLPHead, PixelConvHead, focal_loss
 
 DATA_ROOTS = [
-    Path("/workspace/raw/harbin"),
-    Path("/workspace/raw/haidian_train/haidian"),
+    Path("/workspace/xuannv/data_raw/harbin_scenes"),
+    Path("/workspace/xuannv/data_raw/haidian_train"),
 ]
 
 TASKS = [

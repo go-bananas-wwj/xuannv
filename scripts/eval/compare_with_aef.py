@@ -84,6 +84,6 @@ def compare(eval_dir: str):
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("用法: python compare_with_aef.py <eval_dir>")
-        print("示例: python compare_with_aef.py /workspace/outputs/exp_v14_anti_collapse_0605/eval_epoch_10")
+        print("示例: python compare_with_aef.py /workspace/xuannv/outputs/exp_v14_anti_collapse_0605/eval_epoch_10")
         sys.exit(1)
     compare(sys.argv[1])

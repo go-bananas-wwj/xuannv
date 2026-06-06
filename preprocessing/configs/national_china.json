@@ -17,9 +17,9 @@
     "step_m": 1280,
     "image_size_px": 128
   },
-  "output_dir": "/workspace/raw/national_china/national_china",
-  "cloud_filtered_dir": "/workspace/raw/national_china/national_china_cloud_filtered",
-  "statistics_dir": "/workspace/statistics/national_china",
+  "output_dir": "/workspace/xuannv/data_raw/national_china/national_china",
+  "cloud_filtered_dir": "/workspace/xuannv/data_raw/national_china/national_china_cloud_filtered",
+  "statistics_dir": "/workspace/xuannv/statistics/national_china",
   "sources": {
     "s2": {
       "enabled": true,
@@ -102,5 +102,5 @@
       "service_account_env": "GEE_SERVICE_ACCOUNT"
     }
   },
-  "patches_meta_path": "/workspace/raw/national_china/patches_meta.json"
+  "patches_meta_path": "/workspace/xuannv/data_raw/national_china/patches_meta.json"
 }

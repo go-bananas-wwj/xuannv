@@ -22,7 +22,7 @@ from olmoearth_pretrain.datatypes import MaskedOlmoEarthSample
 from olmoearth_pretrain.data.normalize import Normalizer, Strategy
 from olmoearth_pretrain.data.constants import Modality
 
-RAW = "/workspace/raw/harbin_newarea_olmoearth"
+RAW = "/workspace/xuannv/data_raw/olmoearth_harbin"
 META = "/workspace/xuannv_show/data/harbin/patches_meta.json"
 # 时序模态: 取整年均匀采样 T 景
 TEMPORAL = ["s2", "s1", "landsat"]
@@ -141,7 +141,7 @@ def main():
     ap.add_argument("--n", type=int, default=20, help="默认取前n个patch")
     ap.add_argument("--T", type=int, default=6, help="时间步数")
     ap.add_argument("--device", default="npu")
-    ap.add_argument("--out", default="/workspace/outputs/olmoearth_harbin/embeddings.npz")
+    ap.add_argument("--out", default="/workspace/xuannv/outputs/olmoearth_harbin/embeddings.npz")
     args = ap.parse_args()
 
     if args.device == "npu":

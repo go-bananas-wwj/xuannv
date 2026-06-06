@@ -4,8 +4,8 @@
 用法（由 train.py 自动调用）:
     python scripts/eval/run_periodic_eval.py \
         --config configs/config_dual_teacher_v1.yaml \
-        --checkpoint /workspace/outputs/exp_dual_teacher_v1/epoch_10.pt \
-        --output /workspace/outputs/exp_dual_teacher_v1/eval_epoch_10.json \
+        --checkpoint /workspace/xuannv/outputs/exp_dual_teacher_v1/epoch_10.pt \
+        --output /workspace/xuannv/outputs/exp_dual_teacher_v1/eval_epoch_10.json \
         --device npu:0
 
 评估内容:
@@ -163,7 +163,7 @@ def knn_semantic_segmentation(embeddings: dict, dataset, month_idx: int = 4):
     from PIL import Image
     import rasterio
 
-    data_root = Path(dataset.data_root) if hasattr(dataset, 'data_root') else Path("/workspace/raw/haidian_train")
+    data_root = Path(dataset.data_root) if hasattr(dataset, 'data_root') else Path("/workspace/xuannv/data_raw/haidian_train")
 
     # 收集所有 patch 的 embedding 和 label
     X_list, y_list = [], []

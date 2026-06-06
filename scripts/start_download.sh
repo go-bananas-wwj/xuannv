@@ -21,13 +21,13 @@ tmux new-session -d -s "$SESSION" -c "$WORK_DIR"
 # 激活 conda 并启动 watchdog
 tmux send-keys -t "$SESSION" "conda activate $CONDA_ENV" Enter
 sleep 1
-tmux send-keys -t "$SESSION" "python3 scripts/download_watchdog.py 2>&1 | tee /workspace/raw/haidian_sar/watchdog_stdout.log" Enter
+tmux send-keys -t "$SESSION" "python3 scripts/download_watchdog.py 2>&1 | tee /workspace/xuannv/data_raw/haidian_sar/watchdog_stdout.log" Enter
 
 echo ""
 echo "✅ 下载任务已在 tmux 会话 '$SESSION' 中启动"
 echo ""
 echo "  查看实时进度:   tmux attach -t $SESSION"
-echo "  查看日志:       tail -f /workspace/raw/haidian_sar/watchdog.log"
-echo "  查看文件统计:   watch -n10 'find /workspace/raw/haidian_sar -name \"*.zip\" | wc -l'"
-echo "  查看磁盘占用:   watch -n30 'du -sh /workspace/raw/haidian_sar/'"
+echo "  查看日志:       tail -f /workspace/xuannv/data_raw/haidian_sar/watchdog.log"
+echo "  查看文件统计:   watch -n10 'find /workspace/xuannv/data_raw/haidian_sar -name \"*.zip\" | wc -l'"
+echo "  查看磁盘占用:   watch -n30 'du -sh /workspace/xuannv/data_raw/haidian_sar/'"
 echo "  停止下载:       tmux kill-session -t $SESSION"

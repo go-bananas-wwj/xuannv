@@ -4,7 +4,7 @@
 #   ./scripts/train/launch_v13.sh                     # 使用默认 4 卡，configs/config.yaml
 #   ./scripts/train//launch_v13.sh --npus 0,1,2,3     # 指定 NPU 编号
 #   ./scripts/train/launch_v13.sh --config configs/v14/v14_multi_baseline.yaml
-#   ./scripts/train/launch_v13.sh --resume /workspace/outputs/exp_xxx/epoch_best_xxx.pt
+#   ./scripts/train/launch_v13.sh --resume /workspace/xuannv/outputs/exp_xxx/epoch_best_xxx.pt
 
 set -e
 cd "$(dirname "$0")/../.."

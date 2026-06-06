@@ -396,7 +396,7 @@ def download_patch_landsat(args):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--city", required=True, choices=list(CITIES.keys()))
-    parser.add_argument("--output-root", default="/workspace/raw/heilongjiang_new")
+    parser.add_argument("--output-root", default="/workspace/xuannv/data_raw/heilongjiang_new")
     parser.add_argument("--max-patches", type=int, default=400)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--sources", nargs="+", default=["s2", "dem", "worldcover"])

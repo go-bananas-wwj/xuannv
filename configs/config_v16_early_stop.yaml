@@ -16,7 +16,7 @@
 # ============================================================
 
 data:
-  aef_embed_dir: /workspace/raw/aef_embeddings/haidian_2025_patches
+  aef_embed_dir: /workspace/xuannv/data_raw/aef_embeddings/haidian_2025_patches
   batch_size: 4
   dataset_type: harbin_patches
   image_size: 128
@@ -25,7 +25,7 @@ data:
   - s2
   - s1
   - landsat
-  manifest_path: /workspace/raw/haidian_train/haidian
+  manifest_path: /workspace/xuannv/data_raw/haidian_train
   multi_region_manifest: /workspace/xuannv/configs/multi_region_manifest.json
   max_frames: 24
   metadata_dim: 4
@@ -43,7 +43,7 @@ data:
     s1: 2
     s2: 6
   spatial_augmentation: true
-  stats_dir: /workspace/statistics/haidian_train
+  stats_dir: /workspace/xuannv/statistics/haidian_train
   target_sources:
   - loss_type: 0
     name: s2
@@ -65,7 +65,7 @@ data:
     name: worldcover
     out_channels: 11
     sensor_src: null
-  teacher_embed_dir: /workspace/raw/aef_embeddings/haidian_2025_patches
+  teacher_embed_dir: /workspace/xuannv/data_raw/aef_embeddings/haidian_2025_patches
   olmoearth_tokens_root: null
   temporal_window_augmentation: true
   temporal_window_max_frames: 24
@@ -78,7 +78,7 @@ data:
 
 experiment:
   name: exp_v16_early_stop_0606
-  output_dir: /workspace/outputs/exp_v16_early_stop_0606
+  output_dir: /workspace/xuannv/outputs/exp_v16_early_stop_0606
   seed: 42
 
 model:
