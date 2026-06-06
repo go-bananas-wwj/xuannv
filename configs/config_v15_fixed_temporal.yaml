@@ -1,0 +1,182 @@
+# ============================================================
+# xuannv v15 — 修复时序对比过强导致 AUC 退化
+# 创建时间: 2026-06-06
+#
+# 修复内容 (基于 v14 诊断):
+# 1. temporal_contrastive_weight: 1.0 → 0.2
+#    原因: 纯斥力 hinge loss 强制"不同时间=不同embedding"，破坏变化检测不变性
+#    参考: CACo (Mall et al., CVPR 2023) — "pushing apart temporally distant pairs 
+#          may be counterproductive for unchanged regions"
+# 2. pre_norm_uniform_weight: 2.0 → 1.0
+#    原因: uniformity 过强导致所有embedding过度分散，changed/unchanged相对差异变小
+# 3. erank_loss_weight: 2.0 → 1.0
+#    原因: eRank 过强可能导致embedding空间扭曲
+# 4. 保留 reconstruction_weight=0.3, AEF蒸馏, VICReg 等结构化损失
+# ============================================================
+
+data:
+  aef_embed_dir: /workspace/raw/aef_embeddings/haidian_2025_patches
+  batch_size: 4
+  dataset_type: harbin_patches
+  image_size: 128
+  input_dim: 6
+  input_sources:
+  - s2
+  - s1
+  - landsat
+  manifest_path: /workspace/raw/haidian_train/haidian
+  multi_region_manifest: /workspace/xuannv/configs/multi_region_manifest.json
+  max_frames: 24
+  metadata_dim: 4
+  num_classes: 11
+  num_input_sources: 3
+  num_samples: 744
+  num_target_sources: 5
+  num_workers: 0
+  preload: true
+  random_target_frame: true
+  recon_mask_patch_size: 16
+  recon_mask_ratio: 0.85
+  source_channels:
+    landsat: 6
+    s1: 2
+    s2: 6
+  spatial_augmentation: true
+  stats_dir: /workspace/statistics/haidian_train
+  target_sources:
+  - loss_type: 0
+    name: s2
+    out_channels: 6
+    sensor_src: s2
+  - loss_type: 0
+    name: s1
+    out_channels: 2
+    sensor_src: s1
+  - loss_type: 0
+    name: landsat
+    out_channels: 6
+    sensor_src: landsat
+  - loss_type: 0
+    name: dem
+    out_channels: 1
+    sensor_src: null
+  - loss_type: 1
+    name: worldcover
+    out_channels: 11
+    sensor_src: null
+  teacher_embed_dir: /workspace/raw/aef_embeddings/haidian_2025_patches
+  olmoearth_tokens_root: null
+  temporal_window_augmentation: true
+  temporal_window_max_frames: 24
+  temporal_window_min_frames: 4
+  temporal_window_prob: 0.5
+  use_dual_teacher: false
+  cross_temporal: true
+  cross_temporal_prob: 0.5
+  cross_temporal_min_gap_months: 1
+
+experiment:
+  name: exp_v15_fixed_temporal_0606
+  output_dir: /workspace/outputs/exp_v15_fixed_temporal_0606
+  seed: 42
+
+model:
+  distill_hidden_dim: 512
+  distill_teacher_dim: 768
+  dropout: 0.1
+  embedding_dim: 64
+  metadata_dim: 4
+  mlp_ratio: 3.0
+  num_classes: 11
+  num_frames: 24
+  num_heads: 4
+  num_input_sources: 3
+  num_layers: 4
+  pos_enc_2d_height: 8
+  pos_enc_2d_width: 8
+  relative_time_code_dim: 16
+  sensor_embedding_dim: 16
+  skip_l2_norm_training: true
+  use_2d_pos_enc: false
+  use_classification_head: true
+  use_distill_head: false
+  use_metadata: true
+  use_sensor_embedding: true
+  window_code_dim: 32
+
+training:
+  aef_batch_uniformity_weight: 0.0
+  aef_global_distill_weight: 0.25
+  aef_spatial_distill_weight: 0.5
+  aux_classification_weight: 0.0
+  backbone_lr_scale: 0.1
+  batch_uniformity_weight: 0.0
+  bottleneck_cls_weight: 0.0
+  change_consistency_weight: 0.0
+  classification_weight: 0.03
+  consistency_weight: 0.0
+  covariance_weight: 0.05
+  ct_reconstruction_weight: 0.0
+  curriculum_end_weight: 1.0
+  curriculum_epochs: 5
+  curriculum_start_weight: 0.5
+  decorrelation_weight: 0.1
+  dino_weight: 0.0
+  distill_projector_warmup_epochs: 0
+  encoder_uniform_weight: 0.0
+  epochs: 60
+  erank_loss_weight: 1.0              # ★ 降低（原 2.0）
+  eval_every: 10
+  grad_clip_norm: 1.0
+  gradient_accumulation_steps: 1
+  hyperspherical_uniform_weight: 0.0
+  inter_decorr_weight: 0.0
+  inter_patch_infonce_weight: 0.0
+  inter_variance_weight: 0.0
+  kappa_end: 8000.0
+  kappa_start: 8000.0
+  kappa_warmup_epochs: 0
+  koleo_weight: 0.0
+  l2_temporal_weight: 0.0
+  lmim_weight: 0.0
+  lr: 0.0001
+  lr_min: 1.0e-06
+  lr_schedule: cosine_no_restart
+  memory_bank_size: 2048
+  olmoearth_global_distill_weight: 0.0
+  olmoearth_spatial_distill_weight: 0.0
+  orthogonality_weight: 0.0
+  patch_id_loss_weight: 0.1
+  patch_id_num_patches: 744
+  pixel_change_supervision_weight: 0.0
+  pixel_temporal_info_nce_weight: 0.0
+  pre_norm_uniform_weight: 1.0        # ★ 降低（原 2.0）
+  recon_warmup_epochs: 0
+  reconstruction_weight: 0.3
+  save_interval: 5
+  source_recon_weights:
+  - 1.0
+  - 1.0
+  - 1.0
+  - 0.02
+  - 0.1
+  spherical_variance_weight: 0.0
+  student_back_drop_prob: 0.15
+  student_frame_drop_rate: 0.5
+  student_front_drop_prob: 0.15
+  student_source_drop_rate: 0.3
+  teacher_dropout_rate: 0.1
+  teacher_momentum: 0.996
+  temporal_contrastive_weight: 0.2    # ★ 大幅降低（原 1.0）
+  temporal_gap_aware_weight: 0.0
+  temporal_magnitude_weight: 0.0
+  text_contrastive_weight: 0.0
+  use_curriculum: true
+  use_pre_norm_uniform: true
+  use_spatial_vicreg: true
+  variance_weight: 0.5
+  vicreg_min_std: 1.0
+  vicreg_weight: 0.0
+  warmup_epochs: 10
+  coding_rate_weight: 0.1
+  max_steps_per_epoch: 200
