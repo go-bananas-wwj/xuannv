@@ -148,7 +148,9 @@ def extract_embedding(model, dataset, patch_month_index, cfg,
             skip_decoder=True,
         )
     emb = out.pre_norm_map if use_pre_norm else out.embedding_map  # [1, D, H, W]
-    emb = F.normalize(emb.float(), p=2, dim=1)
+    emb = emb.float()
+    if not use_pre_norm:
+        emb = F.normalize(emb, p=2, dim=1)
     return emb.squeeze(0).cpu().numpy()   # [D, H, W]
 
 
