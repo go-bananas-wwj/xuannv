@@ -227,7 +227,8 @@ def download_patch_s1(args) -> dict:
                             print(f"      [WARN] All-zero data for {item.id}")
                             failed += 1
                             continue
-                        _save(out_path, data_np, bbox_utm, epsg)
+                        data_db = _to_db(data_np)
+                        _save(out_path, data_db, bbox_utm, epsg)
                         downloaded += 1
                     except Exception as e2:
                         print(f"      [WARN] item {item.id} fallback failed: {e2}")
@@ -246,7 +247,8 @@ def download_patch_s1(args) -> dict:
                     print(f"      [WARN] All-zero data for {item.id}")
                     failed += 1
                     continue
-                _save(out_path, data_np, bbox_utm, epsg)
+                data_db = _to_db(data_np)
+                _save(out_path, data_db, bbox_utm, epsg)
                 downloaded += 1
             except Exception as e:
                 print(f"      [WARN] item {item.id} failed: {e}")
@@ -262,6 +264,13 @@ def download_patch_s1(args) -> dict:
         "failed": failed,
         "time_s": round(time.time() - t0, 1),
     }
+
+
+def _to_db(data: np.ndarray) -> np.ndarray:
+    """将 RTC 线性功率值转为 dB，并裁剪到 [-30, 10]。"""
+    data = np.log10(np.clip(data, 1e-10, None)) * 10.0
+    data = np.clip(data, -30.0, 10.0)
+    return data.astype(np.float32)
 
 
 def _save(path: Path, data: np.ndarray, bbox_utm: list[float], epsg: int):
