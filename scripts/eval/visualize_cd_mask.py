@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """变化检测 Mask 可视化 — 验证标注与 patch 对齐是否正确.
 
+核心改进: 将变化 mask 叠加到 S2 RGB 原图上，可直观验证对齐精度.
+
 用法:
     python visualize_cd_mask.py --period june --output-dir out/cd_viz
     python visualize_cd_mask.py --period all --output-dir out/cd_viz
@@ -23,7 +25,20 @@ import geopandas as gpd
 from shapely.geometry import box, Point
 from shapely import vectorized
 
-# ── 时间窗口 ────────────────────────────────────────────────────────────────
+try:
+    import rasterio
+    HAS_RASTERIO = True
+except ImportError:
+    HAS_RASTERIO = False
+
+# ── 时间窗口 → 季度影像映射 ────────────────────────────────────────────────
+PERIOD_TO_QUARTER = {
+    "june": "2025Q2",
+    "aug": "2025Q3",
+    "September": "2025Q3",
+    "October": "2025Q4",
+}
+
 PERIODS: dict[str, dict] = {
     "june": {
         "before": (1743436800000, 1746028799000),
@@ -49,6 +64,7 @@ def parse_args():
     p.add_argument("--period", default="all", choices=["june", "aug", "September", "October", "all"])
     p.add_argument("--annot-dir", default="/workspace/哈尔滨松北新区变化检测汇总文件/变化检测shp文件")
     p.add_argument("--grid", default="/workspace/index/harbin/grid/harbin_grid.geojson")
+    p.add_argument("--s2-root", default="/workspace/raw/harbin/s2")
     p.add_argument("--output-dir", default="out/cd_viz")
     p.add_argument("--max-patches", type=int, default=20, help="最多可视化 patch 数量")
     p.add_argument("--dpi", type=int, default=150)
@@ -81,13 +97,36 @@ def load_changes(annot_dir: str, period: str) -> list:
         return []
 
 
+def load_s2_rgb(s2_root: str, pid: str, quarter: str) -> np.ndarray | None:
+    """读取 S2 季度合成影像并生成 RGB [H, W, 3] (0-1)."""
+    if not HAS_RASTERIO:
+        return None
+    tif_path = Path(s2_root) / pid / f"{quarter}.tif"
+    if not tif_path.exists():
+        return None
+    try:
+        with rasterio.open(tif_path) as src:
+            data = src.read()  # [C, H, W]
+        if data.shape[0] < 3:
+            return None
+        # S2 6波段: [B2, B3, B4, B8, B11, B12] → RGB=[B4, B3, B2] = idx [2,1,0]
+        rgb = data[[2, 1, 0], ...].transpose(1, 2, 0).astype(np.float32)
+        # 百分位归一化增强可视化
+        p2, p98 = np.percentile(rgb, [2, 98])
+        rgb = (rgb - p2) / (p98 - p2 + 1e-6)
+        rgb = np.clip(rgb, 0, 1)
+        return rgb
+    except Exception as e:
+        print(f"  [警告] 读取 {tif_path} 失败: {e}")
+        return None
+
+
 def build_mask(changes: list, bounds: tuple, H: int = 128, W: int = 128) -> np.ndarray:
     """构建变化 mask，与 auc_eval.py 使用相同逻辑（向量化加速）."""
     mask = np.zeros((H, W), dtype=bool)
     minx, miny, maxx, maxy = bounds
     patch_box = box(minx, miny, maxx, maxy)
 
-    # 向量化生成像素中心坐标网格
     xs = np.linspace(minx + (maxx - minx) / (2 * W), maxx - (maxx - minx) / (2 * W), W)
     ys = np.linspace(maxy - (maxy - miny) / (2 * H), miny + (maxy - miny) / (2 * H), H)
     xv, yv = np.meshgrid(xs, ys)
@@ -95,13 +134,11 @@ def build_mask(changes: list, bounds: tuple, H: int = 128, W: int = 128) -> np.n
     for geom in changes:
         if not patch_box.intersects(geom):
             continue
-        # 使用 buffer(1.0) + contains 检查每个像素中心
         try:
             buffered = geom.buffer(1.0)
             inside = vectorized.contains(buffered, xv, yv)
             mask |= inside
         except Exception:
-            # 回退到逐点检查
             for y in range(H):
                 for x in range(W):
                     px = minx + (x + 0.5) / W * (maxx - minx)
@@ -111,39 +148,60 @@ def build_mask(changes: list, bounds: tuple, H: int = 128, W: int = 128) -> np.n
     return mask
 
 
-def visualize_patch(pid: str, bounds: tuple, changes: list, period: str, output_dir: Path, dpi: int):
-    """为单个 patch 生成可视化图."""
+def visualize_patch(pid: str, bounds: tuple, changes: list, period: str,
+                    s2_root: str, output_dir: Path, dpi: int):
+    """为单个 patch 生成可视化图 (4列: RGB原图 / RGB+Mask叠加 / 地理视图 / Mask二值)."""
     H, W = 128, 128
     mask = build_mask(changes, bounds, H, W)
     changed_pixels = int(mask.sum())
     total_pixels = H * W
     ratio = changed_pixels / total_pixels * 100
 
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    quarter = PERIOD_TO_QUARTER.get(period, "2025Q2")
+    rgb = load_s2_rgb(s2_root, pid, quarter)
+    has_rgb = rgb is not None
 
-    # 1. Mask 二值图
-    ax = axes[0]
-    ax.imshow(mask, cmap="Reds", interpolation="nearest")
-    ax.set_title(f"Changed Mask\n{changed_pixels}/{total_pixels} pixels ({ratio:.1f}%)")
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
+    ncols = 4 if has_rgb else 3
+    fig, axes = plt.subplots(1, ncols, figsize=(5 * ncols, 5))
+    if ncols == 3:
+        axes = [axes[0], axes[1], axes[2]]
+    ax_idx = 0
 
-    # 2. 叠加到 patch 边界框的地理视图
-    ax = axes[1]
+    # 1. RGB 原图
+    if has_rgb:
+        ax = axes[ax_idx]
+        ax_idx += 1
+        ax.imshow(rgb)
+        ax.set_title(f"S2 RGB ({quarter})\n{pid}")
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+
+    # 2. RGB + Mask 叠加
+    if has_rgb:
+        ax = axes[ax_idx]
+        ax_idx += 1
+        ax.imshow(rgb)
+        # 红色半透明叠加变化区域
+        overlay = np.zeros((*mask.shape, 4))
+        overlay[mask] = [1.0, 0.0, 0.0, 0.45]  # R, G, B, alpha
+        ax.imshow(overlay)
+        ax.set_title(f"RGB + Changed Mask\n{changed_pixels}px ({ratio:.1f}%)")
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+
+    # 3. 地理叠加视图 (始终保留)
+    ax = axes[ax_idx]
+    ax_idx += 1
     minx, miny, maxx, maxy = bounds
     ax.set_xlim(minx, maxx)
-    ax.set_ylim(maxy, miny)  # y轴翻转，与图像坐标一致
+    ax.set_ylim(maxy, miny)
     ax.set_aspect("equal")
-    ax.set_title(f"Geographic Overlay\n{bounds[:2]}\n{bounds[2:]}")
+    ax.set_title(f"Geographic Overlay\nChanged polygons")
     ax.set_xlabel("Easting (m)")
     ax.set_ylabel("Northing (m)")
-
-    # 绘制 patch 边界
     rect = plt.Rectangle((minx, miny), maxx - minx, maxy - miny,
                          fill=False, edgecolor="black", linewidth=2)
     ax.add_patch(rect)
-
-    # 绘制变化多边形
     for geom in changes:
         if box(minx, miny, maxx, maxy).intersects(geom):
             try:
@@ -152,19 +210,17 @@ def visualize_patch(pid: str, bounds: tuple, changes: list, period: str, output_
             except Exception:
                 pass
 
-    # 3. 像素级详细视图 + 网格
-    ax = axes[2]
+    # 4. Mask 二值图 (始终保留)
+    ax = axes[ax_idx]
+    ax_idx += 1
     ax.imshow(mask, cmap="RdYlGn_r", interpolation="nearest", vmin=0, vmax=1)
-    ax.set_title(f"Pixel Grid (128×128)\nRed=Changed, Green=Unchanged")
+    ax.set_title(f"Changed Mask Only\nRed=Changed")
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-
-    # 添加网格线
     for i in range(0, W + 1, 16):
         ax.axvline(i - 0.5, color="gray", linewidth=0.3)
         ax.axhline(i - 0.5, color="gray", linewidth=0.3)
 
-    # 在图上标出变化像素数量
     fig.suptitle(f"Patch {pid} | Period: {period} | Changed: {changed_pixels}px ({ratio:.1f}%)",
                  fontsize=14, fontweight="bold")
 
@@ -226,7 +282,6 @@ def main():
             continue
         print(f"    共 {len(changes)} 个变化多边形")
 
-        # 找出与该时期变化相交的 patches
         affected_pids = []
         for pid, bounds in patch_bounds.items():
             pb = box(*bounds)
@@ -237,14 +292,14 @@ def main():
 
         print(f"    涉及 {len(affected_pids)} 个 patch")
 
-        # 限制数量
         if len(affected_pids) > args.max_patches:
             print(f"    限制可视化前 {args.max_patches} 个 patch")
             affected_pids = affected_pids[:args.max_patches]
 
         for pid in sorted(affected_pids):
             out_path, ch_px, ratio = visualize_patch(
-                pid, patch_bounds[pid], changes, period, output_dir, args.dpi
+                pid, patch_bounds[pid], changes, period,
+                args.s2_root, output_dir, args.dpi
             )
             all_results.append({
                 "period": period, "pid": pid,
@@ -256,7 +311,6 @@ def main():
     if all_results:
         visualize_summary(all_results, output_dir, args.dpi)
 
-        # 输出统计摘要
         print("\n" + "=" * 60)
         print("  统计摘要")
         print("=" * 60)
