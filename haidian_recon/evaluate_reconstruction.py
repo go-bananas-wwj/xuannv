@@ -144,7 +144,7 @@ def evaluate_reconstruction(checkpoint_path: str, config_path: str, num_samples:
                 "n_samples": len(metrics["psnr"]),
             }
         else:
-            summary[source_name] = {"psnr_mean": 0.0, "ssim_mean": 0.0, "n_samples": 0}
+            summary[source_name] = {"psnr_mean": 0.0, "psnr_std": 0.0, "ssim_mean": 0.0, "ssim_std": 0.0, "n_samples": 0}
 
     return summary
 
