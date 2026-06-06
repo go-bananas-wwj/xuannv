@@ -35,6 +35,7 @@ class HaidianReconDataset(Dataset):
         self.planet_root = Path(planet_root)
         self.image_size = image_size
         self.source_names = source_names or ["tianyi_sar", "s2", "landsat", "planet"]
+        self.cfg_anchor_source = "tianyi_sar"  # 锚点源
         self.split = split
 
         # 加载时间映射表
@@ -109,7 +110,11 @@ class HaidianReconDataset(Dataset):
 
         batch = {}
         for source_name in self.source_names:
-            file_date = sources_files.get(source_name)
+            # 锚点源（tianyi_sar）的file_date就是anchor_date
+            if source_name == self.cfg_anchor_source:
+                file_date = sample["anchor_date"]
+            else:
+                file_date = sources_files.get(source_name)
             data = self._load_source(patch_id, source_name, file_date)
             if data is not None:
                 # [1, 1, C, H, W] — batch维度=1, 时间维度=1
