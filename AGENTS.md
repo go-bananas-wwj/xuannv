@@ -40,6 +40,7 @@
 - **安装命令**: `pip install -e .`（在 `/workspace/xuannv` 下执行）。
 - **核心依赖**: `torch>=2.0`, `numpy`, `rasterio`, `geopandas`, `pyyaml`。
 - **运行环境**: conda `xuannv`，Python 3.11.15。
+- **无 CI/CD 自动化流水线**：`.github/workflows/` 不存在，测试与部署均靠手动执行。
 
 ### NPU 适配要点
 - 所有 `.cuda()` → `.npu()`。
@@ -57,11 +58,15 @@
 xuannv/
 ├── pyproject.toml              # 包配置（setuptools，极简）
 ├── configs/
-│   └── config.yaml             # 活跃训练配置（支持 _base_ 继承）
-│   └── config_dual_teacher_v1.yaml
-│   └── config_haidian_v*.yaml
-│   └── multi_region_manifest.json
-├── src/                        # 核心源码（包名 xuannv，实际通过 sys.path 直接 import src）
+│   ├── config.yaml             # 活跃训练配置（支持 _base_ 继承）
+│   ├── config_dual_teacher_v1.yaml
+│   ├── config_haidian_v*.yaml  # 海淀区域系列实验配置
+│   ├── config_v14_anti_collapse.yaml
+│   ├── config_v27_quick_diag.yaml
+│   ├── harbin_only_manifest.json
+│   ├── multi_region_manifest.json
+│   └── v14/
+├── src/                        # 核心源码（运行时通过 sys.path 直接 import src）
 │   ├── config.py               # YAML → dataclass 配置加载（支持 _base_ 继承）
 │   ├── data/
 │   │   ├── dataset.py          # HarbinPatchDataset（月度采样，3输入/7目标，内存预加载）
@@ -74,7 +79,7 @@ xuannv/
 │   │   ├── blocks.py           # STPEncoder / SpaceOperator / TimeOperator（手动 MHA）
 │   │   ├── sensor_encoders.py  # SensorEncoderBank（多源独立 stem）
 │   │   ├── decoders.py         # ContinuousDecoder / CategoricalDecoder（逐像素 MLP）
-│   │   ├── heads.py            # ChangeDetectionHeadV1/V2/V3（轻量下游头）
+│   │   ├── heads.py            # ChangeDetectionHead / V2 / V3 / MultiClassChangeDetectionHead
 │   │   ├── downstream_heads.py # PixelMLPHead / PixelConvHead
 │   │   ├── distill_head.py     # OlmoEarth 蒸馏投影头
 │   │   └── time_encoding.py    # TimeCode / WindowCode / RelativeTimeCode
@@ -83,8 +88,7 @@ xuannv/
 │   │   ├── losses.py           # 全部损失函数（raw_uniformity, VICReg, temporal, distill 等）
 │   │   ├── optimizer.py        # AdamW + cosine warmup 调度
 │   │   ├── loops.py            # 重建损失辅助
-│   │   ├── memory_bank.py      # EmbeddingMemoryBank
-│   │   └── vicreg_loss.py      # VICReg 损失
+│   │   └── memory_bank.py      # EmbeddingMemoryBank
 │   ├── downstream/
 │   │   └── heads.py            # SegmentationHead / ClassificationHead / ChangeDetectionHeadSimple
 │   ├── inference/
@@ -92,10 +96,12 @@ xuannv/
 │   └── utils/
 │       ├── checkpoint.py       # load/save_checkpoint（支持多 key 回退）
 │       ├── device.py           # get_device（优先 NPU）
-│       └── logging.py          # 日志工具
+│       └── __init__.py
 ├── scripts/
 │   ├── train/
-│   │   └── train.py            # 训练入口（torchrun DDP）
+│   │   ├── train.py            # 训练入口（torchrun DDP）
+│   │   ├── launch_v13.sh       # v13 训练启动脚本示例
+│   │   └── train_dual_teacher.sh
 │   ├── eval/
 │   │   ├── launch_eval.sh      # 一站式评估启动（extract→knn→auc）
 │   │   ├── extract_embeddings.py  # embedding 批量提取（支持分片并行）
@@ -115,17 +121,24 @@ xuannv/
 │   ├── profile_train_step.py   # 单卡 step profiling
 │   └── visualize/              # 可视化脚本
 ├── preprocessing/              # 数据预处理独立模块（与训练代码解耦）
-│   ├── run.py                  # 预处理统一入口
-│   ├── pipelines/              # 流水线编排（patchify, statistics, manifest）
+│   ├── run.py                  # 预处理统一入口（JSON 配置驱动）
+│   ├── configs/                # harbin.json / haidian.json / national_china.json
+│   ├── pipelines/              # 流水线编排（patchify, statistics, manifest, orchestrator）
 │   ├── downloaders/            # GEE / PlanetaryComputer / 本地导入
 │   ├── processors/             # S2/S1/Landsat 后处理
 │   ├── utils/                  # geo / tiff / logging 工具
 │   └── viz/                    # 可视化
 ├── archive/                    # 废弃代码（只读参考，不得修改）
+│   └── src/training/vicreg_loss.py  # 旧版 VICReg 损失（已归档）
 ├── docs/                       # 项目文档（含 BUG_FIX_LOG.md、业务/专利/参考文献）
 ├── data/                       # 运行时数据输出（change_masks, embeddings, labels）
 └── out/                        # 评估结果输出
 ```
+
+**注意**：
+- `src/utils/logging.py` **不存在**，日志功能由训练脚本内的 `FileLogger` 类或 `preprocessing/utils/logging.py` 提供。
+- `src/training/vicreg_loss.py` **不存在**（已归档至 `archive/src/training/vicreg_loss.py`），当前 VICReg 相关逻辑直接内联在 `losses.py` / `trainer.py` 中。
+- 运行时导入方式：训练/推理脚本普遍在顶部执行 `sys.path.insert(0, "/workspace/xuannv")` 后直接 `import src.xxx`，而非通过包名 `import xuannv`。
 
 ---
 
@@ -140,6 +153,7 @@ xuannv/
   - `data.target_sources`: 列出 7 个重建目标及其 `loss_type`（0=连续/L1，1=分类/CE）。
   - `model.skip_l2_norm_training`: `true` 为当前默认（pre-norm 空间训练）。
   - `training.*_weight`: 大量损失权重开关，按需启用。
+- **预处理配置**独立于训练配置，采用 JSON 格式，位于 `preprocessing/configs/`，由 `preprocessing/run.py` 消费。
 
 ---
 
@@ -180,10 +194,11 @@ model, dataset, cfg = load_backbone(
 - **活跃脚本**: `scripts/train/train.py`
 - **活跃训练器**: `src/training/trainer.py`（类名 `DDPv13Trainer`，保留旧名以兼容 checkpoint）
 - **活跃配置**: `configs/config.yaml` 或 `configs/config_dual_teacher_v1.yaml` 等
+- **旧版脚本已归档**：README 中提及的 `scripts/train/train_xuannv_v2.py` 实际位于 `archive/scripts/train_legacy/`，不可使用。
 
 ### 核心机制
 - **Teacher-Student EMA**: Teacher 为 Student 的 EMA 副本（momentum ~0.996），不参与梯度更新。
-- **Student 扰动**: 每 step 对 Student 输入做源级 drop、帧级 drop、前后截断（向量化实现，避免 GPU→CPU 同步）。
+- **Student 扰动**: 每 step 对 Student 输入做源级 drop、帧级 drop、前后截断（向量化实现，避免 NPU→CPU 同步）。
 - **梯度累积**: 通过 `gradient_accumulation_steps` 配置。
 - **Memory Bank**: 扩大 uniformity / VICReg 的有效 batch（默认大小 512）。
 - **双教师蒸馏（可选）**:
@@ -400,6 +415,7 @@ torchrun --nproc_per_node=2 scripts/train/train.py \
 
 ### 数据预处理部署
 - `preprocessing/run.py` 为独立入口，不依赖训练环境初始化。
+- 配置为 JSON 格式（`preprocessing/configs/harbin.json` 等）。
 - 输出到 `/workspace/raw/` 和 `/workspace/statistics/`，与训练代码解耦。
 
 ---
@@ -442,4 +458,4 @@ if gdf.crs.to_epsg() != 32652:
 
 ---
 
-*最后更新: 2026-06-04*
+*最后更新: 2026-06-06*
