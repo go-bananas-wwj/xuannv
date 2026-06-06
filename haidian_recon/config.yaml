@@ -1,0 +1,50 @@
+experiment_name: hre_haidian_recon_v1
+output_dir: /workspace/xuannv/outputs/hre_haidian_recon_v1
+seed: 42
+device: npu
+backend: hccl
+
+model:
+  image_size: 128
+  patch_size: 8
+  embed_dim: 256
+  num_encoder_layers: 8
+  num_decoder_layers: 4
+  num_heads: 8
+  mlp_ratio: 4.0
+  output_dim: 64
+  dropout: 0.1
+  use_gradient_checkpointing: true
+
+masking:
+  modality_probs: [0.1, 0.25, 0.25, 0.4]
+  temporal_keep_ratio: 0.5
+  spatial_visible_ratio: 0.25
+  channel_keep_ratio: 0.5
+  patch_size: 8
+
+data:
+  num_patches: 320
+  data_root: data_raw/haidian/scenes
+  planet_root: data_raw/beijing/planetscene
+  stats_dir: statistics/haidian
+  cache_dir: haidian_recon/.cache
+  image_size: 128
+  batch_size: 8
+  num_workers: 0
+
+training:
+  epochs: 100
+  lr: 0.0001
+  lr_min: 0.000001
+  weight_decay: 0.05
+  warmup_epochs: 10
+  grad_clip_norm: 1.0
+  w_recon: 1.0
+  w_distill: 0.02
+  w_uniform: 0.01
+  aef_checkpoint: null
+  aef_config: configs/config_haidian_v41.yaml
+  save_every: 10
+  eval_every: 10
+  log_every: 50
