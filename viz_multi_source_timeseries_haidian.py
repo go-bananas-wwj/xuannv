@@ -23,7 +23,13 @@ plt.rcParams["axes.unicode_minus"] = False
 
 HAIDIAN_ROOT = Path("data_raw/haidian/scenes")
 PLANET_ROOT = Path("data_raw/beijing/planetscene")
-PATCH_IDS = ["patch_000000", "patch_000030", "patch_000090", "patch_000180"]
+PATCH_IDS = [
+    "patch_000000", "patch_000016", "patch_000032", "patch_000048",
+    "patch_000064", "patch_000080", "patch_000096", "patch_000112",
+    "patch_000128", "patch_000144", "patch_000160", "patch_000176",
+    "patch_000192", "patch_000208", "patch_000224", "patch_000240",
+    "patch_000256", "patch_000272", "patch_000288", "patch_000304",
+]
 OUT_DIR = Path("data_raw/haidian/viz_multi_source")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 

@@ -251,8 +251,7 @@ def main():
                     f"--config {args.config} "
                     f"--checkpoint {ckpt_path} "
                     f"--output {eval_json_path} "
-                    f"--device npu:{local_rank} "
-                    f"--skip-cd"
+                    f"--device npu:{local_rank}"
                 )
                 logger.Print(f"  [FullEval] Running downstream evaluation for epoch {epoch + 1}...")
                 import subprocess

@@ -260,11 +260,16 @@ def knn_semantic_segmentation(embeddings: dict, dataset, month_idx: int = 4):
 
 
 def change_detection_auc(embeddings: dict, dataset):
-    """变化检测 AUC 评估 (Harbin)."""
+    """变化检测 AUC 评估 (Harbin) — pixel-level 与 auc_eval.py 保持一致.
+
+    关键改进 (2026-06-06):
+    1. 从 patch-level mean 改为 pixel-level cosine distance，与 auc_eval.py 对齐
+    2. 修复 changed_pids 匹配逻辑（移除错误的 break）
+    3. 新增 separation、changed_mean、unchanged_mean 指标
+    """
     try:
         import geopandas as gpd
-        from shapely.geometry import box
-        from sklearn.linear_model import LogisticRegression
+        from shapely.geometry import box, Point
         from sklearn.metrics import roc_auc_score
     except ImportError:
         return {"error": "geopandas or sklearn not available"}
@@ -272,15 +277,27 @@ def change_detection_auc(embeddings: dict, dataset):
     if not GRID_PATH.exists() or not ANNOT_DIR.exists():
         return {"error": "annotation data not found"}
 
-    gdf = gpd.read_file(GRID_PATH)
-    patch_bounds = {}
-    for _, row in gdf.iterrows():
-        pid = row.get("sample_id") or row.get("patch_id") or row.get("id")
-        if pid is None:
-            continue
-        coords = list(row.geometry.exterior.coords)
-        xs, ys = [c[0] for c in coords], [c[1] for c in coords]
-        patch_bounds[pid] = (min(xs), min(ys), max(xs), max(ys))
+    # 加载 grid（优先用 geojson 以兼容 auc_eval.py 的格式）
+    try:
+        with open(GRID_PATH) as f:
+            grid_data = json.load(f)
+        patch_bounds: dict[str, tuple] = {}
+        for feat in grid_data["features"]:
+            pid = feat["properties"]["patch_id"]
+            coords = feat["geometry"]["coordinates"][0]
+            xs, ys = [c[0] for c in coords], [c[1] for c in coords]
+            patch_bounds[pid] = (min(xs), min(ys), max(xs), max(ys))
+    except Exception:
+        # fallback 到 shapefile
+        gdf_grid = gpd.read_file(GRID_PATH)
+        patch_bounds = {}
+        for _, row in gdf_grid.iterrows():
+            pid = row.get("sample_id") or row.get("patch_id") or row.get("id")
+            if pid is None:
+                continue
+            coords = list(row.geometry.exterior.coords)
+            xs, ys = [c[0] for c in coords], [c[1] for c in coords]
+            patch_bounds[pid] = (min(xs), min(ys), max(xs), max(ys))
 
     results = {}
     for period_name, info in CD_PERIODS.items():
@@ -296,68 +313,70 @@ def change_detection_auc(embeddings: dict, dataset):
         if gdf.crs.to_epsg() != 32652:
             gdf = gdf.to_crs(epsg=32652)
 
-        changed_pids = set()
-        for _, row in gdf.iterrows():
-            geom = row.geometry
-            if geom is None:
-                continue
-            for pid, bounds in patch_bounds.items():
-                if box(*bounds).intersects(geom):
-                    changed_pids.add(pid)
+        # 收集所有变化多边形
+        changes = [row.geometry for _, row in gdf.iterrows() if row.geometry is not None]
+
+        all_scores, all_labels = [], []
+        period_ch_means, period_unch_means = [], []
+
+        for local_pid, bounds in patch_bounds.items():
+            # 处理多区域 patch_id 映射
+            full_pid = local_pid
+            for fp in dataset.patches:
+                if fp == local_pid or (('_' in fp and not fp.startswith('patch_')) and fp.split('_', 1)[1] == local_pid):
+                    full_pid = fp
                     break
 
-        # 计算每个 patch 的 before/after 差异
-        diffs = []
-        labels = []
-        for pid in dataset.patches:
-            eb = embeddings.get((pid, before_mi))
-            ea = embeddings.get((pid, after_mi))
+            eb = embeddings.get((full_pid, before_mi))
+            ea = embeddings.get((full_pid, after_mi))
             if eb is None or ea is None:
                 continue
-            # 处理多区域 patch_id 格式（如 harbin_patch_000000 -> patch_000000）
-            local_pid = pid.split('_', 1)[1] if '_' in pid and not pid.startswith('patch_') else pid
-            # cosine distance (patch-level mean)
-            eb_g = eb.mean(axis=(1, 2))  # [D]
-            ea_g = ea.mean(axis=(1, 2))  # [D]
-            cos_sim = np.dot(eb_g, ea_g) / (np.linalg.norm(eb_g) * np.linalg.norm(ea_g) + 1e-8)
-            diffs.append(1.0 - cos_sim)
-            labels.append(1 if local_pid in changed_pids else 0)
 
-        if len(diffs) < 4 or sum(labels) == 0:
+            D, H, W = eb.shape
+            # pixel-level cosine distance map
+            # eb, ea: [D, H, W]，已 L2 归一化
+            dist_map = 1.0 - np.sum(eb * ea, axis=0)  # [H, W]
+
+            # 构建 pixel-level changed mask（与 auc_eval.py 相同逻辑）
+            changed_mask = np.zeros((H, W), dtype=bool)
+            minx, miny, maxx, maxy = bounds
+            patch_box = box(minx, miny, maxx, maxy)
+            for geom in changes:
+                if not patch_box.intersects(geom):
+                    continue
+                # 逐像素判断
+                for y in range(H):
+                    for x in range(W):
+                        px = minx + (x + 0.5) / W * (maxx - minx)
+                        py = maxy - (y + 0.5) / H * (maxy - miny)
+                        if geom.buffer(1.0).contains(Point(px, py)):
+                            changed_mask[y, x] = True
+
+            lflat = changed_mask.flatten()
+            sflat = dist_map.flatten()
+
+            if lflat.sum() == 0 or lflat.sum() == len(lflat):
+                continue
+
+            all_scores.extend(sflat.tolist())
+            all_labels.extend(lflat.tolist())
+
+            ch = float(dist_map[changed_mask].mean()) if changed_mask.any() else 0.0
+            unch = float(dist_map[~changed_mask].mean()) if (~changed_mask).any() else 0.0
+            period_ch_means.append(ch)
+            period_unch_means.append(unch)
+
+        if not all_labels or sum(all_labels) == 0 or sum(all_labels) == len(all_labels):
             continue
 
-        diffs = np.array(diffs)
-        labels = np.array(labels)
-
-        # Cosine distance AUC
-        try:
-            auc_cosine = float(roc_auc_score(labels, diffs))
-        except Exception:
-            auc_cosine = 0.5
-
-        # Linear Discriminator AUC
-        try:
-            X = np.stack([np.concatenate([embeddings[(pid, before_mi)].mean(axis=(1,2)),
-                                          embeddings[(pid, after_mi)].mean(axis=(1,2))])
-                         for pid in dataset.patches
-                         if (pid, before_mi) in embeddings and (pid, after_mi) in embeddings])
-            y = np.array([1 if (pid.split('_', 1)[1] if '_' in pid and not pid.startswith('patch_') else pid) in changed_pids else 0
-                         for pid in dataset.patches
-                         if (pid, before_mi) in embeddings and (pid, after_mi) in embeddings])
-            if len(np.unique(y)) > 1:
-                clf = LogisticRegression(max_iter=1000)
-                clf.fit(X, y)
-                auc_linear = float(roc_auc_score(y, clf.predict_proba(X)[:, 1]))
-            else:
-                auc_linear = 0.5
-        except Exception:
-            auc_linear = 0.5
-
+        auc_score = float(roc_auc_score(all_labels, all_scores))
         results[period_name] = {
-            "auc_cosine": auc_cosine,
-            "auc_linear": auc_linear,
-            "n_samples": len(diffs),
-            "n_changed": int(sum(labels)),
+            "auc": auc_score,
+            "changed_mean": float(np.mean(period_ch_means)) if period_ch_means else 0.0,
+            "unchanged_mean": float(np.mean(period_unch_means)) if period_unch_means else 0.0,
+            "separation": float(np.mean(period_ch_means) - np.mean(period_unch_means)) if period_ch_means else 0.0,
+            "n_samples": len(all_labels),
+            "n_positive": int(sum(all_labels)),
         }
 
     return results
