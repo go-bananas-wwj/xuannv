@@ -45,6 +45,6 @@ training:
   w_uniform: 0.01
   aef_checkpoint: null
   aef_config: configs/config_haidian_v41.yaml
-  save_every: 10
-  eval_every: 10
+  save_every: 5
+  eval_every: 5
   log_every: 50
