@@ -5,6 +5,9 @@ import argparse
 import os
 import sys
 
+import random
+
+import numpy as np
 import torch
 
 torch.set_num_threads(4)
@@ -78,9 +81,18 @@ def main() -> None:
         world_size = 1
         local_rank = 0
 
+    # 随机种子: 每个rank用不同seed保证mask策略独立但可复现
+    seed = cfg.seed + rank
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if hasattr(torch_npu, 'manual_seed_all'):
+        torch_npu.manual_seed_all(seed)
+
     if rank == 0:
         print(f"=== HaidianReconEncoder Training ===")
         print(f"Rank: {rank}/{world_size}, LocalRank: {local_rank}, Device: npu:{local_rank}")
+        print(f"Seed: {seed}")
 
     # 配置
     if args.config and os.path.exists(args.config):

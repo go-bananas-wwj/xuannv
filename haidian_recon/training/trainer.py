@@ -183,12 +183,12 @@ class HRETrainer:
                     if self.rank == 0:
                         print(f"[WARN] NaN/Inf loss at step {self.global_step}, skipping...")
                     self.optimizer.zero_grad()
-                    # dummy backward保持DDP同步
+                    # dummy backward: 触发所有参数的DDP all-reduce hook，防止死锁
                     if self.world_size > 1:
-                        for p in self.model.parameters():
-                            if p.requires_grad:
-                                p.grad = torch.zeros_like(p)
-                                break
+                        dummy = sum(p.view(-1)[0] for p in self.model.parameters() if p.requires_grad) * 0.0
+                        dummy.backward()
+                    self.scheduler.step()
+                    self.global_step += 1
                     continue
 
                 # 反向传播

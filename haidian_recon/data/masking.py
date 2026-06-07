@@ -158,6 +158,13 @@ class FourLayerMask(nn.Module):
             x_masked = x.clone()
             _, T_src, C, H, W = x_masked.shape
 
+            # 对batch中无效sample（该源缺失）的数据全部置零，避免污染encoder
+            valid_key = f"{source_name}_valid"
+            if valid_key in batch:
+                valid_mask = batch[valid_key]  # [B]
+                if not valid_mask.all():
+                    x_masked[~valid_mask] = 0.0
+
             # Layer 2: 时间步mask（向量化）
             n_keep = max(1, int(T_src * self.temporal_keep_ratio))
             keep_indices = torch.randperm(T_src, device=device)[:n_keep]
