@@ -84,13 +84,14 @@ def main() -> None:
         print(f"Config: batch_size={args.batch_size}, lr={args.lr}, max_steps={args.max_steps}")
 
     # Build datasets
+    source_names = ["tianyi_sar", "s1", "s2", "landsat", "planet"]
     train_dataset = HaidianAEFDataset(
         data_root="data_raw/haidian/scenes",
         planet_root="data_raw/beijing/planetscene",
         stats_dir="statistics/haidian",
         split="train",
         image_size=128,
-        source_names=["tianyi_sar", "s2", "landsat", "planet"],
+        source_names=source_names,
         max_frames=16,
     )
     val_dataset = HaidianAEFDataset(
@@ -99,7 +100,7 @@ def main() -> None:
         stats_dir="statistics/haidian",
         split="val",
         image_size=128,
-        source_names=["tianyi_sar", "s2", "landsat", "planet"],
+        source_names=source_names,
         max_frames=16,
     )
 
@@ -127,6 +128,7 @@ def main() -> None:
     # Build model
     source_channels = {
         "tianyi_sar": 1,
+        "s1": 2,
         "s2": 6,
         "landsat": 6,
         "planet": 4,
