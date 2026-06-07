@@ -40,10 +40,16 @@ class HaidianReconDataset(Dataset):
         self.split = split
         self.aef_embedding_root = Path(aef_embedding_root) if aef_embedding_root else None
 
-        # 加载时间映射表
+        # 加载时间映射表（不存在时自动生成）
         mapping_path = Path(cache_dir) / "temporal_mapping.json"
         if not mapping_path.exists():
-            raise FileNotFoundError(f"Temporal mapping not found: {mapping_path}")
+            print(f"[Dataset] Temporal mapping not found, building...")
+            from haidian_recon.scripts.build_temporal_mapping import build_mapping
+            build_mapping(
+                data_root=str(self.data_root),
+                planet_root=str(self.planet_root),
+                output_path=str(mapping_path),
+            )
         with open(mapping_path) as f:
             self.mapping = json.load(f)
 
