@@ -34,7 +34,7 @@ data:
   num_workers: 0
 
 training:
-  epochs: 54
+  epochs: 150
   lr: 0.0001
   lr_min: 0.000001
   weight_decay: 0.05
