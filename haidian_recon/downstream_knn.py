@@ -121,11 +121,17 @@ def extract_embeddings_and_labels(
 
     with torch.no_grad():
         for batch in loader:
-            valid_mask = batch.get("valid_mask")
-            if valid_mask is not None and not valid_mask[0].item():
+            # 检查是否有至少一个源的数据有效
+            has_valid = False
+            for key in batch:
+                if key.endswith("_valid") and key != "aef_embedding_valid":
+                    if batch[key][0].item():
+                        has_valid = True
+                        break
+            if not has_valid:
                 continue
 
-            patch_name = batch.get("patch_name", ["unknown"])[0]
+            patch_name = batch["patch_id"][0]
             patch_dir = os.path.join(data_root, patch_name)
             wc_label = read_worldcover_label(patch_dir, target_size=cfg.data.image_size)
             if wc_label is None:

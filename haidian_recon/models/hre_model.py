@@ -196,8 +196,18 @@ class HREModel(nn.Module):
             }
         """
         # 1. Patch Embedding + Token Encoding
+        # 显式获取 batch size（避免在循环内定义后在循环外使用）
+        B = next(
+            (v.shape[0] for v in batch.values() if isinstance(v, torch.Tensor)),
+            None,
+        )
+        if B is None:
+            raise ValueError("No valid input tensors in batch")
+
         all_tokens = []
         source_info = []  # 记录每个源的空间布局信息
+        spatial_token_offset = 0  # 首个 encode 源在 encoder_output 中的起始索引
+        first_encode_n = 0  # 首个 encode 源的空间 token 数
 
         for source_idx, source_name in enumerate(self.source_names):
             x = batch.get(source_name)
@@ -206,13 +216,17 @@ class HREModel(nn.Module):
 
             # Patch embed: [B, T, N, D] — N=256统一
             tokens = self.patch_embed(x, source_name)
-            B, T, N, D = tokens.shape
+            B2, T, N, D = tokens.shape
+            assert B2 == B, f"Batch size mismatch: {B2} vs {B}"
 
             # Token encoding
             time_indices = torch.arange(T, device=tokens.device).unsqueeze(0).expand(B, T)
             tokens = self.token_encoding(tokens, source_idx, time_indices)
 
-            # 记录空间布局
+            # 记录空间布局（仅记录首个 encode 源的空间 token 位置）
+            if len(all_tokens) == 0:
+                spatial_token_offset = 0
+                first_encode_n = T * N
             source_info.append({
                 "name": source_name,
                 "T": T,
@@ -237,10 +251,15 @@ class HREModel(nn.Module):
         embedding = self.bottleneck(encoder_output)
 
         # 4. 空间embedding: 从encoder_output逐位置投影 → [B, 64, 128, 128]
+        # 使用首个 encode 源的实际 token 范围（而非硬编码前256个）
         grid_size = int(math.sqrt(self.n_patches))
-        n_first = grid_size * grid_size  # 第一个源的256个空间token
-        # 取encoder_output中前N个token，reshape为空间网格
-        spatial_tokens = encoder_output[:, :n_first, :]  # [B, 256, 512]
+        assert self.n_patches == grid_size * grid_size, \
+            f"n_patches {self.n_patches} must be perfect square for spatial reshape"
+        spatial_tokens = encoder_output[:, spatial_token_offset:spatial_token_offset + first_encode_n, :]  # [B, first_encode_n, 512]
+        # 仅 reshape 当 token 数匹配预期空间 patch 数（首个 encode 源通常是 T=1）
+        if first_encode_n != self.n_patches:
+            # 若时间维度 >1，取第一个时间步的空间 token（与之前行为一致）
+            spatial_tokens = spatial_tokens[:, :self.n_patches, :]
         spatial_tokens = spatial_tokens.reshape(B, grid_size, grid_size, self.embed_dim)
 
         # 逐位置投影到64维（每个空间位置独立投影）
