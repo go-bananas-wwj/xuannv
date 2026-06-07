@@ -178,7 +178,7 @@ class HRETrainer:
                     loss_spatial_uniform = spatial_uniformity_loss(output["embedding_map"])
 
                 # 总损失
-                w_spatial = getattr(cfg, "w_spatial_uniform", 0.005)
+                w_spatial = getattr(cfg, "w_spatial_uniform", 0.02)
                 loss = (
                     cfg.w_recon * loss_recon
                     + cfg.w_distill * loss_distill

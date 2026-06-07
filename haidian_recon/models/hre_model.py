@@ -130,16 +130,20 @@ class HREModel(nn.Module):
             dropout=dropout,
         )
 
-        # Spatial head: 从64维embedding生成空间embedding [B, 64, 16, 16]
+        # Token-to-spatial: 从512维encoder token逐位置投影到64维
+        self.token_to_spatial = nn.Sequential(
+            nn.LayerNorm(embed_dim),
+            nn.Linear(embed_dim, output_dim),
+            nn.GELU(),
+            nn.Linear(output_dim, output_dim),
+        )
+        # Spatial head: 对64维空间embedding做非线性调制
         self.spatial_head = nn.Sequential(
             nn.LayerNorm(output_dim),
             nn.Linear(output_dim, output_dim),
             nn.GELU(),
             nn.Linear(output_dim, output_dim),
         )
-        # 可学习空间偏置，添加位置变化
-        grid_size = int(math.sqrt(self.n_patches))  # 16
-        self.spatial_bias = nn.Parameter(torch.randn(1, output_dim, grid_size, grid_size) * 0.02)
 
         # Decoder
         self.decoder = HRDecoder(
@@ -232,14 +236,20 @@ class HREModel(nn.Module):
         # 3. Bottleneck → 全局64维Embedding
         embedding = self.bottleneck(encoder_output)
 
-        # 4. 空间embedding: 从64维embedding生成 → [B, 64, 128, 128]
+        # 4. 空间embedding: 从encoder_output逐位置投影 → [B, 64, 128, 128]
         grid_size = int(math.sqrt(self.n_patches))
-        # 全局64维embedding广播到空间网格 + 可学习偏置
-        spatial_emb = embedding.view(B, self.output_dim, 1, 1)  # [B, 64, 1, 1]
-        spatial_emb = spatial_emb.expand(-1, -1, grid_size, grid_size)  # [B, 64, g, g]
-        spatial_emb = spatial_emb + self.spatial_bias  # 添加空间变化
+        n_first = grid_size * grid_size  # 第一个源的256个空间token
+        # 取encoder_output中前N个token，reshape为空间网格
+        spatial_tokens = encoder_output[:, :n_first, :]  # [B, 256, 512]
+        spatial_tokens = spatial_tokens.reshape(B, grid_size, grid_size, self.embed_dim)
+
+        # 逐位置投影到64维（每个空间位置独立投影）
+        spatial_emb = self.token_to_spatial(spatial_tokens)  # [B, g, g, 64]
+
+        # 加入全局embedding做残差调制，增强全局-局部交互
+        spatial_emb = spatial_emb + embedding.view(B, self.output_dim, 1, 1).permute(0, 2, 3, 1)
+
         # 通过spatial_head添加非线性变换
-        spatial_emb = spatial_emb.permute(0, 2, 3, 1)  # [B, g, g, 64]
         spatial_emb = self.spatial_head(spatial_emb)  # [B, g, g, 64]
         spatial_emb = spatial_emb.permute(0, 3, 1, 2)  # [B, 64, g, g]
 
