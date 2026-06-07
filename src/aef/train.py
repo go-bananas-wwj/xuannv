@@ -142,7 +142,7 @@ def main() -> None:
     model = model.to(device)
 
     if world_size > 1:
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=False)
+        model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True)
 
     # Resume
     start_step = 0
