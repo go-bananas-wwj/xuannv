@@ -10,11 +10,11 @@ class MultiScalePatchEmbed(nn.Module):
     """
     Per-source patch embedding with resolution-aware patch sizes.
 
-    High-res sources (Planet 3m, SAR 3m): patch_size=4  -> 64x64 tokens -> pool to 32x32
-    Mid-res sources (S2 10m):            patch_size=8  -> 32x32 tokens
-    Low-res sources (Landsat 30m):       patch_size=16 -> 16x16 tokens -> upsample to 32x32
+    High-res sources (Planet 3m, SAR 3m): patch_size=4  -> 32x32 tokens -> pool to 16x16
+    Mid-res sources (S2 10m):            patch_size=8  -> 16x16 tokens
+    Low-res sources (Landsat 30m):       patch_size=16 -> 8x8 tokens   -> upsample to 16x16
 
-    All sources output a unified [B, T, 1024, D] token sequence for the encoder.
+    All sources output a unified [B, T, 256, D] token sequence for the encoder.
     """
 
     def __init__(
@@ -22,7 +22,7 @@ class MultiScalePatchEmbed(nn.Module):
         source_channels: dict[str, int],
         embed_dim: int = 512,
         patch_size: int = 8,
-        image_size: int = 256,
+        image_size: int = 128,
     ) -> None:
         super().__init__()
         self.source_channels = source_channels
@@ -37,9 +37,9 @@ class MultiScalePatchEmbed(nn.Module):
             "landsat": 16,
         }
 
-        # Target token grid: all sources unified to 32x32 = 1024 tokens
-        self.target_grid = image_size // 8  # 256 // 8 = 32
-        self.target_n_patches = self.target_grid ** 2  # 1024
+        # Target token grid: all sources unified to 16x16 = 256 tokens
+        self.target_grid = image_size // 8  # 128 // 8 = 16
+        self.target_n_patches = self.target_grid ** 2  # 256
 
         # Per-source stems
         self.stems = nn.ModuleDict()
@@ -53,10 +53,10 @@ class MultiScalePatchEmbed(nn.Module):
                 bias=True,
             )
 
-        # High-res token pooling: 64x64 -> 32x32 (Planet, SAR)
+        # High-res token pooling: 32x32 -> 16x16 (Planet, SAR)
         self.token_pool = nn.AvgPool2d(kernel_size=2, stride=2)
 
-        # Low-res token upsampling: 16x16 -> 32x32 (Landsat)
+        # Low-res token upsampling: 8x8 -> 16x16 (Landsat)
         self.token_upsample = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
 
     def forward(
@@ -69,7 +69,7 @@ class MultiScalePatchEmbed(nn.Module):
             x: [B, T, C, H, W] or [B, C, H, W]
             source_name: source key
         Returns:
-            tokens: [B, T, 1024, embed_dim]  (always 1024 patches)
+            tokens: [B, T, 256, embed_dim]  (always 256 patches)
         """
         stem = self.stems[source_name]
 
@@ -95,15 +95,15 @@ class MultiScalePatchEmbed(nn.Module):
 
         # Resolution-aware token grid adjustment
         if source_name in ("planet", "tianyi_sar"):
-            # 64x64 -> 32x32 via pooling
+            # 32x32 -> 16x16 via pooling
             feat = self.token_pool(feat)
         elif source_name == "landsat":
-            # 16x16 -> 32x32 via upsampling
+            # 8x8 -> 16x16 via upsampling
             feat = self.token_upsample(feat)
-        # s2: 32x32, no change needed
+        # s2: 16x16, no change needed
 
         # Flatten to [B*T, n_patches, D]
-        feat = feat.flatten(2).transpose(1, 2)  # [B*T, 1024, embed_dim]
+        feat = feat.flatten(2).transpose(1, 2)  # [B*T, 256, embed_dim]
 
         if x.dim() == 5:
             feat = feat.reshape(B, T, self.target_n_patches, self.embed_dim)

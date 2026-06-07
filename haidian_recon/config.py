@@ -7,7 +7,7 @@ from typing import Dict, List
 
 @dataclass
 class ModelConfig:
-    image_size: int = 256
+    image_size: int = 128
     patch_size: int = 8
     embed_dim: int = 512
     num_encoder_layers: int = 12
@@ -32,14 +32,14 @@ class MaskingConfig:
 @dataclass
 class DataConfig:
     num_patches: int = 320
-    data_root: str = "data_raw/haidian/scenes_256"
-    planet_root: str = "data_raw/beijing/planetscene_256"
+    data_root: str = "data_raw/haidian/scenes"
+    planet_root: str = "data_raw/beijing/planetscene"
     stats_dir: str = "statistics/haidian"
     cache_dir: str = "haidian_recon/.cache"
     anchor_source: str = "tianyi_sar"
     temporal_window_days: float = 5.5
-    image_size: int = 256
-    batch_size: int = 4
+    image_size: int = 128
+    batch_size: int = 8
     num_workers: int = 0  # NPU上先设为0避免死锁
     sources: List[Dict] = field(default_factory=lambda: [
         {"name": "tianyi_sar", "channels": 1, "stats_path": "statistics/haidian/tianyi_sar_stats.json"},
