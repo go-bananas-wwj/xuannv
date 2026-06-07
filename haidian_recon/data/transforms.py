@@ -39,20 +39,13 @@ def normalize_source(data: np.ndarray, source_name: str, stats: dict) -> np.ndar
     source_name = source_name.lower().strip()
 
     # 1. 源特定预处理
-    if source_name == "planet":
-        # Planet: uint16 DN值 → 反射率缩放 → log变换
-        if data.max() > 100:
-            data = data / 10000.0
-        data = np.log(np.clip(data, 0, None) + 1) / 10.0
-    elif source_name in ("s2", "landsat"):
-        # 光学源: log(x+1)/10 变换
-        if data.max() < 2.0:
-            data = data * 10000.0
+    # NOTE: 海淀/哈尔滨数据已通过 preprocessing 流水线预处理为反射率/dB，
+    # 此处不再使用启发式判断，直接按已知格式处理。
+    if source_name in ("planet", "s2", "landsat"):
+        # 光学源: 已为标准反射率 [0,1]，直接 log(x+1)/10 压缩动态范围
         data = np.log(np.clip(data, 0, None) + 1) / 10.0
     elif source_name in ("s1", "tianyi_sar"):
-        # SAR: dB范围裁剪
-        if data.max() > 100:
-            data = np.log10(np.clip(data / 10000.0, 1e-10, None)) * 10.0
+        # SAR: 已为 dB 值，直接裁剪到合理范围
         data = np.clip(data, -30.0, 10.0)
 
     # 2. z-score 归一化

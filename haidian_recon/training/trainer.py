@@ -143,11 +143,11 @@ class HRETrainer:
                 self.train_sampler.set_epoch(epoch)
 
             self.model.train()
-            epoch_loss = 0.0
-            epoch_recon = 0.0
-            epoch_distill = 0.0
-            epoch_uniform = 0.0
-            epoch_spatial_uniform = 0.0
+            epoch_loss = torch.tensor(0.0, device=self.device)
+            epoch_recon = torch.tensor(0.0, device=self.device)
+            epoch_distill = torch.tensor(0.0, device=self.device)
+            epoch_uniform = torch.tensor(0.0, device=self.device)
+            epoch_spatial_uniform = torch.tensor(0.0, device=self.device)
             actual_batches = 0
 
             for batch_idx, batch in enumerate(self.train_loader):
@@ -163,11 +163,16 @@ class HRETrainer:
                 # 重建损失
                 loss_recon = reconstruction_loss(output["reconstructions"], batch, mask_info)
 
-                # AEF蒸馏 — 使用预计算的embedding
+                # AEF蒸馏 — 使用预计算的embedding，过滤掉全0的无效样本
                 loss_distill = torch.tensor(0.0, device=self.device)
                 if self.use_aef_distill and batch.get("aef_embedding") is not None:
                     aef_emb = batch["aef_embedding"]
-                    loss_distill = aef_distillation_loss(output["embedding"], aef_emb)
+                    aef_valid = aef_emb.abs().sum(dim=-1) > 1e-6
+                    if aef_valid.any():
+                        loss_distill = aef_distillation_loss(
+                            output["embedding"][aef_valid],
+                            aef_emb[aef_valid],
+                        )
 
                 # 推散损失（全局）
                 loss_uniform = uniformity_loss(output["embedding"])
@@ -207,12 +212,12 @@ class HRETrainer:
                 self.optimizer.step()
                 self.scheduler.step()
 
-                # 记录
-                epoch_loss += loss.item()
-                epoch_recon += loss_recon.item()
-                epoch_distill += loss_distill.item()
-                epoch_uniform += loss_uniform.item()
-                epoch_spatial_uniform += loss_spatial_uniform.item()
+                # 记录（device上累加，避免NPU同步瓶颈）
+                epoch_loss += loss.detach()
+                epoch_recon += loss_recon.detach()
+                epoch_distill += loss_distill.detach()
+                epoch_uniform += loss_uniform.detach()
+                epoch_spatial_uniform += loss_spatial_uniform.detach()
                 self.global_step += 1
                 actual_batches += 1
 
@@ -225,11 +230,11 @@ class HRETrainer:
             # Epoch日志
             n_batches = actual_batches if actual_batches > 0 else 1
             if self.rank == 0:
-                avg_loss = epoch_loss / n_batches
-                avg_recon = epoch_recon / n_batches
-                avg_distill = epoch_distill / n_batches
-                avg_uniform = epoch_uniform / n_batches
-                avg_spatial = epoch_spatial_uniform / n_batches
+                avg_loss = (epoch_loss / n_batches).item()
+                avg_recon = (epoch_recon / n_batches).item()
+                avg_distill = (epoch_distill / n_batches).item()
+                avg_uniform = (epoch_uniform / n_batches).item()
+                avg_spatial = (epoch_spatial_uniform / n_batches).item()
                 print(f"[Epoch {epoch}] loss={avg_loss:.4f} "
                       f"recon={avg_recon:.4f} "
                       f"distill={avg_distill:.4f} "
@@ -353,6 +358,8 @@ class HRETrainer:
                 lr=self.cfg.training.lr,
                 weight_decay=self.cfg.training.weight_decay,
             )
+            # 重建optimizer后必须更新scheduler引用，否则LR调度失效
+            self.scheduler.optimizer = self.optimizer
         else:
             self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
         self.start_epoch = ckpt["epoch"] + 1

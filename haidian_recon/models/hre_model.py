@@ -251,15 +251,20 @@ class HREModel(nn.Module):
 
         # 通过spatial_head添加非线性变换
         spatial_emb = self.spatial_head(spatial_emb)  # [B, g, g, 64]
-        spatial_emb = spatial_emb.permute(0, 3, 1, 2)  # [B, 64, g, g]
+        spatial_emb_map = spatial_emb.permute(0, 3, 1, 2)  # [B, 64, g, g]
 
         # 上采样到128×128（每个像素一个64D向量）
         embedding_map = F.interpolate(
-            spatial_emb,
+            spatial_emb_map,
             size=(self.image_size, self.image_size),
             mode="bilinear",
             align_corners=False,
         )  # [B, 64, 128, 128]
+
+        # L2 归一化：确保 embedding 分布在单位球面上（下游 kNN/cosine 评估需要）
+        # 注意：保持 spatial_emb 不变，仅归一化返回的 embedding_map
+        embedding_map_norm = embedding_map.norm(dim=1, keepdim=True).clamp(min=1e-8)
+        embedding_map = embedding_map / embedding_map_norm
 
         # 5. 推理时不需要重建
         if mask_info is None or not mask_info.get("decode_sources"):
@@ -293,10 +298,10 @@ class HREModel(nn.Module):
             mask_tokens = self.token_encoding(mask_tokens, source_idx, time_indices)
             mask_tokens = mask_tokens.reshape(B, T * N, self.embed_dim)
 
-            # Decoder: 64维embedding广播后投影到512维，作为重建条件
-            decoder_cond = self.cond_proj(embedding).unsqueeze(1)  # [B, 1, D]
-            decoder_cond = decoder_cond.expand(-1, encoder_output.shape[1], -1)  # [B, N_total, D]
-            decoded = self.decoder(mask_tokens, decoder_cond)  # [B, T*N, D]
+            # Decoder: 使用空间64维embedding作为条件（每个位置独立，非广播）
+            decoder_kv = spatial_emb.reshape(B, -1, self.output_dim)  # [B, 256, 64]
+            decoder_kv = self.cond_proj(decoder_kv)  # [B, 256, 512]
+            decoded = self.decoder(mask_tokens, decoder_kv)  # [B, T*N, D]
 
             # Reconstruction head
             decoded = decoded.reshape(B * T, N, self.embed_dim)

@@ -63,18 +63,13 @@ def _compute_source_stats_worker(args: tuple) -> tuple[str, dict | None]:
                     continue
 
                 # 光学源：log(x+1)/10 变换（与训练时一致）
-                if source_name in {"s2", "landsat"}:
-                    if data.max() < 2.0:
-                        data = data * 10000.0
+                # NOTE: 数据已通过 preprocessing 流水线转为标准反射率 [0,1]，不再使用启发式判断
+                if source_name in {"s2", "landsat", "planet"}:
                     data = np.log(np.clip(data, 0, None) + 1) / 10.0
 
-                # SAR 源：若还是线性 DN 则转 dB
-                if source_name in {"s1", "s1_hr", "sar"}:
-                    if data.max() > 100:
-                        data = 10.0 * np.log10(np.clip(data / 10000.0, 1e-10, None))
-                    elif data.max() <= 2.0:
-                        data = 10.0 * np.log10(np.clip(data, 1e-10, None))
-                    # 已是 dB（含负值）则不转换
+                # SAR 源：已为 dB 值，直接裁剪
+                if source_name in {"s1", "s1_hr", "sar", "tianyi_sar"}:
+                    data = np.clip(data, -30.0, 10.0)
 
                 all_samples.append(data)
             except Exception:
