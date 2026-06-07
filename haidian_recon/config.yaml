@@ -1,5 +1,5 @@
-experiment_name: hre_haidian_recon_v1
-output_dir: /workspace/xuannv/outputs/hre_haidian_recon_v1
+experiment_name: hre_haidian_recon_v2
+output_dir: /workspace/xuannv/outputs/hre_haidian_recon_v2
 seed: 42
 device: npu
 backend: hccl
@@ -7,9 +7,9 @@ backend: hccl
 model:
   image_size: 128
   patch_size: 8
-  embed_dim: 256
-  num_encoder_layers: 8
-  num_decoder_layers: 4
+  embed_dim: 512
+  num_encoder_layers: 12
+  num_decoder_layers: 8
   num_heads: 8
   mlp_ratio: 4.0
   output_dim: 64
@@ -42,7 +42,7 @@ training:
   grad_clip_norm: 1.0
   w_recon: 1.0
   w_distill: 0.02
-  w_uniform: 0.01
+  w_uniform: 0.001
   aef_checkpoint: null
   aef_config: configs/config_haidian_v41.yaml
   save_every: 5
