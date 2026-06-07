@@ -310,6 +310,17 @@ class HRETrainer:
         torch.save(state, path)
         print(f"[Save] Checkpoint saved to {path}")
 
+        # 只保留最近 3 个 checkpoint，删除旧的
+        if self.rank == 0:
+            ckpt_files = sorted(
+                self.output_dir.glob("epoch_*.pt"),
+                key=lambda p: int(p.stem.split("_")[1]),
+            )
+            if len(ckpt_files) > 3:
+                for old_ckpt in ckpt_files[:-3]:
+                    old_ckpt.unlink()
+                    print(f"[Cleanup] Removed old checkpoint: {old_ckpt.name}")
+
     def load_checkpoint(self, path: str) -> None:
         ckpt = torch.load(path, map_location=self.device)
         state = ckpt["model_state_dict"]
