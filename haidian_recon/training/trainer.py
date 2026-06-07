@@ -252,7 +252,7 @@ class HRETrainer:
                 self.evaluate()
 
             # 每20epoch可视化：损失曲线 + 重建图像对比
-            if self.rank == 0 and (epoch + 1) % 20 == 0:
+            if self.rank == 0 and ((epoch + 1) % 20 == 0 or (epoch + 1) % 20 == 1):
                 if len(self.loss_history) > 0:
                     self.plot_losses(epoch)
                 self.visualize_reconstructions(epoch)
