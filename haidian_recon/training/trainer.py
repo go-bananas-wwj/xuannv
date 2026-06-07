@@ -325,13 +325,27 @@ class HRETrainer:
     def load_checkpoint(self, path: str) -> None:
         ckpt = torch.load(path, map_location=self.device)
         state = ckpt["model_state_dict"]
-        # strict=False: 跳过不匹配的参数（如架构变更新增的cond_proj）
-        missing, unexpected = (self.model.module if hasattr(self.model, "module") else self.model).load_state_dict(state, strict=False)
+        # 过滤掉形状不匹配的参数（如spatial_head维度变化）
+        model_state = (self.model.module if hasattr(self.model, "module") else self.model).state_dict()
+        filtered_state = {}
+        shape_mismatch = []
+        for k, v in state.items():
+            if k in model_state:
+                if v.shape == model_state[k].shape:
+                    filtered_state[k] = v
+                else:
+                    shape_mismatch.append(f"{k}: ckpt{v.shape} != model{model_state[k].shape}")
+        if shape_mismatch:
+            print(f"[Load] Shape mismatch (skipped {len(shape_mismatch)} params):")
+            for m in shape_mismatch[:5]:
+                print(f"  {m}")
+        # strict=False: 跳过不匹配的参数
+        missing, unexpected = (self.model.module if hasattr(self.model, "module") else self.model).load_state_dict(filtered_state, strict=False)
         if missing:
             print(f"[Load] Missing keys (will be initialized): {missing}")
         if unexpected:
             print(f"[Load] Unexpected keys (skipped): {unexpected}")
-        if missing:
+        if missing or shape_mismatch:
             # 模型架构变化（如新增cond_proj），optimizer state不匹配，重新初始化
             print("[Load] Model architecture changed, reinitializing optimizer")
             self.optimizer = build_optimizer(
