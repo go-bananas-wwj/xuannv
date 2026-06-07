@@ -29,6 +29,7 @@ class HaidianReconDataset(Dataset):
         split: str = "train",
         train_ratio: float = 0.9,
         seed: int = 42,
+        aef_embedding_root: str | None = "data_raw/haidian/aef_embeddings/haidian_2025_patches",
     ) -> None:
         super().__init__()
         self.data_root = Path(data_root)
@@ -37,6 +38,7 @@ class HaidianReconDataset(Dataset):
         self.source_names = source_names or ["tianyi_sar", "s2", "landsat", "planet"]
         self.cfg_anchor_source = "tianyi_sar"  # 锚点源
         self.split = split
+        self.aef_embedding_root = Path(aef_embedding_root) if aef_embedding_root else None
 
         # 加载时间映射表
         mapping_path = Path(cache_dir) / "temporal_mapping.json"
@@ -122,6 +124,22 @@ class HaidianReconDataset(Dataset):
             else:
                 batch[source_name] = None
 
+        # 加载预计算的 AEF embedding (64, 128, 128) -> GAP -> 64D
+        if self.aef_embedding_root is not None:
+            aef_path = self.aef_embedding_root / f"{patch_id}.npy"
+            if aef_path.exists():
+                aef_emb = np.load(aef_path)  # (64, 128, 128)
+                # 全局平均池化 -> (64,)
+                aef_emb = aef_emb.mean(axis=(1, 2))  # (64,)
+                batch["aef_embedding"] = torch.from_numpy(aef_emb).float()
+            else:
+                batch["aef_embedding"] = None
+        else:
+            batch["aef_embedding"] = None
+
+        # 记录 patch_id 供 trainer 使用
+        batch["patch_id"] = patch_id
+
         return batch
 
 
@@ -137,6 +155,24 @@ def collate_fn(batch_list: list[dict]) -> dict[str, torch.Tensor | None]:
         values = [b[key] for b in batch_list]
         if all(v is None for v in values):
             result[key] = None
+            continue
+
+        # 特殊处理 aef_embedding: 一维向量 (64,)
+        if key == "aef_embedding":
+            dim = next(v for v in values if v is not None).shape[0]
+            stacked = torch.zeros(batch_size, dim, dtype=torch.float32)
+            valid_mask = torch.zeros(batch_size, dtype=torch.bool)
+            for i, v in enumerate(values):
+                if v is not None:
+                    stacked[i] = v
+                    valid_mask[i] = True
+            result[key] = stacked
+            result[f"{key}_valid"] = valid_mask
+            continue
+
+        # 特殊处理 patch_id: 字符串列表
+        if key == "patch_id":
+            result[key] = [v for v in values]
             continue
 
         # 获取第一个非None的shape作为参考 [1, 1, C, H, W]

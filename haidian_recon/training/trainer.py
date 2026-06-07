@@ -15,7 +15,7 @@ from haidian_recon.data.dataset import HaidianReconDataset, collate_fn
 from haidian_recon.data.masking import FourLayerMask
 from haidian_recon.models.hre_model import HREModel
 from haidian_recon.losses.reconstruction import reconstruction_loss
-from haidian_recon.losses.distillation import AEFDistiller, aef_distillation_loss
+from haidian_recon.losses.distillation import aef_distillation_loss
 from haidian_recon.losses.uniformity import uniformity_loss
 from haidian_recon.training.optimizer import build_optimizer, CosineScheduler
 
@@ -60,25 +60,14 @@ class HRETrainer:
             channel_keep_ratio=cfg.masking.channel_keep_ratio,
         ).to(self.device)
 
-        # AEF蒸馏 — 所有rank都加载（已冻结，保证DDP同步）
-        self.aef_distiller = None
-        if cfg.training.aef_checkpoint:
-            try:
-                self.aef_distiller = AEFDistiller(
-                    checkpoint_path=cfg.training.aef_checkpoint,
-                    config_path=cfg.training.aef_config,
-                    device=str(self.device),
-                )
-                self.aef_distiller.to(self.device)
-                self.aef_distiller.eval()
-            except Exception as e:
-                if rank == 0:
-                    print(f"[WARN] Failed to load AEF distiller: {e}")
+        # AEF蒸馏 — 使用预计算的embedding（从dataset加载）
+        self.use_aef_distill = cfg.training.aef_checkpoint is not None and cfg.training.aef_checkpoint != "null"
 
         # 优化器
         self.optimizer = build_optimizer(self.model, cfg.training.lr, cfg.training.weight_decay)
 
         # 数据集
+        aef_emb_root = getattr(cfg.data, "aef_embedding_root", "data_raw/haidian/aef_embeddings/haidian_2025_patches")
         self.train_dataset = HaidianReconDataset(
             data_root=cfg.data.data_root,
             planet_root=cfg.data.planet_root,
@@ -87,6 +76,7 @@ class HRETrainer:
             image_size=cfg.data.image_size,
             source_names=list(source_channels.keys()),
             cache_dir=cfg.data.cache_dir,
+            aef_embedding_root=aef_emb_root,
         )
         self.val_dataset = HaidianReconDataset(
             data_root=cfg.data.data_root,
@@ -96,6 +86,7 @@ class HRETrainer:
             image_size=cfg.data.image_size,
             source_names=list(source_channels.keys()),
             cache_dir=cfg.data.cache_dir,
+            aef_embedding_root=aef_emb_root,
         )
 
         if world_size > 1:
@@ -163,10 +154,10 @@ class HRETrainer:
                 # 重建损失
                 loss_recon = reconstruction_loss(output["reconstructions"], batch, mask_info)
 
-                # AEF蒸馏
+                # AEF蒸馏 — 使用预计算的embedding
                 loss_distill = torch.tensor(0.0, device=self.device)
-                if self.aef_distiller is not None:
-                    aef_emb = self.aef_distiller(batch)
+                if self.use_aef_distill and batch.get("aef_embedding") is not None:
+                    aef_emb = batch["aef_embedding"]
                     loss_distill = aef_distillation_loss(output["embedding"], aef_emb)
 
                 # 推散损失

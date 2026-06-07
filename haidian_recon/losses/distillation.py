@@ -99,11 +99,10 @@ class AEFDistiller(nn.Module):
         if B is None:
             return None
 
-        # 构建AEF输入
+        # 构建AEF输入 — 堆叠为 [B, S, T, C, H, W] 格式
         source_frames = []
         source_timestamps = []
-        source_type_ids = []
-        T_total = 0
+        source_type_ids_per_source = []
 
         for src_name in self.aef_input_sources:
             if src_name == "s1" and batch.get("tianyi_sar") is not None:
@@ -118,32 +117,49 @@ class AEFDistiller(nn.Module):
             source_frames.append(x)
             num_source_types = getattr(self.cfg.model, "num_source_types", 8)
             type_id = self._get_source_type_id(src_name, num_source_types)
-            source_type_ids.extend([type_id] * T)
+            source_type_ids_per_source.append(type_id)
             # 简单时间戳：使用0
             timestamps = torch.zeros(B_src, T, device=x.device)
             source_timestamps.append(timestamps)
-            T_total += T
 
         if len(source_frames) == 0:
             return None
 
-        # 拼接
+        S = len(source_frames)
+        max_t = max(f.shape[1] for f in source_frames)
         max_c = max(f.shape[2] for f in source_frames)
+
+        # Padding 到 [B, S, T_max, C_max, H, W]
         padded_frames = []
+        padded_timestamps = []
         for f in source_frames:
-            if f.shape[2] < max_c:
-                pad = torch.zeros(f.shape[0], f.shape[1], max_c - f.shape[2], f.shape[3], f.shape[4],
-                                  device=f.device, dtype=f.dtype)
-                f = torch.cat([f, pad], dim=2)
-            padded_frames.append(f)
+            b, t, c, h, w = f.shape
+            # pad channels
+            if c < max_c:
+                pad_c = torch.zeros(b, t, max_c - c, h, w, device=f.device, dtype=f.dtype)
+                f = torch.cat([f, pad_c], dim=2)
+            # pad time
+            if t < max_t:
+                pad_t = torch.zeros(b, max_t - t, max_c, h, w, device=f.device, dtype=f.dtype)
+                f = torch.cat([f, pad_t], dim=1)
+            padded_frames.append(f[:, None, ...])  # [B, 1, T_max, C_max, H, W]
 
-        aef_frames = torch.cat(padded_frames, dim=1)  # [B, T_total, C_max, H, W]
-        aef_timestamps = torch.cat(source_timestamps, dim=1)  # [B, T_total]
+        for ts in source_timestamps:
+            b, t = ts.shape
+            if t < max_t:
+                pad_t = torch.zeros(b, max_t - t, device=ts.device)
+                ts = torch.cat([ts, pad_t], dim=1)
+            padded_timestamps.append(ts[:, None, ...])  # [B, 1, T_max]
 
-        # 构建mask (NPU bitwise_and 只支持 bool/int，不能用 float)
-        source_frame_mask = torch.ones(B, T_total, device=aef_frames.device, dtype=torch.bool)
-        source_input_mask = torch.ones(B, T_total, device=aef_frames.device, dtype=torch.bool)
-        source_type_ids_tensor = torch.tensor(source_type_ids, device=aef_frames.device).unsqueeze(0).expand(B, -1)
+        aef_frames = torch.cat(padded_frames, dim=1)  # [B, S, T_max, C_max, H, W]
+        aef_timestamps = torch.cat(padded_timestamps, dim=1)  # [B, S, T_max]
+
+        # 构建mask: [B, S, T_max]
+        source_frame_mask = torch.ones(B, S, max_t, device=aef_frames.device, dtype=torch.bool)
+        source_input_mask = torch.ones(B, S, device=aef_frames.device, dtype=torch.bool)
+
+        # type_ids: [B, S]
+        source_type_ids_tensor = torch.tensor(source_type_ids_per_source, device=aef_frames.device).unsqueeze(0).expand(B, -1)
 
         with torch.no_grad():
             output = self.aef_model(
