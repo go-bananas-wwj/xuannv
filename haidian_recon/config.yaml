@@ -31,7 +31,7 @@ data:
   cache_dir: haidian_recon/.cache
   image_size: 128
   batch_size: 14
-  num_workers: 4
+  num_workers: 0
 
 training:
   epochs: 300
