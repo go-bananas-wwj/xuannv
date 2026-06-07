@@ -130,11 +130,16 @@ class HREModel(nn.Module):
             dropout=dropout,
         )
 
-        # Spatial head: encoder token → 空间embedding [B, 64, 16, 16]
+        # Spatial head: 从64维embedding生成空间embedding [B, 64, 16, 16]
         self.spatial_head = nn.Sequential(
-            nn.LayerNorm(embed_dim),
-            nn.Linear(embed_dim, output_dim),
+            nn.LayerNorm(output_dim),
+            nn.Linear(output_dim, output_dim),
+            nn.GELU(),
+            nn.Linear(output_dim, output_dim),
         )
+        # 可学习空间偏置，添加位置变化
+        grid_size = int(math.sqrt(self.n_patches))  # 16
+        self.spatial_bias = nn.Parameter(torch.randn(1, output_dim, grid_size, grid_size) * 0.02)
 
         # Decoder
         self.decoder = HRDecoder(
@@ -227,32 +232,24 @@ class HREModel(nn.Module):
         # 3. Bottleneck → 全局64维Embedding
         embedding = self.bottleneck(encoder_output)
 
-        # 4. 空间embedding: 取第一个有效源的空间token → [B, 64, 128, 128]
-        embedding_map = None
-        if len(source_info) > 0:
-            first = source_info[0]
-            T_src = first["T"]
-            N_src = first["N"]
-            n_first = T_src * N_src
-            grid_size = int(math.sqrt(N_src))
+        # 4. 空间embedding: 从64维embedding生成 → [B, 64, 128, 128]
+        grid_size = int(math.sqrt(self.n_patches))
+        # 全局64维embedding广播到空间网格 + 可学习偏置
+        spatial_emb = embedding.view(B, self.output_dim, 1, 1)  # [B, 64, 1, 1]
+        spatial_emb = spatial_emb.expand(-1, -1, grid_size, grid_size)  # [B, 64, g, g]
+        spatial_emb = spatial_emb + self.spatial_bias  # 添加空间变化
+        # 通过spatial_head添加非线性变换
+        spatial_emb = spatial_emb.permute(0, 2, 3, 1)  # [B, g, g, 64]
+        spatial_emb = self.spatial_head(spatial_emb)  # [B, g, g, 64]
+        spatial_emb = spatial_emb.permute(0, 3, 1, 2)  # [B, 64, g, g]
 
-            # 取encoder_output中对应第一个源的所有token
-            spatial_tokens = encoder_output[:, :n_first, :]  # [B, T*N, D]
-            spatial_tokens = spatial_tokens.reshape(B, T_src, grid_size, grid_size, D)
-            # 时间维度聚合
-            spatial_tokens = spatial_tokens.mean(dim=1)  # [B, grid_size, grid_size, D]
-
-            # 映射到64D
-            spatial_emb = self.spatial_head(spatial_tokens)  # [B, grid_size, grid_size, 64]
-            spatial_emb = spatial_emb.permute(0, 3, 1, 2)  # [B, 64, grid_size, grid_size]
-
-            # 上采样到128×128（每个像素一个64D向量）
-            embedding_map = F.interpolate(
-                spatial_emb,
-                size=(self.image_size, self.image_size),
-                mode="bilinear",
-                align_corners=False,
-            )  # [B, 64, 128, 128]
+        # 上采样到128×128（每个像素一个64D向量）
+        embedding_map = F.interpolate(
+            spatial_emb,
+            size=(self.image_size, self.image_size),
+            mode="bilinear",
+            align_corners=False,
+        )  # [B, 64, 128, 128]
 
         # 5. 推理时不需要重建
         if mask_info is None or not mask_info.get("decode_sources"):
