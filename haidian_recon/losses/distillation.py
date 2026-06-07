@@ -23,14 +23,51 @@ class AEFDistiller(nn.Module):
         super().__init__()
         from src.config import load_config
         from src.models.model import AEFModel
-        from src.utils.checkpoint import load_checkpoint
 
         self.cfg = load_config(config_path)
-        self.aef_model = AEFModel(self.cfg)
 
-        # 加载checkpoint
-        ckpt = load_checkpoint(checkpoint_path)
-        state = ckpt.get("model_state_dict", ckpt)
+        # 先加载raw checkpoint以检测实际的precision_dim
+        ckpt_raw = torch.load(checkpoint_path, map_location="cpu")
+        state = ckpt_raw.get("model_state_dict", ckpt_raw)
+
+        # 自动修正配置维度以匹配checkpoint
+        adjustments = {}
+
+        # precision_dim: 从第一个 projection 层检测
+        for k in state.keys():
+            if "projection.0.weight" in k:
+                actual = state[k].shape[0]
+                cfg_val = getattr(self.cfg.model, "precision_dim", 128)
+                if actual != cfg_val:
+                    adjustments["precision_dim"] = (cfg_val, actual)
+                    self.cfg.model.precision_dim = actual
+                break
+
+        # embedding_dim: 从 bottleneck.to_embedding 检测
+        for k in state.keys():
+            if "bottleneck.to_embedding.weight" in k:
+                actual = state[k].shape[0]
+                cfg_val = getattr(self.cfg.model, "embedding_dim", 64)
+                if actual != cfg_val:
+                    adjustments["embedding_dim"] = (cfg_val, actual)
+                    self.cfg.model.embedding_dim = actual
+                break
+
+        # space_dim: 从 summary_query 检测
+        for k in state.keys():
+            if "summary_query.weight" in k:
+                actual = state[k].shape[0]
+                cfg_val = getattr(self.cfg.model, "space_dim", 256)
+                if actual != cfg_val:
+                    adjustments["space_dim"] = (cfg_val, actual)
+                    self.cfg.model.space_dim = actual
+                break
+
+        if adjustments:
+            for name, (old, new) in adjustments.items():
+                print(f"[AEFDistiller] Auto-adjust {name}: {old} -> {new}")
+
+        self.aef_model = AEFModel(self.cfg)
         self.aef_model.load_state_dict(state, strict=False)
         self.aef_model.eval()
 
