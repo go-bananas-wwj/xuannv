@@ -89,16 +89,24 @@ def main() -> None:
     if hasattr(torch_npu, 'manual_seed_all'):
         torch_npu.manual_seed_all(seed)
 
-    if rank == 0:
-        print(f"=== HaidianReconEncoder Training ===")
-        print(f"Rank: {rank}/{world_size}, LocalRank: {local_rank}, Device: npu:{local_rank}")
-        print(f"Seed: {seed}")
-
     # 配置
     if args.config and os.path.exists(args.config):
         cfg = load_config(args.config)
     else:
         cfg = Config()
+
+    # 随机种子: 每个rank用不同seed保证mask策略独立但可复现
+    seed = cfg.seed + rank
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if hasattr(torch_npu, 'manual_seed_all'):
+        torch_npu.manual_seed_all(seed)
+
+    if rank == 0:
+        print(f"=== HaidianReconEncoder Training ===")
+        print(f"Rank: {rank}/{world_size}, LocalRank: {local_rank}, Device: npu:{local_rank}")
+        print(f"Seed: {seed}")
 
     if rank == 0:
         print(f"Config: epochs={cfg.training.epochs}, batch_size={cfg.data.batch_size}, lr={cfg.training.lr}")
