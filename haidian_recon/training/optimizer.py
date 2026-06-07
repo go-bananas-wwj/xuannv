@@ -32,12 +32,13 @@ class CosineScheduler:
         total_steps: int,
         warmup_steps: int,
         lr_min: float = 1e-6,
+        base_lr: float | None = None,
     ) -> None:
         self.optimizer = optimizer
         self.total_steps = total_steps
         self.warmup_steps = warmup_steps
         self.lr_min = lr_min
-        self.base_lr = optimizer.param_groups[0]["lr"]
+        self.base_lr = base_lr if base_lr is not None else optimizer.param_groups[0]["lr"]
         self.step_count = 0
 
     def step(self) -> float:

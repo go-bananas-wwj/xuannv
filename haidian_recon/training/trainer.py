@@ -2,9 +2,14 @@
 from __future__ import annotations
 
 import os
+import random
 import time
 from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.distributed as dist
 import torch.nn as nn
@@ -127,6 +132,7 @@ class HRETrainer:
 
         self.global_step = 0
         self.start_epoch = 0
+        self.loss_history = []  # [(epoch, loss, recon, distill, uniform, spatial_u), ...]
 
     def train(self) -> None:
         cfg = self.cfg.training
@@ -141,6 +147,7 @@ class HRETrainer:
             epoch_distill = 0.0
             epoch_uniform = 0.0
             epoch_spatial_uniform = 0.0
+            actual_batches = 0
 
             for batch_idx, batch in enumerate(self.train_loader):
                 # 数据移到device
@@ -189,6 +196,7 @@ class HRETrainer:
                         dummy.backward()
                     self.scheduler.step()
                     self.global_step += 1
+                    actual_batches += 1
                     continue
 
                 # 反向传播
@@ -205,6 +213,7 @@ class HRETrainer:
                 epoch_uniform += loss_uniform.item()
                 epoch_spatial_uniform += loss_spatial_uniform.item()
                 self.global_step += 1
+                actual_batches += 1
 
                 if self.rank == 0 and self.global_step % cfg.log_every == 0:
                     print(f"[Step {self.global_step}] loss={loss.item():.4f} "
@@ -213,13 +222,26 @@ class HRETrainer:
                           f"lr={self.scheduler.optimizer.param_groups[0]['lr']:.6f}")
 
             # Epoch日志
-            n_batches = len(self.train_loader)
+            n_batches = actual_batches if actual_batches > 0 else 1
             if self.rank == 0:
-                print(f"[Epoch {epoch}] loss={epoch_loss/n_batches:.4f} "
-                      f"recon={epoch_recon/n_batches:.4f} "
-                      f"distill={epoch_distill/n_batches:.4f} "
-                      f"uniform={epoch_uniform/n_batches:.4f} "
-                      f"spatial_u={epoch_spatial_uniform/n_batches:.4f}")
+                avg_loss = epoch_loss / n_batches
+                avg_recon = epoch_recon / n_batches
+                avg_distill = epoch_distill / n_batches
+                avg_uniform = epoch_uniform / n_batches
+                avg_spatial = epoch_spatial_uniform / n_batches
+                print(f"[Epoch {epoch}] loss={avg_loss:.4f} "
+                      f"recon={avg_recon:.4f} "
+                      f"distill={avg_distill:.4f} "
+                      f"uniform={avg_uniform:.4f} "
+                      f"spatial_u={avg_spatial:.4f}")
+                self.loss_history.append({
+                    "epoch": epoch,
+                    "loss": avg_loss,
+                    "recon": avg_recon,
+                    "distill": avg_distill,
+                    "uniform": avg_uniform,
+                    "spatial_u": avg_spatial,
+                })
 
             # 保存
             if self.rank == 0 and (epoch + 1) % cfg.save_every == 0:
@@ -229,11 +251,23 @@ class HRETrainer:
             if (epoch + 1) % cfg.eval_every == 0:
                 self.evaluate()
 
+            # 每20epoch可视化损失曲线
+            if self.rank == 0 and (epoch + 1) % 20 == 0 and len(self.loss_history) > 0:
+                self.plot_losses(epoch)
+
     @torch.no_grad()
     def evaluate(self) -> dict:
         self.model.eval()
         total_recon = 0.0
         total_samples = 0
+
+        # 固定随机状态，保证验证结果可复现
+        torch_state = torch.get_rng_state()
+        np_state = np.random.get_state()
+        random_state = random.getstate()
+        torch.manual_seed(self.cfg.seed)
+        np.random.seed(self.cfg.seed)
+        random.seed(self.cfg.seed)
 
         for batch in self.val_loader:
             batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else None for k, v in batch.items()}
@@ -242,6 +276,11 @@ class HRETrainer:
             loss_recon = reconstruction_loss(output["reconstructions"], batch, mask_info)
             total_recon += loss_recon.item()
             total_samples += 1
+
+        # 恢复训练随机状态
+        torch.set_rng_state(torch_state)
+        np.random.set_state(np_state)
+        random.setstate(random_state)
 
         avg_recon = total_recon / max(total_samples, 1)
 
@@ -262,7 +301,9 @@ class HRETrainer:
             "model_state_dict": self.model.module.state_dict() if hasattr(self.model, "module") else self.model.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
             "scheduler_step_count": self.scheduler.step_count,
+            "scheduler_base_lr": self.scheduler.base_lr,
             "global_step": self.global_step,
+            "loss_history": self.loss_history,
         }
         torch.save(state, path)
         print(f"[Save] Checkpoint saved to {path}")
@@ -278,4 +319,41 @@ class HRETrainer:
         self.start_epoch = ckpt["epoch"] + 1
         self.global_step = ckpt.get("global_step", 0)
         self.scheduler.step_count = ckpt.get("scheduler_step_count", 0)
+        self.scheduler.base_lr = ckpt.get("scheduler_base_lr", self.cfg.training.lr)
+        self.loss_history = ckpt.get("loss_history", [])
         print(f"[Load] Checkpoint loaded from {path}")
+
+    def plot_losses(self, epoch: int) -> None:
+        """绘制并保存损失曲线."""
+        if len(self.loss_history) < 2:
+            return
+        epochs = [d["epoch"] for d in self.loss_history]
+        vis_dir = self.output_dir / f"Epoch-{epoch}-VIS"
+        vis_dir.mkdir(parents=True, exist_ok=True)
+
+        fig, axes = plt.subplots(2, 3, figsize=(15, 8))
+        fig.suptitle(f"Training Loss Curves (up to Epoch {epoch})", fontsize=14)
+
+        metrics = [
+            ("loss", "Total Loss", axes[0, 0]),
+            ("recon", "Reconstruction Loss", axes[0, 1]),
+            ("distill", "Distillation Loss", axes[0, 2]),
+            ("uniform", "Uniformity Loss", axes[1, 0]),
+            ("spatial_u", "Spatial Uniformity Loss", axes[1, 1]),
+        ]
+        for key, title, ax in metrics:
+            values = [d[key] for d in self.loss_history]
+            ax.plot(epochs, values, "b-o", markersize=3, linewidth=1)
+            ax.set_title(title)
+            ax.set_xlabel("Epoch")
+            ax.set_ylabel("Loss")
+            ax.grid(True, alpha=0.3)
+
+        # 隐藏多余的子图
+        axes[1, 2].axis("off")
+
+        plt.tight_layout()
+        save_path = vis_dir / "loss_curve.png"
+        plt.savefig(save_path, dpi=150)
+        plt.close()
+        print(f"[Viz] Loss curve saved to {save_path}")
