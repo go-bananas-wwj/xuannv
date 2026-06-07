@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from haidian_recon.models.patch_embed import MultiSourcePatchEmbed
+from haidian_recon.models.patch_embed import MultiScalePatchEmbed
 from haidian_recon.models.encoder import HREncoder
 from haidian_recon.models.decoder import HRDecoder
 from haidian_recon.models.bottleneck import HRBottleneck
@@ -26,10 +26,10 @@ class TokenEncoding(nn.Module):
 
     def __init__(
         self,
-        embed_dim: int = 256,
+        embed_dim: int = 512,
         num_sources: int = 4,
         max_timesteps: int = 48,
-        n_patches: int = 256,
+        n_patches: int = 1024,
     ) -> None:
         super().__init__()
         self.embed_dim = embed_dim
@@ -69,16 +69,17 @@ class TokenEncoding(nn.Module):
 class HREModel(nn.Module):
     """
     HaidianReconEncoder主模型。
+    支持256x256输入 + 多尺度patch embed（分辨率分组）.
     """
 
     def __init__(
         self,
         source_channels: dict[str, int],
-        image_size: int = 128,
+        image_size: int = 256,
         patch_size: int = 8,
-        embed_dim: int = 256,
-        num_encoder_layers: int = 8,
-        num_decoder_layers: int = 4,
+        embed_dim: int = 512,
+        num_encoder_layers: int = 12,
+        num_decoder_layers: int = 8,
         num_heads: int = 8,
         mlp_ratio: float = 4.0,
         output_dim: int = 64,
@@ -91,16 +92,17 @@ class HREModel(nn.Module):
         self.image_size = image_size
         self.patch_size = patch_size
         self.embed_dim = embed_dim
-        self.n_patches = (image_size // patch_size) ** 2
         self.output_dim = output_dim
 
-        # Patch Embedding
-        self.patch_embed = MultiSourcePatchEmbed(
+        # Patch Embedding — 多尺度，按分辨率分组
+        self.patch_embed = MultiScalePatchEmbed(
             source_channels=source_channels,
             embed_dim=embed_dim,
             patch_size=patch_size,
             image_size=image_size,
         )
+        # 统一token数: 32x32 = 1024
+        self.n_patches = self.patch_embed.target_n_patches
 
         # Token Encoding
         self.token_encoding = TokenEncoding(
@@ -128,7 +130,7 @@ class HREModel(nn.Module):
             dropout=dropout,
         )
 
-        # Spatial head: encoder token → 空间embedding [B, 64, 16, 16]
+        # Spatial head: encoder token → 空间embedding [B, 64, 32, 32]
         self.spatial_head = nn.Sequential(
             nn.LayerNorm(embed_dim),
             nn.Linear(embed_dim, output_dim),
@@ -147,14 +149,14 @@ class HREModel(nn.Module):
         # Mask token (decoder query)
         self.mask_token = nn.Parameter(torch.randn(1, 1, embed_dim) * 0.02)
 
-        # Reconstruction heads
+        # Reconstruction heads — 统一用8x8 patch映射回256x256
         self.recon_heads = nn.ModuleDict()
         for name, ch in source_channels.items():
             self.recon_heads[name] = HRReconstructionHead(
                 embed_dim=embed_dim,
                 out_channels=ch,
-                patch_size=patch_size,
-                image_size=image_size,
+                patch_size=patch_size,  # 8
+                image_size=image_size,   # 256
             )
 
     def forward(
@@ -173,6 +175,7 @@ class HREModel(nn.Module):
         Returns:
             {
                 "embedding": [B, output_dim],
+                "embedding_map": [B, output_dim, H, W],
                 "reconstructions": {source_name: [B, T, C, H, W]},
                 "mask_info": mask_info,
             }
@@ -186,7 +189,7 @@ class HREModel(nn.Module):
             if x is None:
                 continue
 
-            # Patch embed: [B, T, N, D]
+            # Patch embed: [B, T, N, D] — N=1024统一
             tokens = self.patch_embed(x, source_name)
             B, T, N, D = tokens.shape
 
@@ -202,7 +205,7 @@ class HREModel(nn.Module):
                 "source_idx": source_idx,
             })
 
-            # Flatten time维度: [B, T*N, D]
+            # Flatten时间维度: [B, T*N, D]
             tokens = tokens.reshape(B, T * N, D)
             all_tokens.append(tokens)
 
@@ -218,7 +221,7 @@ class HREModel(nn.Module):
         # 3. Bottleneck → 全局64维Embedding
         embedding = self.bottleneck(encoder_output)
 
-        # 4. 空间embedding: 取第一个有效源的空间token → [B, 64, 128, 128]
+        # 4. 空间embedding: 取第一个有效源的空间token → [B, 64, 256, 256]
         embedding_map = None
         if len(source_info) > 0:
             first = source_info[0]
@@ -237,13 +240,13 @@ class HREModel(nn.Module):
             spatial_emb = self.spatial_head(spatial_tokens)  # [B, grid_size, grid_size, 64]
             spatial_emb = spatial_emb.permute(0, 3, 1, 2)  # [B, 64, grid_size, grid_size]
 
-            # 上采样到128×128（每个像素一个64D向量）
+            # 上采样到256×256（每个像素一个64D向量）
             embedding_map = F.interpolate(
                 spatial_emb,
                 size=(self.image_size, self.image_size),
                 mode="bilinear",
                 align_corners=False,
-            )  # [B, 64, 128, 128]
+            )  # [B, 64, 256, 256]
 
         # 5. 推理时不需要重建
         if mask_info is None or not mask_info.get("decode_sources"):
@@ -254,9 +257,8 @@ class HREModel(nn.Module):
                 "mask_info": mask_info,
             }
 
-        # 5. Decoder: 为每个decode_source生成重建
+        # 6. Decoder: 为每个decode_source生成重建
         reconstructions = {}
-        B = embedding.shape[0]
 
         for source_name in mask_info["decode_sources"]:
             # 获取该源的时间步数（从原始batch中）
