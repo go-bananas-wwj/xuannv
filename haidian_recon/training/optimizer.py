@@ -41,6 +41,13 @@ class CosineScheduler:
         self.base_lr = base_lr if base_lr is not None else optimizer.param_groups[0]["lr"]
         self.step_count = 0
 
+    def update_schedule(self, total_steps: int, warmup_steps: int, lr_min: float | None = None) -> None:
+        """动态更新调度参数（resume时适配新配置）."""
+        self.total_steps = total_steps
+        self.warmup_steps = warmup_steps
+        if lr_min is not None:
+            self.lr_min = lr_min
+
     def step(self) -> float:
         self.step_count += 1
         if self.step_count <= self.warmup_steps:

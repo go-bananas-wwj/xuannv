@@ -325,10 +325,12 @@ class HRETrainer:
     def load_checkpoint(self, path: str) -> None:
         ckpt = torch.load(path, map_location=self.device)
         state = ckpt["model_state_dict"]
-        if hasattr(self.model, "module"):
-            self.model.module.load_state_dict(state)
-        else:
-            self.model.load_state_dict(state)
+        # strict=False: 跳过不匹配的参数（如架构变更新增的cond_proj）
+        missing, unexpected = (self.model.module if hasattr(self.model, "module") else self.model).load_state_dict(state, strict=False)
+        if missing:
+            print(f"[Load] Missing keys (will be initialized): {missing}")
+        if unexpected:
+            print(f"[Load] Unexpected keys (skipped): {unexpected}")
         self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
         self.start_epoch = ckpt["epoch"] + 1
         self.global_step = ckpt.get("global_step", 0)

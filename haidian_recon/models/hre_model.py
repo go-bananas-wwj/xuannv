@@ -149,6 +149,12 @@ class HREModel(nn.Module):
         # Mask token (decoder query)
         self.mask_token = nn.Parameter(torch.randn(1, 1, embed_dim) * 0.02)
 
+        # 64维 → 512维投影，用于decoder重建条件
+        self.cond_proj = nn.Sequential(
+            nn.Linear(output_dim, embed_dim),
+            nn.LayerNorm(embed_dim),
+        )
+
         # Reconstruction heads
         self.recon_heads = nn.ModuleDict()
         for name, ch in source_channels.items():
@@ -280,8 +286,10 @@ class HREModel(nn.Module):
             mask_tokens = self.token_encoding(mask_tokens, source_idx, time_indices)
             mask_tokens = mask_tokens.reshape(B, T * N, self.embed_dim)
 
-            # Decoder
-            decoded = self.decoder(mask_tokens, encoder_output)  # [B, T*N, D]
+            # Decoder: 64维embedding广播后投影到512维，作为重建条件
+            decoder_cond = self.cond_proj(embedding).unsqueeze(1)  # [B, 1, D]
+            decoder_cond = decoder_cond.expand(-1, encoder_output.shape[1], -1)  # [B, N_total, D]
+            decoded = self.decoder(mask_tokens, decoder_cond)  # [B, T*N, D]
 
             # Reconstruction head
             decoded = decoded.reshape(B * T, N, self.embed_dim)
