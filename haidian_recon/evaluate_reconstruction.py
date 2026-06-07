@@ -20,8 +20,12 @@ from haidian_recon.data.masking import FourLayerMask
 from haidian_recon.models.hre_model import HREModel
 
 
-def compute_psnr(pred: np.ndarray, target: np.ndarray, max_val: float = 6.0) -> float:
+def compute_psnr(pred: np.ndarray, target: np.ndarray, max_val: float | None = None) -> float:
     """计算PSNR."""
+    # 数据经 ±6σ clip，峰峰值 12；若未指定，自动推断
+    if max_val is None:
+        max_val = max(abs(pred.max()), abs(pred.min()), abs(target.max()), abs(target.min()))
+        max_val = max(max_val, 1e-6)
     mse = np.mean((pred - target) ** 2)
     if mse < 1e-10:
         return 100.0

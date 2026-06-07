@@ -58,8 +58,9 @@ def reconstruction_loss(
     elif device_ref is not None:
         return torch.tensor(0.0, device=device_ref)
     else:
-        # 全部decode_sources都没有reconstruction，返回0
+        # 全部decode_sources都没有reconstruction，返回0（确保在正确device上）
         for v in original_batch.values():
-            if v is not None:
+            if isinstance(v, torch.Tensor):
                 return v.new_tensor(0.0)
+        # 兜底：不应到达此处，因为 caller 保证至少一个 decode source
         return torch.tensor(0.0)

@@ -71,11 +71,17 @@ def extract_embeddings(
 
     with torch.no_grad():
         for batch in loader:
-            valid_mask = batch.get("valid_mask")
-            if valid_mask is not None and not valid_mask[0].item():
+            # 检查是否有至少一个源的数据有效
+            has_valid = False
+            for key in batch:
+                if key.endswith("_valid") and key != "aef_embedding_valid":
+                    if batch[key][0].item():
+                        has_valid = True
+                        break
+            if not has_valid:
                 continue
 
-            patch_name = batch.get("patch_name", ["unknown"])[0]
+            patch_name = batch["patch_id"][0]
             batch_device = {k: v.to(device) if isinstance(v, torch.Tensor) else None for k, v in batch.items()}
             output = model(batch_device, mask_info=None)
             emb = output["embedding"][0].cpu().numpy()

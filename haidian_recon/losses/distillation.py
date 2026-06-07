@@ -17,6 +17,9 @@ class AEFDistiller(nn.Module):
     """
     加载预训练AEF模型，输出64维embedding供蒸馏使用。
     注意：AEF的输入格式与HRE不同，需要做适配。
+
+    DEPRECATED: 当前训练流程使用 dataset.py 预加载的 .npy embedding，
+    此类不再被 trainer 实例化，保留仅作参考。
     """
 
     def __init__(self, checkpoint_path: str, config_path: str, device: str = "npu") -> None:

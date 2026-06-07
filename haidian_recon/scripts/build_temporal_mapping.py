@@ -34,8 +34,17 @@ def build_mapping(
     data_root: str = "data_raw/haidian/scenes",
     planet_root: str = "data_raw/beijing/planetscene",
     output_path: str = "haidian_recon/.cache/temporal_mapping.json",
-    max_days: int = 30,
+    max_days: float | None = None,
 ) -> None:
+    # 若未指定，读取配置中的 temporal_window_days
+    if max_days is None:
+        try:
+            from haidian_recon.config import Config
+            cfg = Config()
+            max_days = getattr(cfg.data, "temporal_window_days", 5.5)
+        except Exception:
+            max_days = 5.5
+    max_days = float(max_days)
     data_root = Path(data_root)
     planet_root = Path(planet_root)
     output_path = Path(output_path)

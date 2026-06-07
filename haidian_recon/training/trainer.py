@@ -121,10 +121,18 @@ class HRETrainer:
             drop_last=False,
         )
 
-        # 调度器
+        # 调度器：使用 rank 0 的步数统一所有 rank，避免 DDP 下样本分配不均导致偏差
         steps_per_epoch = len(self.train_loader)
         total_steps = cfg.training.epochs * steps_per_epoch
+        if self.world_size > 1:
+            steps_tensor = torch.tensor(total_steps, device=self.device)
+            dist.all_reduce(steps_tensor, op=dist.ReduceOp.MAX)
+            total_steps = int(steps_tensor.item())
         warmup_steps = cfg.training.warmup_epochs * steps_per_epoch
+        if self.world_size > 1:
+            we_tensor = torch.tensor(warmup_steps, device=self.device)
+            dist.all_reduce(we_tensor, op=dist.ReduceOp.MAX)
+            warmup_steps = int(we_tensor.item())
         self.scheduler = CosineScheduler(self.optimizer, total_steps, warmup_steps, cfg.training.lr_min)
 
         # 输出目录

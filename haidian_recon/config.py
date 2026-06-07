@@ -31,6 +31,7 @@ class MaskingConfig:
 
 @dataclass
 class DataConfig:
+    # NOTE: patch 数量由 temporal_mapping.json 动态推导，此字段仅作文档参考
     num_patches: int = 320
     data_root: str = "data_raw/haidian/scenes"
     planet_root: str = "data_raw/beijing/planetscene"

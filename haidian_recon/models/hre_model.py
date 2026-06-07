@@ -57,9 +57,11 @@ class TokenEncoding(nn.Module):
         tokens = tokens + self.modality_embed.weight[source_id].view(1, 1, 1, D)
 
         if isinstance(time_idx, int):
+            time_idx = min(time_idx, self.max_timesteps - 1)
             tokens = tokens + self.time_embed.weight[time_idx].view(1, 1, 1, D)
         else:
             # time_idx: [B, T]
+            time_idx = time_idx.clamp(max=self.max_timesteps - 1)
             te = self.time_embed(time_idx)  # [B, T, D]
             tokens = tokens + te[:, :, None, :]
 
