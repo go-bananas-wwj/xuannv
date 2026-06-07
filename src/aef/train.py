@@ -73,6 +73,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=str, default="outputs/aef_haidian")
     parser.add_argument("--resume", type=str, default=None)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--distill-weight", type=float, default=0.5)
     args = parser.parse_args()
 
     rank, world_size, local_rank = setup_distributed()
@@ -146,15 +147,23 @@ def main() -> None:
 
     # Resume
     start_step = 0
+    resume_optimizer_state = None
+    resume_scheduler_state = None
     if args.resume and os.path.exists(args.resume):
         ckpt = torch.load(args.resume, map_location="cpu")
-        # DDP wrapper 的 state_dict 带有 module. 前缀
         state_dict = ckpt["model_state_dict"]
-        if world_size > 1 and not any(k.startswith("module.") for k in state_dict.keys()):
+        # 处理 module. 前缀：checkpoint 可能是原始模型或 DDP 模型
+        has_module_prefix = any(k.startswith("module.") for k in state_dict.keys())
+        if world_size > 1 and not has_module_prefix:
             # checkpoint 是原始模型，DDP wrapper 需要加前缀
             state_dict = {"module." + k: v for k, v in state_dict.items()}
+        elif world_size == 1 and has_module_prefix:
+            # checkpoint 是 DDP 模型，单卡恢复需要去掉前缀
+            state_dict = {k.replace("module.", "", 1) if k.startswith("module.") else k: v for k, v in state_dict.items()}
         model.load_state_dict(state_dict, strict=True)
         start_step = ckpt.get("step", 0)
+        resume_optimizer_state = ckpt.get("optimizer_state_dict")
+        resume_scheduler_state = ckpt.get("scheduler_state_dict")
         if rank == 0:
             print(f"[Resume] Loaded checkpoint from {args.resume} at step {start_step}")
 
@@ -173,6 +182,10 @@ def main() -> None:
         output_dir=args.output_dir,
         rank=rank,
         world_size=world_size,
+        distill_weight=args.distill_weight,
+        resume_step=start_step,
+        resume_optimizer_state=resume_optimizer_state,
+        resume_scheduler_state=resume_scheduler_state,
     )
 
     try:

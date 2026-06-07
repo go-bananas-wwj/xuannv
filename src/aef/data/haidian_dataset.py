@@ -17,6 +17,7 @@ from src.aef.data.transforms import read_tif, normalize_source, parse_date_to_ms
 class HaidianAEFDataset(Dataset):
     """
     海淀区多源数据集，适配 AEF 输入格式 (B, T, H, W, C)。
+    同时加载预计算的 AEF 官方 64D embedding 作为蒸馏监督。
     """
 
     def __init__(
@@ -31,6 +32,7 @@ class HaidianAEFDataset(Dataset):
         train_ratio: float = 0.9,
         seed: int = 42,
         max_frames: int = 16,
+        aef_embedding_root: str = "data_raw/haidian/aef_embeddings/haidian_2025_patches",
     ) -> None:
         super().__init__()
         self.data_root = Path(data_root)
@@ -39,7 +41,7 @@ class HaidianAEFDataset(Dataset):
         self.source_names = source_names or ["tianyi_sar", "s2", "landsat", "planet"]
         self.split = split
         self.max_frames = max_frames
-        self.cfg_anchor_source = "tianyi_sar"
+        self.aef_embedding_root = Path(aef_embedding_root)
 
         # 加载时间映射表
         mapping_path = Path(cache_dir) / "temporal_mapping.json"
@@ -82,7 +84,7 @@ class HaidianAEFDataset(Dataset):
             else:
                 self.stats[src] = {}
 
-        # 构建样本列表：每个 patch 对应一个样本（聚合该 patch 的所有时间帧）
+        # 构建样本列表
         self.samples = []
         for patch_id in self.patch_ids:
             self.samples.append({"patch_id": patch_id})
@@ -112,7 +114,7 @@ class HaidianAEFDataset(Dataset):
             data = read_tif(tif_path, self.image_size)
             if data is None:
                 continue
-            # 过滤包含 NaN/Inf 的帧（tianyi_sar 约30%文件有 NaN）
+            # 过滤包含 NaN/Inf 的帧
             if np.isnan(data).any() or np.isinf(data).any():
                 continue
             stats = self.stats.get(source_name, {})
@@ -133,6 +135,14 @@ class HaidianAEFDataset(Dataset):
         data = np.stack(frames, axis=0)
         data = np.transpose(data, (0, 2, 3, 1))  # (T, H, W, C)
         return data, timestamps_ms
+
+    def _load_aef_embedding(self, patch_id: str) -> torch.Tensor | None:
+        """加载预计算的 AEF 官方 64D embedding."""
+        emb_path = self.aef_embedding_root / f"{patch_id}.npy"
+        if not emb_path.exists():
+            return None
+        emb = np.load(emb_path)  # (64, 128, 128)
+        return torch.from_numpy(emb).float()
 
     def __getitem__(self, idx: int) -> dict[str, Any]:
         sample = self.samples[idx]
@@ -157,11 +167,15 @@ class HaidianAEFDataset(Dataset):
         valid_start_ms = min(all_timestamps)
         valid_end_ms = max(all_timestamps)
 
+        # 加载官方 AEF embedding
+        aef_embedding = self._load_aef_embedding(patch_id)
+
         return {
             "source_data": source_data,
             "timestamps": timestamps,
             "valid_period": (valid_start_ms, valid_end_ms),
             "patch_id": patch_id,
+            "aef_embedding": aef_embedding,  # (64, 128, 128) 或 None
         }
 
 
@@ -230,9 +244,36 @@ def collate_fn(batch: list[dict]) -> dict[str, Any]:
     valid_periods = [b["valid_period"] for b in batch]
     patch_ids = [b["patch_id"] for b in batch]
 
-    return {
+    # Collate AEF embeddings
+    aef_embeddings = []
+    has_aef = False
+    for b in batch:
+        emb = b.get("aef_embedding")
+        if emb is not None:
+            aef_embeddings.append(emb)
+            has_aef = True
+        else:
+            aef_embeddings.append(None)
+
+    result: dict[str, Any] = {
         "source_data": collated_sources,
         "timestamps": collated_timestamps,
         "valid_periods": valid_periods,
         "patch_ids": patch_ids,
     }
+
+    if has_aef:
+        # Stack valid embeddings, zero-pad missing ones
+        valid_embs = [e for e in aef_embeddings if e is not None]
+        if valid_embs:
+            C, H, W = valid_embs[0].shape
+            stacked = []
+            for e in aef_embeddings:
+                if e is None:
+                    stacked.append(torch.zeros(C, H, W, dtype=torch.float32))
+                else:
+                    stacked.append(e)
+            result["aef_embedding"] = torch.stack(stacked)  # (B, 64, 128, 128)
+            result["aef_embedding_valid"] = torch.tensor([e is not None for e in aef_embeddings], dtype=torch.bool)
+
+    return result

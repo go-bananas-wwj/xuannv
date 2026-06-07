@@ -12,19 +12,22 @@ AEF loss = Reconstruction loss + Uniformity loss + Consistency loss + Text loss
 
 class AEFLoss:
     """
-    AlphaEarth Foundations loss implementation following Equation 3 in the paper:
+    AlphaEarth Foundations loss implementation following Equation 3 in the paper.
+    新增 AEF 官方 embedding 蒸馏损失，用于防止 uniformity 坍缩。
     """
     
     def __init__(self,
                  reconstruction_weight: float = 1.0,  # a = 1.0
                  uniformity_weight: float = 0.05,    # b = 0.05
                  consistency_weight: float = 0.02,   # c = 0.02
-                 text_weight: float = 0.001):        # d = 0.001
+                 text_weight: float = 0.001,         # d = 0.001
+                 distill_weight: float = 0.5):       # e = 0.5 (AEF 官方 embedding 蒸馏)
         
         self.reconstruction_weight = reconstruction_weight
         self.uniformity_weight = uniformity_weight
         self.consistency_weight = consistency_weight
         self.text_weight = text_weight
+        self.distill_weight = distill_weight
         
         # Source-specific loss configurations from Table S2
         self.source_configs = {
@@ -108,7 +111,55 @@ class AEFLoss:
         targets = torch.arange(img.size(0), device=img.device)
         loss_i = torch.nn.functional.cross_entropy(logits, targets)
         loss_t = torch.nn.functional.cross_entropy(logits.t(), targets)
-        return 0.5 * (loss_i + loss_t)  
+        return 0.5 * (loss_i + loss_t)
+
+    def aef_distill_loss(
+        self,
+        pred_embeddings: torch.Tensor,
+        target_embeddings: torch.Tensor,
+        valid_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """
+        AEF 官方 embedding 蒸馏损失。
+        
+        pred_embeddings: (B, H, W, D) 模型输出的空间 embedding
+        target_embeddings: (B, D, 128, 128) 预计算的官方 AEF embedding
+        valid_mask: (B,) bool 表示哪些样本有官方 embedding
+        
+        目标：将 pred_embeddings 对齐到官方 embedding 的方向和结构，
+        防止 uniformity 坍缩（官方 embedding 已确认是均匀分布的）。
+        """
+        if pred_embeddings is None or target_embeddings is None:
+            return torch.tensor(0.0, device=pred_embeddings.device if pred_embeddings is not None else 'cpu')
+        
+        B, H, W, D_pred = pred_embeddings.shape
+        B_t, D_t, H_t, W_t = target_embeddings.shape
+        
+        # 官方 embedding 空间分辨率可能不同，下采样到模型输出分辨率
+        if H_t != H or W_t != W:
+            target_2d = target_embeddings  # (B, D, H_t, W_t)
+            target_2d = F.interpolate(target_2d, size=(H, W), mode='bilinear', align_corners=False)
+        else:
+            target_2d = target_embeddings
+        
+        # 转为 (B, H, W, D)
+        target = rearrange(target_2d, 'b c h w -> b h w c')
+        
+        # L2 归一化后计算余弦距离 (1 - cosine_similarity)
+        pred_n = torch.nn.functional.normalize(pred_embeddings, p=2, dim=-1)
+        tgt_n = torch.nn.functional.normalize(target, p=2, dim=-1)
+        cosine_sim = (pred_n * tgt_n).sum(dim=-1)  # (B, H, W)
+        
+        loss = (1.0 - cosine_sim)
+        
+        if valid_mask is not None:
+            # 只对有效样本求平均
+            valid_mask_2d = valid_mask.view(B, 1, 1).expand(B, H, W)
+            loss = (loss * valid_mask_2d.float()).sum() / (valid_mask_2d.float().sum() + 1e-8)
+        else:
+            loss = loss.mean()
+        
+        return loss
     
     def __call__(self, outputs: Dict[str, Any]) -> Dict[str, torch.Tensor]:
         """Compute total loss following Equation 3."""
@@ -149,11 +200,23 @@ class AEFLoss:
         else:
             losses['clip'] = torch.tensor(0.0, device=losses['reconstruction'].device)
         
+        # AEF 官方 embedding 蒸馏损失
+        if 'aef_embedding_pred' in outputs and 'aef_embedding_target' in outputs:
+            distill_loss = self.aef_distill_loss(
+                outputs['aef_embedding_pred'],
+                outputs['aef_embedding_target'],
+                outputs.get('aef_embedding_valid'),
+            )
+            losses['distill'] = distill_loss
+        else:
+            losses['distill'] = torch.tensor(0.0, device=losses['reconstruction'].device)
+        
         total_loss = (
             self.reconstruction_weight * losses['reconstruction'] +
             self.uniformity_weight * losses['uniformity'] +
             self.consistency_weight * losses['consistency'] +
-            self.text_weight * losses['clip']
+            self.text_weight * losses['clip'] +
+            self.distill_weight * losses['distill']
         )
         
         losses['total'] = total_loss

@@ -39,6 +39,10 @@ class Trainer:
         output_dir: str | None = None,
         rank: int = 0,
         world_size: int = 1,
+        distill_weight: float = 0.5,
+        resume_step: int = 0,
+        resume_optimizer_state: dict | None = None,
+        resume_scheduler_state: dict | None = None,
     ) -> None:
         self.model = model
         self.dataloader = dataloader
@@ -53,7 +57,7 @@ class Trainer:
         self.save_every = save_every
         self.eval_every = eval_every
 
-        self.loss_fn = AEFLoss()
+        self.loss_fn = AEFLoss(distill_weight=distill_weight)
 
         # Optimizer
         params = list(self.model.parameters())
@@ -66,15 +70,25 @@ class Trainer:
             return 0.5 * (1 + math.cos(math.pi * (step - warmup_steps) / (max_steps - warmup_steps)))
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optim, lr_lambda)
 
+        # Resume optimizer / scheduler 状态
+        if resume_optimizer_state is not None:
+            self.optim.load_state_dict(resume_optimizer_state)
+        if resume_scheduler_state is not None:
+            self.scheduler.load_state_dict(resume_scheduler_state)
+            # 根据 resume_step 快速前进 scheduler 状态
+            for _ in range(resume_step):
+                self.scheduler.step()
+
         self.loss_history = {
             "steps": [],
             "total": [],
             "reconstruction": [],
             "uniformity": [],
             "consistency": [],
+            "distill": [],
         }
 
-        self.step = 0
+        self.step = resume_step
 
     def _prepare_reconstruction_targets(
         self, batch: dict[str, Any], pred: dict[str, torch.Tensor]
@@ -103,19 +117,40 @@ class Trainer:
 
     def train(self) -> None:
         self.model.train()
-        data_iter = itertools.cycle(self.dataloader)
+
+        # 获取 sampler 以便每个 epoch 调用 set_epoch
+        train_sampler = getattr(self.dataloader, "sampler", None)
+        epoch = 0
+        resume_step = self.step  # 记录起始 step，用于计算速度
 
         pbar = tqdm(
-            range(1, self.max_steps + 1),
+            range(self.step + 1, self.max_steps + 1),
             desc="Training",
             unit="step",
             disable=self.rank != 0,
+            initial=self.step,
+            total=self.max_steps,
         )
         start_time = time.time()
 
+        data_iter = iter(self.dataloader)
+
         for step in pbar:
             self.step = step
-            batch = next(data_iter)
+
+            # 每个 epoch 开始时调用 set_epoch（基于 step 数估算）
+            steps_per_epoch = len(self.dataloader) if hasattr(self.dataloader, "__len__") else 1000
+            current_epoch = (step - 1) // steps_per_epoch
+            if current_epoch != epoch and train_sampler is not None and hasattr(train_sampler, "set_epoch"):
+                epoch = current_epoch
+                train_sampler.set_epoch(epoch)
+
+            # 迭代 dataloader，遇到 StopIteration 时重新创建迭代器
+            try:
+                batch = next(data_iter)
+            except StopIteration:
+                data_iter = iter(self.dataloader)
+                batch = next(data_iter)
 
             source_data = {
                 k: v.to(self.device) for k, v in batch["source_data"].items()
@@ -149,6 +184,16 @@ class Trainer:
                 "masks": masks,
             }
 
+            # AEF 官方 embedding 蒸馏
+            if "aef_embedding" in batch:
+                aef_emb = batch["aef_embedding"].to(self.device)  # (B, 64, 128, 128)
+                valid_mask = batch.get("aef_embedding_valid")
+                if valid_mask is not None:
+                    valid_mask = valid_mask.to(self.device)
+                outputs_for_loss["aef_embedding_pred"] = out["embeddings"]
+                outputs_for_loss["aef_embedding_target"] = aef_emb
+                outputs_for_loss["aef_embedding_valid"] = valid_mask
+
             losses = self.loss_fn(outputs_for_loss)
             loss = losses["total"]
 
@@ -161,23 +206,26 @@ class Trainer:
             self.optim.step()
             self.scheduler.step()
 
-            # Sync losses across ranks
+            # Sync losses across ranks (先 gather 再求平均)
             if self.world_size > 1:
                 for k in losses:
                     if losses[k].device != self.device:
                         losses[k] = losses[k].to(self.device)
-                    dist.all_reduce(losses[k], op=dist.ReduceOp.AVG)
+                    dist.all_reduce(losses[k], op=dist.ReduceOp.SUM)
+                    losses[k] = losses[k] / self.world_size
 
             # Logging
             if self.rank == 0:
                 self.loss_history["steps"].append(step)
-                for k in ["total", "reconstruction", "uniformity", "consistency"]:
+                for k in ["total", "reconstruction", "uniformity", "consistency", "distill"]:
                     self.loss_history[k].append(float(losses[k]))
 
                 if step % self.log_every == 0:
                     lr = self.scheduler.get_last_lr()[0]
                     elapsed = time.time() - start_time
-                    steps_per_sec = step / elapsed if elapsed > 0 else 0
+                    # 使用实际已跑 step 数计算速度
+                    actual_steps = step - resume_step
+                    steps_per_sec = actual_steps / elapsed if elapsed > 0 else 0
                     eta = (self.max_steps - step) / steps_per_sec / 3600 if steps_per_sec > 0 else 0
                     print(
                         f"[Step {step}] "
@@ -185,6 +233,7 @@ class Trainer:
                         f"recon={losses['reconstruction']:.4f} "
                         f"uniform={losses['uniformity']:.4f} "
                         f"consist={losses['consistency']:.4f} "
+                        f"distill={losses['distill']:.4f} "
                         f"lr={lr:.6f} "
                         f"({steps_per_sec:.2f} step/s, ETA {eta:.1f}h)"
                     )
@@ -213,6 +262,7 @@ class Trainer:
         self.model.eval()
         total_recon = 0.0
         total_uniform = 0.0
+        total_distill = 0.0
         count = 0
 
         for batch in self.val_dataloader:
@@ -235,9 +285,20 @@ class Trainer:
                 "targets": targets,
                 "masks": masks,
             }
+
+            if "aef_embedding" in batch:
+                aef_emb = batch["aef_embedding"].to(self.device)
+                valid_mask = batch.get("aef_embedding_valid")
+                if valid_mask is not None:
+                    valid_mask = valid_mask.to(self.device)
+                outputs_for_loss["aef_embedding_pred"] = out["embeddings"]
+                outputs_for_loss["aef_embedding_target"] = aef_emb
+                outputs_for_loss["aef_embedding_valid"] = valid_mask
+
             losses = self.loss_fn(outputs_for_loss)
             total_recon += float(losses["reconstruction"])
             total_uniform += float(losses["uniformity"])
+            total_distill += float(losses["distill"])
             count += 1
 
         self.model.train()
@@ -247,19 +308,26 @@ class Trainer:
                 print("[Val] No valid batches")
             return
 
+        # DDP 同步：先 gather sum，再求平均
         if self.world_size > 1:
-            recon_tensor = torch.tensor(total_recon / count, device=self.device)
-            uniform_tensor = torch.tensor(total_uniform / count, device=self.device)
-            dist.all_reduce(recon_tensor, op=dist.ReduceOp.AVG)
-            dist.all_reduce(uniform_tensor, op=dist.ReduceOp.AVG)
-            avg_recon = float(recon_tensor)
-            avg_uniform = float(uniform_tensor)
+            recon_tensor = torch.tensor(total_recon, device=self.device)
+            uniform_tensor = torch.tensor(total_uniform, device=self.device)
+            distill_tensor = torch.tensor(total_distill, device=self.device)
+            count_tensor = torch.tensor(count, device=self.device, dtype=torch.float32)
+            dist.all_reduce(recon_tensor, op=dist.ReduceOp.SUM)
+            dist.all_reduce(uniform_tensor, op=dist.ReduceOp.SUM)
+            dist.all_reduce(distill_tensor, op=dist.ReduceOp.SUM)
+            dist.all_reduce(count_tensor, op=dist.ReduceOp.SUM)
+            avg_recon = float(recon_tensor / count_tensor)
+            avg_uniform = float(uniform_tensor / count_tensor)
+            avg_distill = float(distill_tensor / count_tensor)
         else:
             avg_recon = total_recon / count
             avg_uniform = total_uniform / count
+            avg_distill = total_distill / count
 
         if self.rank == 0:
-            print(f"[Val] recon_loss={avg_recon:.4f} uniform={avg_uniform:.4f}")
+            print(f"[Val] recon_loss={avg_recon:.4f} uniform={avg_uniform:.4f} distill={avg_distill:.4f}")
 
     def _save_checkpoint(self, step: int) -> None:
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -275,4 +343,4 @@ class Trainer:
         }
         torch.save(checkpoint, self.output_dir / f"step_{step:06d}.pt")
         if self.rank == 0:
-            print(f"[Save] Checkpoint saved to {self.output_dir}/step_{step:06d}.pt")
+            print(f"[Checkpoint] Saved at step {step}")

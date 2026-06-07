@@ -109,4 +109,5 @@ class SummaryPeriodEncoder(nn.Module):
 
         q = torch.cat([enc_s, enc_e, enc_d], dim=-1)  # (B, 3*dim//2)
         q = self.fuse(q) + self.q_bias  # (B, dim)
+        q = torch.where(torch.isnan(q), torch.zeros_like(q), q)  # NaN protection
         return q

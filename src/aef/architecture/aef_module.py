@@ -62,6 +62,8 @@ class TimePooling(nn.Module):
             logits = logits.masked_fill(mask_flat == 0, float('-inf'))
 
         attn = torch.softmax(logits, dim=-1)
+        # NaN protection: if all logits are -inf (fully masked), softmax outputs NaN
+        attn = torch.where(torch.isnan(attn), torch.zeros_like(attn), attn)
         
         if attn.dim() == 2:
             attn = attn.unsqueeze(-1)
