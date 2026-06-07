@@ -60,6 +60,7 @@ class TrainingConfig:
     w_recon: float = 1.0
     w_distill: float = 0.02
     w_uniform: float = 0.01
+    w_spatial_uniform: float = 0.005
     aef_checkpoint: str | None = None
     aef_config: str = "configs/config_haidian_v41.yaml"
     optimizer: str = "adamw"

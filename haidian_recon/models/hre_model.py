@@ -8,6 +8,8 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -118,12 +120,18 @@ class HREModel(nn.Module):
             use_gradient_checkpointing=use_gradient_checkpointing,
         )
 
-        # Bottleneck
+        # Bottleneck (全局embedding)
         self.bottleneck = HRBottleneck(
             embed_dim=embed_dim,
             output_dim=output_dim,
             num_heads=num_heads,
             dropout=dropout,
+        )
+
+        # Spatial head: encoder token → 空间embedding [B, 64, 16, 16]
+        self.spatial_head = nn.Sequential(
+            nn.LayerNorm(embed_dim),
+            nn.Linear(embed_dim, output_dim),
         )
 
         # Decoder
@@ -171,6 +179,7 @@ class HREModel(nn.Module):
         """
         # 1. Patch Embedding + Token Encoding
         all_tokens = []
+        source_info = []  # 记录每个源的空间布局信息
 
         for source_idx, source_name in enumerate(self.source_names):
             x = batch.get(source_name)
@@ -185,6 +194,14 @@ class HREModel(nn.Module):
             time_indices = torch.arange(T, device=tokens.device).unsqueeze(0).expand(B, T)
             tokens = self.token_encoding(tokens, source_idx, time_indices)
 
+            # 记录空间布局
+            source_info.append({
+                "name": source_name,
+                "T": T,
+                "N": N,
+                "source_idx": source_idx,
+            })
+
             # Flatten time维度: [B, T*N, D]
             tokens = tokens.reshape(B, T * N, D)
             all_tokens.append(tokens)
@@ -198,13 +215,41 @@ class HREModel(nn.Module):
         # 2. Encoder
         encoder_output = self.encoder(tokens)
 
-        # 3. Bottleneck → 64维Embedding
+        # 3. Bottleneck → 全局64维Embedding
         embedding = self.bottleneck(encoder_output)
 
-        # 4. 推理时不需要重建
+        # 4. 空间embedding: 取第一个有效源的空间token → [B, 64, 128, 128]
+        embedding_map = None
+        if len(source_info) > 0:
+            first = source_info[0]
+            T_src = first["T"]
+            N_src = first["N"]
+            n_first = T_src * N_src
+            grid_size = int(math.sqrt(N_src))
+
+            # 取encoder_output中对应第一个源的所有token
+            spatial_tokens = encoder_output[:, :n_first, :]  # [B, T*N, D]
+            spatial_tokens = spatial_tokens.reshape(B, T_src, grid_size, grid_size, D)
+            # 时间维度聚合
+            spatial_tokens = spatial_tokens.mean(dim=1)  # [B, grid_size, grid_size, D]
+
+            # 映射到64D
+            spatial_emb = self.spatial_head(spatial_tokens)  # [B, grid_size, grid_size, 64]
+            spatial_emb = spatial_emb.permute(0, 3, 1, 2)  # [B, 64, grid_size, grid_size]
+
+            # 上采样到128×128（每个像素一个64D向量）
+            embedding_map = F.interpolate(
+                spatial_emb,
+                size=(self.image_size, self.image_size),
+                mode="bilinear",
+                align_corners=False,
+            )  # [B, 64, 128, 128]
+
+        # 5. 推理时不需要重建
         if mask_info is None or not mask_info.get("decode_sources"):
             return {
                 "embedding": embedding,
+                "embedding_map": embedding_map,
                 "reconstructions": {},
                 "mask_info": mask_info,
             }
@@ -245,6 +290,7 @@ class HREModel(nn.Module):
 
         return {
             "embedding": embedding,
+            "embedding_map": embedding_map,
             "reconstructions": reconstructions,
             "mask_info": mask_info,
         }

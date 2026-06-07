@@ -6,6 +6,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 
 
 class MultiHeadAttention(nn.Module):
@@ -118,7 +119,7 @@ class HREncoder(nn.Module):
         """
         for layer in self.layers:
             if self.use_checkpointing and self.training:
-                x = torch.utils.checkpoint.checkpoint(layer, x, mask)
+                x = checkpoint(layer, x, mask)
             else:
                 x = layer(x, mask)
         x = self.norm(x)

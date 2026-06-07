@@ -16,7 +16,7 @@ from haidian_recon.data.masking import FourLayerMask
 from haidian_recon.models.hre_model import HREModel
 from haidian_recon.losses.reconstruction import reconstruction_loss
 from haidian_recon.losses.distillation import aef_distillation_loss
-from haidian_recon.losses.uniformity import uniformity_loss
+from haidian_recon.losses.uniformity import uniformity_loss, spatial_uniformity_loss
 from haidian_recon.training.optimizer import build_optimizer, CosineScheduler
 
 
@@ -160,14 +160,21 @@ class HRETrainer:
                     aef_emb = batch["aef_embedding"]
                     loss_distill = aef_distillation_loss(output["embedding"], aef_emb)
 
-                # 推散损失
+                # 推散损失（全局）
                 loss_uniform = uniformity_loss(output["embedding"])
 
+                # 推散损失（空间）
+                loss_spatial_uniform = torch.tensor(0.0, device=self.device)
+                if output["embedding_map"] is not None:
+                    loss_spatial_uniform = spatial_uniformity_loss(output["embedding_map"])
+
                 # 总损失
+                w_spatial = getattr(cfg, "w_spatial_uniform", 0.005)
                 loss = (
                     cfg.w_recon * loss_recon
                     + cfg.w_distill * loss_distill
                     + cfg.w_uniform * loss_uniform
+                    + w_spatial * loss_spatial_uniform
                 )
 
                 # NaN/Inf检查
@@ -200,7 +207,8 @@ class HRETrainer:
                 if self.rank == 0 and self.global_step % cfg.log_every == 0:
                     print(f"[Step {self.global_step}] loss={loss.item():.4f} "
                           f"recon={loss_recon.item():.4f} distill={loss_distill.item():.4f} "
-                          f"uniform={loss_uniform.item():.4f} lr={self.scheduler.optimizer.param_groups[0]['lr']:.6f}")
+                          f"uniform={loss_uniform.item():.4f} spatial_u={loss_spatial_uniform.item():.4f} "
+                          f"lr={self.scheduler.optimizer.param_groups[0]['lr']:.6f}")
 
             # Epoch日志
             n_batches = len(self.train_loader)
@@ -208,7 +216,8 @@ class HRETrainer:
                 print(f"[Epoch {epoch}] loss={epoch_loss/n_batches:.4f} "
                       f"recon={epoch_recon/n_batches:.4f} "
                       f"distill={epoch_distill/n_batches:.4f} "
-                      f"uniform={epoch_uniform/n_batches:.4f}")
+                      f"uniform={epoch_uniform/n_batches:.4f} "
+                      f"spatial_u={loss_spatial_uniform.item():.4f}")
 
             # 保存
             if self.rank == 0 and (epoch + 1) % cfg.save_every == 0:

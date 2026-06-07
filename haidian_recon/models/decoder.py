@@ -4,6 +4,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 
 
 class CrossAttentionBlock(nn.Module):
@@ -96,7 +97,7 @@ class HRDecoder(nn.Module):
         x = mask_tokens
         for layer in self.layers:
             if self.use_checkpointing and self.training:
-                x = torch.utils.checkpoint.checkpoint(layer, x, encoder_output)
+                x = checkpoint(layer, x, encoder_output)
             else:
                 x = layer(x, encoder_output)
         x = self.norm(x)
