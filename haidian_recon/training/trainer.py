@@ -121,6 +121,17 @@ class HRETrainer:
             drop_last=False,
         )
 
+        # 预取固定验证 batch 用于可视化（绕过 DistributedSampler，避免每次 spawn worker）
+        if self.rank == 0:
+            val_iter = iter(self.val_loader)
+            self.fixed_val_batch = next(val_iter)
+            self.fixed_val_batch = {
+                k: v.cpu() if isinstance(v, torch.Tensor) else v
+                for k, v in self.fixed_val_batch.items()
+            }
+        else:
+            self.fixed_val_batch = None
+
         # 调度器：使用 rank 0 的步数统一所有 rank，避免 DDP 下样本分配不均导致偏差
         steps_per_epoch = len(self.train_loader)
         total_steps = cfg.training.epochs * steps_per_epoch
@@ -271,6 +282,9 @@ class HRETrainer:
                 if len(self.loss_history) > 0:
                     self.plot_losses(epoch)
                 self.visualize_reconstructions(epoch)
+            # DDP barrier: 确保 rank 0 可视化完成前其他 rank 不进入下一 epoch
+            if self.world_size > 1:
+                dist.barrier()
 
     @torch.no_grad()
     def evaluate(self) -> dict:
@@ -309,6 +323,7 @@ class HRETrainer:
 
         if self.rank == 0:
             print(f"[Val] recon_loss={avg_recon:.4f}")
+        self.model.train()  # 恢复训练模式（所有 rank 统一）
         return {"recon_loss": avg_recon}
 
     def save_checkpoint(self, epoch: int) -> None:
@@ -437,21 +452,20 @@ class HRETrainer:
         vis_dir = self.output_dir / f"Epoch-{epoch}-VIS"
         vis_dir.mkdir(parents=True, exist_ok=True)
 
-        # 取第一个batch的前2个样本
-        batch = next(iter(self.val_loader))
-        batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else None for k, v in batch.items()}
+        # 使用预取的固定验证 batch（避免每次 spawn DataLoader worker）
+        if self.fixed_val_batch is None:
+            return
+        batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else None for k, v in self.fixed_val_batch.items()}
 
-        # 固定随机状态
+        # 固定随机状态（masking.py 已全部使用 torch 随机流）
         torch_state = torch.get_rng_state()
-        np_state = np.random.get_state()
-        random_state = random.getstate()
+        if hasattr(torch, "npu") and torch.npu.is_available():
+            npu_state = torch.npu.get_rng_state()
         torch.manual_seed(self.cfg.seed)
-        np.random.seed(self.cfg.seed)
-        random.seed(self.cfg.seed)
         masked_batch, mask_info = self.masking(batch)
         torch.set_rng_state(torch_state)
-        np.random.set_state(np_state)
-        random.setstate(random_state)
+        if hasattr(torch, "npu") and torch.npu.is_available():
+            torch.npu.set_rng_state(npu_state)
 
         output = self.model(masked_batch, mask_info)
 
@@ -465,39 +479,43 @@ class HRETrainer:
                 continue  # 数据本身缺失
 
             n_show = min(2, original.shape[0])
-            fig, axes = plt.subplots(n_show, 3, figsize=(12, 4 * n_show))
-            if n_show == 1:
-                axes = axes.reshape(1, -1)
+            fig = None
+            try:
+                fig, axes = plt.subplots(n_show, 3, figsize=(9, 3 * n_show))
+                if n_show == 1:
+                    axes = axes.reshape(1, -1)
 
-            for i in range(n_show):
-                orig_img = self._tensor_to_image(original[i, 0])
-                axes[i, 0].imshow(orig_img)
-                axes[i, 0].set_title(f"{source_name} Original")
-                axes[i, 0].axis("off")
+                for i in range(n_show):
+                    orig_img = self._tensor_to_image(original[i, 0])
+                    axes[i, 0].imshow(orig_img)
+                    axes[i, 0].set_title(f"{source_name} Original")
+                    axes[i, 0].axis("off")
 
-                if source_name in decode_sources_set and source_name in output.get("reconstructions", {}):
-                    recon = output["reconstructions"][source_name]
-                    recon_img = self._tensor_to_image(recon[i, 0])
-                    diff_img = np.abs(orig_img - recon_img)
-                    axes[i, 1].imshow(recon_img)
-                    axes[i, 1].set_title(f"{source_name} Reconstruction")
-                    axes[i, 2].imshow(diff_img)
-                    axes[i, 2].set_title(f"{source_name} Diff")
-                else:
-                    # 显示灰色占位图，标注该 source 本次未被 decode
-                    gray = np.ones_like(orig_img) * 0.5
-                    axes[i, 1].imshow(gray)
-                    axes[i, 1].set_title(f"{source_name} (Not Decoded)")
-                    axes[i, 2].imshow(gray)
-                    axes[i, 2].set_title(f"{source_name} (No Diff)")
+                    if source_name in decode_sources_set and source_name in output.get("reconstructions", {}):
+                        recon = output["reconstructions"][source_name]
+                        recon_img = self._tensor_to_image(recon[i, 0])
+                        diff_img = np.abs(orig_img - recon_img)
+                        axes[i, 1].imshow(recon_img)
+                        axes[i, 1].set_title(f"{source_name} Reconstruction")
+                        axes[i, 2].imshow(diff_img)
+                        axes[i, 2].set_title(f"{source_name} Diff")
+                    else:
+                        # 显示灰色占位图，标注该 source 本次未被 decode
+                        gray = np.ones_like(orig_img) * 0.5
+                        axes[i, 1].imshow(gray)
+                        axes[i, 1].set_title(f"{source_name} (Not Decoded)")
+                        axes[i, 2].imshow(gray)
+                        axes[i, 2].set_title(f"{source_name} (No Diff)")
 
-                axes[i, 1].axis("off")
-                axes[i, 2].axis("off")
+                    axes[i, 1].axis("off")
+                    axes[i, 2].axis("off")
 
-            plt.tight_layout()
-            save_path = vis_dir / f"recon_{source_name}.png"
-            plt.savefig(save_path, dpi=150)
-            plt.close()
-            print(f"[Viz] Reconstruction visualization saved to {save_path}")
+                plt.tight_layout()
+                save_path = vis_dir / f"recon_{source_name}.png"
+                plt.savefig(save_path, dpi=100, bbox_inches="tight")
+                print(f"[Viz] Reconstruction visualization saved to {save_path}")
+            finally:
+                if fig is not None:
+                    plt.close(fig)
 
         self.model.train()
