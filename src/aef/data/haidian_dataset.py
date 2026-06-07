@@ -197,6 +197,7 @@ def collate_fn(batch: list[dict]) -> dict[str, Any]:
 
         # 过滤 None
         valid_tensors = [t for t in tensors if t is not None]
+        valid_ts = [t for t in ts_list if t is not None]
 
         if len(valid_tensors) == 0:
             continue

@@ -92,8 +92,9 @@ class Trainer:
             batch_indices = torch.arange(B, device=self.device)
             target = x[batch_indices, idx]  # (B, H, W, C)
 
-            # 下采样到重建分辨率（AEF 输出是 1/2L）
-            H2, W2 = pred[src_key].shape[2], pred[src_key].shape[3]
+            # 下采样到重建分辨率（AEF decoder 输出 H=W=64，然后上采样到 128）
+            # predictions shape: [B, H, W, C]
+            H2, W2 = pred[src_key].shape[1], pred[src_key].shape[2]
             target_2d = rearrange(target, "b h w c -> b c h w")
             target_2d = F.interpolate(target_2d, size=(H2, W2), mode="bilinear", align_corners=False)
             target = rearrange(target_2d, "b c h w -> b h w c")
