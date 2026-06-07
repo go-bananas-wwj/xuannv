@@ -140,9 +140,9 @@ class AEFDistiller(nn.Module):
         aef_frames = torch.cat(padded_frames, dim=1)  # [B, T_total, C_max, H, W]
         aef_timestamps = torch.cat(source_timestamps, dim=1)  # [B, T_total]
 
-        # 构建mask
-        source_frame_mask = torch.ones(B, T_total, device=aef_frames.device)
-        source_input_mask = torch.ones(B, T_total, device=aef_frames.device)
+        # 构建mask (NPU bitwise_and 只支持 bool/int，不能用 float)
+        source_frame_mask = torch.ones(B, T_total, device=aef_frames.device, dtype=torch.bool)
+        source_input_mask = torch.ones(B, T_total, device=aef_frames.device, dtype=torch.bool)
         source_type_ids_tensor = torch.tensor(source_type_ids, device=aef_frames.device).unsqueeze(0).expand(B, -1)
 
         with torch.no_grad():
