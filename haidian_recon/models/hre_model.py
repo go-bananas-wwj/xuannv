@@ -33,6 +33,7 @@ class TokenEncoding(nn.Module):
     ) -> None:
         super().__init__()
         self.embed_dim = embed_dim
+        self.max_timesteps = max_timesteps
         self.modality_embed = nn.Embedding(num_sources, embed_dim)
         self.time_embed = nn.Embedding(max_timesteps, embed_dim)
         # 2D位置编码: 可学习参数
