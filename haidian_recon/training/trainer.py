@@ -331,7 +331,16 @@ class HRETrainer:
             print(f"[Load] Missing keys (will be initialized): {missing}")
         if unexpected:
             print(f"[Load] Unexpected keys (skipped): {unexpected}")
-        self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+        if missing:
+            # 模型架构变化（如新增cond_proj），optimizer state不匹配，重新初始化
+            print("[Load] Model architecture changed, reinitializing optimizer")
+            self.optimizer = build_optimizer(
+                self.model.module if hasattr(self.model, "module") else self.model,
+                lr=self.cfg.training.lr,
+                weight_decay=self.cfg.training.weight_decay,
+            )
+        else:
+            self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
         self.start_epoch = ckpt["epoch"] + 1
         self.global_step = ckpt.get("global_step", 0)
         self.scheduler.step_count = ckpt.get("scheduler_step_count", 0)
