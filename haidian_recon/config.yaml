@@ -40,7 +40,7 @@ training:
   weight_decay: 0.05
   warmup_epochs: 40
   grad_clip_norm: 1.0
-  w_recon: 1.0
+  w_recon: 5.0
   w_distill: 0.015
   w_uniform: 0.04
   aef_checkpoint: /workspace/datasets/xuannv/WeijieWu/xuannv_embddings/outputs/aef_qwen_v5_mixed_scale/epoch_best_epoch161.pt

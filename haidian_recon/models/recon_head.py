@@ -27,9 +27,9 @@ class HRReconstructionHead(nn.Module):
         self.n_patches = (image_size // patch_size) ** 2
 
         # 先用MLP将每个token映射到patch_size^2 * out_channels
+        # 移除GELU，避免负值区域被压缩（导致重建输出接近常数）
         self.mlp = nn.Sequential(
             nn.Linear(embed_dim, embed_dim * 2),
-            nn.GELU(),
             nn.Linear(embed_dim * 2, patch_size * patch_size * out_channels),
         )
 

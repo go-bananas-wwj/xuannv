@@ -258,11 +258,11 @@ class HREModel(nn.Module):
         grid_size = int(math.sqrt(self.n_patches))
         assert self.n_patches == grid_size * grid_size, \
             f"n_patches {self.n_patches} must be perfect square for spatial reshape"
-        spatial_tokens = encoder_output[:, spatial_token_offset:spatial_token_offset + first_encode_n, :]  # [B, first_encode_n, 512]
-        # 仅 reshape 当 token 数匹配预期空间 patch 数（首个 encode 源通常是 T=1）
+        # 保存原始空间 token 供 decoder 使用（信息更丰富的 512D，不经过压缩）
+        decoder_kv_tokens = encoder_output[:, spatial_token_offset:spatial_token_offset + first_encode_n, :]  # [B, first_encode_n, 512]
         if first_encode_n != self.n_patches:
-            # 若时间维度 >1，取第一个时间步的空间 token（与之前行为一致）
-            spatial_tokens = spatial_tokens[:, :self.n_patches, :]
+            decoder_kv_tokens = decoder_kv_tokens[:, :self.n_patches, :]
+        spatial_tokens = decoder_kv_tokens  # [B, n_patches, 512]
         spatial_tokens = spatial_tokens.reshape(B, grid_size, grid_size, self.embed_dim)
 
         # 逐位置投影到64维（每个空间位置独立投影）
@@ -320,9 +320,9 @@ class HREModel(nn.Module):
             mask_tokens = self.token_encoding(mask_tokens, source_idx, time_indices)
             mask_tokens = mask_tokens.reshape(B, T * N, self.embed_dim)
 
-            # Decoder: 使用空间64维embedding作为条件（每个位置独立，非广播）
-            decoder_kv = spatial_emb.reshape(B, -1, self.output_dim)  # [B, 256, 64]
-            decoder_kv = self.cond_proj(decoder_kv)  # [B, 256, 512]
+            # Decoder: 使用 encoder 原始 512D 输出作为条件（信息更丰富）
+            # decoder_kv_tokens 已在上方保存为 [B, n_patches, 512]
+            decoder_kv = decoder_kv_tokens  # [B, 256, 512]
             decoded = self.decoder(mask_tokens, decoder_kv)  # [B, T*N, D]
 
             # Reconstruction head
