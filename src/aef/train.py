@@ -1,0 +1,180 @@
+"""AEF DDP 训练入口."""
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+
+# Add project root to path
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+import random
+
+import numpy as np
+import torch
+import torch.distributed as dist
+import torch_npu
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import DataLoader, DistributedSampler
+
+from src.aef.architecture.aef_module import AlphaEarthFoundations
+from src.aef.data.haidian_dataset import HaidianAEFDataset, collate_fn
+from src.aef.training import Trainer
+
+
+def setup_distributed() -> tuple[int, int, int]:
+    """初始化 DDP."""
+    if "RANK" in os.environ and "WORLD_SIZE" in os.environ:
+        rank = int(os.environ["RANK"])
+        world_size = int(os.environ["WORLD_SIZE"])
+        local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    else:
+        rank = 0
+        world_size = 1
+        local_rank = 0
+
+    if world_size > 1:
+        dist.init_process_group(
+            backend="hccl",
+            rank=rank,
+            world_size=world_size,
+        )
+        torch.npu.set_device(local_rank)
+
+    return rank, world_size, local_rank
+
+
+def cleanup_distributed() -> None:
+    if dist.is_initialized():
+        dist.destroy_process_group()
+
+
+def set_seed(seed: int) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.npu.is_available():
+        torch.npu.manual_seed_all(seed)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="configs/config_aef_haidian.yaml")
+    parser.add_argument("--batch-size", type=int, default=4)
+    parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--max-steps", type=int, default=100000)
+    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--warmup-steps", type=int, default=2000)
+    parser.add_argument("--log-every", type=int, default=50)
+    parser.add_argument("--save-every", type=int, default=5000)
+    parser.add_argument("--eval-every", type=int, default=5000)
+    parser.add_argument("--output-dir", type=str, default="outputs/aef_haidian")
+    parser.add_argument("--resume", type=str, default=None)
+    parser.add_argument("--seed", type=int, default=42)
+    args = parser.parse_args()
+
+    rank, world_size, local_rank = setup_distributed()
+    set_seed(args.seed + rank)
+
+    if rank == 0:
+        print(f"Rank: {rank}/{world_size}, LocalRank: {local_rank}, Device: npu:{local_rank}")
+        print(f"Config: batch_size={args.batch_size}, lr={args.lr}, max_steps={args.max_steps}")
+
+    # Build datasets
+    train_dataset = HaidianAEFDataset(
+        data_root="data_raw/haidian/scenes",
+        planet_root="data_raw/beijing/planetscene",
+        stats_dir="statistics/haidian",
+        split="train",
+        image_size=128,
+        source_names=["tianyi_sar", "s2", "landsat", "planet"],
+        max_frames=16,
+    )
+    val_dataset = HaidianAEFDataset(
+        data_root="data_raw/haidian/scenes",
+        planet_root="data_raw/beijing/planetscene",
+        stats_dir="statistics/haidian",
+        split="val",
+        image_size=128,
+        source_names=["tianyi_sar", "s2", "landsat", "planet"],
+        max_frames=16,
+    )
+
+    # Samplers
+    train_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank, shuffle=True) if world_size > 1 else None
+    val_sampler = DistributedSampler(val_dataset, num_replicas=world_size, rank=rank, shuffle=False) if world_size > 1 else None
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        sampler=train_sampler,
+        collate_fn=collate_fn,
+        num_workers=args.num_workers,
+        pin_memory=False,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=args.batch_size,
+        sampler=val_sampler,
+        collate_fn=collate_fn,
+        num_workers=args.num_workers,
+        pin_memory=False,
+    )
+
+    # Build model
+    source_channels = {
+        "tianyi_sar": 1,
+        "s2": 6,
+        "landsat": 6,
+        "planet": 4,
+    }
+    model = AlphaEarthFoundations(
+        model_size="small",
+        input_sources=source_channels,
+        decode_sources=source_channels,
+        per_source_latent=32,
+        enable_text_align=False,
+    )
+
+    device = f"npu:{local_rank}"
+    model = model.to(device)
+
+    if world_size > 1:
+        model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=False)
+
+    # Resume
+    start_step = 0
+    if args.resume and os.path.exists(args.resume):
+        ckpt = torch.load(args.resume, map_location="cpu")
+        model.load_state_dict(ckpt["model_state_dict"], strict=True)
+        start_step = ckpt.get("step", 0)
+        if rank == 0:
+            print(f"[Resume] Loaded checkpoint from {args.resume} at step {start_step}")
+
+    # Trainer
+    trainer = Trainer(
+        model=model.module if world_size > 1 else model,
+        dataloader=train_loader,
+        val_dataloader=val_loader,
+        device=device,
+        lr=args.lr,
+        max_steps=args.max_steps,
+        warmup_steps=args.warmup_steps,
+        log_every=args.log_every,
+        save_every=args.save_every,
+        eval_every=args.eval_every,
+        output_dir=args.output_dir,
+        rank=rank,
+        world_size=world_size,
+    )
+
+    try:
+        trainer.train()
+    finally:
+        cleanup_distributed()
+
+
+if __name__ == "__main__":
+    main()

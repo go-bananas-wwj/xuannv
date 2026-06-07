@@ -1,0 +1,236 @@
+"""海淀区数据集适配 AEF 格式."""
+from __future__ import annotations
+
+import json
+import os
+import random
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import torch
+from torch.utils.data import Dataset
+
+from src.aef.data.transforms import read_tif, normalize_source, parse_date_to_ms
+
+
+class HaidianAEFDataset(Dataset):
+    """
+    海淀区多源数据集，适配 AEF 输入格式 (B, T, H, W, C)。
+    """
+
+    def __init__(
+        self,
+        data_root: str = "data_raw/haidian/scenes",
+        planet_root: str = "data_raw/beijing/planetscene",
+        stats_dir: str = "statistics/haidian",
+        cache_dir: str = "src/aef/.cache",
+        image_size: int = 128,
+        source_names: list[str] | None = None,
+        split: str = "train",
+        train_ratio: float = 0.9,
+        seed: int = 42,
+        max_frames: int = 16,
+    ) -> None:
+        super().__init__()
+        self.data_root = Path(data_root)
+        self.planet_root = Path(planet_root)
+        self.image_size = image_size
+        self.source_names = source_names or ["tianyi_sar", "s2", "landsat", "planet"]
+        self.split = split
+        self.max_frames = max_frames
+        self.cfg_anchor_source = "tianyi_sar"
+
+        # 加载时间映射表
+        mapping_path = Path(cache_dir) / "temporal_mapping.json"
+        if not mapping_path.exists():
+            print(f"[Dataset] Temporal mapping not found, building...")
+            import fcntl
+            lock_path = mapping_path.with_suffix(".json.lock")
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(lock_path, "w") as lockfile:
+                fcntl.flock(lockfile, fcntl.LOCK_EX)
+                if not mapping_path.exists():
+                    from src.aef.scripts.build_temporal_mapping import build_mapping
+                    build_mapping(
+                        data_root=str(self.data_root),
+                        planet_root=str(self.planet_root),
+                        output_path=str(mapping_path),
+                    )
+                fcntl.flock(lockfile, fcntl.LOCK_UN)
+        with open(mapping_path) as f:
+            self.mapping = json.load(f)
+
+        self.patch_ids = sorted(self.mapping.keys())
+
+        # 划分 train/val
+        rng = random.Random(seed)
+        rng.shuffle(self.patch_ids)
+        n_train = int(len(self.patch_ids) * train_ratio)
+        if split == "train":
+            self.patch_ids = self.patch_ids[:n_train]
+        else:
+            self.patch_ids = self.patch_ids[n_train:]
+
+        # 加载统计量
+        self.stats = {}
+        for src in self.source_names:
+            stats_path = Path(stats_dir) / f"{src}_stats.json"
+            if stats_path.exists():
+                with open(stats_path) as f:
+                    self.stats[src] = json.load(f)
+            else:
+                self.stats[src] = {}
+
+        # 构建样本列表：每个 patch 对应一个样本（聚合该 patch 的所有时间帧）
+        self.samples = []
+        for patch_id in self.patch_ids:
+            self.samples.append({"patch_id": patch_id})
+
+        print(f"[{split}] {len(self.patch_ids)} patches, {len(self.samples)} samples")
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def _load_source_frames(self, patch_id: str, source_name: str) -> tuple[np.ndarray, list[float]] | None:
+        """加载单个源的所有帧数据，返回 (data, timestamps_ms)."""
+        if source_name == "planet":
+            src_dir = self.planet_root / patch_id
+        else:
+            src_dir = self.data_root / patch_id / source_name
+
+        if not src_dir.exists():
+            return None
+
+        tif_files = sorted(src_dir.glob("*.tif"))
+        if len(tif_files) == 0:
+            return None
+
+        frames = []
+        timestamps_ms = []
+        for tif_path in tif_files[:self.max_frames]:
+            data = read_tif(tif_path, self.image_size)
+            if data is None:
+                continue
+            # 过滤包含 NaN/Inf 的帧（tianyi_sar 约30%文件有 NaN）
+            if np.isnan(data).any() or np.isinf(data).any():
+                continue
+            stats = self.stats.get(source_name, {})
+            data = normalize_source(data, source_name, stats)
+            # 归一化后再次检查 NaN
+            if np.isnan(data).any() or np.isinf(data).any():
+                continue
+            frames.append(data)
+            # 从文件名解析日期并转为 ms
+            date_str = tif_path.stem
+            ts_ms = parse_date_to_ms(date_str)
+            timestamps_ms.append(ts_ms)
+
+        if len(frames) == 0:
+            return None
+
+        # Stack: (T, C, H, W) -> (T, H, W, C)
+        data = np.stack(frames, axis=0)
+        data = np.transpose(data, (0, 2, 3, 1))  # (T, H, W, C)
+        return data, timestamps_ms
+
+    def __getitem__(self, idx: int) -> dict[str, Any]:
+        sample = self.samples[idx]
+        patch_id = sample["patch_id"]
+
+        source_data: dict[str, torch.Tensor] = {}
+        timestamps: dict[str, torch.Tensor] = {}
+
+        all_timestamps: list[float] = []
+        for source_name in self.source_names:
+            result = self._load_source_frames(patch_id, source_name)
+            if result is not None:
+                data, ts_ms = result
+                source_data[source_name] = torch.from_numpy(data).float()
+                timestamps[source_name] = torch.tensor(ts_ms, dtype=torch.float32)
+                all_timestamps.extend(ts_ms)
+
+        if len(all_timestamps) == 0:
+            raise ValueError(f"No data loaded for patch {patch_id}")
+
+        # Valid period: 数据的最早到最晚时间
+        valid_start_ms = min(all_timestamps)
+        valid_end_ms = max(all_timestamps)
+
+        return {
+            "source_data": source_data,
+            "timestamps": timestamps,
+            "valid_period": (valid_start_ms, valid_end_ms),
+            "patch_id": patch_id,
+        }
+
+
+def collate_fn(batch: list[dict]) -> dict[str, Any]:
+    """合并 batch，处理变长序列，输出 AEF 格式."""
+    batch_size = len(batch)
+
+    # 获取所有源名称
+    all_sources = set()
+    for b in batch:
+        all_sources.update(b["source_data"].keys())
+
+    # 先计算全局最大时间步数（所有源之间统一）
+    global_max_t = 0
+    for b in batch:
+        for src, tensor in b["source_data"].items():
+            global_max_t = max(global_max_t, tensor.shape[0])
+
+    collated_sources: dict[str, torch.Tensor] = {}
+    collated_timestamps: dict[str, torch.Tensor] = {}
+
+    for source in all_sources:
+        # 收集该源的所有样本
+        tensors = []
+        ts_list = []
+        for b in batch:
+            if source in b["source_data"]:
+                tensors.append(b["source_data"][source])
+                ts_list.append(b["timestamps"][source])
+            else:
+                tensors.append(None)
+                ts_list.append(None)
+
+        # 过滤 None
+        valid_tensors = [t for t in tensors if t is not None]
+
+        if len(valid_tensors) == 0:
+            continue
+
+        max_t = global_max_t  # 使用全局最大时间步
+        _, H, W, C = valid_tensors[0].shape
+
+        padded_tensors = []
+        padded_ts = []
+        for t, ts in zip(tensors, ts_list):
+            if t is None:
+                # 填充零张量
+                padded_tensors.append(torch.zeros(max_t, H, W, C, dtype=torch.float32))
+                padded_ts.append(torch.zeros(max_t, dtype=torch.float32))
+            else:
+                if t.shape[0] < max_t:
+                    pad_t = max_t - t.shape[0]
+                    t_pad = torch.cat([t, torch.zeros(pad_t, H, W, C, dtype=t.dtype)], dim=0)
+                    ts_pad = torch.cat([ts, ts[-1:].repeat(pad_t)], dim=0) if ts.numel() > 0 else torch.zeros(max_t, dtype=torch.float32)
+                    padded_tensors.append(t_pad)
+                    padded_ts.append(ts_pad)
+                else:
+                    padded_tensors.append(t)
+                    padded_ts.append(ts)
+
+        collated_sources[source] = torch.stack(padded_tensors)
+        collated_timestamps[source] = torch.stack(padded_ts)
+
+    valid_periods = [b["valid_period"] for b in batch]
+    patch_ids = [b["patch_id"] for b in batch]
+
+    return {
+        "source_data": collated_sources,
+        "timestamps": collated_timestamps,
+        "valid_periods": valid_periods,
+        "patch_ids": patch_ids,
+    }
