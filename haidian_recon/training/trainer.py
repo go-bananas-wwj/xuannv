@@ -402,32 +402,43 @@ class HRETrainer:
 
         output = self.model(masked_batch, mask_info)
 
-        for source_name in mask_info.get("decode_sources", []):
-            if source_name not in output["reconstructions"]:
-                continue
-            recon = output["reconstructions"][source_name]   # [B, T, C, H, W]
-            original = mask_info["original_batch"][source_name]  # [B, T, C, H, W]
-            if original is None or recon is None:
-                continue
+        # 显示所有 source（不只是 decode_sources），对于没被 decode 的标注出来
+        decode_sources_set = set(mask_info.get("decode_sources", []))
+        all_sources = list(self.source_channels.keys())
 
-            n_show = min(2, recon.shape[0])
+        for source_name in all_sources:
+            original = mask_info["original_batch"].get(source_name)
+            if original is None:
+                continue  # 数据本身缺失
+
+            n_show = min(2, original.shape[0])
             fig, axes = plt.subplots(n_show, 3, figsize=(12, 4 * n_show))
             if n_show == 1:
                 axes = axes.reshape(1, -1)
 
             for i in range(n_show):
                 orig_img = self._tensor_to_image(original[i, 0])
-                recon_img = self._tensor_to_image(recon[i, 0])
-                diff_img = np.abs(orig_img - recon_img)
-
                 axes[i, 0].imshow(orig_img)
                 axes[i, 0].set_title(f"{source_name} Original")
                 axes[i, 0].axis("off")
-                axes[i, 1].imshow(recon_img)
-                axes[i, 1].set_title(f"{source_name} Reconstruction")
+
+                if source_name in decode_sources_set and source_name in output.get("reconstructions", {}):
+                    recon = output["reconstructions"][source_name]
+                    recon_img = self._tensor_to_image(recon[i, 0])
+                    diff_img = np.abs(orig_img - recon_img)
+                    axes[i, 1].imshow(recon_img)
+                    axes[i, 1].set_title(f"{source_name} Reconstruction")
+                    axes[i, 2].imshow(diff_img)
+                    axes[i, 2].set_title(f"{source_name} Diff")
+                else:
+                    # 显示灰色占位图，标注该 source 本次未被 decode
+                    gray = np.ones_like(orig_img) * 0.5
+                    axes[i, 1].imshow(gray)
+                    axes[i, 1].set_title(f"{source_name} (Not Decoded)")
+                    axes[i, 2].imshow(gray)
+                    axes[i, 2].set_title(f"{source_name} (No Diff)")
+
                 axes[i, 1].axis("off")
-                axes[i, 2].imshow(diff_img)
-                axes[i, 2].set_title(f"{source_name} Diff")
                 axes[i, 2].axis("off")
 
             plt.tight_layout()
