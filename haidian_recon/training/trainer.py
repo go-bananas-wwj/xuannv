@@ -245,7 +245,7 @@ class HRETrainer:
 
             # 保存
             if self.rank == 0 and (epoch + 1) % cfg.save_every == 0:
-                self.save_checkpoint(epoch)
+                self.save_checkpoint(epoch + 1)
 
             # 验证
             if (epoch + 1) % cfg.eval_every == 0:

@@ -30,7 +30,7 @@ data:
   stats_dir: statistics/haidian
   cache_dir: haidian_recon/.cache
   image_size: 128
-  batch_size: 16
+  batch_size: 20
   num_workers: 0
 
 training:
