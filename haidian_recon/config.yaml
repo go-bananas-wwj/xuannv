@@ -41,9 +41,9 @@ training:
   warmup_epochs: 10
   grad_clip_norm: 1.0
   w_recon: 1.0
-  w_distill: 0.02
-  w_uniform: 0.001
-  aef_checkpoint: null
+  w_distill: 0.005
+  w_uniform: 0.01
+  aef_checkpoint: /workspace/datasets/xuannv/WeijieWu/xuannv_embddings/outputs/aef_qwen_v5_mixed_scale/epoch_best_epoch161.pt
   aef_config: configs/config_haidian_v41.yaml
   save_every: 5
   eval_every: 5
