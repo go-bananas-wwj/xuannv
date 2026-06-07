@@ -37,6 +37,7 @@ class HRETrainer:
 
         # 模型
         source_channels = {s["name"]: s["channels"] for s in cfg.data.sources}
+        self.source_channels = source_channels
         self.model = HREModel(
             source_channels=source_channels,
             image_size=cfg.model.image_size,
