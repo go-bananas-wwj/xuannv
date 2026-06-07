@@ -62,7 +62,7 @@ def set_seed(seed: int) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/config_aef_haidian.yaml")
-    parser.add_argument("--batch-size", type=int, default=4)
+    parser.add_argument("--batch-size", type=int, default=6)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--max-steps", type=int, default=100000)
     parser.add_argument("--lr", type=float, default=1e-4)
