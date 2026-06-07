@@ -97,7 +97,10 @@ class FourLayerMask(nn.Module):
                     mask_info["modality_roles"][source_name] = "NOT_SELECTED"
                     continue
 
-            role = np.random.choice(self.roles, p=self.modality_probs)
+            # 使用 torch 随机流替代 np.random，避免 CPU↔NPU 同步 + DDP 随机状态一致
+            probs = torch.tensor(self.modality_probs, device=device)
+            role_idx = torch.multinomial(probs, 1).item()
+            role = self.roles[role_idx]
             mask_info["modality_roles"][source_name] = role
 
         # 约束检查：确保至少1个encode源和1个decode源
@@ -114,7 +117,8 @@ class FourLayerMask(nn.Module):
         if len(encode_sources) == 0:
             available = [s for s in self.source_names if batch.get(s) is not None]
             if available:
-                forced = random.choice(available)
+                idx = torch.randint(0, len(available), (1,), device=device).item()
+                forced = available[idx]
                 mask_info["modality_roles"][forced] = "ENCODE_AND_DECODE"
                 encode_sources.append(forced)
                 if forced not in decode_sources:
@@ -124,7 +128,8 @@ class FourLayerMask(nn.Module):
         if len(decode_sources) == 0:
             available = [s for s in self.source_names if batch.get(s) is not None]
             if available:
-                forced = random.choice(available)
+                idx = torch.randint(0, len(available), (1,), device=device).item()
+                forced = available[idx]
                 if forced in encode_sources:
                     mask_info["modality_roles"][forced] = "ENCODE_AND_DECODE"
                 else:

@@ -205,8 +205,9 @@ class HRETrainer:
                         print(f"[WARN] NaN/Inf loss at step {self.global_step}, skipping...")
                     self.optimizer.zero_grad()
                     # dummy backward: 触发所有参数的DDP all-reduce hook，防止死锁
+                    # 使用单个参数的 zero-sum 替代逐参数循环，避免 NPU→CPU 频繁同步
                     if self.world_size > 1:
-                        dummy = sum(p.view(-1)[0] for p in self.model.parameters() if p.requires_grad) * 0.0
+                        dummy = next(p for p in self.model.parameters() if p.requires_grad).sum() * 0.0
                         dummy.backward()
                     self.scheduler.step()
                     self.global_step += 1
