@@ -47,7 +47,7 @@ class HRETrainer:
         ).to(self.device)
 
         if world_size > 1:
-            self.model = DDP(self.model, device_ids=[local_rank], find_unused_parameters=True)
+            self.model = DDP(self.model, device_ids=[local_rank], find_unused_parameters=False)
 
         # Masking
         self.masking = FourLayerMask(
@@ -209,7 +209,7 @@ class HRETrainer:
                 if self.rank == 0 and self.global_step % cfg.log_every == 0:
                     print(f"[Step {self.global_step}] loss={loss.item():.4f} "
                           f"recon={loss_recon.item():.4f} distill={loss_distill.item():.4f} "
-                          f"uniform={loss_uniform.item():.4f} spatial_u={epoch_spatial_uniform/n_batches:.4f} "
+                          f"uniform={loss_uniform.item():.4f} spatial_u={loss_spatial_uniform.item():.4f} "
                           f"lr={self.scheduler.optimizer.param_groups[0]['lr']:.6f}")
 
             # Epoch日志
