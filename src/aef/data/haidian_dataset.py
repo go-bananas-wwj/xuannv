@@ -208,9 +208,10 @@ def collate_fn(batch: list[dict]) -> dict[str, Any]:
         padded_ts = []
         for t, ts in zip(tensors, ts_list):
             if t is None:
-                # 填充零张量
+                # 填充零张量，时间戳复制最后一个有效时间戳
                 padded_tensors.append(torch.zeros(max_t, H, W, C, dtype=torch.float32))
-                padded_ts.append(torch.zeros(max_t, dtype=torch.float32))
+                last_valid_ts = valid_ts[-1][-1].item() if valid_ts else 0.0
+                padded_ts.append(torch.full((max_t,), last_valid_ts, dtype=torch.float32))
             else:
                 if t.shape[0] < max_t:
                     pad_t = max_t - t.shape[0]

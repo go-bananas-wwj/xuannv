@@ -59,6 +59,10 @@ class STPBlock(nn.Module):
         
         # precision_to_space: precision_H -> space_H (upsample by 0.125)
         precision_to_space_resampled = self.precision_to_space(precision_2d)
+        if precision_to_space_resampled.shape[2:] != (space_H, space_W):
+            precision_to_space_resampled = F.interpolate(
+                precision_to_space_resampled, size=(space_H, space_W), mode='bilinear', align_corners=False
+            )
      
         
         # space_to_time: space_H -> time_H (upsample by 2.0)

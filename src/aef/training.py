@@ -163,6 +163,8 @@ class Trainer:
             # Sync losses across ranks
             if self.world_size > 1:
                 for k in losses:
+                    if losses[k].device != self.device:
+                        losses[k] = losses[k].to(self.device)
                     dist.all_reduce(losses[k], op=dist.ReduceOp.AVG)
 
             # Logging
@@ -239,6 +241,11 @@ class Trainer:
 
         self.model.train()
 
+        if count == 0:
+            if self.rank == 0:
+                print("[Val] No valid batches")
+            return
+
         if self.world_size > 1:
             recon_tensor = torch.tensor(total_recon / count, device=self.device)
             uniform_tensor = torch.tensor(total_uniform / count, device=self.device)
@@ -255,11 +262,16 @@ class Trainer:
 
     def _save_checkpoint(self, step: int) -> None:
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        # 保存原始模型的 state_dict（去除 DDP 的 module. 前缀）
+        model_state = self.model.state_dict()
+        if hasattr(self.model, "module"):
+            model_state = {k.replace("module.", "", 1) if k.startswith("module.") else k: v for k, v in model_state.items()}
         checkpoint = {
             "step": step,
-            "model_state_dict": self.model.state_dict(),
+            "model_state_dict": model_state,
             "optimizer_state_dict": self.optim.state_dict(),
             "scheduler_state_dict": self.scheduler.state_dict(),
         }
         torch.save(checkpoint, self.output_dir / f"step_{step:06d}.pt")
-        print(f"[Save] Checkpoint saved to {self.output_dir}/step_{step:06d}.pt")
+        if self.rank == 0:
+            print(f"[Save] Checkpoint saved to {self.output_dir}/step_{step:06d}.pt")

@@ -123,7 +123,7 @@ class AEFLoss:
             )
             losses['reconstruction'] = recon_loss
         else:
-            losses['reconstruction'] = torch.tensor(0.0)
+            losses['reconstruction'] = torch.tensor(0.0, device=next(iter(outputs.values())).device if outputs else 'cpu')
         
         if 'embeddings' in outputs:
             uniformity_loss = self.batch_uniformity_loss(outputs['embeddings'])

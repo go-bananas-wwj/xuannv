@@ -192,7 +192,7 @@ class AlphaEarthFoundations(nn.Module):
         student_sources: Dict[str, torch.Tensor] = {}
         student_ts: Dict[str, torch.Tensor] = {}
 
-        drop_prob = {name: (0.0 if name == 'sentinel2' else 0.3) for name in self.input_sources.keys()} # only keep S2 always for reconstruction
+        drop_prob = {name: (0.0 if name in ('sentinel2', 's2') else 0.3) for name in self.input_sources.keys()} # only keep S2 always for reconstruction
 
         # Choose time perturbation strategy
         # 0: random frame drops, 1: drop latter half-year, 2: drop former half-year
@@ -277,7 +277,7 @@ class AlphaEarthFoundations(nn.Module):
             vp = torch.tensor(valid_periods, dtype=feats_teacher.dtype, device=feats_teacher.device)
         else:
             vp = valid_periods.to(feats_teacher.dtype).to(feats_teacher.device)
-        mu_t = self.summarizer(feats_teacher, ts, vp)      # (B, H', W', 64)
+        mu_t = self.summarizer(feats_teacher.detach(), ts, vp)      # (B, H', W', 64)
         mu_s = self.summarizer(feats_student, ts_student, vp)  # (B, H', W', 64)
 
         B, H2, W2, _ = mu_t.shape

@@ -148,14 +148,19 @@ def main() -> None:
     start_step = 0
     if args.resume and os.path.exists(args.resume):
         ckpt = torch.load(args.resume, map_location="cpu")
-        model.load_state_dict(ckpt["model_state_dict"], strict=True)
+        # DDP wrapper 的 state_dict 带有 module. 前缀
+        state_dict = ckpt["model_state_dict"]
+        if world_size > 1 and not any(k.startswith("module.") for k in state_dict.keys()):
+            # checkpoint 是原始模型，DDP wrapper 需要加前缀
+            state_dict = {"module." + k: v for k, v in state_dict.items()}
+        model.load_state_dict(state_dict, strict=True)
         start_step = ckpt.get("step", 0)
         if rank == 0:
             print(f"[Resume] Loaded checkpoint from {args.resume} at step {start_step}")
 
-    # Trainer
+    # Trainer 接收 DDP wrapper，确保梯度 all_reduce 生效
     trainer = Trainer(
-        model=model.module if world_size > 1 else model,
+        model=model,  # DDP wrapper
         dataloader=train_loader,
         val_dataloader=val_loader,
         device=device,

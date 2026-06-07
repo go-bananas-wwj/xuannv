@@ -68,7 +68,7 @@ class VonMisesFisherDecoder(nn.Module):
         # Gaussian noise on the tangent plane and renormalizes; this is a coarse approximation
 
         # Noise scale inversely related to kappa
-        noise_scale = (1.0 / (kappa + 1e-6)).clamp(min=1e-3)
+        noise_scale = (1.0 / (kappa + 1e-6)).clamp(min=1e-3, max=10.0)
         mu_flat = rearrange(mu, 'b h w d -> (b h w) d')
         samples = []
         for _ in range(num_samples):
