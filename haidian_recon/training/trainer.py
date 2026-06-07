@@ -251,9 +251,11 @@ class HRETrainer:
             if (epoch + 1) % cfg.eval_every == 0:
                 self.evaluate()
 
-            # 每20epoch可视化损失曲线
-            if self.rank == 0 and (epoch + 1) % 20 == 0 and len(self.loss_history) > 0:
-                self.plot_losses(epoch)
+            # 每20epoch可视化：损失曲线 + 重建图像对比
+            if self.rank == 0 and (epoch + 1) % 20 == 0:
+                if len(self.loss_history) > 0:
+                    self.plot_losses(epoch)
+                self.visualize_reconstructions(epoch)
 
     @torch.no_grad()
     def evaluate(self) -> dict:
@@ -357,3 +359,81 @@ class HRETrainer:
         plt.savefig(save_path, dpi=150)
         plt.close()
         print(f"[Viz] Loss curve saved to {save_path}")
+
+    def _tensor_to_image(self, tensor: torch.Tensor) -> np.ndarray:
+        """将 [C, H, W] tensor 转为 [H, W, 3] numpy 图像，用于可视化."""
+        arr = tensor.detach().cpu().numpy()
+        # 取前3通道作为RGB，单通道则重复
+        if arr.shape[0] >= 3:
+            rgb = np.transpose(arr[:3], (1, 2, 0))
+        else:
+            gray = arr[0]
+            rgb = np.stack([gray, gray, gray], axis=-1)
+        # percentile stretch
+        p_low, p_high = np.percentile(rgb, [2, 98])
+        if p_high > p_low:
+            rgb = np.clip((rgb - p_low) / (p_high - p_low), 0, 1)
+        return rgb
+
+    @torch.no_grad()
+    def visualize_reconstructions(self, epoch: int) -> None:
+        """可视化重建图像与原图对比，每20epoch调用."""
+        if self.rank != 0:
+            return
+        self.model.eval()
+        vis_dir = self.output_dir / f"Epoch-{epoch}-VIS"
+        vis_dir.mkdir(parents=True, exist_ok=True)
+
+        # 取第一个batch的前2个样本
+        batch = next(iter(self.val_loader))
+        batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else None for k, v in batch.items()}
+
+        # 固定随机状态
+        torch_state = torch.get_rng_state()
+        np_state = np.random.get_state()
+        random_state = random.getstate()
+        torch.manual_seed(self.cfg.seed)
+        np.random.seed(self.cfg.seed)
+        random.seed(self.cfg.seed)
+        masked_batch, mask_info = self.masking(batch)
+        torch.set_rng_state(torch_state)
+        np.random.set_state(np_state)
+        random.setstate(random_state)
+
+        output = self.model(masked_batch, mask_info)
+
+        for source_name in mask_info.get("decode_sources", []):
+            if source_name not in output["reconstructions"]:
+                continue
+            recon = output["reconstructions"][source_name]   # [B, T, C, H, W]
+            original = mask_info["original_batch"][source_name]  # [B, T, C, H, W]
+            if original is None or recon is None:
+                continue
+
+            n_show = min(2, recon.shape[0])
+            fig, axes = plt.subplots(n_show, 3, figsize=(12, 4 * n_show))
+            if n_show == 1:
+                axes = axes.reshape(1, -1)
+
+            for i in range(n_show):
+                orig_img = self._tensor_to_image(original[i, 0])
+                recon_img = self._tensor_to_image(recon[i, 0])
+                diff_img = np.abs(orig_img - recon_img)
+
+                axes[i, 0].imshow(orig_img)
+                axes[i, 0].set_title(f"{source_name} Original")
+                axes[i, 0].axis("off")
+                axes[i, 1].imshow(recon_img)
+                axes[i, 1].set_title(f"{source_name} Reconstruction")
+                axes[i, 1].axis("off")
+                axes[i, 2].imshow(diff_img)
+                axes[i, 2].set_title(f"{source_name} Diff")
+                axes[i, 2].axis("off")
+
+            plt.tight_layout()
+            save_path = vis_dir / f"recon_{source_name}.png"
+            plt.savefig(save_path, dpi=150)
+            plt.close()
+            print(f"[Viz] Reconstruction visualization saved to {save_path}")
+
+        self.model.train()
