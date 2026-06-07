@@ -275,16 +275,16 @@ class HREModel(nn.Module):
 
             # 添加位置/时间/模态编码
             source_idx = self.source_names.index(source_name)
-            mask_tokens = mask_tokens.reshape(B, T, N, D)
+            mask_tokens = mask_tokens.reshape(B, T, N, self.embed_dim)
             time_indices = torch.arange(T, device=mask_tokens.device).unsqueeze(0).expand(B, T)
             mask_tokens = self.token_encoding(mask_tokens, source_idx, time_indices)
-            mask_tokens = mask_tokens.reshape(B, T * N, D)
+            mask_tokens = mask_tokens.reshape(B, T * N, self.embed_dim)
 
             # Decoder
             decoded = self.decoder(mask_tokens, encoder_output)  # [B, T*N, D]
 
             # Reconstruction head
-            decoded = decoded.reshape(B * T, N, D)
+            decoded = decoded.reshape(B * T, N, self.embed_dim)
             recon = self.recon_heads[source_name](decoded)  # [B*T, C, H, W]
             C = recon.shape[1]
             recon = recon.reshape(B, T, C, self.image_size, self.image_size)

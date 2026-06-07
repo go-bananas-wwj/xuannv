@@ -59,7 +59,7 @@ class FourLayerMask(nn.Module):
         # 获取batch shape
         first_valid = None
         for v in batch.values():
-            if v is not None and not isinstance(v, torch.Tensor) or (isinstance(v, torch.Tensor) and v.dim() == 5):
+            if isinstance(v, torch.Tensor) and v.dim() == 5:
                 first_valid = v
                 break
         if first_valid is None:

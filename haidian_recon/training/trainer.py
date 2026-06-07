@@ -61,7 +61,7 @@ class HRETrainer:
         ).to(self.device)
 
         # AEF蒸馏 — 使用预计算的embedding（从dataset加载）
-        self.use_aef_distill = cfg.training.aef_checkpoint is not None and cfg.training.aef_checkpoint != "null"
+        self.use_aef_distill = bool(cfg.training.aef_checkpoint) and cfg.training.aef_checkpoint != "null"
 
         # 优化器
         self.optimizer = build_optimizer(self.model, cfg.training.lr, cfg.training.weight_decay)
@@ -140,6 +140,7 @@ class HRETrainer:
             epoch_recon = 0.0
             epoch_distill = 0.0
             epoch_uniform = 0.0
+            epoch_spatial_uniform = 0.0
 
             for batch_idx, batch in enumerate(self.train_loader):
                 # 数据移到device
@@ -202,12 +203,13 @@ class HRETrainer:
                 epoch_recon += loss_recon.item()
                 epoch_distill += loss_distill.item()
                 epoch_uniform += loss_uniform.item()
+                epoch_spatial_uniform += loss_spatial_uniform.item()
                 self.global_step += 1
 
                 if self.rank == 0 and self.global_step % cfg.log_every == 0:
                     print(f"[Step {self.global_step}] loss={loss.item():.4f} "
                           f"recon={loss_recon.item():.4f} distill={loss_distill.item():.4f} "
-                          f"uniform={loss_uniform.item():.4f} spatial_u={loss_spatial_uniform.item():.4f} "
+                          f"uniform={loss_uniform.item():.4f} spatial_u={epoch_spatial_uniform/n_batches:.4f} "
                           f"lr={self.scheduler.optimizer.param_groups[0]['lr']:.6f}")
 
             # Epoch日志
@@ -217,7 +219,7 @@ class HRETrainer:
                       f"recon={epoch_recon/n_batches:.4f} "
                       f"distill={epoch_distill/n_batches:.4f} "
                       f"uniform={epoch_uniform/n_batches:.4f} "
-                      f"spatial_u={loss_spatial_uniform.item():.4f}")
+                      f"spatial_u={epoch_spatial_uniform/n_batches:.4f}")
 
             # 保存
             if self.rank == 0 and (epoch + 1) % cfg.save_every == 0:
