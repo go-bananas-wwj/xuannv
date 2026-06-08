@@ -28,6 +28,7 @@ class HaidianAEFDataset(Dataset):
         cache_dir: str = "src/aef/.cache",
         image_size: int = 128,
         source_names: list[str] | None = None,
+        required_sources: list[str] | None = None,
         split: str = "train",
         train_ratio: float = 0.9,
         seed: int = 42,
@@ -88,12 +89,37 @@ class HaidianAEFDataset(Dataset):
             else:
                 self.stats[src] = {}
 
-        # 构建样本列表
+        self.required_sources = required_sources or self.source_names
+
+        # 快速预检查：过滤掉在时间窗口内缺少必需源的 patch
         self.samples = []
         for patch_id in self.patch_ids:
-            self.samples.append({"patch_id": patch_id})
+            has_all = True
+            for src in self.required_sources:
+                if src == "planet":
+                    src_dir = self.planet_root / patch_id
+                else:
+                    src_dir = self.data_root / patch_id / src
+                if not src_dir.exists():
+                    has_all = False
+                    break
+                files = sorted(src_dir.glob("*.tif"))
+                has_in_window = False
+                for f in files:
+                    date_str = f.stem
+                    if self.start_date and date_str < self.start_date:
+                        continue
+                    if self.end_date and date_str > self.end_date:
+                        continue
+                    has_in_window = True
+                    break
+                if not has_in_window:
+                    has_all = False
+                    break
+            if has_all:
+                self.samples.append({"patch_id": patch_id})
 
-        print(f"[{split}] {len(self.patch_ids)} patches, {len(self.samples)} samples")
+        print(f"[{split}] {len(self.patch_ids)} patches, {len(self.samples)} valid samples (required: {self.required_sources})")
 
     def __len__(self) -> int:
         return len(self.samples)

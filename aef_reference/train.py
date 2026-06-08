@@ -3,6 +3,12 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
+
+# 确保本目录优先于父目录，加载本地 src/aef/ 而非外部 src/aef/
+_PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
 import random
 
@@ -59,7 +65,7 @@ def main() -> None:
     os.environ.setdefault("ASCEND_LAUNCH_BLOCKING", "1")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch-size", type=int, default=2)
+    parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--max-steps", type=int, default=100000)
     parser.add_argument("--lr", type=float, default=1e-4)
@@ -75,7 +81,7 @@ def main() -> None:
     parser.add_argument("--resume", type=str, default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--distill-warmup-steps", type=int, default=1000)
-    parser.add_argument("--grad-accum-steps", type=int, default=1)
+    parser.add_argument("--grad-accum-steps", type=int, default=4)
     args = parser.parse_args()
 
     rank, world_size, local_rank = setup_distributed()
@@ -95,6 +101,14 @@ def main() -> None:
 
     # Build datasets (海淀数据，5源输入 + 辅助重建目标)
     source_names = ["s1", "s2", "tianyi_sar", "landsat", "planet", "dem", "worldcover", "dynamic_world", "jrc_water"]
+    input_sources = {
+        "s1": 2,
+        "s2": 6,
+        "tianyi_sar": 1,
+        "landsat": 6,
+        "planet": 4,
+    }
+    input_source_names = list(input_sources.keys())
     train_dataset = HaidianAEFDataset(
         data_root="data_raw/haidian/scenes",
         planet_root="data_raw/beijing/planetscene",
@@ -102,6 +116,7 @@ def main() -> None:
         split="train",
         image_size=128,
         source_names=source_names,
+        required_sources=input_source_names,
         max_frames=16,
         aef_embedding_root="data_raw/haidian/aef_embeddings/haidian_2025_patches",
         start_date="20251201",
@@ -114,6 +129,7 @@ def main() -> None:
         split="val",
         image_size=128,
         source_names=source_names,
+        required_sources=input_source_names,
         max_frames=16,
         aef_embedding_root="data_raw/haidian/aef_embeddings/haidian_2025_patches",
         start_date="20251201",
@@ -150,13 +166,6 @@ def main() -> None:
     )
 
     # Build model (5源输入)
-    input_sources = {
-        "s1": 2,
-        "s2": 6,
-        "tianyi_sar": 1,
-        "landsat": 6,
-        "planet": 4,
-    }
     decode_sources = {
         "s1": 2,
         "s2": 6,
