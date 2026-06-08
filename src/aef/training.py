@@ -50,6 +50,7 @@ class Trainer:
         resume_optimizer_state: dict | None = None,
         resume_scheduler_state: dict | None = None,
         seed: int = 42,
+        viz_patch_ids: list[str] | None = None,
     ) -> None:
         self.model = model
         self.dataloader = dataloader
@@ -65,6 +66,7 @@ class Trainer:
         self.eval_every = eval_every
         self.distill_warmup_steps = distill_warmup_steps
         self.grad_accum_steps = grad_accum_steps
+        self.viz_patch_ids = viz_patch_ids
 
         self.loss_fn = AEFLoss()
 
@@ -500,107 +502,121 @@ class Trainer:
 
     @torch.no_grad()
     def _visualize(self, step: int) -> None:
-        """合并大图可视化：5源输入 + Student PCA RGB + AEF PCA RGB + 差异热图."""
+        """2行合并大图：Row0=5源输入, Row1=Student PCA | AEF PCA | Diff.
+        对 viz_patch_ids 中指定的每个 patch 各生成一张图."""
         if self.rank != 0:
             return
 
         self.model.eval()
-        batch = self._viz_batch
-        if batch is None:
-            batch = next(iter(self.val_dataloader))
-        source_data = {k: v.to(self.device) for k, v in batch["source_data"].items()}
-        timestamps = {k: v.to(self.device) for k, v in batch["timestamps"].items()}
-        valid_periods = batch["valid_periods"]
-
-        out = self.model(source_data, timestamps, valid_periods)
-
         viz_dir = self.output_dir / "visualizations"
         viz_dir.mkdir(parents=True, exist_ok=True)
 
-        patch_id = batch.get("patch_ids", ["b0"])[0]
-
-        # ===== 合并大图布局 =====
         import matplotlib.gridspec as gridspec
-        fig = plt.figure(figsize=(20, 18))
-        gs = gridspec.GridSpec(4, 5, figure=fig, hspace=0.25, wspace=0.15,
-                               height_ratios=[1.2, 1.5, 1.5, 1.5])
+        from src.aef.data.haidian_dataset import collate_fn
 
-        # ---- Row 0: 5个输入源 ----
-        input_sources = ["s1", "s2", "tianyi_sar", "landsat", "planet"]
-        for i, src in enumerate(input_sources):
-            ax = fig.add_subplot(gs[0, i])
-            if src not in batch["source_data"]:
-                ax.text(0.5, 0.5, "NO DATA", ha="center", va="center", fontsize=14)
-                ax.axis("off")
-                continue
+        viz_patch_ids = getattr(self, "viz_patch_ids", None)
+        target_patches = set(viz_patch_ids) if viz_patch_ids else set()
 
-            data = batch["source_data"][src][0]  # (T, H, W, C)
-            ts = batch["timestamps"][src][0]
-            T = data.shape[0]
+        # 从 val_dataset 收集目标 patch
+        dataset = self.val_dataloader.dataset
+        samples_to_viz = []
+        if target_patches:
+            for idx in range(len(dataset)):
+                sample = dataset[idx]
+                if sample["patch_id"] in target_patches:
+                    samples_to_viz.append(sample)
+        else:
+            # 回退到 _viz_batch
+            batch = self._viz_batch
+            if batch is None:
+                batch = next(iter(self.val_dataloader))
+            samples_to_viz = [{k: v[0] if isinstance(v, torch.Tensor) else v for k, v in batch.items()}]
 
-            # Planet: 跳过填充帧，找第一个有效帧
-            if src == "planet":
-                valid_idx = None
-                for t in range(T):
-                    if data[t].abs().max() > 0.001:
-                        valid_idx = t
-                        break
-                if valid_idx is None:
-                    ax.text(0.5, 0.5, "NO DATA", ha="center", va="center", fontsize=14)
+        for sample in samples_to_viz:
+            patch_id = sample["patch_id"]
+            # 组装 batch_size=1
+            batch = collate_fn([sample])
+            source_data = {k: v.to(self.device) for k, v in batch["source_data"].items()}
+            timestamps = {k: v.to(self.device) for k, v in batch["timestamps"].items()}
+            valid_periods = batch["valid_periods"]
+            out = self.model(source_data, timestamps, valid_periods)
+
+            fig = plt.figure(figsize=(18, 10))
+            gs = gridspec.GridSpec(2, 1, figure=fig, hspace=0.2,
+                                   height_ratios=[1, 1.3])
+            gs_top = gs[0].subgridspec(1, 5, wspace=0.15)
+            gs_bottom = gs[1].subgridspec(1, 3, wspace=0.15)
+
+            # ---- Row 0: 5个输入源 ----
+            input_sources = ["s1", "s2", "tianyi_sar", "landsat", "planet"]
+            for i, src in enumerate(input_sources):
+                ax = fig.add_subplot(gs_top[0, i])
+                if src not in batch["source_data"]:
+                    ax.text(0.5, 0.5, "NO DATA", ha="center", va="center", fontsize=12)
                     ax.axis("off")
                     continue
-                frame = data[valid_idx]
+
+                data = batch["source_data"][src][0]  # (T, H, W, C)
+                ts = batch["timestamps"][src][0]
+                T = data.shape[0]
+
+                if src == "planet":
+                    valid_idx = None
+                    for t in range(T):
+                        if data[t].abs().max() > 0.001:
+                            valid_idx = t
+                            break
+                    if valid_idx is None:
+                        ax.text(0.5, 0.5, "NO DATA", ha="center", va="center", fontsize=12)
+                        ax.axis("off")
+                        continue
+                    frame = data[valid_idx]
+                else:
+                    center = ts.mean()
+                    t_idx = (ts - center).abs().argmin().item()
+                    frame = data[t_idx]
+
+                rgb = self._tensor_to_rgb(frame)
+                ax.imshow(rgb)
+                title = src.upper()
+                if src == "landsat":
+                    title += " [30m→10m]"
+                ax.set_title(title, fontsize=11, fontweight="bold")
+                ax.axis("off")
+
+            # ---- Row 1: Student PCA | AEF PCA | Diff ----
+            ax_student = fig.add_subplot(gs_bottom[0, 0])
+            ax_aef = fig.add_subplot(gs_bottom[0, 1])
+            ax_diff = fig.add_subplot(gs_bottom[0, 2])
+
+            student_emb = out["student_embeddings"][0].cpu().numpy()
+            if "aef_embedding" in batch and batch["aef_embedding"] is not None:
+                aef_emb = batch["aef_embedding"][0].permute(1, 2, 0).cpu().numpy()
+                student_rgb, aef_rgb = self._embed_to_rgb_shared(student_emb, aef_emb)
+                diff = np.abs(student_rgb - aef_rgb).mean(axis=-1)
+
+                ax_student.imshow(student_rgb)
+                ax_student.set_title("Student (PCA RGB)", fontsize=12, fontweight="bold")
+                ax_student.axis("off")
+
+                ax_aef.imshow(aef_rgb)
+                ax_aef.set_title("AEF Official (PCA RGB)", fontsize=12, fontweight="bold")
+                ax_aef.axis("off")
+
+                im = ax_diff.imshow(diff, cmap="hot")
+                ax_diff.set_title("|Student - AEF|", fontsize=12, fontweight="bold")
+                ax_diff.axis("off")
+                plt.colorbar(im, ax=ax_diff, fraction=0.046, pad=0.04)
             else:
-                # 取时间中点最近帧
-                center = ts.mean()
-                t_idx = (ts - center).abs().argmin().item()
-                frame = data[t_idx]
+                for ax in (ax_student, ax_aef, ax_diff):
+                    ax.text(0.5, 0.5, "AEF N/A", ha="center", va="center", fontsize=12)
+                    ax.axis("off")
 
-            rgb = self._tensor_to_rgb(frame)
-            ax.imshow(rgb)
-            title = src.upper()
-            if src == "landsat":
-                title += " [30m→10m]"
-            ax.set_title(title, fontsize=12, fontweight="bold")
-            ax.axis("off")
-
-        # ---- Row 1: Student Embedding PCA RGB ----
-        ax_student = fig.add_subplot(gs[1, :])
-        student_emb = out["student_embeddings"][0].cpu().numpy()  # (H, W, 64)
-
-        # ---- Row 2: AEF Official Embedding PCA RGB ----
-        ax_aef = fig.add_subplot(gs[2, :])
-
-        # ---- Row 3: 差异热图 ----
-        ax_diff = fig.add_subplot(gs[3, :])
-
-        if "aef_embedding" in batch and batch["aef_embedding"] is not None:
-            aef_emb = batch["aef_embedding"][0].permute(1, 2, 0).cpu().numpy()  # (H, W, 64)
-            student_rgb, aef_rgb = self._embed_to_rgb_shared(student_emb, aef_emb)
-            diff = np.abs(student_rgb - aef_rgb).mean(axis=-1)
-
-            ax_student.imshow(student_rgb)
-            ax_student.set_title(f"Student Embedding (PCA RGB) — {patch_id}", fontsize=14, fontweight="bold")
-            ax_student.axis("off")
-
-            ax_aef.imshow(aef_rgb)
-            ax_aef.set_title(f"AEF Official Embedding (PCA RGB) — {patch_id}", fontsize=14, fontweight="bold")
-            ax_aef.axis("off")
-
-            im = ax_diff.imshow(diff, cmap="hot")
-            ax_diff.set_title(f"|Student - AEF| (mean) — {patch_id}", fontsize=14, fontweight="bold")
-            ax_diff.axis("off")
-            plt.colorbar(im, ax=ax_diff, fraction=0.046, pad=0.04)
-        else:
-            ax_student.text(0.5, 0.5, "AEF Embedding Not Available", ha="center", va="center", fontsize=14)
-            ax_student.axis("off")
-            ax_aef.axis("off")
-            ax_diff.axis("off")
-
-        plt.suptitle(f"Patch Visualization @ Step {step}", fontsize=16, fontweight="bold", y=0.98)
-        plt.savefig(viz_dir / f"viz_step_{step:06d}_seed{self.seed}.png", dpi=150, bbox_inches="tight")
-        plt.close()
+            plt.suptitle(f"{patch_id} @ Step {step}", fontsize=14, fontweight="bold", y=0.98)
+            plt.savefig(viz_dir / f"viz_step_{step:06d}_{patch_id}_seed{self.seed}.png",
+                        dpi=150, bbox_inches="tight")
+            plt.close()
 
         self.model.train()
-        print(f"[Viz] Saved merged visualization at step {step}")
+        print(f"[Viz] Saved {len(samples_to_viz)} patch visualizations at step {step}")
 
