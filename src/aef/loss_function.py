@@ -100,12 +100,17 @@ class AEFLoss:
             B, H, W, D = x.shape
             x = rearrange(x, 'b h w d -> (b h w) d')
         
-        # 加噪声打破完全坍缩死锁（梯度屏障）
-        x = x + torch.randn_like(x) * 0.1
+        # 加小噪声打破完全坍缩死锁
+        x = x + torch.randn_like(x) * 0.05
         
-        # 计算平均配对距离 (NPU-safe，避免成对矩阵)
-        x_shift = torch.roll(x, shifts=x.size(0)//2, dims=0)
-        sq_dists = ((x - x_shift) ** 2).sum(dim=-1)
+        # 随机采样配对（避免 half-batch shift 只配对相似样本）
+        N = x.size(0)
+        K = min(N * 2, 512)  # 最多采样 512 对
+        idx_i = torch.randint(0, N, (K,), device=x.device)
+        # 强制 idx_j ≠ idx_i
+        offset = torch.randint(1, N, (K,), device=x.device)
+        idx_j = (idx_i + offset) % N
+        sq_dists = ((x[idx_i] - x[idx_j]) ** 2).sum(dim=-1)
         
         # 自适应温度: t = 2 / D
         D = x.size(-1)
