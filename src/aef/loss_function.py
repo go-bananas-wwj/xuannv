@@ -169,6 +169,7 @@ class AEFLoss:
     
     def consistency_loss(self, teacher_embeddings: torch.Tensor, 
                         student_embeddings: torch.Tensor) -> torch.Tensor:
+        # teacher/student 现在是 pre-norm，计算 cosine 前先做 L2 norm
         mu = torch.nn.functional.normalize(teacher_embeddings, p=2, dim=-1)
         mu_s = torch.nn.functional.normalize(student_embeddings, p=2, dim=-1)
         dots = (mu * mu_s).sum(dim=-1)

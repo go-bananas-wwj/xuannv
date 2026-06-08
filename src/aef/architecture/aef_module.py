@@ -78,8 +78,8 @@ class TemporalSummarizer(nn.Module):
     """
     Time-conditional summarization using a single query per sample and
     multi-head attention over time at each spatial location.
-    Produces per-pixel 64D unit vectors (S^63).
-    """
+    训练时输出 pre-norm 64D 向量（保留幅度信息，用于反坍缩损失）。
+    """"
 
     def __init__(self, feature_dim: int, embed_dim: int = 64, num_heads: int = 8):
         super().__init__()
@@ -99,15 +99,15 @@ class TemporalSummarizer(nn.Module):
             valid_periods: (B, 2) [t_s, t_e)
             mask: optional (B, T) validity mask
         Returns:
-            embeddings: (B, H, W, 64), unit-norm per vector
+            embeddings: (B, H, W, 64), pre-norm (training) / unit-norm (inference)
+            **训练时不做 L2 norm**，反坍缩损失在 pre-norm 欧氏空间计算以绕过 Jacobian 梯度屏障。
         """
         # Build single query per sample
         q = self.summarizer_q(valid_periods)                 # (B, C)
         # Pool over time at each (h,w)
         z = self.time_pool(feats, q, mask=mask)              # (B, H, W, C)
-        # Project to 64D and L2-normalize
+        # Project to 64D，**训练时不 L2 norm**，保留幅度信息
         mu = self.proj_64(z)                                 # (B, H, W, 64)
-        mu = F.normalize(mu, p=2, dim=-1)
         return mu
 
 
@@ -255,7 +255,7 @@ class AlphaEarthFoundations(nn.Module):
 
         Returns:
             Dict with keys:
-              - embeddings: (B, H', W', 64) unit vectors (S^63)
+              - embeddings: (B, H', W', 64) **pre-norm** vectors (训练时保留幅度)
               - reconstructions: dict of decoded sources -> (B, S, H', W', C_src)
         """
         # Prepare inputs
