@@ -1,6 +1,8 @@
 """AEF 训练器 — 适配 NPU + DDP."""
 from __future__ import annotations
 
+import contextlib
+import copy
 import itertools
 import math
 import os
@@ -81,9 +83,23 @@ class Trainer:
             self.optim.load_state_dict(resume_optimizer_state)
         if resume_scheduler_state is not None:
             self.scheduler.load_state_dict(resume_scheduler_state)
-            # 根据 resume_step 快速前进 scheduler 状态
-            for _ in range(resume_step):
-                self.scheduler.step()
+            self.scheduler.last_epoch = resume_step
+
+        # EMA Teacher 模型
+        self.ema_model = None
+        if self.world_size > 1 or True:  # 始终启用 EMA
+            self.ema_model = copy.deepcopy(model)
+            for p in self.ema_model.parameters():
+                p.requires_grad = False
+            self.ema_model.eval()
+
+        # 缓存可视化用的 batch，避免反复实例化 dataloader
+        self._viz_batch = None
+        if val_dataloader is not None:
+            try:
+                self._viz_batch = next(iter(val_dataloader))
+            except StopIteration:
+                pass
 
         self.loss_history = {
             "steps": [],
@@ -117,10 +133,14 @@ class Trainer:
             target = x[batch_indices, idx]  # (B, H, W, C)
 
             # 下采样到重建分辨率（decoder 直接输出全分辨率，无需额外下采样）
-            # predictions shape: [B, H, W, C]
             H2, W2 = pred[src_key].shape[1], pred[src_key].shape[2]
             target_2d = rearrange(target, "b h w c -> b c h w")
-            target_2d = F.interpolate(target_2d, size=(H2, W2), mode="bilinear", align_corners=False)
+            # 分类目标用 nearest 插值，避免破坏类别语义
+            config = self.loss_fn.source_configs.get(src_key, {"loss_fn": F.l1_loss})
+            if config["loss_fn"] == F.cross_entropy:
+                target_2d = F.interpolate(target_2d, size=(H2, W2), mode="nearest")
+            else:
+                target_2d = F.interpolate(target_2d, size=(H2, W2), mode="bilinear", align_corners=False)
             target = rearrange(target_2d, "b c h w -> b h w c")
             targets[src_key] = target
         return targets
@@ -182,6 +202,13 @@ class Trainer:
 
             out = self.model(source_data, timestamps, valid_periods)
 
+            # EMA Teacher: 用 EMA 模型重新计算 teacher embedding，覆盖当前模型的 teacher
+            if self.ema_model is not None:
+                with torch.no_grad():
+                    out_ema = self.ema_model(source_data, timestamps, valid_periods)
+                out["teacher_embeddings"] = out_ema["embeddings"]
+                out["embeddings"] = out_ema["embeddings"]
+
             # predictions: 取第一个 sample（AEF decoder 输出 (B, S, H, W, C)，S=1 时就是 deterministic）
             predictions: dict[str, torch.Tensor] = {}
             for src, rec in out["reconstructions"].items():
@@ -217,13 +244,26 @@ class Trainer:
             losses = self.loss_fn(outputs_for_loss)
             loss = losses["total"] / self.grad_accum_steps
 
-            loss.backward()
+            # DDP no_sync: 非同步 step 跳过 all_reduce，避免梯度被错误平均
+            is_sync_step = step % self.grad_accum_steps == 0
+            ctx = (
+                self.model.no_sync()
+                if (self.world_size > 1 and hasattr(self.model, "no_sync") and not is_sync_step)
+                else contextlib.nullcontext()
+            )
+            with ctx:
+                loss.backward()
 
             # Gradient clipping + optimizer step only after grad_accum_steps
-            if step % self.grad_accum_steps == 0:
+            if is_sync_step:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                 self.optim.step()
                 self.scheduler.step()
+                # EMA 更新
+                if self.ema_model is not None:
+                    with torch.no_grad():
+                        for p_ema, p in zip(self.ema_model.parameters(), self.model.parameters()):
+                            p_ema.data.mul_(0.996).add_(p.data, alpha=0.004)
                 self.optim.zero_grad(set_to_none=True)
 
             # Sync losses across ranks (detach before all_reduce)
@@ -329,22 +369,24 @@ class Trainer:
 
         self.model.train()
 
-        if count == 0:
+        # DDP 同步：先同步 count，避免某些 rank count==0 提前 return 导致 deadlock
+        count_tensor = torch.tensor(count, device=self.device, dtype=torch.float32)
+        if self.world_size > 1:
+            dist.all_reduce(count_tensor, op=dist.ReduceOp.SUM)
+        if count_tensor.item() == 0:
             if self.rank == 0:
                 print("[Val] No valid batches")
             return
 
-        # DDP 同步：先 gather sum，再求平均
+        # DDP 同步：gather sum，再求平均
         if self.world_size > 1:
             recon_tensor = torch.tensor(total_recon, device=self.device, dtype=torch.float32)
             uniform_tensor = torch.tensor(total_uniform, device=self.device, dtype=torch.float32)
             var_tensor = torch.tensor(total_var, device=self.device, dtype=torch.float32)
             cov_tensor = torch.tensor(total_cov, device=self.device, dtype=torch.float32)
             distill_tensor = torch.tensor(total_distill, device=self.device, dtype=torch.float32)
-            count_tensor = torch.tensor(count, device=self.device, dtype=torch.float32)
             for t in [recon_tensor, uniform_tensor, var_tensor, cov_tensor, distill_tensor]:
                 dist.all_reduce(t, op=dist.ReduceOp.SUM)
-            dist.all_reduce(count_tensor, op=dist.ReduceOp.SUM)
             avg_recon = float(recon_tensor / count_tensor)
             avg_uniform = float(uniform_tensor / count_tensor)
             avg_var = float(var_tensor / count_tensor)
@@ -383,8 +425,10 @@ class Trainer:
             return
 
         self.model.eval()
-        # 取验证集第一个 batch
-        batch = next(iter(self.val_dataloader))
+        # 使用缓存的可视化 batch，避免反复实例化 dataloader
+        batch = self._viz_batch
+        if batch is None:
+            batch = next(iter(self.val_dataloader))
         source_data = {k: v.to(self.device) for k, v in batch["source_data"].items()}
         timestamps = {k: v.to(self.device) for k, v in batch["timestamps"].items()}
         valid_periods = batch["valid_periods"]

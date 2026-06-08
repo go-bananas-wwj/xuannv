@@ -235,8 +235,15 @@ class AlphaEarthFoundations(nn.Module):
             # Apply keep_mask: zero out dropped frames and repeat last timestamp to keep shapes
             keep_mask_4d = keep_mask.view(B, T, 1, 1, 1)
             x_pert = x * keep_mask_4d
-            # timestamps: keep original shape but clamp dropped segments to nearest kept
+            # timestamps: 将被丢弃帧的时间戳设置为该样本内最近保留帧的时间戳
             ts_pert = ts.clone()
+            for b in range(B):
+                kept_indices = torch.where(keep_mask[b])[0]
+                if kept_indices.numel() > 0:
+                    for t_idx in range(T):
+                        if not keep_mask[b, t_idx]:
+                            nearest = kept_indices[(kept_indices - t_idx).abs().argmin()]
+                            ts_pert[b, t_idx] = ts[b, nearest]
 
             student_sources[name] = x_pert
             student_ts[name] = ts_pert
