@@ -191,6 +191,7 @@ def main() -> None:
     start_step = 0
     resume_optimizer_state = None
     resume_scheduler_state = None
+    resume_ema_state = None
     if args.resume and os.path.exists(args.resume):
         ckpt = torch.load(args.resume, map_location="cpu")
         state_dict = ckpt["model_state_dict"]
