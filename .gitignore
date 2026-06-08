@@ -67,5 +67,9 @@ node_modules/
 **/patent_figures_test*.md
 
 
+# aef_reference outputs
+aef_reference/outputs/
+aef_reference/outputs_olmoearth/
+
 # NPU CANN 运行时缓存
 kernel_meta/

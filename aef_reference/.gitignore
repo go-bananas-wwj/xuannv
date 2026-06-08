@@ -1,0 +1,11 @@
+/.github
+/.idea/
+/.vscode/
+/dist/
+/.env
+/.pytest_cache
+/examples
+/tests
+*.pyc
+
+data/olmoearth_pretrain_dataset/
