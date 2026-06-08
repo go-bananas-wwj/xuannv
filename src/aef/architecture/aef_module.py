@@ -79,7 +79,7 @@ class TemporalSummarizer(nn.Module):
     Time-conditional summarization using a single query per sample and
     multi-head attention over time at each spatial location.
     训练时输出 pre-norm 64D 向量（保留幅度信息，用于反坍缩损失）。
-    """"
+    """
 
     def __init__(self, feature_dim: int, embed_dim: int = 64, num_heads: int = 8):
         super().__init__()
