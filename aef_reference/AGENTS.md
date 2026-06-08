@@ -6,11 +6,21 @@
 
 ---
 
+## 零、隔离原则（⚠️ 最高优先级）
+
+1. **`aef_reference/` 是独立工作空间**。虽然物理上位于 `/workspace/xuannv/` 下，但其源码、训练、输出全部隔离在此目录内部。
+2. **严禁使用父目录 `/workspace/xuannv/src/` 下的任何代码**（包括但不限于 `src/aef/`、`src/models/`、`src/training/` 等）。
+3. **严禁修改父目录 `/workspace/xuannv/src/` 下的任何文件**。所有模型、数据集、损失、训练器、工具类的修改必须在本目录内完成。
+4. **`train.py` 只能 import 本目录内的模块或标准库 / 第三方库**。若现有 `train.py` 仍通过 `sys.path.insert` 引用外部 `src.aef.*`，应在后续迭代中逐步迁移到本目录内部实现。
+5. 本目录已有的 `src/alphaearth/` 为本工作空间的参考实现，可自由修改以适配需求；`src/utils/` 为本工作空间专用工具。
+
+---
+
 ## 一、项目概述
 
 ### 1.1 这是什么项目
 
-`aef_reference/` 是 `/workspace/xuannv/` 主项目下的一个**子目录**（非独立 git 仓库，与主项目共享 git 历史），承担 **海淀区多源遥感嵌入底座** 的训练代码职责。它基于 **AlphaEarth Foundations (AEF)** 架构进行改进和适配，但**实际运行时大量代码来自主项目的 `src/aef/` 目录**。
+`aef_reference/` 是 **海淀区多源遥感嵌入底座** 的独立训练工作空间。它基于 **AlphaEarth Foundations (AEF)** 架构进行改进和适配，所有代码自包含，不依赖外部 `src/`。
 
 **核心目标**：
 - 在海淀区 320 个 patch 的多源遥感数据上，训练一个输出 **64 维 embedding** 的深度学习模型
@@ -22,23 +32,22 @@
 
 ```
 /workspace/xuannv/
-├── pyproject.toml              # 主项目包配置（setuptools）
-├── src/aef/                    # ← 实际运行时的核心源码（被 train.py import）
-│   ├── architecture/
-│   ├── data/
-│   ├── loss_function.py
-│   └── training.py
-└── aef_reference/              # ← 本子目录
-    ├── train.py                # 活跃训练入口（import src.aef.*）
-    ├── src/alphaearth/         # 原始参考实现（OlmoEarth 数据集导向）
+├── src/                        # ← 父目录源码，本工作空间禁止使用、禁止修改
+│   ├── aef/
+│   ├── models/
+│   └── training/
+└── aef_reference/              # ← 本独立工作空间
+    ├── train.py                # 训练入口（仅 import 本目录内模块或 pip 包）
+    ├── src/alphaearth/         # 本工作空间的核心/参考源码（可自由修改）
+    ├── src/utils/              # 本工作空间专用工具
     ├── outputs/                # 训练输出隔离在此
     └── AGENTS.md               # 本文件
 ```
 
 **关键区别**：
-- `src/alphaearth/`：原始参考实现，面向 OlmoEarth 预训练数据集（单源 Landsat），单卡训练，CUDA 设备
-- `src/aef/`（主项目）：活跃实现，面向海淀区 5 源数据，8 卡 NPU DDP，包含蒸馏、可视化、时间筛选等改进
-- `train.py` 通过 `sys.path.insert` 引用主项目的 `src/aef/`，**不要修改 `src/alphaearth/` 来期望影响 `train.py` 的行为**
+- `src/alphaearth/`：本工作空间的核心实现（原参考代码），面向海淀区 5 源数据，NPU 设备，可自由修改
+- `src/utils/`：本工作空间专用工具函数
+- **任何情况下都不要修改父目录 `src/aef/` 或 `src/models/` 等文件来影响本工作空间**
 
 ### 1.3 解决什么问题
 
@@ -75,15 +84,15 @@
 
 ### 2.3 构建与安装
 
-`aef_reference/` 本身**无独立的 `pyproject.toml` 或 `setup.py`**。如需安装依赖，在主项目根目录执行：
+本工作空间独立运行，不依赖主项目的 `pyproject.toml`。直接安装所需依赖即可：
 
 ```bash
-cd /workspace/xuannv
+cd /workspace/xuannv/aef_reference
 conda activate xuannv
-pip install -e .
+pip install -r requirements.txt
 ```
 
-主项目 `pyproject.toml` 配置了 `setuptools>=61.0`，包名为 `xuannv`，包含 `src*` 目录。
+若 `requirements.txt` 中未列全，可手动补充：`torch>=2.0`, `torch-npu`, `einops`, `rasterio`, `geopandas`, `numpy`, `matplotlib`, `tqdm`, `scipy`, `pandas`。
 
 ---
 
@@ -91,19 +100,20 @@ pip install -e .
 
 ### 3.1 活跃代码（实际运行依赖）
 
-这些文件在 `train.py` 运行时被直接加载，**修改它们才会影响训练行为**：
+这些文件位于本工作空间内，在 `train.py` 运行时被直接加载，**仅修改本目录下的文件才会影响训练行为**（严禁触碰父目录 `src/aef/`）：
 
 | 文件 | 职责 |
 |------|------|
 | `aef_reference/train.py` | 活跃训练入口：DDP 初始化、Dataset/DataLoader 构建、Trainer 启动 |
-| `src/aef/architecture/aef_module.py` | AlphaEarthFoundations 模型定义（含 TemporalSummarizer、TimePooling） |
-| `src/aef/architecture/encoder.py` | STPEncoder（三通路编码器） |
-| `src/aef/architecture/decoder.py` | VonMisesFisherDecoder（隐式解码器） |
-| `src/aef/architecture/encoder_utils.py` | IndividualSourceEncoder、SinusoidalTimeEncoding、SummaryPeriodEncoder |
-| `src/aef/data/haidian_dataset.py` | HaidianAEFDataset + collate_fn（5 源数据加载、时间筛选、AEF embedding 加载） |
-| `src/aef/data/transforms.py` | TIFF 读取、源类型归一化、日期解析 |
-| `src/aef/loss_function.py` | AEFLoss（重建 + uniformity + consistency + distill + 多种备用正则） |
-| `src/aef/training.py` | Trainer（DDP、EMA、梯度累积、可视化、评估、checkpoint） |
+| `aef_reference/src/alphaearth/architecture/aef_module.py` | AlphaEarthFoundations 模型定义（含 TemporalSummarizer、TimePooling） |
+| `aef_reference/src/alphaearth/architecture/encoder.py` | STPEncoder（三通路编码器） |
+| `aef_reference/src/alphaearth/architecture/decoder.py` | VonMisesFisherDecoder（隐式解码器） |
+| `aef_reference/src/alphaearth/architecture/encoder_utils.py` | IndividualSourceEncoder、SinusoidalTimeEncoding、SummaryPeriodEncoder |
+| `aef_reference/src/alphaearth/data.py` / `data_olmoearth.py` | 数据集定义与 collate_fn（可在此基础上改造为 5 源海淀数据集） |
+| `aef_reference/src/alphaearth/loss_function.py` | AEFLoss（重建 + uniformity + consistency + distill + 多种备用正则） |
+| `aef_reference/src/alphaearth/training.py` | Trainer（单卡基础实现；DDP/EMA/可视化等改进需在本目录内完成） |
+
+**注意**：若 `train.py` 当前仍通过 `sys.path.insert` 引用外部 `src/aef/`，后续迭代应逐步将所需模块复制/重构到 `aef_reference/src/alphaearth/` 或新建子包中，确保完全隔离。
 
 ### 3.2 参考代码（原始实现，修改不影响 train.py）
 
@@ -254,7 +264,7 @@ torchrun --nproc_per_node=8 aef_reference/train.py \
 | AEF 官方 embedding | `data_raw/haidian/aef_embeddings/haidian_2025_patches/{patch_id}.npy` |
 | 训练输出 | `aef_reference/outputs/aef_distill_seed{seed}/` |
 | 可视化输出 | `aef_reference/outputs/aef_distill_seed{seed}/visualizations/` |
-| 时间映射缓存 | `src/aef/.cache/temporal_mapping.json` |
+| 时间映射缓存 | `aef_reference/.cache/temporal_mapping.json`（若需要，请建在本目录内） |
 
 ### 5.4 时间筛选
 
@@ -429,9 +439,10 @@ viz_patch_ids = ["patch_000036", "patch_000069", "patch_000091", "patch_000120",
 
 ### 10.3 文件修改范围
 
-- **所有文件操作限制在 `/workspace/xuannv/` 内**
-- `archive/` 目录（若存在）为废弃代码，只读参考，不得修改
-- `aef_reference/` 下的修改**不会**自动影响主项目；如果修改了 `src/aef/`（主项目目录），则会影响 `train.py`
+- **所有文件操作严格限制在 `/workspace/xuannv/aef_reference/` 内**
+- **`archive/` 目录（若存在）为废弃代码，只读参考，不得修改**
+- **严禁修改 `/workspace/xuannv/src/` 下的任何文件**（包括 `src/aef/`、`src/models/`、`src/training/` 等父目录源码）
+- 若发现 `train.py` 仍引用外部 `src.aef.*`，应在本目录内创建替代模块并修改 import 路径，而不是去改父目录
 
 ### 10.4 测试与验证
 
