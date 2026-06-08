@@ -47,6 +47,13 @@ class AEFLoss:
         self.magnitude_weight = magnitude_weight
 
         self.source_configs = {
+            's2': {'weight': 1.0, 'loss_fn': F.l1_loss},
+            's1': {'weight': 1.0, 'loss_fn': F.l1_loss},
+            'landsat': {'weight': 1.0, 'loss_fn': F.l1_loss},
+            'dem': {'weight': 0.05, 'loss_fn': F.l1_loss},
+            'jrc_water': {'weight': 0.3, 'loss_fn': F.l1_loss},
+            'worldcover': {'weight': 0.5, 'loss_fn': F.cross_entropy},
+            'dynamic_world': {'weight': 0.5, 'loss_fn': F.cross_entropy},
             'sentinel2': {'weight': 1.0, 'loss_fn': F.l1_loss},
         }
 
@@ -81,7 +88,15 @@ class AEFLoss:
                 target_masked = targets[source] * mask
 
                 if config['loss_fn'] == F.cross_entropy:
-                    loss = config['loss_fn'](pred_masked, target_masked.long())
+                    # NPU cross_entropy expects (N, C, ...) logits and (N, ...) targets
+                    pred_ce = pred_masked.permute(0, 3, 1, 2)  # (B, C, H, W)
+                    if target_masked.dim() == 4 and target_masked.shape[-1] > 1:
+                        # one-hot target: (B, H, W, C) -> argmax -> (B, H, W)
+                        target_ce = target_masked.argmax(dim=-1).long()
+                    else:
+                        # class index target: (B, H, W, 1) -> squeeze -> (B, H, W)
+                        target_ce = target_masked.squeeze(-1).long()
+                    loss = F.cross_entropy(pred_ce, target_ce)
                 else:
                     loss = config['loss_fn'](pred_masked, target_masked)
 
