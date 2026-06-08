@@ -98,6 +98,9 @@ class AEFLoss:
             B, H, W, D = x.shape
             x = rearrange(x, 'b h w d -> (b h w) d')
         
+        # 加噪声打破完全坍缩死锁（梯度屏障）
+        x = x + torch.randn_like(x) * 0.1
+        
         # 计算平均配对距离 (NPU-safe，避免成对矩阵)
         x_shift = torch.roll(x, shifts=x.size(0)//2, dims=0)
         sq_dists = ((x - x_shift) ** 2).sum(dim=-1)
@@ -124,9 +127,10 @@ class AEFLoss:
             x = rearrange(x, 'b h w d -> (b h w) d')
         
         # x: (N, D)
-        std = torch.sqrt(x.var(dim=0) + 1e-4)
-        # hinge: max(0, gamma - std)
-        return torch.mean(torch.relu(gamma - std))
+        # 直接用方差（而非标准差），坍缩时梯度不为零
+        var = x.var(dim=0)
+        # hinge: max(0, gamma^2 - var)，目标: var >= gamma^2
+        return torch.mean(torch.relu(gamma ** 2 - var))
     
     def vicreg_covariance_loss(self, embeddings: torch.Tensor) -> torch.Tensor:
         """
