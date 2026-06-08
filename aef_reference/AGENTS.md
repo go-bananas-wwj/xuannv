@@ -2,6 +2,7 @@
 
 > **目录**: `/workspace/xuannv/aef_reference/`
 > **最后更新**: 2026-06-08
+> **活跃分支**: `v12-clean-dynamic`
 
 ---
 
@@ -9,7 +10,7 @@
 
 ### 1.1 这是什么项目
 
-`aef_reference/` 是 **海淀区多源遥感嵌入底座** 的训练代码目录，基于 **AlphaEarth Foundations (AEF)** 架构进行改进和适配。
+`aef_reference/` 是 `/workspace/xuannv/` 主项目下的一个**子目录**（非独立 git 仓库，与主项目共享 git 历史），承担 **海淀区多源遥感嵌入底座** 的训练代码职责。它基于 **AlphaEarth Foundations (AEF)** 架构进行改进和适配，但**实际运行时大量代码来自主项目的 `src/aef/` 目录**。
 
 **核心目标**：
 - 在海淀区 320 个 patch 的多源遥感数据上，训练一个输出 **64 维 embedding** 的深度学习模型
@@ -17,14 +18,36 @@
 - 同时 **蒸馏 AEF 官方预训练 embedding** 作为辅助监督，加速收敛并提升质量
 - 最终输出的 64D embedding 供下游任务使用（变化检测、地物分类等）
 
-### 1.2 解决什么问题
+### 1.2 与主项目的关系
+
+```
+/workspace/xuannv/
+├── pyproject.toml              # 主项目包配置（setuptools）
+├── src/aef/                    # ← 实际运行时的核心源码（被 train.py import）
+│   ├── architecture/
+│   ├── data/
+│   ├── loss_function.py
+│   └── training.py
+└── aef_reference/              # ← 本子目录
+    ├── train.py                # 活跃训练入口（import src.aef.*）
+    ├── src/alphaearth/         # 原始参考实现（OlmoEarth 数据集导向）
+    ├── outputs/                # 训练输出隔离在此
+    └── AGENTS.md               # 本文件
+```
+
+**关键区别**：
+- `src/alphaearth/`：原始参考实现，面向 OlmoEarth 预训练数据集（单源 Landsat），单卡训练，CUDA 设备
+- `src/aef/`（主项目）：活跃实现，面向海淀区 5 源数据，8 卡 NPU DDP，包含蒸馏、可视化、时间筛选等改进
+- `train.py` 通过 `sys.path.insert` 引用主项目的 `src/aef/`，**不要修改 `src/alphaearth/` 来期望影响 `train.py` 的行为**
+
+### 1.3 解决什么问题
 
 遥感数据在空间、时间、模态上高度冗余，普通 mask 策略（如 MAE 的 75% patch mask）对于多模态数据仍然过于简单。本项目通过：
 - **5 源异构输入**（SAR + 多光谱 + 高分辨率），增加重建难度
 - **时间窗口筛选**，聚焦特定季节的数据分布
 - **AEF 蒸馏对齐**，让模型学习到经过大规模预训练验证的表征空间
 
-### 1.3 要达到的效果
+### 1.4 要达到的效果
 
 | 指标 | 目标 |
 |------|------|
@@ -35,81 +58,85 @@
 
 ---
 
-## 二、模型配置
+## 二、技术栈与运行环境
 
-### 2.1 输入源（5 源）
+### 2.1 硬件
 
-| 源名 | 通道数 | 空间分辨率 | 数据路径 |
-|------|--------|-----------|----------|
-| `s1` (Sentinel-1) | 2 (VH+VV) | ~10m | `data_raw/haidian/scenes/{patch_id}/s1/` |
-| `s2` | 6 | 10m | `data_raw/haidian/scenes/{patch_id}/s2/` |
-| `tianyi_sar` (天仪SAR) | 1 | ~3m | `data_raw/haidian/scenes/{patch_id}/tianyi_sar/` |
-| `landsat` | 6 | 30m → 上采样到 10m | `data_raw/haidian/scenes/{patch_id}/landsat/` |
-| `planet` | 4 | ~3-5m | `data_raw/beijing/planetscene/{patch_id}/` |
+- 8 × Huawei Ascend 910B4 NPU
+- DDP 后端：`hccl`（华为集合通信库）
+- 必须设置 `ASCEND_LAUNCH_BLOCKING=1` 规避 SDMA 竞态（见第七节）
 
-**注意**：
-- `s1` 和 `tianyi_sar` 是两个**独立的 SAR 源**，同时保留
-- Planet 数据不在 patch 目录下，单独存放在 `beijing/planetscene/`
-- 各源独立做 Patch Embedding（不共享权重）
+### 2.2 软件依赖
 
-### 2.2 重建目标（解码源）
+- **运行环境**: `conda activate xuannv`，Python 3.11.15
+- **PyTorch**: torch 2.1.0 + torch_npu 2.1.0.post18
+- **核心库**: einops, rasterio, geopandas, numpy, matplotlib, tqdm, scipy, pandas
+- **完整依赖列表**: 见主项目 `requirements.txt`（`aef_reference/` 下无独立的 requirements）
 
-在 5 源输入基础上，模型可额外重建以下辅助目标。**这些目标是否参与训练、权重如何分配，可视具体实验需求灵活配置，不强制全部启用。**
+### 2.3 构建与安装
 
-| 目标 | 输入数据（标签） | 模型预测输出 | 损失类型 |
-|------|-----------------|-------------|---------|
-| `dem` | 1 通道（高程值） | 1 通道（回归值） | L1 |
-| `worldcover` | **1 通道（类别索引）** | **11 通道（类别 logits）** | CrossEntropy |
-| `dynamic_world` | **1 通道（类别索引）** | **9 通道（类别 logits）** | CrossEntropy |
-| `jrc_water` | 1 通道（水体概率/掩码） | 1 通道（回归值） | L1 |
+`aef_reference/` 本身**无独立的 `pyproject.toml` 或 `setup.py`**。如需安装依赖，在主项目根目录执行：
 
-**说明**：
-- WorldCover 和 Dynamic World 作为**输入标签**时，本质上是单通道的类别索引图像（每个像素一个整数类别值），和 DEM/JRC Water 一样是静态数据
-- 模型为了做分类预测，输出端会生成 `num_classes` 通道的 logits，再与单通道标签通过 CrossEntropy 比较
-- 上表中的"模型预测输出"列才是训练代码里 `decoder_channels[source]` 配置的数值
+```bash
+cd /workspace/xuannv
+conda activate xuannv
+pip install -e .
+```
 
-### 2.3 时间筛选
-
-**范围**：`2025-12-01` 至 `2026-04-30`
-
-- 各源只保留该时间窗口内的帧
-- Planet 数据原本就约 6 帧（2025-12 ~ 2026-04），筛选后可能剩 3-6 帧
-- 时间筛选在 `HaidianAEFDataset._load_source_frames()` 中实现，通过文件名 `YYYYMMDD.tif` 过滤
+主项目 `pyproject.toml` 配置了 `setuptools>=61.0`，包名为 `xuannv`，包含 `src*` 目录。
 
 ---
 
-## 三、与 AEF 的对齐
+## 三、代码组织结构
 
-### 3.1 架构对齐
+### 3.1 活跃代码（实际运行依赖）
 
-- 输出 **64D embedding**，与 AEF 官方模型维度一致
-- 使用 `VMFBottleneck` + `VonMisesFisherDecoder` 架构
-- `per_source_latent=32`，5 源共 160D 输入到 Transformer
+这些文件在 `train.py` 运行时被直接加载，**修改它们才会影响训练行为**：
 
-### 3.2 蒸馏对齐
+| 文件 | 职责 |
+|------|------|
+| `aef_reference/train.py` | 活跃训练入口：DDP 初始化、Dataset/DataLoader 构建、Trainer 启动 |
+| `src/aef/architecture/aef_module.py` | AlphaEarthFoundations 模型定义（含 TemporalSummarizer、TimePooling） |
+| `src/aef/architecture/encoder.py` | STPEncoder（三通路编码器） |
+| `src/aef/architecture/decoder.py` | VonMisesFisherDecoder（隐式解码器） |
+| `src/aef/architecture/encoder_utils.py` | IndividualSourceEncoder、SinusoidalTimeEncoding、SummaryPeriodEncoder |
+| `src/aef/data/haidian_dataset.py` | HaidianAEFDataset + collate_fn（5 源数据加载、时间筛选、AEF embedding 加载） |
+| `src/aef/data/transforms.py` | TIFF 读取、源类型归一化、日期解析 |
+| `src/aef/loss_function.py` | AEFLoss（重建 + uniformity + consistency + distill + 多种备用正则） |
+| `src/aef/training.py` | Trainer（DDP、EMA、梯度累积、可视化、评估、checkpoint） |
 
-- 加载 AEF 官方预计算的 64D embedding 作为软目标
-- embedding 文件路径：`data_raw/haidian/aef_embeddings/haidian_2025_patches/{patch_id}.npy`
-- 蒸馏损失：cosine distance 或 L2 distance 对齐 Student 和 AEF embedding
+### 3.2 参考代码（原始实现，修改不影响 train.py）
 
-### 3.3 两阶段训练策略
+位于 `aef_reference/src/alphaearth/`，面向 OlmoEarth 数据集和 CUDA 环境：
 
-| 阶段 | 条件 | Distill 权重 | Recon 权重 | 目的 |
-|------|------|-------------|-----------|------|
-| **Stage 1: distill_align** | step ≤ 1000 | 5.0 | 0.1 | 先对齐 AEF 表征空间 |
-| **Stage 2: normal** | step > 1000 | 0.2 | 1.0 | 再学习重建细节 |
+| 文件 | 职责 |
+|------|------|
+| `src/alphaearth/__init__.py` | 包导出 |
+| `src/alphaearth/architecture/` | 原始 AEF 架构（aef_module, encoder, decoder, STPBlock, stp_operators, encoder_utils, laplacian_pyramid_exchange） |
+| `src/alphaearth/data.py` | 合成数据 / NPZ 数据集（AEFDataset, AEFNPZDataset） |
+| `src/alphaearth/data_olmoearth.py` | OlmoEarth 预训练数据集（tar 包读取） |
+| `src/alphaearth/loss_function.py` | 原始 AEFLoss（无 distill） |
+| `src/alphaearth/training.py` | 原始 Trainer（单卡、无 EMA、无可视化） |
+| `src/alphaearth/run_train.py` | 合成数据冒烟测试入口 |
+| `src/alphaearth/run_train_olmoearth_dataset.py` | OlmoEarth 训练入口 |
+
+### 3.3 模型架构要点
+
+- **STP Encoder**: 3 条并行通路
+  - Space Operator: ViT-like 空间自注意力，1/16L 分辨率
+  - Time Operator: 时间轴自注意力，1/8L 分辨率
+  - Precision Operator: 3×3 卷积，1/2L 分辨率
+- **TemporalSummarizer**: 单 query 多头时间注意力 → 投影到 64D
+  - **训练时 skip L2 norm**（保留幅度信息，pre-norm 空间计算反坍缩损失）
+  - 推理时恢复 L2 归一化
+- **VonMisesFisherDecoder**: 以 embedding 为均值方向，拼接 geometry + timecode 后逐像素 MLP 解码
+- **Teacher-Student 扰动**: 随机源丢弃、帧丢弃、半周期截断（向量化实现，避免 NPU→CPU 同步）
 
 ---
 
 ## 四、训练配置
 
-### 4.1 硬件
-
-- 8 × Huawei Ascend 910B4 NPU
-- 后端：`hccl`（华为集合通信库）
-- 必须设置 `ASCEND_LAUNCH_BLOCKING=1` 规避 SDMA 竞态（见"已知坑"）
-
-### 4.2 超参数
+### 4.1 超参数
 
 | 参数 | 值 |
 |------|-----|
@@ -124,6 +151,27 @@
 | save_every | 500 step |
 | eval_every | 500 step |
 | log_every | 50 step |
+| distill_warmup_steps | 1000 |
+| EMA momentum | 0.996 |
+| gradient clipping max_norm | 1.0 |
+
+### 4.2 模型配置
+
+```python
+input_sources = {
+    "s1": 2,
+    "s2": 6,
+    "tianyi_sar": 1,
+    "landsat": 6,
+    "planet": 4,
+}
+decode_sources = {
+    "s1": 2, "s2": 6, "tianyi_sar": 1, "landsat": 6, "planet": 4,
+    "dem": 1, "worldcover": 11, "dynamic_world": 9, "jrc_water": 1,
+}
+per_source_latent = 32
+model_size = "small"
+```
 
 ### 4.3 启动命令
 
@@ -147,26 +195,121 @@ torchrun --nproc_per_node=8 --master_port=29500 \
 ```bash
 tmux new-session -d -s aef_train -c /workspace/xuannv
 tmux send-keys -t aef_train 'conda activate xuannv' Enter
-tmux send-keys -t aef_train 'torchrun --nproc_per_node=8 ...' Enter
+tmux send-keys -t aef_train 'torchrun --nproc_per_node=8 aef_reference/train.py --batch-size 2 --max-steps 100000 --save-every 500 --eval-every 500 --distill-warmup-steps 1000 --grad-accum-steps 2 --log-every 50 --seed 42' Enter
 ```
+
+### 4.4 恢复训练
+
+```bash
+torchrun --nproc_per_node=8 aef_reference/train.py \
+  --resume aef_reference/outputs/aef_distill_seed42/step_000500_seed42.pt \
+  ...（其他参数保持一致）
+```
+
+**注意**：3 源 checkpoint（s1/s2/landsat）**不能 resume** 到 5 源模型（缺少 tianyi_sar 和 planet 的 stem 参数）。
 
 ---
 
-## 五、可视化方案
+## 五、数据源与路径
 
-### 5.1 触发时机
+### 5.1 输入源（5 源）
+
+| 源名 | 通道数 | 空间分辨率 | 数据路径 |
+|------|--------|-----------|----------|
+| `s1` (Sentinel-1) | 2 (VH+VV) | ~10m | `data_raw/haidian/scenes/{patch_id}/s1/` |
+| `s2` | 6 | 10m | `data_raw/haidian/scenes/{patch_id}/s2/` |
+| `tianyi_sar` (天仪SAR) | 1 | ~3m | `data_raw/haidian/scenes/{patch_id}/tianyi_sar/` |
+| `landsat` | 6 | 30m → 上采样到 10m | `data_raw/haidian/scenes/{patch_id}/landsat/` |
+| `planet` | 4 | ~3-5m | `data_raw/beijing/planetscene/{patch_id}/` |
+
+- `s1` 和 `tianyi_sar` 是两个**独立的 SAR 源**，同时保留
+- Planet 数据不在 patch 目录下，单独存放在 `beijing/planetscene/`
+- 各源独立做 Patch Embedding（不共享权重）
+
+### 5.2 重建目标（解码源）
+
+| 目标 | 输入数据（标签） | 模型预测输出 | 损失类型 | 权重 |
+|------|-----------------|-------------|---------|------|
+| `s1` | (T, H, W, 2) | (B, H, W, 2) | L1 | 1.0 |
+| `s2` | (T, H, W, 6) | (B, H, W, 6) | L1 | 1.0 |
+| `tianyi_sar` | (T, H, W, 1) | (B, H, W, 1) | L1 | 1.0 |
+| `landsat` | (T, H, W, 6) | (B, H, W, 6) | L1 | 1.0 |
+| `planet` | (T, H, W, 4) | (B, H, W, 4) | L1 | 1.0 |
+| `dem` | 1 通道（高程值） | 1 通道（回归值） | L1 | 0.05 |
+| `worldcover` | **1 通道（类别索引）** | **11 通道（类别 logits）** | CrossEntropy | 0.5 |
+| `dynamic_world` | **1 通道（类别索引）** | **9 通道（类别 logits）** | CrossEntropy | 0.5 |
+| `jrc_water` | 1 通道（水体概率/掩码） | 1 通道（回归值） | L1 | 0.3 |
+
+**说明**：
+- WorldCover 和 Dynamic World 作为**输入标签**时，本质上是单通道的类别索引图像（每个像素一个整数类别值），和 DEM/JRC Water 一样是静态数据
+- 模型为了做分类预测，输出端会生成 `num_classes` 通道的 logits，再与单通道标签通过 CrossEntropy 比较
+
+### 5.3 其他关键路径
+
+| 用途 | 路径 |
+|------|------|
+| 海淀场景数据 | `data_raw/haidian/scenes/{patch_id}/` |
+| Planet 数据 | `data_raw/beijing/planetscene/{patch_id}/` |
+| 统计量（mean/std） | `statistics/haidian/{source}_stats.json` |
+| AEF 官方 embedding | `data_raw/haidian/aef_embeddings/haidian_2025_patches/{patch_id}.npy` |
+| 训练输出 | `aef_reference/outputs/aef_distill_seed{seed}/` |
+| 可视化输出 | `aef_reference/outputs/aef_distill_seed{seed}/visualizations/` |
+| 时间映射缓存 | `src/aef/.cache/temporal_mapping.json` |
+
+### 5.4 时间筛选
+
+**范围**：`2025-12-01` 至 `2026-04-30`
+
+- 各源只保留该时间窗口内的帧
+- Planet 数据原本就约 6 帧（2025-12 ~ 2026-04），筛选后可能剩 3-6 帧
+- 时间筛选在 `HaidianAEFDataset._load_source_frames()` 中实现，通过文件名 `YYYYMMDD.tif` 过滤
+
+---
+
+## 六、训练策略
+
+### 6.1 两阶段蒸馏
+
+| 阶段 | 条件 | Distill 权重 | Recon 权重 | 目的 |
+|------|------|-------------|-----------|------|
+| **Stage 1: distill_align** | step ≤ 1000 | 5.0 | 0.1 | 先对齐 AEF 表征空间 |
+| **Stage 2: normal** | step > 1000 | 0.2 | 1.0 | 再学习重建细节 |
+
+### 6.2 EMA Teacher
+
+- 始终启用（无论单卡/多卡）
+- EMA 更新公式：`p_ema = 0.996 * p_ema + 0.004 * p`
+- EMA 模型用于覆盖 teacher_embeddings，不直接参与梯度更新
+
+### 6.3 损失函数组成
+
+| 损失 | 默认权重 | 计算空间 |
+|------|---------|----------|
+| reconstruction | 1.0（stage1 时 0.1） | 像素空间 |
+| uniformity (batch) | 0.05 | L2-normed embedding |
+| consistency | 0.02 | L2-normed teacher/student |
+| distill (AEF 对齐) | 0.2 / 5.0 | cosine distance |
+| clip (text) | 0.001 | L2-normed image/text |
+
+备用损失（默认权重 0.0，可通过修改代码启用）：raw_uniform, variance, covariance, decorr, erank, coding_rate, magnitude
+
+---
+
+## 七、可视化方案
+
+### 7.1 触发时机
 
 每 `save_every=500` step，对 **5 个指定 patch** 各生成一张可视化图。
 
-### 5.2 指定 Patch
+### 7.2 指定 Patch
 
 ```python
 viz_patch_ids = ["patch_000036", "patch_000069", "patch_000091", "patch_000120", "patch_000150"]
 ```
 
-如果 patch 在 val set 中不存在，自动从 train set 中搜索。
+如果 patch 在 val set 中不存在，自动从 train set 中搜索（通过 `dataset[idx]` 遍历）。
 
-### 5.3 布局（2 行）
+### 7.3 布局（2 行）
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -176,44 +319,24 @@ viz_patch_ids = ["patch_000036", "patch_000069", "patch_000091", "patch_000120",
 └─────────────────────────────────────────────────────────┘
 ```
 
-**细节**：
-- **第一行**：每个源取该 patch 时间中点最近的有效帧
-  - Planet：跳过 collate 填充帧（全 0 帧），取第一个 `abs.max() > 0.001` 的帧
-  - Landsat：标题标注 `[30m→10m]` 提示低分辨率上采样
-  - 天仪 SAR：单通道显示为**灰度**（不是红色）
-  - 每通道单独 min-max 归一化后取前 3 通道作为 RGB
+**第一行细节**：
+- 每个源取该 patch 时间中点最近的有效帧
+- Planet：跳过 collate 填充帧（全 0 帧），取第一个 `abs.max() > 0.001` 的帧
+- Landsat：标题标注 `[30m→10m]` 提示低分辨率上采样
+- 天仪 SAR：单通道显示为**灰度**（不是红色）
+- 每通道单独 min-max 归一化后取前 3 通道作为 RGB
 
-- **第二行**：
-  - **PCA 统一基**：以 AEF embedding 做 SVD，Student 用同一套基投影，保证颜色空间可比
-  - 差异热图：`np.abs(student_rgb - aef_rgb).mean(axis=-1)`，hot colormap
+**第二行细节**：
+- **PCA 统一基**：以 AEF embedding 做 SVD，Student 用同一套基投影，保证颜色空间可比
+- 差异热图：`np.abs(student_rgb - aef_rgb).mean(axis=-1)`，hot colormap
 
 **输出文件名**：`viz_step_{step:06d}_{patch_id}_seed{seed}.png`
 
 ---
 
-## 六、关键文件路径
+## 八、已知坑与注意事项
 
-| 用途 | 路径 |
-|------|------|
-| **训练入口** | `aef_reference/train.py` |
-| **模型定义** | `src/aef/architecture/aef_module.py` |
-| **数据集** | `src/aef/data/haidian_dataset.py` |
-| **collate_fn** | `src/aef/data/haidian_dataset.py` (同文件) |
-| **损失函数** | `src/aef/loss_function.py` |
-| **训练器** | `src/aef/training.py` |
-| **海淀场景数据** | `data_raw/haidian/scenes/{patch_id}/` |
-| **Planet 数据** | `data_raw/beijing/planetscene/{patch_id}/` |
-| **统计量** | `statistics/haidian/{source}_stats.json` |
-| **AEF 官方 embedding** | `data_raw/haidian/aef_embeddings/haidian_2025_patches/{patch_id}.npy` |
-| **训练输出** | `aef_reference/outputs/aef_distill_seed{seed}/` |
-| **可视化输出** | `aef_reference/outputs/aef_distill_seed{seed}/visualizations/` |
-| **本项目 AGENTS** | `aef_reference/AGENTS.md` (本文件) |
-
----
-
-## 七、已知坑与注意事项
-
-### 7.1 NPU 多卡 SDMA 竞态（致命）
+### 8.1 NPU 多卡 SDMA 竞态（致命）
 
 **现象**：4 卡/8 卡训练时，`aclnnInplaceAddcdiv` 或 `aclnnInplaceAdd` 触发 `fftsplus sdma error`，TBE 子进程崩溃。
 
@@ -223,7 +346,7 @@ viz_patch_ids = ["patch_000036", "patch_000069", "patch_000091", "patch_000120",
 
 **代价**：同步模式比异步慢约 20-30%，但完全稳定。
 
-### 7.2 可视化 tensor detach（致命）
+### 8.2 可视化 tensor detach（致命）
 
 **现象**：`_visualize()` 中调用 `.cpu().numpy()` 时报错 `Can't call numpy() on Tensor that requires grad`。
 
@@ -231,39 +354,39 @@ viz_patch_ids = ["patch_000036", "patch_000069", "patch_000091", "patch_000120",
 
 **解决**：所有从模型输出取出的 tensor 必须显式 `.detach()`。
 
-### 7.3 Planet 填充帧
+### 8.3 Planet 填充帧
 
 **现象**：Planet 每 patch 约 6 帧，但 collate_fn 统一填充到 `max_t=16`，frame 6-15 全为 0。
 
 **解决**：可视化时跳过填充帧（检查 `frame.abs().max() > 0.001`）。
 
-### 7.4 Landsat 低分辨率
+### 8.4 Landsat 低分辨率
 
 **现象**：Landsat 原始 30m 分辨率，上采样到 128×128 后空间分布不均匀（某些行非零像素少）。
 
 **注意**：这是数据本身特性，非 bug。可视化标题标注 `[30m→10m]`。
 
-### 7.5 Checkpoint 兼容性
+### 8.5 Checkpoint 兼容性
 
 **重要**：3 源 checkpoint（s1/s2/landsat）**不能 resume** 到 5 源模型（缺少 tianyi_sar 和 planet 的 stem 参数）。
 
 **当前状态**：之前的 500 step 3 源权重已废弃，5 源训练需**从头开始**。
 
-### 7.6 单通道显示
+### 8.6 单通道显示
 
 **注意**：1 通道数据（如 tianyi_sar）在 `_tensor_to_rgb()` 中复制为灰度图，不要显示为红色（只填 R 通道）。
 
-### 7.7 投影头权重固定（待实现）
+### 8.7 各源独立投影头固定（待实现）
 
-**需求**：参考 OlmoEarth 论文，各源独立的投影头（stem）权重建议固定（`requires_grad=False`），使每次投影一致，更好训练 STP（空间-时间处理）层。
+**需求**：参考 OlmoEarth 论文，各源独立的投影头（stem）权重建议固定（`requires_grad=False`），使每次投影一致，更好训练 STP 层。
 
 **状态**：待训练启动前确认是否实现。
 
 ---
 
-## 八、实验历史与当前状态
+## 九、实验历史与当前状态
 
-### 8.1 实验 1：3 源蒸馏（已废弃）
+### 9.1 实验 1：3 源蒸馏（已废弃）
 
 | 项目 | 内容 |
 |------|------|
@@ -274,7 +397,7 @@ viz_patch_ids = ["patch_000036", "patch_000069", "patch_000091", "patch_000120",
 | 遗留权重 | `aef_reference/outputs/aef_distill_seed42/step_000500_seed42.pt` |
 | 可用性 | ❌ 不能 resume 到 5 源模型 |
 
-### 8.2 当前状态（5 源改造完成，待训练）
+### 9.2 当前状态（5 源改造完成，待训练）
 
 | 项目 | 状态 |
 |------|------|
@@ -288,36 +411,74 @@ viz_patch_ids = ["patch_000036", "patch_000069", "patch_000091", "patch_000120",
 
 ---
 
-## 九、项目决策记录
+## 十、开发规范
 
-### 9.1 数据源决策
+### 10.1 Git 提交规范
+
+- **分支**：`v12-clean-dynamic`
+- **禁止**：推送到 `main`
+- **每次修改后必须执行**：`git add -A && git commit -m "描述" && git push origin v12-clean-dynamic`
+
+### 10.2 代码风格
+
+- 所有 Python 文件顶部使用 `from __future__ import annotations`
+- 类型注解完整（PEP 484）
+- 模块内注释使用中文
+- 设备选择：活跃代码统一使用 `npu`，参考代码使用 `cuda`（不要混改）
+- 训练脚本顶部设置 `torch.set_num_threads(4)`
+
+### 10.3 文件修改范围
+
+- **所有文件操作限制在 `/workspace/xuannv/` 内**
+- `archive/` 目录（若存在）为废弃代码，只读参考，不得修改
+- `aef_reference/` 下的修改**不会**自动影响主项目；如果修改了 `src/aef/`（主项目目录），则会影响 `train.py`
+
+### 10.4 测试与验证
+
+本项目为研究型代码库，**无 pytest/unittest 自动化测试套件**。验证方式：
+
+1. **合成数据冒烟测试**：
+   ```bash
+   cd /workspace/xuannv/aef_reference
+   python -m alphaearth.run_train
+   ```
+   （验证单卡前向 + 损失 + 优化器步进能否跑通）
+
+2. **OlmoEarth 子集训练**：
+   ```bash
+   python -m alphaearth.run_train_olmoearth_dataset \
+       --data_dir ./data/olmoearth_pretrain_dataset/10_landsat_monthly \
+       --batch_size 4 --max_steps 100
+   ```
+
+3. **可视化预览**：运行 `train.py` 前，可先通过 `outputs/viz_preview/` 下的历史图片确认可视化布局是否符合预期。
+
+4. **NPU 占用检查**：训练前执行 `npu-smi info` 确认卡空闲。
+
+---
+
+## 十一、项目决策记录
+
+### 11.1 数据源决策
 
 - **S1 和天仪 SAR 同时保留**：两者是不同卫星（Sentinel-1 vs 天仪），物理特性不同，都作为独立输入源。
 - **Planet 保留**：高分辨率（3-5m），虽然帧数少但信息密度高。
 
-### 9.2 时间筛选决策
+### 11.2 时间筛选决策
 
 - **2025-12 ~ 2026-04**：聚焦冬季到春季的时段，Planet 数据恰好覆盖该窗口。
 
-### 9.3 可视化决策
+### 11.3 可视化决策
 
 - **5 个指定 patch**：36, 69, 91, 120, 150 — 分散在空间上，覆盖不同地物类型。
 - **PCA 统一基**：以 AEF 做 SVD，Student 用同一套基投影，差异图才有意义。
 - **Planet 跳过填充帧**：避免显示全黑图。
 
-### 9.4 训练策略决策
+### 11.4 训练策略决策
 
 - **两阶段**：先蒸馏对齐（distill=5.0），再重建（recon=1.0）
-- ** distill_warmup_steps=1000**：足够让 embedding 空间对齐后再学重建
+- **distill_warmup_steps=1000**：足够让 embedding 空间对齐后再学重建
 
 ---
 
-## 十、Git 提交规范
-
-- **分支**：`v12-clean-dynamic`
-- **禁止**：推送到 `main`
-- **每次修改后**：`git add -A && git commit -m "描述" && git push origin v12-clean-dynamic`
-
----
-
-*本文档由 AI 编码代理根据用户要求和项目实际情况整理，供后续开发和维护参考。*
+*本文档由 AI 编码代理根据实际项目内容整理，供后续开发和维护参考。*
