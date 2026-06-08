@@ -549,7 +549,11 @@ class Trainer:
         timestamps = {k: v.to(self.device) for k, v in batch["timestamps"].items()}
         valid_periods = batch["valid_periods"]
 
-        out = self.model(source_data, timestamps, valid_periods)
+        with torch.no_grad():
+            out = self.model(source_data, timestamps, valid_periods)
+
+        # 确保所有输出 tensor 都已 detach（NPU DDP 下 no_grad 可能不完全生效）
+        out = {k: v.detach() if isinstance(v, torch.Tensor) else v for k, v in out.items()}
 
         viz_dir = self.output_dir / "visualizations"
         viz_dir.mkdir(parents=True, exist_ok=True)
