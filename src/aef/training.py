@@ -8,6 +8,9 @@ import time
 from pathlib import Path
 from typing import Any
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.distributed as dist
@@ -264,13 +267,13 @@ class Trainer:
                     "total": f"{float(loss):.4f}",
                 })
 
-            # Save checkpoint
-            if step % self.save_every == 0 and self.rank == 0:
-                self._save_checkpoint(step)
-
-            # Eval
-            if step % self.eval_every == 0:
+            # Save checkpoint + eval + visualize
+            if step % self.save_every == 0:
+                if self.rank == 0:
+                    self._save_checkpoint(step)
                 self._eval()
+                if self.rank == 0:
+                    self._visualize(step)
 
         pbar.close()
         if self.rank == 0:
@@ -372,3 +375,75 @@ class Trainer:
         torch.save(checkpoint, self.output_dir / f"step_{step:06d}.pt")
         if self.rank == 0:
             print(f"[Checkpoint] Saved at step {step}")
+
+    @torch.no_grad()
+    def _visualize(self, step: int) -> None:
+        """保存可视化：teacher/student embedding 对比 + reconstruction 对比."""
+        if self.rank != 0:
+            return
+
+        self.model.eval()
+        # 取验证集第一个 batch
+        batch = next(iter(self.val_dataloader))
+        source_data = {k: v.to(self.device) for k, v in batch["source_data"].items()}
+        timestamps = {k: v.to(self.device) for k, v in batch["timestamps"].items()}
+        valid_periods = batch["valid_periods"]
+
+        out = self.model(source_data, timestamps, valid_periods)
+
+        viz_dir = self.output_dir / "visualizations"
+        viz_dir.mkdir(parents=True, exist_ok=True)
+
+        # ---- 1. Embedding 对比 ----
+        emb_t = out["teacher_embeddings"][0].cpu().numpy()  # (H, W, 64)
+        emb_s = out["student_embeddings"][0].cpu().numpy()  # (H, W, 64)
+
+        fig, axes = plt.subplots(2, 4, figsize=(16, 8))
+        dims = np.random.choice(64, 4, replace=False)
+        for i, d in enumerate(dims):
+            vmin = min(emb_t[..., d].min(), emb_s[..., d].min())
+            vmax = max(emb_t[..., d].max(), emb_s[..., d].max())
+            axes[0, i].imshow(emb_t[..., d], vmin=vmin, vmax=vmax, cmap="viridis")
+            axes[0, i].set_title(f"Teacher dim {d}")
+            axes[0, i].axis("off")
+            axes[1, i].imshow(emb_s[..., d], vmin=vmin, vmax=vmax, cmap="viridis")
+            axes[1, i].set_title(f"Student dim {d}")
+            axes[1, i].axis("off")
+        plt.suptitle(f"Embedding Comparison @ Step {step}", fontsize=14, fontweight="bold")
+        plt.tight_layout()
+        plt.savefig(viz_dir / f"embedding_step_{step:06d}.png", dpi=150, bbox_inches="tight")
+        plt.close()
+
+        # ---- 2. Reconstruction 对比 ----
+        predictions = {src: rec[:, 0] for src, rec in out["reconstructions"].items()}
+        targets = self._prepare_reconstruction_targets(batch, predictions)
+
+        # 选最多 3 个源展示
+        src_list = list(predictions.keys())[:3]
+        if src_list:
+            fig, axes = plt.subplots(2, len(src_list), figsize=(5 * len(src_list), 8))
+            if len(src_list) == 1:
+                axes = axes.reshape(2, 1)
+            for i, src in enumerate(src_list):
+                pred = predictions[src][0].cpu().numpy()
+                tgt = targets[src][0].cpu().numpy()
+                # 归一化到 [0,1] 用于显示
+                pred_rgb = pred[..., :3]
+                tgt_rgb = tgt[..., :3]
+                pred_min, pred_max = pred_rgb.min(), pred_rgb.max()
+                tgt_min, tgt_max = tgt_rgb.min(), tgt_rgb.max()
+                pred_rgb = np.clip((pred_rgb - pred_min) / (pred_max - pred_min + 1e-8), 0, 1)
+                tgt_rgb = np.clip((tgt_rgb - tgt_min) / (tgt_max - tgt_min + 1e-8), 0, 1)
+                axes[0, i].imshow(tgt_rgb)
+                axes[0, i].set_title(f"{src} Target")
+                axes[0, i].axis("off")
+                axes[1, i].imshow(pred_rgb)
+                axes[1, i].set_title(f"{src} Pred")
+                axes[1, i].axis("off")
+            plt.suptitle(f"Reconstruction @ Step {step}", fontsize=14, fontweight="bold")
+            plt.tight_layout()
+            plt.savefig(viz_dir / f"recon_step_{step:06d}.png", dpi=150, bbox_inches="tight")
+            plt.close()
+
+        self.model.train()
+        print(f"[Viz] Saved visualizations at step {step}")
