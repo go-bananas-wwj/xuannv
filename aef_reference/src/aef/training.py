@@ -525,14 +525,26 @@ class Trainer:
         viz_patch_ids = getattr(self, "viz_patch_ids", None)
         target_patches = set(viz_patch_ids) if viz_patch_ids else set()
 
-        # 从 val_dataset 收集目标 patch
-        dataset = self.val_dataloader.dataset
+        # 从 val_dataset 收集目标 patch，若找不到则从 train_dataset 搜索
         samples_to_viz = []
         if target_patches:
-            for idx in range(len(dataset)):
-                sample = dataset[idx]
+            # 先在 val_dataset 中查找
+            val_dataset = self.val_dataloader.dataset
+            found_in_val = []
+            for idx in range(len(val_dataset)):
+                sample = val_dataset[idx]
                 if sample["patch_id"] in target_patches:
-                    samples_to_viz.append(sample)
+                    found_in_val.append(sample)
+            found_ids = {s["patch_id"] for s in found_in_val}
+            samples_to_viz.extend(found_in_val)
+            # 对 val 中缺失的 patch，到 train_dataset 中搜索
+            missing = target_patches - found_ids
+            if missing and hasattr(self, "dataloader") and self.dataloader is not None:
+                train_dataset = self.dataloader.dataset
+                for idx in range(len(train_dataset)):
+                    sample = train_dataset[idx]
+                    if sample["patch_id"] in missing:
+                        samples_to_viz.append(sample)
         else:
             # 回退到 _viz_batch
             batch = self._viz_batch
