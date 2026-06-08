@@ -60,6 +60,8 @@ def set_seed(seed: int) -> None:
 
 
 def main() -> None:
+    torch.set_num_threads(4)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/config_aef_haidian.yaml")
     parser.add_argument("--batch-size", type=int, default=4)
@@ -68,20 +70,16 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--warmup-steps", type=int, default=2000)
     parser.add_argument("--log-every", type=int, default=50)
-    parser.add_argument("--save-every", type=int, default=5000)
+    parser.add_argument("--save-every", type=int, default=500)
     parser.add_argument("--eval-every", type=int, default=5000)
     parser.add_argument("--output-dir", type=str, default="outputs/aef_haidian")
     parser.add_argument("--resume", type=str, default=None)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--distill-weight", type=float, default=0.5)
-    parser.add_argument("--raw-uniform-weight", type=float, default=10.0)
-    parser.add_argument("--variance-weight", type=float, default=50.0)
-    parser.add_argument("--covariance-weight", type=float, default=5.0)
-    parser.add_argument("--decorr-weight", type=float, default=0.0)
+    parser.add_argument("--distill-warmup-steps", type=int, default=1000)
     args = parser.parse_args()
 
     rank, world_size, local_rank = setup_distributed()
-    set_seed(args.seed + rank)
+    set_seed(args.seed)
 
     if rank == 0:
         print(f"Rank: {rank}/{world_size}, LocalRank: {local_rank}, Device: npu:{local_rank}")
@@ -149,7 +147,7 @@ def main() -> None:
     model = model.to(device)
 
     if world_size > 1:
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True)
+        model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=False)
 
     # Resume
     start_step = 0
@@ -188,11 +186,7 @@ def main() -> None:
         output_dir=args.output_dir,
         rank=rank,
         world_size=world_size,
-        distill_weight=args.distill_weight,
-        raw_uniform_weight=args.raw_uniform_weight,
-        variance_weight=args.variance_weight,
-        covariance_weight=args.covariance_weight,
-        decorr_weight=args.decorr_weight,
+        distill_warmup_steps=args.distill_warmup_steps,
         resume_step=start_step,
         resume_optimizer_state=resume_optimizer_state,
         resume_scheduler_state=resume_scheduler_state,

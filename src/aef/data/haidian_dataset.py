@@ -241,7 +241,7 @@ def collate_fn(batch: list[dict]) -> dict[str, Any]:
         collated_sources[source] = torch.stack(padded_tensors)
         collated_timestamps[source] = torch.stack(padded_ts)
 
-    valid_periods = [b["valid_period"] for b in batch]
+    valid_periods = torch.tensor([b["valid_period"] for b in batch], dtype=torch.float32)
     patch_ids = [b["patch_id"] for b in batch]
 
     # Collate AEF embeddings

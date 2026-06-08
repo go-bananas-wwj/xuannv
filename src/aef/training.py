@@ -34,19 +34,12 @@ class Trainer:
         max_steps: int = 100000,
         warmup_steps: int = 2000,
         log_every: int = 50,
-        save_every: int = 5000,
+        save_every: int = 500,
         eval_every: int = 5000,
         output_dir: str | None = None,
         rank: int = 0,
         world_size: int = 1,
-        distill_weight: float = 0.5,
-        raw_uniform_weight: float = 10.0,
-        variance_weight: float = 50.0,
-        covariance_weight: float = 5.0,
-        decorr_weight: float = 0.0,
-        erank_weight: float = 5.0,
-        coding_rate_weight: float = 2.0,
-        magnitude_weight: float = 5.0,
+        distill_warmup_steps: int = 1000,
         resume_step: int = 0,
         resume_optimizer_state: dict | None = None,
         resume_scheduler_state: dict | None = None,
@@ -63,17 +56,9 @@ class Trainer:
         self.log_every = log_every
         self.save_every = save_every
         self.eval_every = eval_every
+        self.distill_warmup_steps = distill_warmup_steps
 
-        self.loss_fn = AEFLoss(
-            distill_weight=distill_weight,
-            raw_uniform_weight=raw_uniform_weight,
-            variance_weight=variance_weight,
-            covariance_weight=covariance_weight,
-            decorr_weight=decorr_weight,
-            erank_weight=erank_weight,
-            coding_rate_weight=coding_rate_weight,
-            magnitude_weight=magnitude_weight,
-        )
+        self.loss_fn = AEFLoss()
 
         # Optimizer
         params = list(self.model.parameters())
@@ -100,18 +85,15 @@ class Trainer:
             "total": [],
             "reconstruction": [],
             "uniformity": [],
-            "raw_uniform": [],
-            "variance": [],
-            "covariance": [],
-            "decorr": [],
-            "erank": [],
-            "coding_rate": [],
-            "magnitude": [],
             "consistency": [],
             "distill": [],
         }
 
         self.step = resume_step
+
+    def _log(self, msg: str) -> None:
+        if self.rank == 0:
+            print(msg)
 
     def _prepare_reconstruction_targets(
         self, batch: dict[str, Any], pred: dict[str, torch.Tensor]
@@ -129,7 +111,7 @@ class Trainer:
             batch_indices = torch.arange(B, device=self.device)
             target = x[batch_indices, idx]  # (B, H, W, C)
 
-            # 下采样到重建分辨率（AEF decoder 输出 H=W=64，然后上采样到 128）
+            # 下采样到重建分辨率（decoder 直接输出全分辨率，无需额外下采样）
             # predictions shape: [B, H, W, C]
             H2, W2 = pred[src_key].shape[1], pred[src_key].shape[2]
             target_2d = rearrange(target, "b h w c -> b c h w")
@@ -160,6 +142,16 @@ class Trainer:
 
         for step in pbar:
             self.step = step
+
+            # Stage switching for distill alignment
+            if step <= self.distill_warmup_steps:
+                self.loss_fn.set_stage("distill_align")
+                if step == 1 or step == self.distill_warmup_steps:
+                    self._log(f"[Stage] distill_align at step {step}")
+            else:
+                self.loss_fn.set_stage("normal")
+                if step == self.distill_warmup_steps + 1:
+                    self._log(f"[Stage] normal at step {step}")
 
             # 每个 epoch 开始时调用 set_epoch（基于 step 数估算）
             steps_per_epoch = len(self.dataloader) if hasattr(self.dataloader, "__len__") else 1000
@@ -229,38 +221,34 @@ class Trainer:
             self.optim.step()
             self.scheduler.step()
 
-            # Sync losses across ranks (先 gather 再求平均)
+            # Sync losses across ranks (detach before all_reduce)
             if self.world_size > 1:
-                for k in losses:
-                    if losses[k].device != self.device:
-                        losses[k] = losses[k].to(self.device)
-                    dist.all_reduce(losses[k], op=dist.ReduceOp.SUM)
-                    losses[k] = losses[k] / self.world_size
+                with torch.no_grad():
+                    for k in losses:
+                        tensor = losses[k].detach()
+                        if tensor.device != self.device:
+                            tensor = tensor.to(self.device)
+                        dist.all_reduce(tensor, op=dist.ReduceOp.SUM)
+                        losses[k] = tensor / self.world_size
 
             # Logging
             if self.rank == 0:
                 self.loss_history["steps"].append(step)
-                for k in ["total", "reconstruction", "uniformity", "raw_uniform", "variance", "covariance", "decorr", "erank", "coding_rate", "magnitude", "consistency", "distill"]:
+                for k in ["total", "reconstruction", "uniformity", "consistency", "distill"]:
                     self.loss_history[k].append(float(losses[k]))
 
                 if step % self.log_every == 0:
                     lr = self.scheduler.get_last_lr()[0]
                     elapsed = time.time() - start_time
-                    # 使用实际已跑 step 数计算速度
                     actual_steps = step - resume_step
                     steps_per_sec = actual_steps / elapsed if elapsed > 0 else 0
                     eta = (self.max_steps - step) / steps_per_sec / 3600 if steps_per_sec > 0 else 0
+                    stage_tag = "[Align]" if step <= self.distill_warmup_steps else "[Normal]"
                     print(
-                        f"[Step {step}] "
+                        f"[Step {step}] {stage_tag} "
                         f"loss={losses['total']:.4f} "
                         f"recon={losses['reconstruction']:.4f} "
                         f"uniform={losses['uniformity']:.4f} "
-                        f"raw_unif={losses['raw_uniform']:.4f} "
-                        f"var={losses['variance']:.4f} "
-                        f"cov={losses['covariance']:.4f} "
-                        f"erank={losses['erank']:.4f} "
-                        f"cr={losses['coding_rate']:.4f} "
-                        f"mag={losses['magnitude']:.4f} "
                         f"consist={losses['consistency']:.4f} "
                         f"distill={losses['distill']:.4f} "
                         f"lr={lr:.6f} "
@@ -291,12 +279,8 @@ class Trainer:
         self.model.eval()
         total_recon = 0.0
         total_uniform = 0.0
-        total_raw_unif = 0.0
         total_var = 0.0
         total_cov = 0.0
-        total_erank = 0.0
-        total_cr = 0.0
-        total_mag = 0.0
         total_distill = 0.0
         count = 0
 
@@ -333,12 +317,8 @@ class Trainer:
             losses = self.loss_fn(outputs_for_loss)
             total_recon += float(losses["reconstruction"])
             total_uniform += float(losses["uniformity"])
-            total_raw_unif += float(losses["raw_uniform"])
             total_var += float(losses["variance"])
             total_cov += float(losses["covariance"])
-            total_erank += float(losses["erank"])
-            total_cr += float(losses["coding_rate"])
-            total_mag += float(losses["magnitude"])
             total_distill += float(losses["distill"])
             count += 1
 
@@ -351,41 +331,29 @@ class Trainer:
 
         # DDP 同步：先 gather sum，再求平均
         if self.world_size > 1:
-            recon_tensor = torch.tensor(total_recon, device=self.device)
-            uniform_tensor = torch.tensor(total_uniform, device=self.device)
-            raw_unif_tensor = torch.tensor(total_raw_unif, device=self.device)
-            var_tensor = torch.tensor(total_var, device=self.device)
-            cov_tensor = torch.tensor(total_cov, device=self.device)
-            erank_tensor = torch.tensor(total_erank, device=self.device)
-            cr_tensor = torch.tensor(total_cr, device=self.device)
-            mag_tensor = torch.tensor(total_mag, device=self.device)
-            distill_tensor = torch.tensor(total_distill, device=self.device)
+            recon_tensor = torch.tensor(total_recon, device=self.device, dtype=torch.float32)
+            uniform_tensor = torch.tensor(total_uniform, device=self.device, dtype=torch.float32)
+            var_tensor = torch.tensor(total_var, device=self.device, dtype=torch.float32)
+            cov_tensor = torch.tensor(total_cov, device=self.device, dtype=torch.float32)
+            distill_tensor = torch.tensor(total_distill, device=self.device, dtype=torch.float32)
             count_tensor = torch.tensor(count, device=self.device, dtype=torch.float32)
-            for t in [recon_tensor, uniform_tensor, raw_unif_tensor, var_tensor, cov_tensor, erank_tensor, cr_tensor, mag_tensor, distill_tensor]:
+            for t in [recon_tensor, uniform_tensor, var_tensor, cov_tensor, distill_tensor]:
                 dist.all_reduce(t, op=dist.ReduceOp.SUM)
             dist.all_reduce(count_tensor, op=dist.ReduceOp.SUM)
             avg_recon = float(recon_tensor / count_tensor)
             avg_uniform = float(uniform_tensor / count_tensor)
-            avg_raw_unif = float(raw_unif_tensor / count_tensor)
             avg_var = float(var_tensor / count_tensor)
             avg_cov = float(cov_tensor / count_tensor)
-            avg_erank = float(erank_tensor / count_tensor)
-            avg_cr = float(cr_tensor / count_tensor)
-            avg_mag = float(mag_tensor / count_tensor)
             avg_distill = float(distill_tensor / count_tensor)
         else:
             avg_recon = total_recon / count
             avg_uniform = total_uniform / count
-            avg_raw_unif = total_raw_unif / count
             avg_var = total_var / count
             avg_cov = total_cov / count
-            avg_erank = total_erank / count
-            avg_cr = total_cr / count
-            avg_mag = total_mag / count
             avg_distill = total_distill / count
 
         if self.rank == 0:
-            print(f"[Val] recon={avg_recon:.4f} uniform={avg_uniform:.4f} raw_unif={avg_raw_unif:.4f} var={avg_var:.4f} cov={avg_cov:.4f} erank={avg_erank:.4f} cr={avg_cr:.4f} mag={avg_mag:.4f} distill={avg_distill:.4f}")
+            print(f"[Val] recon={avg_recon:.4f} uniform={avg_uniform:.4f} var={avg_var:.4f} cov={avg_cov:.4f} distill={avg_distill:.4f}")
 
     def _save_checkpoint(self, step: int) -> None:
         self.output_dir.mkdir(parents=True, exist_ok=True)

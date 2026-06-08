@@ -198,35 +198,39 @@ class AlphaEarthFoundations(nn.Module):
 
         drop_prob = {name: (0.0 if name in ('sentinel2', 's2') else 0.3) for name in self.input_sources.keys()} # only keep S2 always for reconstruction
 
-        # Choose time perturbation strategy
-        # 0: random frame drops, 1: drop latter half-year, 2: drop former half-year
-        strat = torch.randint(low=0, high=3, size=(1,)).item()
-
         for name, x in source_data.items():
             ts = timestamps[name]
             B, T, H, W, C = x.shape
             keep_mask = torch.ones(B, T, dtype=torch.bool, device=x.device)
 
-            # Randomly drop entire source for student with prob
-            if torch.rand(()) < drop_prob.get(name, 0.2):
-                keep_mask[:] = False
-            else:
-                if strat == 0:
-                    # Random per-frame drops: percentages by source (approximate paper ratios)
-                    frac = 0.5 if name == 'sentinel2' else 0.3
-                    drops = torch.rand(B, T, device=x.device) < frac
-                    keep_mask = ~drops
+            # Per-sample random: drop entire source for student with prob
+            source_drop = torch.rand(B, device=x.device) < drop_prob.get(name, 0.2)
+            keep_mask[source_drop, :] = False
+
+            # Per-sample random time perturbation strategy
+            # 0: random frame drops, 1: drop latter half-year, 2: drop former half-year
+            strat = torch.randint(low=0, high=3, size=(B,), device=x.device)
+
+            # Pre-compute half-year masks (vectorized)
+            t0 = ts.min(dim=1, keepdim=True).values  # (B, 1)
+            t1 = ts.max(dim=1, keepdim=True).values  # (B, 1)
+            mid = (t0 + t1) / 2.0
+            drop_latter = ts <= mid   # (B, T)
+            drop_former = ts >= mid   # (B, T)
+
+            # Per-sample time perturbation
+            frac = 0.5 if name in ('sentinel2', 's2') else 0.3
+            rand_drops = torch.rand(B, T, device=x.device) < frac
+
+            for b in range(B):
+                if source_drop[b]:
+                    continue
+                if strat[b] == 0:
+                    keep_mask[b] = ~rand_drops[b]
+                elif strat[b] == 1:
+                    keep_mask[b] = drop_latter[b]
                 else:
-                    # Half-year drop
-                    t0 = ts.min(dim=1).values
-                    t1 = ts.max(dim=1).values
-                    mid = (t0 + t1) / 2.0
-                    if strat == 1:
-                        # drop latter half
-                        keep_mask = ts <= mid.unsqueeze(1)
-                    else:
-                        # drop former half
-                        keep_mask = ts >= mid.unsqueeze(1)
+                    keep_mask[b] = drop_former[b]
 
             # Apply keep_mask: zero out dropped frames and repeat last timestamp to keep shapes
             keep_mask_4d = keep_mask.view(B, T, 1, 1, 1)
@@ -266,23 +270,24 @@ class AlphaEarthFoundations(nn.Module):
         first_src = next(iter(self.input_sources.keys()))
         ts = timestamps[first_src]  # (B, T)
 
-        # Encode (teacher) with STP to precision resolution (B, T, H/2, W/2, d_p)
-        feats_teacher = self.encoder(x, ts)
+        # valid_periods: convert to tensor on correct device/dtype
+        first_tensor = source_data[first_src]
+        if isinstance(valid_periods, list):
+            vp = torch.tensor(valid_periods, dtype=first_tensor.dtype, device=first_tensor.device)
+        else:
+            vp = valid_periods.to(first_tensor.dtype).to(first_tensor.device)
+
+        # Encode (teacher) with STP to full resolution (B, T, H, W, d_p)
+        with torch.no_grad():
+            feats_teacher = self.encoder(x, ts)
+        mu_t = self.summarizer(feats_teacher, ts, vp)  # (B, H, W, 64)
 
         # Build student inputs via perturbation, then encode student
         student_srcs, student_ts_dict = self._perturb_inputs(source_data, timestamps)
         x_student = self._stack_inputs(student_srcs)
         ts_student = student_ts_dict[first_src]
         feats_student = self.encoder(x_student, ts_student)
-
-        # Summarize across time to 64D embeddings per pixel
-        # valid_periods provided as list of tuples -> tensor (B, 2)
-        if isinstance(valid_periods, list):
-            vp = torch.tensor(valid_periods, dtype=feats_teacher.dtype, device=feats_teacher.device)
-        else:
-            vp = valid_periods.to(feats_teacher.dtype).to(feats_teacher.device)
-        mu_t = self.summarizer(feats_teacher.detach(), ts, vp)      # (B, H', W', 64)
-        mu_s = self.summarizer(feats_student, ts_student, vp)  # (B, H', W', 64)
+        mu_s = self.summarizer(feats_student, ts_student, vp)  # (B, H, W, 64)
 
         B, H2, W2, _ = mu_t.shape
         if geometry_metadata is None:
@@ -292,22 +297,15 @@ class AlphaEarthFoundations(nn.Module):
         ts_center = ts.mean(dim=1)  # (B,)
 
         reconstructions: Dict[str, torch.Tensor] = {}
-        B, T, H, W, _ = x.shape
         for src, _ch in self.decode_sources.items():
             recon = self.decoder(
                 embeddings=mu_t,
                 geometry_metadata=geometry_metadata,
                 timestamps=ts_center,
-                valid_period=(vp[:, 0], vp[:, 1]) if isinstance(vp, tuple) else (vp[:, 0], vp[:, 1]),
+                valid_period=(vp[:, 0], vp[:, 1]),
                 source=src,
                 num_samples=num_decode_samples,
-            )  # (B, S, H/2, W/2, C_src)
-            
-            # Upsample to original resolution
-            B_recon, S, H_recon, W_recon, C_recon = recon.shape
-            recon_2d = rearrange(recon, 'b s h w c -> (b s) c h w')
-            recon_2d = F.interpolate(recon_2d, size=(H, W), mode='bilinear', align_corners=False)
-            recon = rearrange(recon_2d, '(b s) c h w -> b s h w c', b=B_recon, s=S)
+            )  # (B, S, H, W, C_src) — decoder 直接输出全分辨率
             reconstructions[src] = recon
 
         # Image-level pooled embeddings (for text alignment)

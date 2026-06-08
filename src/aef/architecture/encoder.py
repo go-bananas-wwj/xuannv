@@ -30,9 +30,9 @@ class STPEncoder(nn.Module):
         # STP blocks as per paper
         self.blocks = nn.ModuleList([STPBlock(d_s, d_t, d_p) for _ in range(num_blocks)])
         
-        # Final learned spatial resampling to precision resolution
-        self.final_space_resample = LearnedSpatialResampling(self.space_dim, self.precision_dim, 8.0)
-        self.final_time_resample = LearnedSpatialResampling(self.time_dim, self.precision_dim, 4.0)
+        # Final learned spatial resampling to full resolution (H, W)
+        self.final_space_resample = LearnedSpatialResampling(self.space_dim, self.precision_dim, 16.0)
+        self.final_time_resample = LearnedSpatialResampling(self.time_dim, self.precision_dim, 8.0)
         
         # Output norm
         self.norm = nn.LayerNorm(self.precision_dim)
@@ -44,7 +44,7 @@ class STPEncoder(nn.Module):
             timestamps: Millisecond timestamps (B, T)
             
         Returns:
-            Features at 1/2L resolution: (B, T, H/2, W/2, precision_dim)
+            Features at full resolution: (B, T, H, W, precision_dim)
         """
         B, T, H, W, C = x.shape
         
@@ -68,10 +68,10 @@ class STPEncoder(nn.Module):
         )
         time_features = rearrange(time_features, '(b t) c h w -> b t h w c', b=B, t=T)
         
-        # Precision pathway: keep at precision_dim and downsample to 1/2L
+        # Precision pathway: keep at precision_dim and full resolution (H, W)
         precision_features = F.adaptive_avg_pool2d(
             rearrange(x_proj, 'b t h w c -> (b t) c h w'),
-            (H // 2, W // 2)
+            (H, W)
         )
         precision_features = rearrange(precision_features, '(b t) c h w -> b t h w c', b=B, t=T)
 

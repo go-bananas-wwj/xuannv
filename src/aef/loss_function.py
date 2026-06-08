@@ -1,4 +1,3 @@
-
 from typing import Any, Dict
 from einops import rearrange
 import torch
@@ -6,33 +5,34 @@ import torch.nn as nn
 from torch.functional import F
 import math
 
-"""
-AEF loss = Reconstruction loss + Uniformity loss + Consistency loss + Text loss + Distill loss
-新增: raw_uniformity (pre-norm), VICReg variance/covariance, decorrelation
-"""
-
 
 class AEFLoss:
     """
     AlphaEarth Foundations loss implementation.
-    强化反坍缩: raw_uniformity + VICReg + 高权重 distill
+    Aligned with official paper (arXiv:2507.22291):
+      - Reconstruction (α=1.0)
+      - Batch Uniformity (b=0.05)
+      - Consistency (c=0.02)
+      - Text Contrastive (d=0.001)
+    Plus AEF distillation for staged training.
     """
-    
+
     def __init__(self,
-                 reconstruction_weight: float = 0.5,   # 降低: 让反坍缩有机会主导
-                 uniformity_weight: float = 2.0,      # L2 uniformity
+                 reconstruction_weight: float = 1.0,
+                 uniformity_weight: float = 0.05,
                  consistency_weight: float = 0.02,
                  text_weight: float = 0.001,
-                 distill_weight: float = 0.5,         # 降低: 教师本身坍缩
-                 raw_uniform_weight: float = 20.0,    # 大幅提高: pre-norm 反坍缩
-                 variance_weight: float = 50.0,       # 提高: VICReg 硬性约束
-                 covariance_weight: float = 5.0,       # 提高: 维度去相关
-                 decorr_weight: float = 0.0,           # 关闭: 无效且值巨大
-                 erank_weight: float = 5.0,            # 新增: erank 最大化
-                 coding_rate_weight: float = 2.0,      # 新增: MCR² 编码率
-                 magnitude_weight: float = 5.0,        # 新增: 强制 embedding 幅度 ≥ 0.5
+                 distill_weight: float = 0.2,
+                 # Disabled losses (kept for backward compatibility, weight=0)
+                 raw_uniform_weight: float = 0.0,
+                 variance_weight: float = 0.0,
+                 covariance_weight: float = 0.0,
+                 decorr_weight: float = 0.0,
+                 erank_weight: float = 0.0,
+                 coding_rate_weight: float = 0.0,
+                 magnitude_weight: float = 0.0,
                  ):
-        
+
         self.reconstruction_weight = reconstruction_weight
         self.uniformity_weight = uniformity_weight
         self.consistency_weight = consistency_weight
@@ -45,35 +45,52 @@ class AEFLoss:
         self.erank_weight = erank_weight
         self.coding_rate_weight = coding_rate_weight
         self.magnitude_weight = magnitude_weight
-        
+
         self.source_configs = {
             'sentinel2': {'weight': 1.0, 'loss_fn': F.l1_loss},
         }
-    
-    def reconstruction_loss(self, predictions: Dict[str, torch.Tensor], 
+
+    def set_stage(self, stage: str):
+        """Dynamic weight switching for staged training."""
+        if stage == "distill_align":
+            self.reconstruction_weight = 0.1
+            self.distill_weight = 5.0
+            self.uniformity_weight = 0.05
+            self.consistency_weight = 0.02
+            self.text_weight = 0.0
+        elif stage == "normal":
+            self.reconstruction_weight = 1.0
+            self.distill_weight = 0.2
+            self.uniformity_weight = 0.05
+            self.consistency_weight = 0.02
+            self.text_weight = 0.001
+        else:
+            raise ValueError(f"Unknown stage: {stage}")
+
+    def reconstruction_loss(self, predictions: Dict[str, torch.Tensor],
                           targets: Dict[str, torch.Tensor],
                           masks: Dict[str, torch.Tensor]) -> torch.Tensor:
         total_loss = 0.0
-        
+
         for source in predictions:
             if source in targets:
                 config = self.source_configs.get(source, {'weight': 1.0, 'loss_fn': F.l1_loss})
                 mask = masks.get(source, torch.ones_like(targets[source]))
-                
+
                 pred_masked = predictions[source] * mask
                 target_masked = targets[source] * mask
-                
+
                 if config['loss_fn'] == F.cross_entropy:
                     loss = config['loss_fn'](pred_masked, target_masked.long())
                 else:
                     loss = config['loss_fn'](pred_masked, target_masked)
 
                 total_loss += config['weight'] * loss
-        
+
         return total_loss
-    
+
     def batch_uniformity_loss(self, embeddings: torch.Tensor) -> torch.Tensor:
-        """L2 空间 batch uniformity (旧版，值越低越好)."""
+        """L2 space batch uniformity (lower is better)."""
         x = embeddings
         if x.dim() == 5:
             B, T, H, W, D = x.shape
@@ -86,12 +103,9 @@ class AEFLoss:
         x_prime = torch.roll(x, shifts=1, dims=0)
         dots = (x * x_prime).sum(dim=-1).abs()
         return dots.mean()
-    
+
     def raw_uniformity_loss(self, embeddings: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
-        """
-        Pre-norm 欧氏空间 uniformity (NPU-native, 无 L2 Jacobian 梯度屏障).
-        值越负越好（-4.0 ~ -1.0 为健康范围），越接近 0 越坍缩。
-        """
+        """Pre-norm Euclidean uniformity (kept for compatibility, disabled by default)."""
         x = embeddings
         if x.dim() == 5:
             B, T, H, W, D = x.shape
@@ -99,32 +113,23 @@ class AEFLoss:
         elif x.dim() == 4:
             B, H, W, D = x.shape
             x = rearrange(x, 'b h w d -> (b h w) d')
-        
-        # 加小噪声打破完全坍缩死锁
-        x = x + torch.randn_like(x) * 0.05
-        
-        # 随机采样配对（避免 half-batch shift 只配对相似样本）
+
         N = x.size(0)
-        K = min(N * 2, 512)  # 最多采样 512 对
+        if N < 2:
+            return x.new_tensor(0.0)
+
+        x = x + torch.randn_like(x) * 0.05
+        K = min(N * 2, 512)
         idx_i = torch.randint(0, N, (K,), device=x.device)
-        # 强制 idx_j ≠ idx_i
         offset = torch.randint(1, N, (K,), device=x.device)
         idx_j = (idx_i + offset) % N
         sq_dists = ((x[idx_i] - x[idx_j]) ** 2).sum(dim=-1)
-        
-        # 自适应温度: t = 2 / D
         D = x.size(-1)
         t = 2.0 / max(D, 1)
-        
         loss = torch.exp(-t * sq_dists).mean()
-        # 返回 log：坍缩时→0，展开时→-∞，最小化即推开 embedding
         return torch.log(loss + eps)
-    
+
     def vicreg_variance_loss(self, embeddings: torch.Tensor, gamma: float = 1.0) -> torch.Tensor:
-        """
-        VICReg variance loss: 约束 batch 中每个维度的标准差 >= gamma.
-        这是防止坍缩的硬性约束。
-        """
         x = embeddings
         if x.dim() == 5:
             B, T, H, W, D = x.shape
@@ -132,17 +137,15 @@ class AEFLoss:
         elif x.dim() == 4:
             B, H, W, D = x.shape
             x = rearrange(x, 'b h w d -> (b h w) d')
-        
-        # x: (N, D)
-        # 直接用方差（而非标准差），坍缩时梯度不为零
-        var = x.var(dim=0)
-        # hinge: max(0, gamma^2 - var)，目标: var >= gamma^2
+
+        N = x.size(0)
+        if N < 2:
+            return x.new_tensor(0.0)
+
+        var = x.var(dim=0, unbiased=False)
         return torch.mean(torch.relu(gamma ** 2 - var))
-    
+
     def vicreg_covariance_loss(self, embeddings: torch.Tensor) -> torch.Tensor:
-        """
-        VICReg covariance loss: 让维度之间去相关.
-        """
         x = embeddings
         if x.dim() == 5:
             B, T, H, W, D = x.shape
@@ -150,19 +153,17 @@ class AEFLoss:
         elif x.dim() == 4:
             B, H, W, D = x.shape
             x = rearrange(x, 'b h w d -> (b h w) d')
-        
-        # x: (N, D)
+
         N = x.size(0)
+        if N < 2:
+            return x.new_tensor(0.0)
+
         x = x - x.mean(dim=0)
-        cov = (x.T @ x) / (N - 1)
-        # 非对角线元素的平方和
+        cov = (x.T @ x) / max(N - 1, 1)
         off_diag = cov - torch.diag(torch.diag(cov))
-        return (off_diag ** 2).sum() / D
-    
+        return (off_diag ** 2).sum() / x.size(-1)
+
     def decorrelation_loss(self, embeddings: torch.Tensor) -> torch.Tensor:
-        """
-        Barlow Twins 风格去相关损失.
-        """
         x = embeddings
         if x.dim() == 5:
             B, T, H, W, D = x.shape
@@ -170,22 +171,18 @@ class AEFLoss:
         elif x.dim() == 4:
             B, H, W, D = x.shape
             x = rearrange(x, 'b h w d -> (b h w) d')
-        
-        # 标准化
-        x = (x - x.mean(dim=0)) / (x.std(dim=0) + 1e-6)
+
         N = x.size(0)
-        c = (x.T @ x) / N
-        
-        # 目标是单位矩阵
-        identity = torch.eye(D, device=x.device, dtype=x.dtype)
+        if N < 2:
+            return x.new_tensor(0.0)
+
+        x = (x - x.mean(dim=0)) / (x.std(dim=0) + 1e-6)
+        c = (x.T @ x) / max(N, 1)
+        identity = torch.eye(x.size(-1), device=x.device, dtype=x.dtype)
         diff = (c - identity) ** 2
-        # 对角线权重 1，非对角线权重 1
         return diff.sum()
-    
+
     def magnitude_loss(self, embeddings: torch.Tensor, min_norm: float = 0.5) -> torch.Tensor:
-        """
-        强制 pre-norm embedding 的幅度 ≥ min_norm，防止模型通过趋向 0 来取巧。
-        """
         x = embeddings
         if x.dim() == 5:
             B, T, H, W, D = x.shape
@@ -195,12 +192,8 @@ class AEFLoss:
             x = rearrange(x, 'b h w d -> (b h w) d')
         norms = x.norm(dim=-1)
         return torch.relu(min_norm - norms).mean()
-    
+
     def erank_maximization_loss(self, embeddings: torch.Tensor) -> torch.Tensor:
-        """
-        erank 最大化损失——列方差熵近似（NPU-native）。
-        坍缩时大，均匀时 ≈ 0，梯度在坍缩时不消失。
-        """
         x = embeddings
         if x.dim() == 5:
             B, T, H, W, D = x.shape
@@ -208,23 +201,19 @@ class AEFLoss:
         elif x.dim() == 4:
             B, H, W, D = x.shape
             x = rearrange(x, 'b h w d -> (b h w) d')
-        
+
         N, D = x.shape
         if N < 2:
             return x.new_tensor(0.0)
-        
+
         x = x - x.mean(0, keepdim=True)
         col_var = x.pow(2).mean(dim=0).clamp(min=1e-8)
         probs = col_var / col_var.sum()
         entropy = -(probs * probs.log()).sum()
         max_entropy = math.log(float(D))
         return (max_entropy - entropy).clamp(min=0.0)
-    
+
     def coding_rate_loss(self, embeddings: torch.Tensor, eps: float = 0.5) -> torch.Tensor:
-        """
-        MCR² 编码率损失——对角协方差近似（NPU-native）。
-        越负越好，坍缩维度梯度最大。
-        """
         x = embeddings
         if x.dim() == 5:
             B, T, H, W, D = x.shape
@@ -232,10 +221,10 @@ class AEFLoss:
         elif x.dim() == 4:
             B, H, W, D = x.shape
             x = rearrange(x, 'b h w d -> (b h w) d')
-        
+
         if x.shape[0] < 2:
             return x.new_tensor(0.0)
-        
+
         N, D = x.shape
         Z = x - x.mean(dim=0, keepdim=True)
         col_var = Z.pow(2).mean(dim=0)
@@ -244,16 +233,16 @@ class AEFLoss:
         if torch.isnan(loss) or torch.isinf(loss):
             return x.new_tensor(0.0)
         return loss
-    
-    def consistency_loss(self, teacher_embeddings: torch.Tensor, 
+
+    def consistency_loss(self, teacher_embeddings: torch.Tensor,
                         student_embeddings: torch.Tensor) -> torch.Tensor:
-        # teacher/student 现在是 pre-norm，计算 cosine 前先做 L2 norm
-        mu = torch.nn.functional.normalize(teacher_embeddings, p=2, dim=-1)
+        # Teacher stop-gradient: student learns to match teacher
+        mu = torch.nn.functional.normalize(teacher_embeddings.detach(), p=2, dim=-1)
         mu_s = torch.nn.functional.normalize(student_embeddings, p=2, dim=-1)
         dots = (mu * mu_s).sum(dim=-1)
         return ((1.0 - dots) * 0.5).mean()
-    
-    def clip_loss(self, image_embeddings: torch.Tensor, 
+
+    def clip_loss(self, image_embeddings: torch.Tensor,
                   text_embeddings: torch.Tensor) -> torch.Tensor:
         img = torch.nn.functional.normalize(image_embeddings, p=2, dim=-1)
         txt = torch.nn.functional.normalize(text_embeddings, p=2, dim=-1)
@@ -270,37 +259,40 @@ class AEFLoss:
         valid_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         if pred_embeddings is None or target_embeddings is None:
-            return torch.tensor(0.0, device=pred_embeddings.device if pred_embeddings is not None else 'cpu')
-        
+            device = pred_embeddings.device if pred_embeddings is not None else (
+                target_embeddings.device if target_embeddings is not None else torch.device('cpu')
+            )
+            return torch.tensor(0.0, device=device)
+
         B, H, W, D_pred = pred_embeddings.shape
         B_t, D_t, H_t, W_t = target_embeddings.shape
-        
+
         if H_t != H or W_t != W:
             target_2d = target_embeddings
             target_2d = F.interpolate(target_2d, size=(H, W), mode='bilinear', align_corners=False)
         else:
             target_2d = target_embeddings
-        
+
         target = rearrange(target_2d, 'b c h w -> b h w c')
-        
+
         pred_n = torch.nn.functional.normalize(pred_embeddings, p=2, dim=-1)
         tgt_n = torch.nn.functional.normalize(target, p=2, dim=-1)
         cosine_sim = (pred_n * tgt_n).sum(dim=-1)
-        
+
         loss = (1.0 - cosine_sim)
-        
+
         if valid_mask is not None:
             valid_mask_2d = valid_mask.view(B, 1, 1).expand(B, H, W)
             loss = (loss * valid_mask_2d.float()).sum() / (valid_mask_2d.float().sum() + 1e-8)
         else:
             loss = loss.mean()
-        
+
         return loss
-    
+
     def __call__(self, outputs: Dict[str, Any]) -> Dict[str, torch.Tensor]:
         losses = {}
         device = next(iter(outputs.values())).device if outputs else torch.device('cpu')
-        
+
         if 'predictions' in outputs and 'targets' in outputs:
             recon_loss = self.reconstruction_loss(
                 outputs['predictions'],
@@ -310,92 +302,46 @@ class AEFLoss:
             losses['reconstruction'] = recon_loss
         else:
             losses['reconstruction'] = torch.tensor(0.0, device=device)
-        
-        # L2 uniformity (旧版)
+
         if 'embeddings' in outputs:
-            uniformity_loss = self.batch_uniformity_loss(outputs['embeddings'])
-            losses['uniformity'] = uniformity_loss
+            losses['uniformity'] = self.batch_uniformity_loss(outputs['embeddings'])
+            losses['raw_uniform'] = self.raw_uniformity_loss(outputs['embeddings'])
+            losses['variance'] = self.vicreg_variance_loss(outputs['embeddings'])
+            losses['covariance'] = self.vicreg_covariance_loss(outputs['embeddings'])
+            losses['decorr'] = self.decorrelation_loss(outputs['embeddings'])
+            losses['erank'] = self.erank_maximization_loss(outputs['embeddings'])
+            losses['coding_rate'] = self.coding_rate_loss(outputs['embeddings'])
+            losses['magnitude'] = self.magnitude_loss(outputs['embeddings'])
         else:
-            losses['uniformity'] = torch.tensor(0.0, device=device)
-        
-        # Raw uniformity (pre-norm, 新增)
-        if 'embeddings' in outputs:
-            raw_uniform_loss = self.raw_uniformity_loss(outputs['embeddings'])
-            losses['raw_uniform'] = raw_uniform_loss
-        else:
-            losses['raw_uniform'] = torch.tensor(0.0, device=device)
-        
-        # VICReg variance (新增)
-        if 'embeddings' in outputs:
-            var_loss = self.vicreg_variance_loss(outputs['embeddings'])
-            losses['variance'] = var_loss
-        else:
-            losses['variance'] = torch.tensor(0.0, device=device)
-        
-        # VICReg covariance (新增)
-        if 'embeddings' in outputs:
-            cov_loss = self.vicreg_covariance_loss(outputs['embeddings'])
-            losses['covariance'] = cov_loss
-        else:
-            losses['covariance'] = torch.tensor(0.0, device=device)
-        
-        # Decorrelation (新增)
-        if 'embeddings' in outputs:
-            decorr_loss = self.decorrelation_loss(outputs['embeddings'])
-            losses['decorr'] = decorr_loss
-        else:
-            losses['decorr'] = torch.tensor(0.0, device=device)
-        
-        # ERank 最大化（新增: 坍缩时梯度非零）
-        if 'embeddings' in outputs:
-            erank_loss = self.erank_maximization_loss(outputs['embeddings'])
-            losses['erank'] = erank_loss
-        else:
-            losses['erank'] = torch.tensor(0.0, device=device)
-        
-        # Coding Rate（新增: MCR² 坍缩时梯度非零）
-        if 'embeddings' in outputs:
-            cr_loss = self.coding_rate_loss(outputs['embeddings'])
-            losses['coding_rate'] = cr_loss
-        else:
-            losses['coding_rate'] = torch.tensor(0.0, device=device)
-        
-        # Magnitude 正则化（新增: 防止 embedding 趋向 0）
-        if 'embeddings' in outputs:
-            mag_loss = self.magnitude_loss(outputs['embeddings'])
-            losses['magnitude'] = mag_loss
-        else:
-            losses['magnitude'] = torch.tensor(0.0, device=device)
+            for k in ['uniformity', 'raw_uniform', 'variance', 'covariance',
+                      'decorr', 'erank', 'coding_rate', 'magnitude']:
+                losses[k] = torch.tensor(0.0, device=device)
 
         if 'teacher_embeddings' in outputs and 'student_embeddings' in outputs:
-            consistency_loss = self.consistency_loss(
+            losses['consistency'] = self.consistency_loss(
                 outputs['teacher_embeddings'],
                 outputs['student_embeddings']
             )
-            losses['consistency'] = consistency_loss
         else:
             losses['consistency'] = torch.tensor(0.0, device=device)
-        
+
         if 'image_embeddings' in outputs and 'text_embeddings' in outputs:
-            clip_loss = self.clip_loss(
+            losses['clip'] = self.clip_loss(
                 outputs['image_embeddings'],
                 outputs['text_embeddings']
             )
-            losses['clip'] = clip_loss
         else:
             losses['clip'] = torch.tensor(0.0, device=device)
-        
-        # AEF 官方 embedding 蒸馏
+
         if 'aef_embedding_pred' in outputs and 'aef_embedding_target' in outputs:
-            distill_loss = self.aef_distill_loss(
+            losses['distill'] = self.aef_distill_loss(
                 outputs['aef_embedding_pred'],
                 outputs['aef_embedding_target'],
                 outputs.get('aef_embedding_valid'),
             )
-            losses['distill'] = distill_loss
         else:
             losses['distill'] = torch.tensor(0.0, device=device)
-        
+
         total_loss = (
             self.reconstruction_weight * losses['reconstruction'] +
             self.uniformity_weight * losses['uniformity'] +
@@ -410,7 +356,7 @@ class AEFLoss:
             self.text_weight * losses['clip'] +
             self.distill_weight * losses['distill']
         )
-        
+
         losses['total'] = total_loss
-        
+
         return losses
