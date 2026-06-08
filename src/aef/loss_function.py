@@ -20,14 +20,14 @@ class AEFLoss:
     
     def __init__(self,
                  reconstruction_weight: float = 1.0,
-                 uniformity_weight: float = 0.5,      # 提升: 0.05->0.5
+                 uniformity_weight: float = 2.0,      # L2 uniformity
                  consistency_weight: float = 0.02,
                  text_weight: float = 0.001,
-                 distill_weight: float = 5.0,         # 提升: 0.5->5.0
-                 raw_uniform_weight: float = 3.0,     # 新增: pre-norm uniformity
-                 variance_weight: float = 25.0,       # 新增: VICReg variance
-                 covariance_weight: float = 1.0,      # 新增: VICReg covariance
-                 decorr_weight: float = 0.5,          # 新增: Barlow Twins decorr
+                 distill_weight: float = 0.5,         # 降低: 教师本身坍缩
+                 raw_uniform_weight: float = 10.0,    # 提高: pre-norm 反坍缩
+                 variance_weight: float = 50.0,       # 提高: VICReg 硬性约束
+                 covariance_weight: float = 5.0,       # 提高: 维度去相关
+                 decorr_weight: float = 0.0,           # 关闭: 无效且值巨大
                  ):
         
         self.reconstruction_weight = reconstruction_weight
