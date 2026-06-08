@@ -39,7 +39,11 @@ class Trainer:
         output_dir: str | None = None,
         rank: int = 0,
         world_size: int = 1,
-        distill_weight: float = 0.5,
+        distill_weight: float = 5.0,
+        raw_uniform_weight: float = 3.0,
+        variance_weight: float = 25.0,
+        covariance_weight: float = 1.0,
+        decorr_weight: float = 0.5,
         resume_step: int = 0,
         resume_optimizer_state: dict | None = None,
         resume_scheduler_state: dict | None = None,
@@ -57,7 +61,13 @@ class Trainer:
         self.save_every = save_every
         self.eval_every = eval_every
 
-        self.loss_fn = AEFLoss(distill_weight=distill_weight)
+        self.loss_fn = AEFLoss(
+            distill_weight=distill_weight,
+            raw_uniform_weight=raw_uniform_weight,
+            variance_weight=variance_weight,
+            covariance_weight=covariance_weight,
+            decorr_weight=decorr_weight,
+        )
 
         # Optimizer
         params = list(self.model.parameters())
@@ -84,6 +94,10 @@ class Trainer:
             "total": [],
             "reconstruction": [],
             "uniformity": [],
+            "raw_uniform": [],
+            "variance": [],
+            "covariance": [],
+            "decorr": [],
             "consistency": [],
             "distill": [],
         }
@@ -217,7 +231,7 @@ class Trainer:
             # Logging
             if self.rank == 0:
                 self.loss_history["steps"].append(step)
-                for k in ["total", "reconstruction", "uniformity", "consistency", "distill"]:
+                for k in ["total", "reconstruction", "uniformity", "raw_uniform", "variance", "covariance", "decorr", "consistency", "distill"]:
                     self.loss_history[k].append(float(losses[k]))
 
                 if step % self.log_every == 0:
@@ -232,6 +246,10 @@ class Trainer:
                         f"loss={losses['total']:.4f} "
                         f"recon={losses['reconstruction']:.4f} "
                         f"uniform={losses['uniformity']:.4f} "
+                        f"raw_unif={losses['raw_uniform']:.4f} "
+                        f"var={losses['variance']:.4f} "
+                        f"cov={losses['covariance']:.4f} "
+                        f"decorr={losses['decorr']:.4f} "
                         f"consist={losses['consistency']:.4f} "
                         f"distill={losses['distill']:.4f} "
                         f"lr={lr:.6f} "
@@ -262,6 +280,9 @@ class Trainer:
         self.model.eval()
         total_recon = 0.0
         total_uniform = 0.0
+        total_raw_unif = 0.0
+        total_var = 0.0
+        total_cov = 0.0
         total_distill = 0.0
         count = 0
 
@@ -298,6 +319,9 @@ class Trainer:
             losses = self.loss_fn(outputs_for_loss)
             total_recon += float(losses["reconstruction"])
             total_uniform += float(losses["uniformity"])
+            total_raw_unif += float(losses["raw_uniform"])
+            total_var += float(losses["variance"])
+            total_cov += float(losses["covariance"])
             total_distill += float(losses["distill"])
             count += 1
 
@@ -312,22 +336,30 @@ class Trainer:
         if self.world_size > 1:
             recon_tensor = torch.tensor(total_recon, device=self.device)
             uniform_tensor = torch.tensor(total_uniform, device=self.device)
+            raw_unif_tensor = torch.tensor(total_raw_unif, device=self.device)
+            var_tensor = torch.tensor(total_var, device=self.device)
+            cov_tensor = torch.tensor(total_cov, device=self.device)
             distill_tensor = torch.tensor(total_distill, device=self.device)
             count_tensor = torch.tensor(count, device=self.device, dtype=torch.float32)
-            dist.all_reduce(recon_tensor, op=dist.ReduceOp.SUM)
-            dist.all_reduce(uniform_tensor, op=dist.ReduceOp.SUM)
-            dist.all_reduce(distill_tensor, op=dist.ReduceOp.SUM)
+            for t in [recon_tensor, uniform_tensor, raw_unif_tensor, var_tensor, cov_tensor, distill_tensor]:
+                dist.all_reduce(t, op=dist.ReduceOp.SUM)
             dist.all_reduce(count_tensor, op=dist.ReduceOp.SUM)
             avg_recon = float(recon_tensor / count_tensor)
             avg_uniform = float(uniform_tensor / count_tensor)
+            avg_raw_unif = float(raw_unif_tensor / count_tensor)
+            avg_var = float(var_tensor / count_tensor)
+            avg_cov = float(cov_tensor / count_tensor)
             avg_distill = float(distill_tensor / count_tensor)
         else:
             avg_recon = total_recon / count
             avg_uniform = total_uniform / count
+            avg_raw_unif = total_raw_unif / count
+            avg_var = total_var / count
+            avg_cov = total_cov / count
             avg_distill = total_distill / count
 
         if self.rank == 0:
-            print(f"[Val] recon_loss={avg_recon:.4f} uniform={avg_uniform:.4f} distill={avg_distill:.4f}")
+            print(f"[Val] recon={avg_recon:.4f} uniform={avg_uniform:.4f} raw_unif={avg_raw_unif:.4f} var={avg_var:.4f} cov={avg_cov:.4f} distill={avg_distill:.4f}")
 
     def _save_checkpoint(self, step: int) -> None:
         self.output_dir.mkdir(parents=True, exist_ok=True)

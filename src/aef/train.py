@@ -73,7 +73,11 @@ def main() -> None:
     parser.add_argument("--output-dir", type=str, default="outputs/aef_haidian")
     parser.add_argument("--resume", type=str, default=None)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--distill-weight", type=float, default=0.5)
+    parser.add_argument("--distill-weight", type=float, default=5.0)
+    parser.add_argument("--raw-uniform-weight", type=float, default=3.0)
+    parser.add_argument("--variance-weight", type=float, default=25.0)
+    parser.add_argument("--covariance-weight", type=float, default=1.0)
+    parser.add_argument("--decorr-weight", type=float, default=0.5)
     args = parser.parse_args()
 
     rank, world_size, local_rank = setup_distributed()
@@ -185,6 +189,10 @@ def main() -> None:
         rank=rank,
         world_size=world_size,
         distill_weight=args.distill_weight,
+        raw_uniform_weight=args.raw_uniform_weight,
+        variance_weight=args.variance_weight,
+        covariance_weight=args.covariance_weight,
+        decorr_weight=args.decorr_weight,
         resume_step=start_step,
         resume_optimizer_state=resume_optimizer_state,
         resume_scheduler_state=resume_scheduler_state,
