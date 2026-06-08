@@ -131,16 +131,26 @@ class Trainer:
 
     @staticmethod
     def _tensor_to_rgb(t: torch.Tensor) -> np.ndarray:
-        """将 (H, W, C) tensor 转为归一化 RGB numpy. 对每通道单独 min-max."""
+        """将 (H, W, C) tensor 转为归一化 RGB numpy. 对每通道单独 min-max.
+        单通道数据复制为灰度图."""
         arr = t.detach().cpu().numpy()
         if arr.ndim == 2:
             arr = arr[..., np.newaxis]
         C = arr.shape[-1]
         rgb = np.zeros((*arr.shape[:2], 3), dtype=np.float32)
-        for c in range(min(C, 3)):
-            ch = arr[..., c]
+        if C == 1:
+            # 单通道 -> 灰度
+            ch = arr[..., 0]
             ch_min, ch_max = ch.min(), ch.max()
-            rgb[..., c] = (ch - ch_min) / (ch_max - ch_min + 1e-8)
+            gray = (ch - ch_min) / (ch_max - ch_min + 1e-8)
+            rgb[..., 0] = gray
+            rgb[..., 1] = gray
+            rgb[..., 2] = gray
+        else:
+            for c in range(min(C, 3)):
+                ch = arr[..., c]
+                ch_min, ch_max = ch.min(), ch.max()
+                rgb[..., c] = (ch - ch_min) / (ch_max - ch_min + 1e-8)
         return rgb
 
     @staticmethod
@@ -511,8 +521,9 @@ class Trainer:
 
         # ===== 合并大图布局 =====
         import matplotlib.gridspec as gridspec
-        fig = plt.figure(figsize=(24, 20))
-        gs = gridspec.GridSpec(4, 5, figure=fig, hspace=0.3, wspace=0.2)
+        fig = plt.figure(figsize=(20, 18))
+        gs = gridspec.GridSpec(4, 5, figure=fig, hspace=0.25, wspace=0.15,
+                               height_ratios=[1.2, 1.5, 1.5, 1.5])
 
         # ---- Row 0: 5个输入源 ----
         input_sources = ["s1", "s2", "tianyi_sar", "landsat", "planet"]
