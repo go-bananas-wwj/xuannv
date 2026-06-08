@@ -49,7 +49,9 @@ class AEFLoss:
         self.source_configs = {
             's2': {'weight': 1.0, 'loss_fn': F.l1_loss},
             's1': {'weight': 1.0, 'loss_fn': F.l1_loss},
+            'tianyi_sar': {'weight': 1.0, 'loss_fn': F.l1_loss},
             'landsat': {'weight': 1.0, 'loss_fn': F.l1_loss},
+            'planet': {'weight': 1.0, 'loss_fn': F.l1_loss},
             'dem': {'weight': 0.05, 'loss_fn': F.l1_loss},
             'jrc_water': {'weight': 0.3, 'loss_fn': F.l1_loss},
             'worldcover': {'weight': 0.5, 'loss_fn': F.cross_entropy},

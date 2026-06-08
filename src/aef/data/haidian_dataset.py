@@ -33,11 +33,15 @@ class HaidianAEFDataset(Dataset):
         seed: int = 42,
         max_frames: int = 16,
         aef_embedding_root: str = "data_raw/haidian/aef_embeddings/haidian_2025_patches",
+        start_date: str | None = None,
+        end_date: str | None = None,
     ) -> None:
         super().__init__()
         self.data_root = Path(data_root)
         self.planet_root = Path(planet_root)
         self.image_size = image_size
+        self.start_date = start_date
+        self.end_date = end_date
         self.source_names = source_names or ["tianyi_sar", "s2", "landsat", "planet"]
         self.split = split
         self.max_frames = max_frames
@@ -110,7 +114,17 @@ class HaidianAEFDataset(Dataset):
 
         frames = []
         timestamps_ms = []
-        for tif_path in tif_files[:self.max_frames]:
+        for tif_path in tif_files:
+            # 时间筛选
+            date_str = tif_path.stem
+            if self.start_date and date_str < self.start_date:
+                continue
+            if self.end_date and date_str > self.end_date:
+                continue
+
+            if len(frames) >= self.max_frames:
+                break
+
             data = read_tif(tif_path, self.image_size)
             if data is None:
                 continue
@@ -124,7 +138,6 @@ class HaidianAEFDataset(Dataset):
                 continue
             frames.append(data)
             # 从文件名解析日期并转为 ms
-            date_str = tif_path.stem
             ts_ms = parse_date_to_ms(date_str)
             timestamps_ms.append(ts_ms)
 

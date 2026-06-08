@@ -143,6 +143,33 @@ class Trainer:
             rgb[..., c] = (ch - ch_min) / (ch_max - ch_min + 1e-8)
         return rgb
 
+    @staticmethod
+    def _embed_to_rgb_shared(student_emb: np.ndarray, aef_emb: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """用 AEF embedding 的 SVD 基做统一 PCA，保证两者颜色空间可比.
+        输入: (H, W, 64) numpy. 输出: (H, W, 3) RGB, 范围 [0,1]."""
+        H, W, D = aef_emb.shape
+        # 以 AEF 为参考计算 PCA 基
+        aef_flat = aef_emb.reshape(-1, D)
+        mean = aef_flat.mean(axis=0)
+        centered = aef_flat - mean
+        _, _, vh = np.linalg.svd(centered, full_matrices=False)
+        basis = vh[:3].T  # (64, 3)
+
+        # AEF 投影
+        aef_centered = aef_flat - mean
+        aef_proj = aef_centered @ basis
+        aef_proj = (aef_proj - aef_proj.min(axis=0)) / (aef_proj.max(axis=0) - aef_proj.min(axis=0) + 1e-8)
+        aef_rgb = aef_proj.reshape(H, W, 3)
+
+        # Student 用同一套 mean + basis 投影
+        student_flat = student_emb.reshape(-1, D)
+        student_centered = student_flat - mean
+        student_proj = student_centered @ basis
+        student_proj = (student_proj - student_proj.min(axis=0)) / (student_proj.max(axis=0) - student_proj.min(axis=0) + 1e-8)
+        student_rgb = student_proj.reshape(H, W, 3)
+
+        return student_rgb, aef_rgb
+
     def _log(self, msg: str) -> None:
         if self.rank == 0:
             print(msg)
@@ -463,7 +490,7 @@ class Trainer:
 
     @torch.no_grad()
     def _visualize(self, step: int) -> None:
-        """保存可视化：teacher/student embedding 对比 + PCA RGB + reconstruction."""
+        """合并大图可视化：5源输入 + Student PCA RGB + AEF PCA RGB + 差异热图."""
         if self.rank != 0:
             return
 
@@ -480,82 +507,89 @@ class Trainer:
         viz_dir = self.output_dir / "visualizations"
         viz_dir.mkdir(parents=True, exist_ok=True)
 
-        patch_ids = batch.get("patch_ids", [f"b{i}" for i in range(len(out["teacher_embeddings"]))])
+        patch_id = batch.get("patch_ids", ["b0"])[0]
 
-        # ---- 1. 单维度 Embedding 对比（batch 前 2 个 patch）----
-        n_show = min(2, len(out["teacher_embeddings"]))
-        fig, axes = plt.subplots(n_show, 4, figsize=(16, 4 * n_show))
-        if n_show == 1:
-            axes = axes.reshape(1, 4)
-        dims = np.random.choice(64, 4, replace=False)
-        for b in range(n_show):
-            emb_t = out["teacher_embeddings"][b].cpu().numpy()
-            emb_s = out["student_embeddings"][b].cpu().numpy()
-            for i, d in enumerate(dims):
-                vmin = min(emb_t[..., d].min(), emb_s[..., d].min())
-                vmax = max(emb_t[..., d].max(), emb_s[..., d].max())
-                if b == 0:
-                    axes[b, i].set_title(f"Dim {d}")
-                im = axes[b, i].imshow(emb_s[..., d], vmin=vmin, vmax=vmax, cmap="viridis")
-                axes[b, i].axis("off")
-                plt.colorbar(im, ax=axes[b, i], fraction=0.046)
-            axes[b, 0].set_ylabel(f"{patch_ids[b]}", fontsize=12, fontweight="bold")
-        plt.suptitle(f"Student Embedding Channels @ Step {step}", fontsize=14, fontweight="bold")
-        plt.tight_layout()
-        plt.savefig(viz_dir / f"embedding_step_{step:06d}_seed{self.seed}.png", dpi=150, bbox_inches="tight")
+        # ===== 合并大图布局 =====
+        import matplotlib.gridspec as gridspec
+        fig = plt.figure(figsize=(24, 20))
+        gs = gridspec.GridSpec(4, 5, figure=fig, hspace=0.3, wspace=0.2)
+
+        # ---- Row 0: 5个输入源 ----
+        input_sources = ["s1", "s2", "tianyi_sar", "landsat", "planet"]
+        for i, src in enumerate(input_sources):
+            ax = fig.add_subplot(gs[0, i])
+            if src not in batch["source_data"]:
+                ax.text(0.5, 0.5, "NO DATA", ha="center", va="center", fontsize=14)
+                ax.axis("off")
+                continue
+
+            data = batch["source_data"][src][0]  # (T, H, W, C)
+            ts = batch["timestamps"][src][0]
+            T = data.shape[0]
+
+            # Planet: 跳过填充帧，找第一个有效帧
+            if src == "planet":
+                valid_idx = None
+                for t in range(T):
+                    if data[t].abs().max() > 0.001:
+                        valid_idx = t
+                        break
+                if valid_idx is None:
+                    ax.text(0.5, 0.5, "NO DATA", ha="center", va="center", fontsize=14)
+                    ax.axis("off")
+                    continue
+                frame = data[valid_idx]
+            else:
+                # 取时间中点最近帧
+                center = ts.mean()
+                t_idx = (ts - center).abs().argmin().item()
+                frame = data[t_idx]
+
+            rgb = self._tensor_to_rgb(frame)
+            ax.imshow(rgb)
+            title = src.upper()
+            if src == "landsat":
+                title += " [30m→10m]"
+            ax.set_title(title, fontsize=12, fontweight="bold")
+            ax.axis("off")
+
+        # ---- Row 1: Student Embedding PCA RGB ----
+        ax_student = fig.add_subplot(gs[1, :])
+        student_emb = out["student_embeddings"][0].cpu().numpy()  # (H, W, 64)
+
+        # ---- Row 2: AEF Official Embedding PCA RGB ----
+        ax_aef = fig.add_subplot(gs[2, :])
+
+        # ---- Row 3: 差异热图 ----
+        ax_diff = fig.add_subplot(gs[3, :])
+
+        if "aef_embedding" in batch and batch["aef_embedding"] is not None:
+            aef_emb = batch["aef_embedding"][0].permute(1, 2, 0).cpu().numpy()  # (H, W, 64)
+            student_rgb, aef_rgb = self._embed_to_rgb_shared(student_emb, aef_emb)
+            diff = np.abs(student_rgb - aef_rgb).mean(axis=-1)
+
+            ax_student.imshow(student_rgb)
+            ax_student.set_title(f"Student Embedding (PCA RGB) — {patch_id}", fontsize=14, fontweight="bold")
+            ax_student.axis("off")
+
+            ax_aef.imshow(aef_rgb)
+            ax_aef.set_title(f"AEF Official Embedding (PCA RGB) — {patch_id}", fontsize=14, fontweight="bold")
+            ax_aef.axis("off")
+
+            im = ax_diff.imshow(diff, cmap="hot")
+            ax_diff.set_title(f"|Student - AEF| (mean) — {patch_id}", fontsize=14, fontweight="bold")
+            ax_diff.axis("off")
+            plt.colorbar(im, ax=ax_diff, fraction=0.046, pad=0.04)
+        else:
+            ax_student.text(0.5, 0.5, "AEF Embedding Not Available", ha="center", va="center", fontsize=14)
+            ax_student.axis("off")
+            ax_aef.axis("off")
+            ax_diff.axis("off")
+
+        plt.suptitle(f"Patch Visualization @ Step {step}", fontsize=16, fontweight="bold", y=0.98)
+        plt.savefig(viz_dir / f"viz_step_{step:06d}_seed{self.seed}.png", dpi=150, bbox_inches="tight")
         plt.close()
 
-        # ---- 2. PCA RGB: AEF 官方 embedding vs Student embedding ----
-        if "aef_embedding" in batch and batch["aef_embedding"] is not None:
-            aef_emb = batch["aef_embedding"].to(self.device)  # (B, 64, H, W)
-            student_emb = out["student_embeddings"]  # (B, H, W, 64)
-            n_show = min(1, len(student_emb))
-            fig, axes = plt.subplots(1, 3, figsize=(18, 5))
-            aef_np = aef_emb[0].permute(1, 2, 0).cpu().numpy()  # (H, W, 64)
-            student_np = student_emb[0].cpu().numpy()
-            aef_rgb = self._embed_to_rgb(aef_np)
-            student_rgb = self._embed_to_rgb(student_np)
-            diff = np.abs(aef_rgb - student_rgb).mean(axis=-1)
-            axes[0].imshow(aef_rgb)
-            axes[0].set_title("AEF Official Embedding (PCA RGB)")
-            axes[0].axis("off")
-            axes[1].imshow(student_rgb)
-            axes[1].set_title("Student Embedding (PCA RGB)")
-            axes[1].axis("off")
-            im = axes[2].imshow(diff, cmap="hot")
-            axes[2].set_title("|AEF - Student| (mean)")
-            axes[2].axis("off")
-            plt.colorbar(im, ax=axes[2], fraction=0.046)
-            plt.suptitle(f"Embedding PCA RGB @ Step {step}", fontsize=14, fontweight="bold")
-            plt.tight_layout()
-            plt.savefig(viz_dir / f"pca_rgb_step_{step:06d}_seed{self.seed}.png", dpi=150, bbox_inches="tight")
-            plt.close()
-
-        # ---- 3. Reconstruction 对比（每通道单独归一化） ----
-        predictions = {src: rec[:, 0] for src, rec in out["reconstructions"].items()}
-        targets = self._prepare_reconstruction_targets(batch, predictions)
-        src_list = list(predictions.keys())[:3]
-        if src_list:
-            fig, axes = plt.subplots(2, len(src_list), figsize=(5 * len(src_list), 8))
-            if len(src_list) == 1:
-                axes = axes.reshape(2, 1)
-            for i, src in enumerate(src_list):
-                pred = predictions[src][0]
-                tgt = targets[src][0]
-                pred_rgb = self._tensor_to_rgb(pred)
-                tgt_rgb = self._tensor_to_rgb(tgt)
-                axes[0, i].imshow(tgt_rgb)
-                axes[0, i].set_title(f"{src} Target")
-                axes[0, i].axis("off")
-                axes[1, i].imshow(pred_rgb)
-                axes[1, i].set_title(f"{src} Pred")
-                axes[1, i].axis("off")
-            patch_id = patch_ids[0] if patch_ids else "b0"
-            plt.suptitle(f"Reconstruction {patch_id} @ Step {step}", fontsize=14, fontweight="bold")
-            plt.tight_layout()
-            plt.savefig(viz_dir / f"recon_step_{step:06d}_seed{self.seed}.png", dpi=150, bbox_inches="tight")
-            plt.close()
-
         self.model.train()
-        print(f"[Viz] Saved visualizations at step {step}")
+        print(f"[Viz] Saved merged visualization at step {step}")
 
