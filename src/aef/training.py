@@ -49,6 +49,7 @@ class Trainer:
         resume_step: int = 0,
         resume_optimizer_state: dict | None = None,
         resume_scheduler_state: dict | None = None,
+        seed: int = 42,
     ) -> None:
         self.model = model
         self.dataloader = dataloader
@@ -110,6 +111,7 @@ class Trainer:
             "distill": [],
         }
 
+        self.seed = seed
         self.step = resume_step
 
     def _log(self, msg: str) -> None:
@@ -414,7 +416,7 @@ class Trainer:
             "optimizer_state_dict": self.optim.state_dict(),
             "scheduler_state_dict": self.scheduler.state_dict(),
         }
-        torch.save(checkpoint, self.output_dir / f"step_{step:06d}.pt")
+        torch.save(checkpoint, self.output_dir / f"step_{step:06d}_seed{self.seed}.pt")
         if self.rank == 0:
             print(f"[Checkpoint] Saved at step {step}")
 
@@ -471,7 +473,7 @@ class Trainer:
             axes[b, 0].set_ylabel(f"{patch_ids[b]}", fontsize=12, fontweight="bold")
         plt.suptitle(f"Student Embedding Channels @ Step {step}", fontsize=14, fontweight="bold")
         plt.tight_layout()
-        plt.savefig(viz_dir / f"embedding_step_{step:06d}.png", dpi=150, bbox_inches="tight")
+        plt.savefig(viz_dir / f"embedding_step_{step:06d}_seed{self.seed}.png", dpi=150, bbox_inches="tight")
         plt.close()
 
         # ---- 2. PCA RGB 全域可视化（batch 前 3 个 patch）----
@@ -498,7 +500,7 @@ class Trainer:
             axes[b, 0].set_ylabel(f"{patch_ids[b]}", fontsize=12, fontweight="bold")
         plt.suptitle(f"PCA RGB Embedding @ Step {step}", fontsize=14, fontweight="bold")
         plt.tight_layout()
-        plt.savefig(viz_dir / f"pca_rgb_step_{step:06d}.png", dpi=150, bbox_inches="tight")
+        plt.savefig(viz_dir / f"pca_rgb_step_{step:06d}_seed{self.seed}.png", dpi=150, bbox_inches="tight")
         plt.close()
 
         # ---- 3. Reconstruction 对比 ----
@@ -527,7 +529,7 @@ class Trainer:
             patch_id = patch_ids[0] if patch_ids else "b0"
             plt.suptitle(f"Reconstruction {patch_id} @ Step {step}", fontsize=14, fontweight="bold")
             plt.tight_layout()
-            plt.savefig(viz_dir / f"recon_step_{step:06d}.png", dpi=150, bbox_inches="tight")
+            plt.savefig(viz_dir / f"recon_step_{step:06d}_seed{self.seed}.png", dpi=150, bbox_inches="tight")
             plt.close()
 
         self.model.train()
@@ -569,7 +571,7 @@ class Trainer:
             axes[1, i].axis("off")
         plt.suptitle(f"Embedding Comparison @ Step {step}", fontsize=14, fontweight="bold")
         plt.tight_layout()
-        plt.savefig(viz_dir / f"embedding_step_{step:06d}.png", dpi=150, bbox_inches="tight")
+        plt.savefig(viz_dir / f"embedding_step_{step:06d}_seed{self.seed}.png", dpi=150, bbox_inches="tight")
         plt.close()
 
         # ---- 2. Reconstruction 对比 ----
@@ -600,7 +602,7 @@ class Trainer:
                 axes[1, i].axis("off")
             plt.suptitle(f"Reconstruction @ Step {step}", fontsize=14, fontweight="bold")
             plt.tight_layout()
-            plt.savefig(viz_dir / f"recon_step_{step:06d}.png", dpi=150, bbox_inches="tight")
+            plt.savefig(viz_dir / f"recon_step_{step:06d}_seed{self.seed}.png", dpi=150, bbox_inches="tight")
             plt.close()
 
         self.model.train()
