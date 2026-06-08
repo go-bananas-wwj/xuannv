@@ -103,8 +103,8 @@ class AEFLoss:
         t = 2.0 / max(D, 1)
         
         loss = torch.exp(-t * sq_dists).mean()
-        # 返回 log 使其更稳定
-        return -torch.log(loss + eps)
+        # 返回 log：坍缩时→0，展开时→-∞，最小化即推开 embedding
+        return torch.log(loss + eps)
     
     def vicreg_variance_loss(self, embeddings: torch.Tensor, gamma: float = 1.0) -> torch.Tensor:
         """
