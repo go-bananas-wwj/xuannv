@@ -86,25 +86,27 @@ def main() -> None:
         print(f"Rank: {rank}/{world_size}, LocalRank: {local_rank}, Device: npu:{local_rank}")
         print(f"Config: batch_size={args.batch_size}, lr={args.lr}, max_steps={args.max_steps}")
 
-    # Build datasets
-    source_names = ["tianyi_sar", "s1", "s2", "landsat", "planet"]
+    # Build datasets (哈尔滨数据)
+    source_names = ["s1", "s2", "landsat", "dem", "worldcover", "dynamic_world", "jrc_water"]
     train_dataset = HaidianAEFDataset(
-        data_root="data_raw/haidian/scenes",
-        planet_root="data_raw/beijing/planetscene",
-        stats_dir="statistics/haidian",
+        data_root="data_raw/harbin/scenes",
+        planet_root="data_raw/harbin/planetscene",
+        stats_dir="statistics/harbin",
         split="train",
         image_size=128,
         source_names=source_names,
         max_frames=16,
+        aef_embedding_root="data_raw/harbin/aef_embeddings/harbin_2025_patches",
     )
     val_dataset = HaidianAEFDataset(
-        data_root="data_raw/haidian/scenes",
-        planet_root="data_raw/beijing/planetscene",
-        stats_dir="statistics/haidian",
+        data_root="data_raw/harbin/scenes",
+        planet_root="data_raw/harbin/planetscene",
+        stats_dir="statistics/harbin",
         split="val",
         image_size=128,
         source_names=source_names,
         max_frames=16,
+        aef_embedding_root="data_raw/harbin/aef_embeddings/harbin_2025_patches",
     )
 
     # Samplers
@@ -129,17 +131,24 @@ def main() -> None:
     )
 
     # Build model
-    source_channels = {
-        "tianyi_sar": 1,
+    input_sources = {
         "s1": 2,
         "s2": 6,
         "landsat": 6,
-        "planet": 4,
+    }
+    decode_sources = {
+        "s1": 2,
+        "s2": 6,
+        "landsat": 6,
+        "dem": 1,
+        "worldcover": 11,
+        "dynamic_world": 9,
+        "jrc_water": 1,
     }
     model = AlphaEarthFoundations(
         model_size="small",
-        input_sources=source_channels,
-        decode_sources=source_channels,
+        input_sources=input_sources,
+        decode_sources=decode_sources,
         per_source_latent=32,
         enable_text_align=False,
     )
