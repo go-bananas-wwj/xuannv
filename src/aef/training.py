@@ -418,7 +418,121 @@ class Trainer:
         if self.rank == 0:
             print(f"[Checkpoint] Saved at step {step}")
 
+    def _embed_to_rgb(self, emb: np.ndarray) -> np.ndarray:
+        """将高维 embedding 用 PCA 降到 3 维并归一化为 RGB."""
+        H, W, D = emb.shape
+        flat = emb.reshape(-1, D)
+        mean = flat.mean(axis=0)
+        centered = flat - mean
+        u, s, vh = np.linalg.svd(centered, full_matrices=False)
+        comps = vh[:3]
+        proj = centered @ comps.T
+        proj = (proj - proj.min(axis=0)) / (proj.max(axis=0) - proj.min(axis=0) + 1e-8)
+        return proj.reshape(H, W, 3)
+
     @torch.no_grad()
+    def _visualize(self, step: int) -> None:
+        """保存可视化：teacher/student embedding 对比 + PCA RGB + reconstruction."""
+        if self.rank != 0:
+            return
+
+        self.model.eval()
+        batch = self._viz_batch
+        if batch is None:
+            batch = next(iter(self.val_dataloader))
+        source_data = {k: v.to(self.device) for k, v in batch["source_data"].items()}
+        timestamps = {k: v.to(self.device) for k, v in batch["timestamps"].items()}
+        valid_periods = batch["valid_periods"]
+
+        out = self.model(source_data, timestamps, valid_periods)
+
+        viz_dir = self.output_dir / "visualizations"
+        viz_dir.mkdir(parents=True, exist_ok=True)
+
+        patch_ids = batch.get("patch_ids", [f"b{i}" for i in range(len(out["teacher_embeddings"]))])
+
+        # ---- 1. 单维度 Embedding 对比（batch 前 2 个 patch）----
+        n_show = min(2, len(out["teacher_embeddings"]))
+        fig, axes = plt.subplots(n_show, 4, figsize=(16, 4 * n_show))
+        if n_show == 1:
+            axes = axes.reshape(1, 4)
+        dims = np.random.choice(64, 4, replace=False)
+        for b in range(n_show):
+            emb_t = out["teacher_embeddings"][b].cpu().numpy()
+            emb_s = out["student_embeddings"][b].cpu().numpy()
+            for i, d in enumerate(dims):
+                vmin = min(emb_t[..., d].min(), emb_s[..., d].min())
+                vmax = max(emb_t[..., d].max(), emb_s[..., d].max())
+                if b == 0:
+                    axes[b, i].set_title(f"Dim {d}")
+                im = axes[b, i].imshow(emb_s[..., d], vmin=vmin, vmax=vmax, cmap="viridis")
+                axes[b, i].axis("off")
+                plt.colorbar(im, ax=axes[b, i], fraction=0.046)
+            axes[b, 0].set_ylabel(f"{patch_ids[b]}", fontsize=12, fontweight="bold")
+        plt.suptitle(f"Student Embedding Channels @ Step {step}", fontsize=14, fontweight="bold")
+        plt.tight_layout()
+        plt.savefig(viz_dir / f"embedding_step_{step:06d}.png", dpi=150, bbox_inches="tight")
+        plt.close()
+
+        # ---- 2. PCA RGB 全域可视化（batch 前 3 个 patch）----
+        n_show = min(3, len(out["teacher_embeddings"]))
+        fig, axes = plt.subplots(n_show, 3, figsize=(15, 5 * n_show))
+        if n_show == 1:
+            axes = axes.reshape(1, 3)
+        for b in range(n_show):
+            emb_t = out["teacher_embeddings"][b].cpu().numpy()
+            emb_s = out["student_embeddings"][b].cpu().numpy()
+            rgb_t = self._embed_to_rgb(emb_t)
+            rgb_s = self._embed_to_rgb(emb_s)
+            axes[b, 0].imshow(rgb_t)
+            axes[b, 0].set_title(f"Teacher PCA RGB")
+            axes[b, 0].axis("off")
+            axes[b, 1].imshow(rgb_s)
+            axes[b, 1].set_title(f"Student PCA RGB")
+            axes[b, 1].axis("off")
+            diff = np.abs(rgb_t - rgb_s).mean(axis=-1)
+            im = axes[b, 2].imshow(diff, cmap="hot")
+            axes[b, 2].set_title(f"|Teacher - Student|")
+            axes[b, 2].axis("off")
+            plt.colorbar(im, ax=axes[b, 2], fraction=0.046)
+            axes[b, 0].set_ylabel(f"{patch_ids[b]}", fontsize=12, fontweight="bold")
+        plt.suptitle(f"PCA RGB Embedding @ Step {step}", fontsize=14, fontweight="bold")
+        plt.tight_layout()
+        plt.savefig(viz_dir / f"pca_rgb_step_{step:06d}.png", dpi=150, bbox_inches="tight")
+        plt.close()
+
+        # ---- 3. Reconstruction 对比 ----
+        predictions = {src: rec[:, 0] for src, rec in out["reconstructions"].items()}
+        targets = self._prepare_reconstruction_targets(batch, predictions)
+        src_list = list(predictions.keys())[:3]
+        if src_list:
+            fig, axes = plt.subplots(2, len(src_list), figsize=(5 * len(src_list), 8))
+            if len(src_list) == 1:
+                axes = axes.reshape(2, 1)
+            for i, src in enumerate(src_list):
+                pred = predictions[src][0].cpu().numpy()
+                tgt = targets[src][0].cpu().numpy()
+                pred_rgb = pred[..., :3]
+                tgt_rgb = tgt[..., :3]
+                pred_min, pred_max = pred_rgb.min(), pred_rgb.max()
+                tgt_min, tgt_max = tgt_rgb.min(), tgt_rgb.max()
+                pred_rgb = np.clip((pred_rgb - pred_min) / (pred_max - pred_min + 1e-8), 0, 1)
+                tgt_rgb = np.clip((tgt_rgb - tgt_min) / (tgt_max - tgt_min + 1e-8), 0, 1)
+                axes[0, i].imshow(tgt_rgb)
+                axes[0, i].set_title(f"{src} Target")
+                axes[0, i].axis("off")
+                axes[1, i].imshow(pred_rgb)
+                axes[1, i].set_title(f"{src} Pred")
+                axes[1, i].axis("off")
+            patch_id = patch_ids[0] if patch_ids else "b0"
+            plt.suptitle(f"Reconstruction {patch_id} @ Step {step}", fontsize=14, fontweight="bold")
+            plt.tight_layout()
+            plt.savefig(viz_dir / f"recon_step_{step:06d}.png", dpi=150, bbox_inches="tight")
+            plt.close()
+
+        self.model.train()
+        print(f"[Viz] Saved visualizations at step {step}")
+
     def _visualize(self, step: int) -> None:
         """保存可视化：teacher/student embedding 对比 + reconstruction 对比."""
         if self.rank != 0:
