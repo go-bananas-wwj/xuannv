@@ -176,9 +176,18 @@ class AlphaEarthFoundations(nn.Module):
     def _stack_inputs(self, source_data: Dict[str, torch.Tensor]) -> torch.Tensor:
         """Per-source encode, then concatenate along channel axis -> (B, T, H, W, C_total)."""
         xs: List[torch.Tensor] = []
-        for name, _c in self.input_sources.items():
-            x = source_data[name]  # (B, T, H, W, C)
-            B, T, H, W, C = x.shape
+        # 获取参考张量以推断 shape
+        ref = next(iter(source_data.values())) if source_data else None
+        for name, C in self.input_sources.items():
+            if name in source_data:
+                x = source_data[name]  # (B, T, H, W, C)
+            elif ref is not None:
+                # 缺失的源用零张量填充（防御性处理）
+                B, T, H, W, _ = ref.shape
+                x = torch.zeros(B, T, H, W, C, dtype=ref.dtype, device=ref.device)
+            else:
+                raise ValueError(f"source_data is empty and cannot infer shape for {name}")
+            B, T, H, W, _ = x.shape
             flat = rearrange(x, 'b t h w c -> (b t h w) c')
             enc = self.source_encoders[name](flat)
             enc = rearrange(enc, '(b t h w) c -> b t h w c', b=B, t=T, h=H, w=W)
