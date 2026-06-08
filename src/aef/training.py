@@ -39,11 +39,13 @@ class Trainer:
         output_dir: str | None = None,
         rank: int = 0,
         world_size: int = 1,
-        distill_weight: float = 5.0,
-        raw_uniform_weight: float = 3.0,
-        variance_weight: float = 25.0,
-        covariance_weight: float = 1.0,
-        decorr_weight: float = 0.5,
+        distill_weight: float = 0.5,
+        raw_uniform_weight: float = 10.0,
+        variance_weight: float = 50.0,
+        covariance_weight: float = 5.0,
+        decorr_weight: float = 0.0,
+        erank_weight: float = 5.0,
+        coding_rate_weight: float = 2.0,
         resume_step: int = 0,
         resume_optimizer_state: dict | None = None,
         resume_scheduler_state: dict | None = None,
@@ -67,6 +69,8 @@ class Trainer:
             variance_weight=variance_weight,
             covariance_weight=covariance_weight,
             decorr_weight=decorr_weight,
+            erank_weight=erank_weight,
+            coding_rate_weight=coding_rate_weight,
         )
 
         # Optimizer
@@ -98,6 +102,8 @@ class Trainer:
             "variance": [],
             "covariance": [],
             "decorr": [],
+            "erank": [],
+            "coding_rate": [],
             "consistency": [],
             "distill": [],
         }
@@ -231,7 +237,7 @@ class Trainer:
             # Logging
             if self.rank == 0:
                 self.loss_history["steps"].append(step)
-                for k in ["total", "reconstruction", "uniformity", "raw_uniform", "variance", "covariance", "decorr", "consistency", "distill"]:
+                for k in ["total", "reconstruction", "uniformity", "raw_uniform", "variance", "covariance", "decorr", "erank", "coding_rate", "consistency", "distill"]:
                     self.loss_history[k].append(float(losses[k]))
 
                 if step % self.log_every == 0:
@@ -249,7 +255,8 @@ class Trainer:
                         f"raw_unif={losses['raw_uniform']:.4f} "
                         f"var={losses['variance']:.4f} "
                         f"cov={losses['covariance']:.4f} "
-                        f"decorr={losses['decorr']:.4f} "
+                        f"erank={losses['erank']:.4f} "
+                        f"cr={losses['coding_rate']:.4f} "
                         f"consist={losses['consistency']:.4f} "
                         f"distill={losses['distill']:.4f} "
                         f"lr={lr:.6f} "
@@ -283,6 +290,8 @@ class Trainer:
         total_raw_unif = 0.0
         total_var = 0.0
         total_cov = 0.0
+        total_erank = 0.0
+        total_cr = 0.0
         total_distill = 0.0
         count = 0
 
@@ -322,6 +331,8 @@ class Trainer:
             total_raw_unif += float(losses["raw_uniform"])
             total_var += float(losses["variance"])
             total_cov += float(losses["covariance"])
+            total_erank += float(losses["erank"])
+            total_cr += float(losses["coding_rate"])
             total_distill += float(losses["distill"])
             count += 1
 
@@ -339,9 +350,11 @@ class Trainer:
             raw_unif_tensor = torch.tensor(total_raw_unif, device=self.device)
             var_tensor = torch.tensor(total_var, device=self.device)
             cov_tensor = torch.tensor(total_cov, device=self.device)
+            erank_tensor = torch.tensor(total_erank, device=self.device)
+            cr_tensor = torch.tensor(total_cr, device=self.device)
             distill_tensor = torch.tensor(total_distill, device=self.device)
             count_tensor = torch.tensor(count, device=self.device, dtype=torch.float32)
-            for t in [recon_tensor, uniform_tensor, raw_unif_tensor, var_tensor, cov_tensor, distill_tensor]:
+            for t in [recon_tensor, uniform_tensor, raw_unif_tensor, var_tensor, cov_tensor, erank_tensor, cr_tensor, distill_tensor]:
                 dist.all_reduce(t, op=dist.ReduceOp.SUM)
             dist.all_reduce(count_tensor, op=dist.ReduceOp.SUM)
             avg_recon = float(recon_tensor / count_tensor)
@@ -349,6 +362,8 @@ class Trainer:
             avg_raw_unif = float(raw_unif_tensor / count_tensor)
             avg_var = float(var_tensor / count_tensor)
             avg_cov = float(cov_tensor / count_tensor)
+            avg_erank = float(erank_tensor / count_tensor)
+            avg_cr = float(cr_tensor / count_tensor)
             avg_distill = float(distill_tensor / count_tensor)
         else:
             avg_recon = total_recon / count
@@ -356,10 +371,12 @@ class Trainer:
             avg_raw_unif = total_raw_unif / count
             avg_var = total_var / count
             avg_cov = total_cov / count
+            avg_erank = total_erank / count
+            avg_cr = total_cr / count
             avg_distill = total_distill / count
 
         if self.rank == 0:
-            print(f"[Val] recon={avg_recon:.4f} uniform={avg_uniform:.4f} raw_unif={avg_raw_unif:.4f} var={avg_var:.4f} cov={avg_cov:.4f} distill={avg_distill:.4f}")
+            print(f"[Val] recon={avg_recon:.4f} uniform={avg_uniform:.4f} raw_unif={avg_raw_unif:.4f} var={avg_var:.4f} cov={avg_cov:.4f} erank={avg_erank:.4f} cr={avg_cr:.4f} distill={avg_distill:.4f}")
 
     def _save_checkpoint(self, step: int) -> None:
         self.output_dir.mkdir(parents=True, exist_ok=True)

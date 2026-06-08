@@ -89,6 +89,8 @@ class TemporalSummarizer(nn.Module):
         self.summarizer_q = SummaryPeriodEncoder(dim=feature_dim)
         self.time_pool = TimePooling(dim=feature_dim, num_heads=num_heads)
         self.proj_64 = nn.Linear(feature_dim, embed_dim, bias=False)
+        # 增大初始化 std，让初始 embedding 更分散，打破坍缩死锁
+        nn.init.xavier_normal_(self.proj_64.weight, gain=2.0)
 
     def forward(self, feats: torch.Tensor, timestamps: torch.Tensor,
                 valid_periods: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:

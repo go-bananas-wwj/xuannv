@@ -28,6 +28,8 @@ class AEFLoss:
                  variance_weight: float = 50.0,       # 提高: VICReg 硬性约束
                  covariance_weight: float = 5.0,       # 提高: 维度去相关
                  decorr_weight: float = 0.0,           # 关闭: 无效且值巨大
+                 erank_weight: float = 5.0,            # 新增: erank 最大化
+                 coding_rate_weight: float = 2.0,      # 新增: MCR² 编码率
                  ):
         
         self.reconstruction_weight = reconstruction_weight
@@ -39,6 +41,8 @@ class AEFLoss:
         self.variance_weight = variance_weight
         self.covariance_weight = covariance_weight
         self.decorr_weight = decorr_weight
+        self.erank_weight = erank_weight
+        self.coding_rate_weight = coding_rate_weight
         
         self.source_configs = {
             'sentinel2': {'weight': 1.0, 'loss_fn': F.l1_loss},
@@ -167,6 +171,55 @@ class AEFLoss:
         # 对角线权重 1，非对角线权重 1
         return diff.sum()
     
+    def erank_maximization_loss(self, embeddings: torch.Tensor) -> torch.Tensor:
+        """
+        erank 最大化损失——列方差熵近似（NPU-native）。
+        坍缩时大，均匀时 ≈ 0，梯度在坍缩时不消失。
+        """
+        x = embeddings
+        if x.dim() == 5:
+            B, T, H, W, D = x.shape
+            x = rearrange(x, 'b t h w d -> (b t h w) d')
+        elif x.dim() == 4:
+            B, H, W, D = x.shape
+            x = rearrange(x, 'b h w d -> (b h w) d')
+        
+        N, D = x.shape
+        if N < 2:
+            return x.new_tensor(0.0)
+        
+        x = x - x.mean(0, keepdim=True)
+        col_var = x.pow(2).mean(dim=0).clamp(min=1e-8)
+        probs = col_var / col_var.sum()
+        entropy = -(probs * probs.log()).sum()
+        max_entropy = math.log(float(D))
+        return (max_entropy - entropy).clamp(min=0.0)
+    
+    def coding_rate_loss(self, embeddings: torch.Tensor, eps: float = 0.5) -> torch.Tensor:
+        """
+        MCR² 编码率损失——对角协方差近似（NPU-native）。
+        越负越好，坍缩维度梯度最大。
+        """
+        x = embeddings
+        if x.dim() == 5:
+            B, T, H, W, D = x.shape
+            x = rearrange(x, 'b t h w d -> (b t h w) d')
+        elif x.dim() == 4:
+            B, H, W, D = x.shape
+            x = rearrange(x, 'b h w d -> (b h w) d')
+        
+        if x.shape[0] < 2:
+            return x.new_tensor(0.0)
+        
+        N, D = x.shape
+        Z = x - x.mean(dim=0, keepdim=True)
+        col_var = Z.pow(2).mean(dim=0)
+        alpha = D / (N * eps ** 2 + 1e-8)
+        loss = -0.5 * (1.0 + alpha * col_var).clamp(min=1e-8).log().sum()
+        if torch.isnan(loss) or torch.isinf(loss):
+            return x.new_tensor(0.0)
+        return loss
+    
     def consistency_loss(self, teacher_embeddings: torch.Tensor, 
                         student_embeddings: torch.Tensor) -> torch.Tensor:
         # teacher/student 现在是 pre-norm，计算 cosine 前先做 L2 norm
@@ -267,6 +320,20 @@ class AEFLoss:
             losses['decorr'] = decorr_loss
         else:
             losses['decorr'] = torch.tensor(0.0, device=device)
+        
+        # ERank 最大化（新增: 坍缩时梯度非零）
+        if 'embeddings' in outputs:
+            erank_loss = self.erank_maximization_loss(outputs['embeddings'])
+            losses['erank'] = erank_loss
+        else:
+            losses['erank'] = torch.tensor(0.0, device=device)
+        
+        # Coding Rate（新增: MCR² 坍缩时梯度非零）
+        if 'embeddings' in outputs:
+            cr_loss = self.coding_rate_loss(outputs['embeddings'])
+            losses['coding_rate'] = cr_loss
+        else:
+            losses['coding_rate'] = torch.tensor(0.0, device=device)
 
         if 'teacher_embeddings' in outputs and 'student_embeddings' in outputs:
             consistency_loss = self.consistency_loss(
@@ -304,6 +371,8 @@ class AEFLoss:
             self.variance_weight * losses['variance'] +
             self.covariance_weight * losses['covariance'] +
             self.decorr_weight * losses['decorr'] +
+            self.erank_weight * losses['erank'] +
+            self.coding_rate_weight * losses['coding_rate'] +
             self.consistency_weight * losses['consistency'] +
             self.text_weight * losses['clip'] +
             self.distill_weight * losses['distill']
