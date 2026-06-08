@@ -30,6 +30,7 @@ class AEFLoss:
                  decorr_weight: float = 0.0,           # 关闭: 无效且值巨大
                  erank_weight: float = 5.0,            # 新增: erank 最大化
                  coding_rate_weight: float = 2.0,      # 新增: MCR² 编码率
+                 magnitude_weight: float = 5.0,        # 新增: 强制 embedding 幅度 ≥ 0.5
                  ):
         
         self.reconstruction_weight = reconstruction_weight
@@ -43,6 +44,7 @@ class AEFLoss:
         self.decorr_weight = decorr_weight
         self.erank_weight = erank_weight
         self.coding_rate_weight = coding_rate_weight
+        self.magnitude_weight = magnitude_weight
         
         self.source_configs = {
             'sentinel2': {'weight': 1.0, 'loss_fn': F.l1_loss},
@@ -174,6 +176,20 @@ class AEFLoss:
         diff = (c - identity) ** 2
         # 对角线权重 1，非对角线权重 1
         return diff.sum()
+    
+    def magnitude_loss(self, embeddings: torch.Tensor, min_norm: float = 0.5) -> torch.Tensor:
+        """
+        强制 pre-norm embedding 的幅度 ≥ min_norm，防止模型通过趋向 0 来取巧。
+        """
+        x = embeddings
+        if x.dim() == 5:
+            B, T, H, W, D = x.shape
+            x = rearrange(x, 'b t h w d -> (b t h w) d')
+        elif x.dim() == 4:
+            B, H, W, D = x.shape
+            x = rearrange(x, 'b h w d -> (b h w) d')
+        norms = x.norm(dim=-1)
+        return torch.relu(min_norm - norms).mean()
     
     def erank_maximization_loss(self, embeddings: torch.Tensor) -> torch.Tensor:
         """
@@ -338,6 +354,13 @@ class AEFLoss:
             losses['coding_rate'] = cr_loss
         else:
             losses['coding_rate'] = torch.tensor(0.0, device=device)
+        
+        # Magnitude 正则化（新增: 防止 embedding 趋向 0）
+        if 'embeddings' in outputs:
+            mag_loss = self.magnitude_loss(outputs['embeddings'])
+            losses['magnitude'] = mag_loss
+        else:
+            losses['magnitude'] = torch.tensor(0.0, device=device)
 
         if 'teacher_embeddings' in outputs and 'student_embeddings' in outputs:
             consistency_loss = self.consistency_loss(
@@ -377,6 +400,7 @@ class AEFLoss:
             self.decorr_weight * losses['decorr'] +
             self.erank_weight * losses['erank'] +
             self.coding_rate_weight * losses['coding_rate'] +
+            self.magnitude_weight * losses['magnitude'] +
             self.consistency_weight * losses['consistency'] +
             self.text_weight * losses['clip'] +
             self.distill_weight * losses['distill']

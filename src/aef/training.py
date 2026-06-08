@@ -46,6 +46,7 @@ class Trainer:
         decorr_weight: float = 0.0,
         erank_weight: float = 5.0,
         coding_rate_weight: float = 2.0,
+        magnitude_weight: float = 5.0,
         resume_step: int = 0,
         resume_optimizer_state: dict | None = None,
         resume_scheduler_state: dict | None = None,
@@ -71,6 +72,7 @@ class Trainer:
             decorr_weight=decorr_weight,
             erank_weight=erank_weight,
             coding_rate_weight=coding_rate_weight,
+            magnitude_weight=magnitude_weight,
         )
 
         # Optimizer
@@ -104,6 +106,7 @@ class Trainer:
             "decorr": [],
             "erank": [],
             "coding_rate": [],
+            "magnitude": [],
             "consistency": [],
             "distill": [],
         }
@@ -237,7 +240,7 @@ class Trainer:
             # Logging
             if self.rank == 0:
                 self.loss_history["steps"].append(step)
-                for k in ["total", "reconstruction", "uniformity", "raw_uniform", "variance", "covariance", "decorr", "erank", "coding_rate", "consistency", "distill"]:
+                for k in ["total", "reconstruction", "uniformity", "raw_uniform", "variance", "covariance", "decorr", "erank", "coding_rate", "magnitude", "consistency", "distill"]:
                     self.loss_history[k].append(float(losses[k]))
 
                 if step % self.log_every == 0:
@@ -257,6 +260,7 @@ class Trainer:
                         f"cov={losses['covariance']:.4f} "
                         f"erank={losses['erank']:.4f} "
                         f"cr={losses['coding_rate']:.4f} "
+                        f"mag={losses['magnitude']:.4f} "
                         f"consist={losses['consistency']:.4f} "
                         f"distill={losses['distill']:.4f} "
                         f"lr={lr:.6f} "
@@ -292,6 +296,7 @@ class Trainer:
         total_cov = 0.0
         total_erank = 0.0
         total_cr = 0.0
+        total_mag = 0.0
         total_distill = 0.0
         count = 0
 
@@ -333,6 +338,7 @@ class Trainer:
             total_cov += float(losses["covariance"])
             total_erank += float(losses["erank"])
             total_cr += float(losses["coding_rate"])
+            total_mag += float(losses["magnitude"])
             total_distill += float(losses["distill"])
             count += 1
 
@@ -352,9 +358,10 @@ class Trainer:
             cov_tensor = torch.tensor(total_cov, device=self.device)
             erank_tensor = torch.tensor(total_erank, device=self.device)
             cr_tensor = torch.tensor(total_cr, device=self.device)
+            mag_tensor = torch.tensor(total_mag, device=self.device)
             distill_tensor = torch.tensor(total_distill, device=self.device)
             count_tensor = torch.tensor(count, device=self.device, dtype=torch.float32)
-            for t in [recon_tensor, uniform_tensor, raw_unif_tensor, var_tensor, cov_tensor, erank_tensor, cr_tensor, distill_tensor]:
+            for t in [recon_tensor, uniform_tensor, raw_unif_tensor, var_tensor, cov_tensor, erank_tensor, cr_tensor, mag_tensor, distill_tensor]:
                 dist.all_reduce(t, op=dist.ReduceOp.SUM)
             dist.all_reduce(count_tensor, op=dist.ReduceOp.SUM)
             avg_recon = float(recon_tensor / count_tensor)
@@ -364,6 +371,7 @@ class Trainer:
             avg_cov = float(cov_tensor / count_tensor)
             avg_erank = float(erank_tensor / count_tensor)
             avg_cr = float(cr_tensor / count_tensor)
+            avg_mag = float(mag_tensor / count_tensor)
             avg_distill = float(distill_tensor / count_tensor)
         else:
             avg_recon = total_recon / count
@@ -373,10 +381,11 @@ class Trainer:
             avg_cov = total_cov / count
             avg_erank = total_erank / count
             avg_cr = total_cr / count
+            avg_mag = total_mag / count
             avg_distill = total_distill / count
 
         if self.rank == 0:
-            print(f"[Val] recon={avg_recon:.4f} uniform={avg_uniform:.4f} raw_unif={avg_raw_unif:.4f} var={avg_var:.4f} cov={avg_cov:.4f} erank={avg_erank:.4f} cr={avg_cr:.4f} distill={avg_distill:.4f}")
+            print(f"[Val] recon={avg_recon:.4f} uniform={avg_uniform:.4f} raw_unif={avg_raw_unif:.4f} var={avg_var:.4f} cov={avg_cov:.4f} erank={avg_erank:.4f} cr={avg_cr:.4f} mag={avg_mag:.4f} distill={avg_distill:.4f}")
 
     def _save_checkpoint(self, step: int) -> None:
         self.output_dir.mkdir(parents=True, exist_ok=True)
