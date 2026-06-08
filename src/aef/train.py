@@ -76,6 +76,7 @@ def main() -> None:
     parser.add_argument("--resume", type=str, default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--distill-warmup-steps", type=int, default=1000)
+    parser.add_argument("--grad-accum-steps", type=int, default=1)
     args = parser.parse_args()
 
     rank, world_size, local_rank = setup_distributed()
@@ -187,6 +188,7 @@ def main() -> None:
         rank=rank,
         world_size=world_size,
         distill_warmup_steps=args.distill_warmup_steps,
+        grad_accum_steps=args.grad_accum_steps,
         resume_step=start_step,
         resume_optimizer_state=resume_optimizer_state,
         resume_scheduler_state=resume_scheduler_state,

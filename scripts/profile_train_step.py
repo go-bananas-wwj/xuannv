@@ -1,258 +1,250 @@
-#!/usr/bin/env python3
-"""Profile a single training step to find bottlenecks."""
-import sys, os, time
-sys.path.insert(0, "/workspace/xuannv")
+"""
+Profiling script to identify the bottleneck in AEF training step.
+Tests: encoder-only, decoder-only, full forward, loss computation.
+Compares 64x64 vs 128x128 resolution impact.
+"""
+from __future__ import annotations
+
+import os
+import sys
+import time
+
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
 import torch
-import torch.nn.functional as F
+import torch_npu
 
-try:
-    import torch_npu
-    HAS_NPU = True
-except ImportError:
-    HAS_NPU = False
+from src.aef.architecture.aef_module import AlphaEarthFoundations
+from src.aef.architecture.encoder import STPEncoder
+from src.aef.architecture.decoder import VonMisesFisherDecoder
+from src.aef.loss_function import AEFLoss
 
-from src.config import load_config
-from src.data.builder import build_dataloader
-from src.models.model import AEFModel
-from src.training.trainer import DDPv13Trainer, _build_student_view
-from src.training.losses import (
-    reconstruction_loss, batch_uniformity_loss_l2, raw_uniformity_loss,
-    variance_regularizer, covariance_loss, erank_maximization_loss,
-    inter_patch_infonce_loss, decorrelation_loss, classification_loss,
-    temporal_contrastive_loss, consistency_loss_spatial,
-)
 
-def profile_step():
-    cfg = load_config("configs/config_dual_teacher_v1.yaml")
-    device = torch.device("npu:0") if HAS_NPU else torch.device("cpu")
+def time_it(fn, desc, warmup=2, repeats=5):
+    """Time a function, with warmup and repeats."""
+    device = torch.npu.current_device() if torch.npu.is_available() else "cpu"
     
-    dataloader = build_dataloader(cfg, training=True, distributed=False)
-    batch = next(iter(dataloader))
-    batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+    for _ in range(warmup):
+        fn()
+        if torch.npu.is_available():
+            torch.npu.synchronize(device)
     
-    model = AEFModel(cfg).to(device)
-    teacher = AEFModel(cfg).to(device)
-    teacher.eval()
-    for p in teacher.parameters():
-        p.requires_grad = False
+    times = []
+    for _ in range(repeats):
+        if torch.npu.is_available():
+            torch.npu.synchronize(device)
+        t0 = time.perf_counter()
+        fn()
+        if torch.npu.is_available():
+            torch.npu.synchronize(device)
+        t1 = time.perf_counter()
+        times.append(t1 - t0)
     
-    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.training.lr)
+    mean = sum(times) / len(times)
+    std = (sum((t - mean) ** 2 for t in times) / len(times)) ** 0.5
+    print(f"  {desc}: {mean:.3f}s ± {std:.3f}s  (min={min(times):.3f}, max={max(times):.3f})")
+    return mean
+
+
+def profile_encoder(B=2, T=16, H=128, W=128, device="npu:0"):
+    print(f"\n=== Encoder Profile (B={B}, T={T}, H={H}, W={W}) ===")
     
-    t = cfg.training
-    timings = {}
+    encoder = STPEncoder(input_channels=160, d_s=512, d_t=256, d_p=64, num_blocks=6).to(device)
+    x = torch.randn(B, T, H, W, 160, device=device)
+    ts = torch.randint(0, 1000, (B, T), device=device).float()
     
-    def tic(label):
-        timings[label] = time.perf_counter()
+    time_it(lambda: encoder(x, ts), "Encoder forward")
     
-    def toc(label):
-        dt = time.perf_counter() - timings[label]
-        timings[label] = dt
-        return dt
+    # Memory
+    if torch.npu.is_available():
+        torch.npu.reset_peak_memory_stats(device)
+        encoder(x, ts)
+        torch.npu.synchronize(device)
+        mem = torch.npu.max_memory_allocated(device) / 1024**3
+        print(f"  Peak memory: {mem:.2f} GB")
+
+
+def profile_decoder(B=2, H=128, W=128, device="npu:0"):
+    print(f"\n=== Decoder Profile (B={B}, H={H}, W={W}) ===")
     
-    # Warmup: 2 steps
-    for _ in range(2):
-        model.zero_grad()
-        out = model(
-            source_frames=batch["source_frames"],
-            source_timestamps_ms=batch["source_timestamps_ms"],
-            source_frame_mask=batch["source_frame_mask"],
-            source_input_mask=batch["source_input_mask"],
-            source_type_ids=batch["source_type_ids"],
-            valid_start_ms=batch["valid_start_ms"],
-            valid_end_ms=batch["valid_end_ms"],
-            target_relative_time=batch["target_relative_time"],
-            target_metadata=batch["target_metadata"],
-            target_loss_type=batch.get("target_loss_type"),
-            target_source_idx=batch.get("target_source_idx"),
-        )
-        loss = out.reconstructions.sum() * 0.0
-        loss.backward()
-        if HAS_NPU:
-            torch.npu.synchronize()
+    decoder = VonMisesFisherDecoder(embedding_dim=64, source_dims={"sentinel2": 5}, geometry_dim=16).to(device)
+    emb = torch.randn(B, H, W, 64, device=device)
+    geo = torch.zeros(B, 16, device=device)
+    ts_center = torch.zeros(B, device=device)
+    vp = (torch.zeros(B, device=device), torch.ones(B, device=device))
     
-    # Profile step
-    model.train()
-    timings = {}
+    time_it(lambda: decoder(emb, geo, ts_center, vp, "sentinel2", 1), "Decoder forward")
     
-    # Teacher forward
-    tic("teacher_fwd")
+    # Profile each MLP layer
     with torch.no_grad():
-        teacher_out = teacher(**{k: batch[k] for k in [
-            "source_frames", "source_timestamps_ms", "source_frame_mask",
-            "source_input_mask", "source_type_ids", "valid_start_ms", "valid_end_ms",
-            "target_relative_time", "target_metadata"
-        ] if k in batch})
-    if HAS_NPU:
-        torch.npu.synchronize()
-    teacher_dt = toc("teacher_fwd")
+        B_total = B * H * W
+        flat_input = torch.randn(B_total, 144, device=device)
+        mlp = decoder.source_decoders["sentinel2"]
+        time_it(lambda: mlp(flat_input), f"  Decoder MLP (batch={B_total})")
     
-    # Student view build
-    tic("student_view")
-    student_frames, student_frame_mask, student_input_mask, _ = _build_student_view(
-        batch["source_frames"], batch["source_timestamps_ms"],
-        batch["source_frame_mask"], batch["source_input_mask"],
-        drop_rate=0.5, source_drop_rate=0.3, front_drop_prob=0.15, back_drop_prob=0.15,
-    )
-    if HAS_NPU:
-        torch.npu.synchronize()
-    view_dt = toc("student_view")
+    if torch.npu.is_available():
+        torch.npu.reset_peak_memory_stats(device)
+        decoder(emb, geo, ts_center, vp, "sentinel2", 1)
+        torch.npu.synchronize(device)
+        mem = torch.npu.max_memory_allocated(device) / 1024**3
+        print(f"  Peak memory: {mem:.2f} GB")
+
+
+def profile_full_model(B=2, T=16, H=128, W=128, device="npu:0"):
+    print(f"\n=== Full Model Profile (B={B}, T={T}, H={H}, W={W}) ===")
     
-    # Student forward
-    tic("student_fwd")
-    student_out = model(
-        source_frames=student_frames, source_timestamps_ms=batch["source_timestamps_ms"],
-        source_frame_mask=student_frame_mask, source_input_mask=student_input_mask,
-        source_type_ids=batch["source_type_ids"], valid_start_ms=batch["valid_start_ms"],
-        valid_end_ms=batch["valid_end_ms"], target_relative_time=batch["target_relative_time"],
-        target_metadata=batch["target_metadata"],
-        target_loss_type=batch.get("target_loss_type"),
-        target_source_idx=batch.get("target_source_idx"),
-    )
-    if HAS_NPU:
-        torch.npu.synchronize()
-    student_dt = toc("student_fwd")
+    model = AlphaEarthFoundations(
+        input_sources={"sentinel2": 5},
+        decode_sources={"sentinel2": 5},
+    ).to(device)
+    model.eval()
     
-    # Reconstruction loss
-    tic("recon")
-    from src.training.loops import compute_recon_loss
-    recon = compute_recon_loss(
-        student_out.reconstructions, batch["target_images"], batch["target_mask"],
-        batch.get("target_loss_type"), cfg.data.num_classes,
-    )
-    if HAS_NPU:
-        torch.npu.synchronize()
-    recon_dt = toc("recon")
+    x = {"sentinel2": torch.randn(B, T, H, W, 5, device=device)}
+    ts = {"sentinel2": torch.randint(0, 1000, (B, T), device=device).float()}
+    vp = torch.tensor([[0, 1000], [0, 1000]], dtype=torch.float32, device=device)
     
-    # Gather pre_norm
-    tic("gather")
-    pre_norm = student_out.pre_norm_embedding
-    gathered_pre = pre_norm  # single card, skip gather
-    if HAS_NPU:
-        torch.npu.synchronize()
-    gather_dt = toc("gather")
+    # Full forward (no grad)
+    time_it(lambda: model(x, ts, vp), "Full forward (eval)")
     
-    # VICReg variance + covariance
-    tic("vicreg")
-    var = variance_regularizer(gathered_pre.float(), min_std=1.0)
-    cov = covariance_loss(gathered_pre.float())
-    if HAS_NPU:
-        torch.npu.synchronize()
-    vicreg_dt = toc("vicreg")
+    # Forward + backward
+    model.train()
+    loss_fn = AEFLoss()
     
-    # Uniformity
-    tic("uniform")
-    l2_uniform = raw_uniformity_loss(gathered_pre.float())
-    if HAS_NPU:
-        torch.npu.synchronize()
-    uniform_dt = toc("uniform")
+    def forward_backward():
+        out = model(x, ts, vp)
+        predictions = {"sentinel2": out["reconstructions"]["sentinel2"][:, 0]}
+        targets = {"sentinel2": torch.randn(B, H, W, 5, device=device)}
+        masks = {"sentinel2": torch.ones(B, H, W, 1, device=device)}
+        losses = loss_fn({
+            "embeddings": out["embeddings"],
+            "teacher_embeddings": out["teacher_embeddings"],
+            "student_embeddings": out["student_embeddings"],
+            "predictions": predictions,
+            "targets": targets,
+            "masks": masks,
+        })
+        losses["total"].backward()
     
-    # erank (SVD)
-    tic("erank")
-    erank_val = erank_maximization_loss(gathered_pre.float())
-    if HAS_NPU:
-        torch.npu.synchronize()
-    erank_dt = toc("erank")
+    time_it(forward_backward, "Forward + backward")
     
-    # Diagnosis SVD
-    tic("diag_svd")
-    _z = gathered_pre.float()
-    _z = _z - _z.mean(dim=0)
-    try:
-        _svs = torch.linalg.svdvals(_z.T @ _z)
-    except Exception:
-        pass
-    if HAS_NPU:
-        torch.npu.synchronize()
-    diag_svd_dt = toc("diag_svd")
+    if torch.npu.is_available():
+        torch.npu.reset_peak_memory_stats(device)
+        forward_backward()
+        torch.npu.synchronize(device)
+        mem = torch.npu.max_memory_allocated(device) / 1024**3
+        print(f"  Peak memory: {mem:.2f} GB")
+
+
+def profile_components(B=2, T=16, H=128, W=128, device="npu:0"):
+    print(f"\n=== Component Breakdown (B={B}, T={T}, H={H}, W={W}) ===")
     
-    # AEF distill
-    tic("aef_distill")
-    aef_spatial_val = torch.tensor(0.0, device=device)
-    aef_global_val = torch.tensor(0.0, device=device)
-    aef_spatial_emb = batch.get("aef_spatial_emb")
-    if aef_spatial_emb is not None:
-        aef_spatial_emb = aef_spatial_emb.to(device).float()
-        student_64 = student_out.pre_norm_map.float()
-        if aef_spatial_emb.shape[2:] != student_64.shape[2:]:
-            aef_spatial_emb = F.adaptive_avg_pool2d(aef_spatial_emb, student_64.shape[2:])
-        aef_spatial_val = (1.0 - F.cosine_similarity(student_64, aef_spatial_emb, dim=1, eps=1e-6)).mean()
-        aef_global_emb = batch.get("aef_global_emb")
-        if aef_global_emb is not None:
-            aef_global_emb = aef_global_emb.to(device).float()
-        else:
-            aef_global_emb = aef_spatial_emb.mean(dim=(2, 3))
-        student_global = student_64.mean(dim=(2, 3))
-        aef_global_val = (1.0 - F.cosine_similarity(student_global, aef_global_emb, dim=1, eps=1e-6)).mean()
-    if HAS_NPU:
-        torch.npu.synchronize()
-    aef_dt = toc("aef_distill")
+    model = AlphaEarthFoundations(
+        input_sources={"sentinel2": 5},
+        decode_sources={"sentinel2": 5},
+    ).to(device)
+    model.eval()
     
-    # OlmoEarth distill
-    tic("olmo_distill")
-    olmo_spatial_val = torch.tensor(0.0, device=device)
-    olmo_global_val = torch.tensor(0.0, device=device)
-    teacher_tok = batch.get("teacher_spatial_tokens")
-    if teacher_tok is not None and student_out.distill_map is not None:
-        teacher_tok = teacher_tok.to(device)
-        teacher_raw = teacher_tok.permute(0, 3, 1, 2).float()
-        student_map = student_out.distill_map.float()
-        if teacher_raw.shape[2:] != student_map.shape[2:]:
-            teacher_sp = F.adaptive_avg_pool2d(teacher_raw, student_map.shape[2:])
-        else:
-            teacher_sp = teacher_raw
-        t_cent = teacher_sp - teacher_sp.mean(dim=(2, 3), keepdim=True)
-        s_cent = student_map - student_map.mean(dim=(2, 3), keepdim=True)
-        olmo_spatial_val = (1.0 - F.cosine_similarity(s_cent, t_cent, dim=1, eps=1e-6)).mean()
-        teacher_global_ref = batch.get("teacher_global_emb")
-        if teacher_global_ref is not None:
-            teacher_global_ref = teacher_global_ref.to(device).float()
-        else:
-            teacher_global_ref = teacher_raw.mean(dim=(2, 3))
-        olmo_global_val = (1.0 - F.cosine_similarity(student_out.distill_global.float(), teacher_global_ref, dim=1, eps=1e-6)).mean()
-    if HAS_NPU:
-        torch.npu.synchronize()
-    olmo_dt = toc("olmo_distill")
+    x = {"sentinel2": torch.randn(B, T, H, W, 5, device=device)}
+    ts = {"sentinel2": torch.randint(0, 1000, (B, T), device=device).float()}
+    vp = torch.tensor([[0, 1000], [0, 1000]], dtype=torch.float32, device=device)
     
-    # Classification
-    tic("cls")
-    cls = classification_loss(student_out.logits.float(), batch["label"])
-    if HAS_NPU:
-        torch.npu.synchronize()
-    cls_dt = toc("cls")
+    # Stack inputs
+    x_stacked = model._stack_inputs(x)
+    first_src = next(iter(model.input_sources.keys()))
+    ts_tensor = ts[first_src]
     
-    # Total + backward
-    tic("backward")
-    total = recon + 0.03 * cls + 0.2 * var + 0.05 * cov + 1.0 * l2_uniform + 0.3 * erank_val + 0.75 * aef_spatial_val + 0.3 * aef_global_val + 0.3 * olmo_spatial_val + 0.15 * olmo_global_val
-    total.backward()
-    if HAS_NPU:
-        torch.npu.synchronize()
-    backward_dt = toc("backward")
+    # 1. Input projection + individual encoders
+    def fn_input():
+        _ = model._stack_inputs(x)
+    time_it(fn_input, "1. Input stack + source encoders")
     
-    # Optimizer step
-    tic("optim")
-    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-    optimizer.step()
-    if HAS_NPU:
-        torch.npu.synchronize()
-    optim_dt = toc("optim")
+    # 2. Teacher encoder
+    def fn_teacher_encoder():
+        with torch.no_grad():
+            _ = model.encoder(x_stacked, ts_tensor)
+    time_it(fn_teacher_encoder, "2. Teacher encoder (no_grad)")
+    
+    # 3. Student encoder (with perturbation)
+    def fn_student_encoder():
+        student_srcs, student_ts_dict = model._perturb_inputs(x, ts)
+        x_student = model._stack_inputs(student_srcs)
+        ts_student = student_ts_dict[first_src]
+        _ = model.encoder(x_student, ts_student)
+    time_it(fn_student_encoder, "3. Student encoder")
+    
+    # 4. Summarizer
+    with torch.no_grad():
+        feats_teacher = model.encoder(x_stacked, ts_tensor)
+    def fn_summarizer():
+        _ = model.summarizer(feats_teacher, ts_tensor, vp)
+    time_it(fn_summarizer, "4. Summarizer")
+    
+    # 5. Decoder
+    with torch.no_grad():
+        mu_t = model.summarizer(feats_teacher, ts_tensor, vp)
+    geo = torch.zeros(B, 16, device=device, dtype=mu_t.dtype)
+    ts_center = ts_tensor.mean(dim=1)
+    def fn_decoder():
+        _ = model.decoder(mu_t, geo, ts_center, (vp[:, 0], vp[:, 1]), "sentinel2", 1)
+    time_it(fn_decoder, "5. Decoder")
+
+
+def compare_resolution(B=2, T=16, device="npu:0"):
+    print("\n" + "="*60)
+    print("RESOLUTION COMPARISON: 64x64 vs 128x128")
+    print("="*60)
+    
+    for H, W in [(64, 64), (128, 128)]:
+        print(f"\n--- Resolution {H}x{W} ---")
+        
+        model = AlphaEarthFoundations(
+            input_sources={"sentinel2": 5},
+            decode_sources={"sentinel2": 5},
+        ).to(device)
+        model.eval()
+        
+        x = {"sentinel2": torch.randn(B, T, H, W, 5, device=device)}
+        ts = {"sentinel2": torch.randint(0, 1000, (B, T), device=device).float()}
+        vp = torch.tensor([[0, 1000], [0, 1000]], dtype=torch.float32, device=device)
+        
+        time_it(lambda: model(x, ts, vp), f"Full forward {H}x{W}")
+        
+        if torch.npu.is_available():
+            torch.npu.reset_peak_memory_stats(device)
+            model(x, ts, vp)
+            torch.npu.synchronize(device)
+            mem = torch.npu.max_memory_allocated(device) / 1024**3
+            print(f"  Peak memory: {mem:.2f} GB")
+
+
+def main():
+    device = "npu:0" if torch.npu.is_available() else "cpu"
+    print(f"Device: {device}")
+    print(f"PyTorch: {torch.__version__}")
+    if torch.npu.is_available():
+        print(f"NPU: {torch.npu.get_device_name(0)}")
+    
+    # 1. Component breakdown at 128x128
+    profile_components(B=2, T=16, H=128, W=128, device=device)
+    
+    # 2. Encoder standalone
+    profile_encoder(B=2, T=16, H=128, W=128, device=device)
+    
+    # 3. Decoder standalone
+    profile_decoder(B=2, H=128, W=128, device=device)
+    
+    # 4. Full model forward+backward
+    profile_full_model(B=2, T=16, H=128, W=128, device=device)
+    
+    # 5. Resolution comparison
+    compare_resolution(B=2, T=16, device=device)
     
     print("\n" + "="*60)
-    print("  STEP PROFILING RESULTS")
-    print("="*60)
-    total_step = teacher_dt + view_dt + student_dt + recon_dt + gather_dt + vicreg_dt + uniform_dt + erank_dt + diag_svd_dt + aef_dt + olmo_dt + cls_dt + backward_dt + optim_dt
-    for name, dt in [
-        ("teacher_fwd", teacher_dt), ("student_view", view_dt), ("student_fwd", student_dt),
-        ("recon_loss", recon_dt), ("gather", gather_dt), ("vicreg", vicreg_dt),
-        ("uniformity", uniform_dt), ("erank_loss", erank_dt), ("diag_svd", diag_svd_dt),
-        ("aef_distill", aef_dt), ("olmo_distill", olmo_dt), ("cls_loss", cls_dt),
-        ("backward", backward_dt), ("optimizer", optim_dt),
-    ]:
-        pct = dt / total_step * 100
-        bar = "█" * int(pct / 2)
-        print(f"  {name:20s} {dt:7.3f}s ({pct:5.1f}%) {bar}")
-    print(f"  {'TOTAL':20s} {total_step:7.3f}s")
+    print("Profiling complete")
     print("="*60)
 
+
 if __name__ == "__main__":
-    profile_step()
+    main()

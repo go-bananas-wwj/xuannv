@@ -40,6 +40,7 @@ class Trainer:
         rank: int = 0,
         world_size: int = 1,
         distill_warmup_steps: int = 1000,
+        grad_accum_steps: int = 1,
         resume_step: int = 0,
         resume_optimizer_state: dict | None = None,
         resume_scheduler_state: dict | None = None,
@@ -57,6 +58,7 @@ class Trainer:
         self.save_every = save_every
         self.eval_every = eval_every
         self.distill_warmup_steps = distill_warmup_steps
+        self.grad_accum_steps = grad_accum_steps
 
         self.loss_fn = AEFLoss()
 
@@ -210,16 +212,16 @@ class Trainer:
                 outputs_for_loss["aef_embedding_valid"] = valid_mask
 
             losses = self.loss_fn(outputs_for_loss)
-            loss = losses["total"]
+            loss = losses["total"] / self.grad_accum_steps
 
-            self.optim.zero_grad(set_to_none=True)
             loss.backward()
 
-            # Gradient clipping
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-
-            self.optim.step()
-            self.scheduler.step()
+            # Gradient clipping + optimizer step only after grad_accum_steps
+            if step % self.grad_accum_steps == 0:
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                self.optim.step()
+                self.scheduler.step()
+                self.optim.zero_grad(set_to_none=True)
 
             # Sync losses across ranks (detach before all_reduce)
             if self.world_size > 1:
