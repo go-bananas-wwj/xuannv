@@ -498,9 +498,11 @@ class AEFLoss:
                 grad_v_cosine_sim = torch.clamp(grad_v_cosine_sim, -1.0, 1.0)
                 grad_v_loss = 1.0 - grad_v_cosine_sim
 
-                grad_loss = grad_h_loss + grad_v_loss
+                grad_h_loss_val = grad_h_loss.mean()
+                grad_v_loss_val = grad_v_loss.mean()
             else:
-                grad_loss = 0.0
+                grad_h_loss_val = 0.0
+                grad_v_loss_val = 0.0
         else:
             # --- Global-level cosine distance ---
             pred_global = pred_embeddings.mean(dim=(1, 2))
@@ -515,17 +517,23 @@ class AEFLoss:
             tgt_mag = tgt_global.norm(dim=-1)
             mag_loss = ((pred_mag - tgt_mag) ** 2) / (tgt_mag ** 2 + 1e-8)
 
-            grad_loss = 0.0
+            grad_h_loss_val = 0.0
+            grad_v_loss_val = 0.0
 
-        loss = cosine_loss + 0.001 * mag_loss + self.spatial_distill_weight * grad_loss
-
+        # Pixel-wise loss (handles valid_mask)
+        pixel_loss = cosine_loss + 0.001 * mag_loss
         if valid_mask is not None:
             vm = valid_mask.float()
-            if vm.dim() == 1 and loss.dim() == 3:
+            if vm.dim() == 1 and pixel_loss.dim() == 3:
                 vm = vm.view(-1, 1, 1)
-            loss = (loss * vm).sum() / (vm.sum() + 1e-8)
+            pixel_loss = (pixel_loss * vm).sum() / (vm.sum() + 1e-8)
         else:
-            loss = loss.mean()
+            pixel_loss = pixel_loss.mean()
+
+        # Gradient loss (global, shape-independent)
+        grad_loss = grad_h_loss_val + grad_v_loss_val
+
+        loss = pixel_loss + self.spatial_distill_weight * grad_loss
 
         return loss
 
