@@ -255,6 +255,19 @@ class HaidianAEFDataset(Dataset):
         # 加载官方 AEF embedding
         aef_embedding = self._load_aef_embedding(patch_id)
 
+        # 训练时随机垂直翻转，破坏数据固有的南北梯度
+        if self.split == "train" and np.random.rand() < 0.5:
+            for src in source_data:
+                data = source_data[src].numpy()
+                data = np.flip(data, axis=1)  # flip H dimension
+                if source_data[src].dtype == torch.long:
+                    source_data[src] = torch.from_numpy(data.copy()).long()
+                else:
+                    source_data[src] = torch.from_numpy(data.copy()).float()
+            if aef_embedding is not None:
+                aef_embedding = np.flip(aef_embedding, axis=1)  # (64, H, W) -> flip H
+                aef_embedding = aef_embedding.copy()
+
         return {
             "source_data": source_data,
             "timestamps": timestamps,

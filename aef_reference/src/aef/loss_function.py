@@ -63,9 +63,9 @@ class AEFLoss:
         """Dynamic weight switching for staged training."""
         if stage == "distill_align":
             self.reconstruction_weight = 0.01
-            self.distill_weight = 20.0
-            self.uniformity_weight = 0.0
-            self.consistency_weight = 0.0
+            self.distill_weight = 5.0
+            self.uniformity_weight = 0.05
+            self.consistency_weight = 0.02
             self.text_weight = 0.0
         elif stage == "normal":
             self.reconstruction_weight = 1.0
