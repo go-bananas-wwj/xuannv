@@ -33,6 +33,7 @@ class AEFLoss:
                  coding_rate_weight: float = 0.0,
                  magnitude_weight: float = 0.0,
                  y_grad_weight: float = 0.0,
+                 channel_decorr_weight: float = 0.0,
                  ):
 
         self.reconstruction_weight = reconstruction_weight
@@ -48,6 +49,7 @@ class AEFLoss:
         self.coding_rate_weight = coding_rate_weight
         self.magnitude_weight = magnitude_weight
         self.y_grad_weight = y_grad_weight
+        self.channel_decorr_weight = channel_decorr_weight
 
         self.source_configs = {
             's2': {'weight': 1.0, 'loss_fn': F.l1_loss},
@@ -71,6 +73,7 @@ class AEFLoss:
             self.uniformity_weight = float(os.environ.get('UNIFORMITY_WEIGHT', '0.5'))
             self.consistency_weight = float(os.environ.get('CONSISTENCY_WEIGHT', '0.02'))
             self.y_grad_weight = float(os.environ.get('Y_GRAD_WEIGHT', '0.0'))
+            self.channel_decorr_weight = float(os.environ.get('CHANNEL_DECORR_WEIGHT', '0.0'))
             self.text_weight = 0.0
         elif stage == "normal":
             self.reconstruction_weight = float(os.environ.get('RECON_WEIGHT', '1.0'))
@@ -78,6 +81,7 @@ class AEFLoss:
             self.uniformity_weight = float(os.environ.get('UNIFORMITY_WEIGHT', '0.05'))
             self.consistency_weight = float(os.environ.get('CONSISTENCY_WEIGHT', '0.02'))
             self.y_grad_weight = float(os.environ.get('Y_GRAD_WEIGHT', '0.0'))
+            self.channel_decorr_weight = float(os.environ.get('CHANNEL_DECORR_WEIGHT', '0.0'))
             self.text_weight = 0.001
         else:
             raise ValueError(f"Unknown stage: {stage}")
@@ -257,6 +261,34 @@ class AEFLoss:
         norms = x.norm(dim=-1)
         return torch.relu(min_norm - norms).mean()
 
+    def channel_decorrelation_loss(self, embeddings: torch.Tensor) -> torch.Tensor:
+        """Force different embedding channels to learn diverse spatial patterns.
+        
+        This breaks the "all channels are stripes" problem by penalizing
+        channel-channel correlation at each spatial location.
+        """
+        x = embeddings
+        if x.dim() == 5:
+            B, T, H, W, D = x.shape
+            x = rearrange(x, 'b t h w d -> b (t h w) d')
+        elif x.dim() == 4:
+            B, H, W, D = x.shape
+            x = rearrange(x, 'b h w d -> b (h w) d')
+        else:
+            return x.new_tensor(0.0)
+        
+        B, N, D = x.shape
+        if N < 2 or D < 2:
+            return x.new_tensor(0.0)
+        
+        # Center
+        x = x - x.mean(dim=1, keepdim=True)
+        # Covariance per sample: (B, D, D)
+        cov = torch.bmm(x.transpose(1, 2), x) / max(N - 1, 1)
+        # Penalize off-diagonal correlations
+        off_diag = cov - torch.diag_embed(torch.diagonal(cov, dim1=-2, dim2=-1))
+        return (off_diag ** 2).sum() / (B * D * (D - 1) + 1e-8)
+
     def erank_maximization_loss(self, embeddings: torch.Tensor) -> torch.Tensor:
         x = embeddings
         if x.dim() == 5:
@@ -430,9 +462,10 @@ class AEFLoss:
             losses['erank'] = self.erank_maximization_loss(outputs['embeddings'])
             losses['coding_rate'] = self.coding_rate_loss(outputs['embeddings'])
             losses['magnitude'] = self.magnitude_loss(outputs['embeddings'])
+            losses['channel_decorr'] = self.channel_decorrelation_loss(outputs['embeddings'])
         else:
             for k in ['uniformity', 'raw_uniform', 'variance', 'covariance',
-                      'decorr', 'erank', 'coding_rate', 'magnitude']:
+                      'decorr', 'erank', 'coding_rate', 'magnitude', 'channel_decorr']:
                 losses[k] = torch.tensor(0.0, device=device)
 
         if 'teacher_embeddings' in outputs and 'student_embeddings' in outputs:
@@ -470,6 +503,7 @@ class AEFLoss:
             self.erank_weight * losses['erank'] +
             self.coding_rate_weight * losses['coding_rate'] +
             self.magnitude_weight * losses['magnitude'] +
+            self.channel_decorr_weight * losses['channel_decorr'] +
             self.consistency_weight * losses['consistency'] +
             self.text_weight * losses['clip'] +
             self.distill_weight * losses['distill']
