@@ -361,21 +361,30 @@ class AEFLoss:
 
         spatial_distill = os.environ.get('SPATIAL_DISTILL', 'true').lower() == 'true'
 
+        # --- FIX: Handle zero vectors in target to avoid NaN from F.normalize ---
+        # AEF official embeddings have ~0.78% zero-vector pixels
+        tgt_safe = target.clone()
+        tgt_zero_mask = (tgt_safe.norm(dim=-1, keepdim=True) < 1e-6)
+        tgt_safe = torch.where(tgt_zero_mask, torch.randn_like(tgt_safe) * 1e-4, tgt_safe)
+
         if spatial_distill:
             # --- Pixel-level cosine distance ---
             pred_n = F.normalize(pred_embeddings, p=2, dim=-1)
-            tgt_n = F.normalize(target, p=2, dim=-1)
+            tgt_n = F.normalize(tgt_safe, p=2, dim=-1)
             cosine_sim = (pred_n * tgt_n).sum(dim=-1)
             cosine_loss = (1.0 - cosine_sim)
+            # Mask out the zero-vector locations from loss
+            cosine_loss = torch.where(tgt_zero_mask.squeeze(-1), torch.zeros_like(cosine_loss), cosine_loss)
 
             # --- Pixel-level magnitude matching ---
             pred_mag = pred_embeddings.norm(dim=-1)
             tgt_mag = target.norm(dim=-1)
             mag_loss = ((pred_mag - tgt_mag) ** 2) / (tgt_mag ** 2 + 1e-8)
+            mag_loss = torch.where(tgt_zero_mask.squeeze(-1), torch.zeros_like(mag_loss), mag_loss)
         else:
             # --- Global-level cosine distance ---
             pred_global = pred_embeddings.mean(dim=(1, 2))
-            tgt_global = target.mean(dim=(1, 2))
+            tgt_global = tgt_safe.mean(dim=(1, 2))
             pred_n = F.normalize(pred_global, p=2, dim=-1)
             tgt_n = F.normalize(tgt_global, p=2, dim=-1)
             cosine_sim = (pred_n * tgt_n).sum(dim=-1)
