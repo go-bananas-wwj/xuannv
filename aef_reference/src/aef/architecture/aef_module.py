@@ -87,6 +87,8 @@ class TemporalSummarizer(nn.Module):
         self.embed_dim = embed_dim
 
         self.summarizer_q = SummaryPeriodEncoder(dim=feature_dim)
+        # Spatial smoothing before time pooling to suppress residual grid artifacts
+        self.spatial_smooth = nn.Conv2d(feature_dim, feature_dim, kernel_size=3, padding=1, groups=1)
         self.time_pool = TimePooling(dim=feature_dim, num_heads=num_heads)
         self.proj_64 = nn.Linear(feature_dim, embed_dim, bias=False)
         # 增大初始化 std，让初始 embedding 更分散，打破坍缩死锁
@@ -104,10 +106,16 @@ class TemporalSummarizer(nn.Module):
             embeddings: (B, H, W, 64), pre-norm (training) / unit-norm (inference)
             **训练时不做 L2 norm**，反坍缩损失在 pre-norm 欧氏空间计算以绕过 Jacobian 梯度屏障。
         """
+        # Spatial smoothing to suppress residual grid artifacts from encoder upsampling
+        B, T, H, W, C = feats.shape
+        feats_2d = feats.view(B * T, H, W, C).permute(0, 3, 1, 2)  # (BT, C, H, W)
+        feats_2d = self.spatial_smooth(feats_2d)
+        feats_smooth = feats_2d.permute(0, 2, 3, 1).view(B, T, H, W, C)
+        
         # Build single query per sample
         q = self.summarizer_q(valid_periods)                 # (B, C)
         # Pool over time at each (h,w)
-        z = self.time_pool(feats, q, mask=mask)              # (B, H, W, C)
+        z = self.time_pool(feats_smooth, q, mask=mask)       # (B, H, W, C)
         # Project to 64D，**训练时不 L2 norm**，保留幅度信息
         mu = self.proj_64(z)                                 # (B, H, W, 64)
         return mu

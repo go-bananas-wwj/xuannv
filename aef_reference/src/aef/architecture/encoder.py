@@ -36,10 +36,11 @@ class STPEncoder(nn.Module):
         self.final_time_resample = LearnedSpatialResampling(self.time_dim, self.precision_dim, 4.0)
         
         # Post-fusion conv to blend pathways and suppress residual grid patterns
+        # Kernel 5x5 to cover larger upsampling block boundaries (8x up from 16x16)
         self.final_fusion = nn.Sequential(
-            nn.Conv2d(self.precision_dim, self.precision_dim, kernel_size=3, padding=1, groups=1),
+            nn.Conv2d(self.precision_dim, self.precision_dim, kernel_size=5, padding=2, groups=1),
             nn.GELU(),
-            nn.Conv2d(self.precision_dim, self.precision_dim, kernel_size=3, padding=1, groups=1),
+            nn.Conv2d(self.precision_dim, self.precision_dim, kernel_size=5, padding=2, groups=1),
         )
         
         # Output norm
