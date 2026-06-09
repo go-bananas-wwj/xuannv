@@ -32,8 +32,9 @@ class VonMisesFisherDecoder(nn.Module):
         # AEF official uses fixed kappa=8000 (Section S2.2.4, Figure S22)
         self.register_buffer('kappa', torch.tensor(8000.0))
         
-        # Decoders for each source
+        # Decoders for each source (per-pixel MLP + spatial refinement conv)
         self.source_decoders = nn.ModuleDict()
+        self.spatial_refinement = nn.ModuleDict()
         for source, dim in source_dims.items():
             input_dim = embedding_dim + geometry_dim + embedding_dim  # embedding + geometry + timecode
             self.source_decoders[source] = nn.Sequential(
@@ -44,6 +45,12 @@ class VonMisesFisherDecoder(nn.Module):
                 nn.GELU(),
                 nn.LayerNorm(256),
                 nn.Linear(256, dim)
+            )
+            # 3x3 spatial conv to break striping artifacts
+            self.spatial_refinement[source] = nn.Sequential(
+                nn.Conv2d(dim, dim, kernel_size=3, padding=1, groups=1),
+                nn.GELU(),
+                nn.Conv2d(dim, dim, kernel_size=3, padding=1, groups=1),
             )
         
         # Geometry metadata encoder
@@ -135,6 +142,12 @@ class VonMisesFisherDecoder(nn.Module):
             
             # Reshape back to spatial grid
             decoded = rearrange(decoded_flat, '(b l1 l2) c -> b l1 l2 c', b=B, l1=L, l2=L)
+            
+            # Apply spatial refinement conv to break striping artifacts
+            decoded = rearrange(decoded, 'b l1 l2 c -> b c l1 l2')
+            decoded = decoded + self.spatial_refinement[source](decoded)  # residual connection
+            decoded = rearrange(decoded, 'b c l1 l2 -> b l1 l2 c')
+            
             decoded_samples.append(decoded)
         
         decoded_samples = torch.stack(decoded_samples, dim=1)  # (B, num_samples, L, L, source_dim)

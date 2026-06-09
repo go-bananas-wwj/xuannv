@@ -267,6 +267,22 @@ class HaidianAEFDataset(Dataset):
             if aef_embedding is not None:
                 aef_embedding = torch.flip(aef_embedding, dims=[1])  # (64, H, W) -> flip H
 
+        # 训练时随机打乱行顺序，彻底破坏y方向位置信息
+        if self.split == "train" and np.random.rand() < 0.5:
+            # 获取统一行排列（所有源和AEF使用相同排列）
+            first_src = next(iter(source_data.keys()))
+            H = source_data[first_src].shape[1]
+            row_perm = np.random.permutation(H)
+            for src in source_data:
+                data = source_data[src].numpy()
+                data = data[:, row_perm, :, :]
+                if source_data[src].dtype == torch.long:
+                    source_data[src] = torch.from_numpy(data.copy()).long()
+                else:
+                    source_data[src] = torch.from_numpy(data.copy()).float()
+            if aef_embedding is not None:
+                aef_embedding = aef_embedding[:, row_perm, :]  # (64, H, W)
+
         return {
             "source_data": source_data,
             "timestamps": timestamps,

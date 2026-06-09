@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from torch.functional import F
 import math
+import os
 
 
 class AEFLoss:
@@ -31,6 +32,7 @@ class AEFLoss:
                  erank_weight: float = 0.0,
                  coding_rate_weight: float = 0.0,
                  magnitude_weight: float = 0.0,
+                 y_grad_weight: float = 0.0,
                  ):
 
         self.reconstruction_weight = reconstruction_weight
@@ -45,6 +47,7 @@ class AEFLoss:
         self.erank_weight = erank_weight
         self.coding_rate_weight = coding_rate_weight
         self.magnitude_weight = magnitude_weight
+        self.y_grad_weight = y_grad_weight
 
         self.source_configs = {
             's2': {'weight': 1.0, 'loss_fn': F.l1_loss},
@@ -60,18 +63,21 @@ class AEFLoss:
         }
 
     def set_stage(self, stage: str):
-        """Dynamic weight switching for staged training."""
+        """Dynamic weight switching for staged training.
+        Weights can be overridden via environment variables for ablation studies."""
         if stage == "distill_align":
-            self.reconstruction_weight = 0.01
-            self.distill_weight = 5.0
-            self.uniformity_weight = 0.5
-            self.consistency_weight = 0.02
+            self.reconstruction_weight = float(os.environ.get('RECON_WEIGHT', '0.01'))
+            self.distill_weight = float(os.environ.get('DISTILL_WEIGHT', '5.0'))
+            self.uniformity_weight = float(os.environ.get('UNIFORMITY_WEIGHT', '0.5'))
+            self.consistency_weight = float(os.environ.get('CONSISTENCY_WEIGHT', '0.02'))
+            self.y_grad_weight = float(os.environ.get('Y_GRAD_WEIGHT', '0.0'))
             self.text_weight = 0.0
         elif stage == "normal":
-            self.reconstruction_weight = 1.0
-            self.distill_weight = 0.2
-            self.uniformity_weight = 0.05
-            self.consistency_weight = 0.02
+            self.reconstruction_weight = float(os.environ.get('RECON_WEIGHT', '1.0'))
+            self.distill_weight = float(os.environ.get('DISTILL_WEIGHT', '0.2'))
+            self.uniformity_weight = float(os.environ.get('UNIFORMITY_WEIGHT', '0.05'))
+            self.consistency_weight = float(os.environ.get('CONSISTENCY_WEIGHT', '0.02'))
+            self.y_grad_weight = float(os.environ.get('Y_GRAD_WEIGHT', '0.0'))
             self.text_weight = 0.001
         else:
             raise ValueError(f"Unknown stage: {stage}")
@@ -101,6 +107,17 @@ class AEFLoss:
                     loss = F.cross_entropy(pred_ce, target_ce, ignore_index=255)
                 else:
                     loss = config['loss_fn'](pred_masked, target_masked)
+                    
+                    # Spatial gradient penalty to break horizontal striping
+                    # Encourage smooth transitions in both x and y directions
+                    pred_spatial = pred_masked.permute(0, 3, 1, 2)  # (B, C, H, W)
+                    dy = (pred_spatial[:, :, 1:, :] - pred_spatial[:, :, :-1, :]).abs().mean()
+                    dx = (pred_spatial[:, :, :, 1:] - pred_spatial[:, :, :, :-1]).abs().mean()
+                    spatial_smooth = 0.5 * (dx + dy)
+                    
+                    # Also penalize embedding striping directly
+                    # If prediction is stripy, embedding is likely stripy too
+                    loss = loss + 0.1 * spatial_smooth
 
                 if total_loss is None:
                     total_loss = config['weight'] * loss
@@ -289,6 +306,22 @@ class AEFLoss:
         dots = (mu * mu_s).sum(dim=-1)
         return ((1.0 - dots) * 0.5).mean()
 
+    def y_gradient_penalty_loss(self, embeddings: torch.Tensor) -> torch.Tensor:
+        """Penalty for y-direction gradients in embedding map.
+        
+        High y-gradient indicates stripe artifacts (north-south bias).
+        We penalize this to encourage spatially diverse embeddings.
+        """
+        if embeddings.dim() == 4:
+            # (B, H, W, D)
+            y_grad = (embeddings[:, 1:, :, :] - embeddings[:, :-1, :, :]).abs().mean()
+        elif embeddings.dim() == 3:
+            # (H, W, D)
+            y_grad = (embeddings[1:, :, :] - embeddings[:-1, :, :]).abs().mean()
+        else:
+            return torch.tensor(0.0, device=embeddings.device)
+        return y_grad
+
     def clip_loss(self, image_embeddings: torch.Tensor,
                   text_embeddings: torch.Tensor) -> torch.Tensor:
         img = torch.nn.functional.normalize(image_embeddings, p=2, dim=-1)
@@ -305,12 +338,9 @@ class AEFLoss:
         target_embeddings: torch.Tensor,
         valid_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        """Global-level distillation: only align GAP-pooled embeddings.
+        """AEF distillation: spatial-level (pixel-by-pixel) or global-level (GAP).
         
-        AEF itself has high spatial uniformity (~0.75), meaning spatial locations
-        are already similar. Spatial-level distillation forces Student to copy this
-        collapse. Instead, we only distill the global average, letting uniformity_loss
-        handle spatial diversity.
+        Controlled via SPATIAL_DISTILL env var (default: true for pixel-level).
         """
         if pred_embeddings is None or target_embeddings is None:
             device = pred_embeddings.device if pred_embeddings is not None else (
@@ -329,24 +359,40 @@ class AEFLoss:
 
         target = rearrange(target_2d, 'b c h w -> b h w c')
 
-        # Global average pooling
-        pred_global = pred_embeddings.mean(dim=(1, 2))  # (B, D)
-        tgt_global = target.mean(dim=(1, 2))  # (B, D)
+        spatial_distill = os.environ.get('SPATIAL_DISTILL', 'true').lower() == 'true'
 
-        pred_n = F.normalize(pred_global, p=2, dim=-1)
-        tgt_n = F.normalize(tgt_global, p=2, dim=-1)
-        cosine_sim = (pred_n * tgt_n).sum(dim=-1)
-        cosine_loss = (1.0 - cosine_sim)
+        if spatial_distill:
+            # --- Pixel-level cosine distance ---
+            pred_n = F.normalize(pred_embeddings, p=2, dim=-1)
+            tgt_n = F.normalize(target, p=2, dim=-1)
+            cosine_sim = (pred_n * tgt_n).sum(dim=-1)
+            cosine_loss = (1.0 - cosine_sim)
 
-        # Magnitude matching on global vectors
-        pred_mag = pred_global.norm(dim=-1)
-        tgt_mag = tgt_global.norm(dim=-1)
-        mag_loss = ((pred_mag - tgt_mag) ** 2) / (tgt_mag ** 2 + 1e-8)
+            # --- Pixel-level magnitude matching ---
+            pred_mag = pred_embeddings.norm(dim=-1)
+            tgt_mag = target.norm(dim=-1)
+            mag_loss = ((pred_mag - tgt_mag) ** 2) / (tgt_mag ** 2 + 1e-8)
+        else:
+            # --- Global-level cosine distance ---
+            pred_global = pred_embeddings.mean(dim=(1, 2))
+            tgt_global = target.mean(dim=(1, 2))
+            pred_n = F.normalize(pred_global, p=2, dim=-1)
+            tgt_n = F.normalize(tgt_global, p=2, dim=-1)
+            cosine_sim = (pred_n * tgt_n).sum(dim=-1)
+            cosine_loss = (1.0 - cosine_sim)
+
+            # --- Global-level magnitude matching ---
+            pred_mag = pred_global.norm(dim=-1)
+            tgt_mag = tgt_global.norm(dim=-1)
+            mag_loss = ((pred_mag - tgt_mag) ** 2) / (tgt_mag ** 2 + 1e-8)
 
         loss = cosine_loss + 0.001 * mag_loss
 
         if valid_mask is not None:
-            loss = (loss * valid_mask.float()).sum() / (valid_mask.float().sum() + 1e-8)
+            vm = valid_mask.float()
+            if vm.dim() == 1 and loss.dim() == 3:
+                vm = vm.view(-1, 1, 1)
+            loss = (loss * vm).sum() / (vm.sum() + 1e-8)
         else:
             loss = loss.mean()
 
@@ -419,6 +465,12 @@ class AEFLoss:
             self.text_weight * losses['clip'] +
             self.distill_weight * losses['distill']
         )
+
+        if 'embeddings' in outputs and self.y_grad_weight > 0:
+            losses['y_grad'] = self.y_gradient_penalty_loss(outputs['embeddings'])
+            total_loss = total_loss + self.y_grad_weight * losses['y_grad']
+        else:
+            losses['y_grad'] = torch.tensor(0.0, device=device)
 
         losses['total'] = total_loss
 
