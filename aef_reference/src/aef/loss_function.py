@@ -160,13 +160,11 @@ class AEFLoss:
             x = F.adaptive_avg_pool2d(x, (1, 1)).view(B * T, D)
         elif x.dim() == 4:
             B, H, W, D = x.shape
-            if B >= 4:
-                # Large batch: pool over space to get per-sample embeddings
-                x = x.permute(0, 3, 1, 2)  # (B, D, H, W)
-                x = F.adaptive_avg_pool2d(x, (1, 1)).view(B, D)
-            else:
-                # Small batch: use spatial pixels to augment sample pool
-                x = x.reshape(B * H * W, D)
+            # Always pool over space to get per-sample embeddings.
+            # Using spatial pixels for small batches encourages stripe artifacts
+            # because the model can group pixels by row to minimize uniformity loss.
+            x = x.permute(0, 3, 1, 2)  # (B, D, H, W)
+            x = F.adaptive_avg_pool2d(x, (1, 1)).view(B, D)
 
         x = F.normalize(x, p=2, dim=-1)
         x = torch.where(torch.isnan(x), torch.zeros_like(x), x)
