@@ -456,6 +456,30 @@ class AEFLoss:
             tgt_mag = target.norm(dim=-1)
             mag_loss = ((pred_mag - tgt_mag) ** 2) / (tgt_mag ** 2 + 1e-8)
             mag_loss = torch.where(tgt_zero_mask.squeeze(-1), torch.zeros_like(mag_loss), mag_loss)
+
+            # --- Spatial gradient cosine distance (anti-stripe) ---
+            if self.spatial_distill_weight > 0:
+                # Horizontal gradient (along width) - key for anti-stripe
+                pred_grad_h = pred_embeddings[:, :, 1:, :] - pred_embeddings[:, :, :-1, :]
+                tgt_grad_h = target[:, :, 1:, :] - target[:, :, :-1, :]
+                pred_grad_h_n = F.normalize(pred_grad_h, p=2, dim=-1)
+                tgt_grad_h_n = F.normalize(tgt_grad_h, p=2, dim=-1)
+                grad_h_cosine_sim = (pred_grad_h_n * tgt_grad_h_n).sum(dim=-1)
+                grad_h_cosine_sim = torch.clamp(grad_h_cosine_sim, -1.0, 1.0)
+                grad_h_loss = 1.0 - grad_h_cosine_sim
+
+                # Vertical gradient (along height)
+                pred_grad_v = pred_embeddings[:, 1:, :, :] - pred_embeddings[:, :-1, :, :]
+                tgt_grad_v = target[:, 1:, :, :] - target[:, :-1, :, :]
+                pred_grad_v_n = F.normalize(pred_grad_v, p=2, dim=-1)
+                tgt_grad_v_n = F.normalize(tgt_grad_v, p=2, dim=-1)
+                grad_v_cosine_sim = (pred_grad_v_n * tgt_grad_v_n).sum(dim=-1)
+                grad_v_cosine_sim = torch.clamp(grad_v_cosine_sim, -1.0, 1.0)
+                grad_v_loss = 1.0 - grad_v_cosine_sim
+
+                grad_loss = grad_h_loss + grad_v_loss
+            else:
+                grad_loss = 0.0
         else:
             # --- Global-level cosine distance ---
             pred_global = pred_embeddings.mean(dim=(1, 2))
@@ -470,7 +494,9 @@ class AEFLoss:
             tgt_mag = tgt_global.norm(dim=-1)
             mag_loss = ((pred_mag - tgt_mag) ** 2) / (tgt_mag ** 2 + 1e-8)
 
-        loss = cosine_loss + 0.001 * mag_loss
+            grad_loss = 0.0
+
+        loss = cosine_loss + 0.001 * mag_loss + self.spatial_distill_weight * grad_loss
 
         if valid_mask is not None:
             vm = valid_mask.float()
@@ -487,10 +513,11 @@ class AEFLoss:
         pred_embeddings: torch.Tensor,
         target_embeddings: torch.Tensor,
     ) -> torch.Tensor:
-        """Spatial gradient distillation: match horizontal and vertical gradients.
+        """Spatial gradient distillation: match horizontal and vertical gradients via cosine similarity.
 
         Penalizes stripe patterns by requiring student to have similar spatial
-        variation as AEF target within each row.
+        variation direction as AEF target. Uses cosine distance so zero-gradient
+        (stripe) regions receive maximum penalty regardless of embedding scale.
         """
         if pred_embeddings is None or target_embeddings is None:
             device = pred_embeddings.device if pred_embeddings is not None else (
@@ -509,15 +536,25 @@ class AEFLoss:
 
         target = rearrange(target_2d, 'b c h w -> b h w c')
 
+        def _gradient_cosine_loss(pred, tgt):
+            """Cosine distance between gradients, with penalty for zero gradients."""
+            pred_norm = pred.norm(dim=-1, keepdim=True)
+            tgt_norm = tgt.norm(dim=-1, keepdim=True)
+            # Cosine similarity; if pred gradient is near-zero, cos_sim -> 0, loss -> 1
+            cos_sim = (pred * tgt).sum(dim=-1) / (pred_norm.squeeze(-1) * tgt_norm.squeeze(-1) + 1e-8)
+            # Clamp to avoid NaN
+            cos_sim = torch.clamp(cos_sim, -1.0, 1.0)
+            return torch.mean(1.0 - cos_sim)
+
         # Horizontal gradient (along width) - key for anti-stripe
         pred_grad_h = pred_embeddings[:, :, 1:, :] - pred_embeddings[:, :, :-1, :]
         tgt_grad_h = target[:, :, 1:, :] - target[:, :, :-1, :]
-        grad_h_loss = F.mse_loss(pred_grad_h, tgt_grad_h)
+        grad_h_loss = _gradient_cosine_loss(pred_grad_h, tgt_grad_h)
 
         # Vertical gradient (along height)
         pred_grad_v = pred_embeddings[:, 1:, :, :] - pred_embeddings[:, :-1, :, :]
         tgt_grad_v = target[:, 1:, :, :] - target[:, :-1, :, :]
-        grad_v_loss = F.mse_loss(pred_grad_v, tgt_grad_v)
+        grad_v_loss = _gradient_cosine_loss(pred_grad_v, tgt_grad_v)
 
         return grad_h_loss + grad_v_loss
 
@@ -572,16 +609,10 @@ class AEFLoss:
                 outputs['aef_embedding_target'],
                 outputs.get('aef_embedding_valid'),
             )
-            if self.spatial_distill_weight > 0:
-                losses['spatial_distill'] = self.spatial_gradient_distill_loss(
-                    outputs['aef_embedding_pred'],
-                    outputs['aef_embedding_target'],
-                )
-            else:
-                losses['spatial_distill'] = torch.tensor(0.0, device=device)
         else:
             losses['distill'] = torch.tensor(0.0, device=device)
-            losses['spatial_distill'] = torch.tensor(0.0, device=device)
+
+        losses['spatial_distill'] = torch.tensor(0.0, device=device)
 
         total_loss = (
             self.reconstruction_weight * losses['reconstruction'] +
@@ -596,8 +627,7 @@ class AEFLoss:
             self.channel_decorr_weight * losses['channel_decorr'] +
             self.consistency_weight * losses['consistency'] +
             self.text_weight * losses['clip'] +
-            self.distill_weight * losses['distill'] +
-            self.spatial_distill_weight * losses['spatial_distill']
+            self.distill_weight * losses['distill']
         )
 
         if 'embeddings' in outputs and self.y_grad_weight > 0:
