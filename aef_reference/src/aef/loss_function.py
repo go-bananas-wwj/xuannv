@@ -305,6 +305,13 @@ class AEFLoss:
         target_embeddings: torch.Tensor,
         valid_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
+        """Global-level distillation: only align GAP-pooled embeddings.
+        
+        AEF itself has high spatial uniformity (~0.75), meaning spatial locations
+        are already similar. Spatial-level distillation forces Student to copy this
+        collapse. Instead, we only distill the global average, letting uniformity_loss
+        handle spatial diversity.
+        """
         if pred_embeddings is None or target_embeddings is None:
             device = pred_embeddings.device if pred_embeddings is not None else (
                 target_embeddings.device if target_embeddings is not None else torch.device('cpu')
@@ -322,21 +329,24 @@ class AEFLoss:
 
         target = rearrange(target_2d, 'b c h w -> b h w c')
 
-        pred_n = F.normalize(pred_embeddings, p=2, dim=-1)
-        tgt_n = F.normalize(target, p=2, dim=-1)
+        # Global average pooling
+        pred_global = pred_embeddings.mean(dim=(1, 2))  # (B, D)
+        tgt_global = target.mean(dim=(1, 2))  # (B, D)
+
+        pred_n = F.normalize(pred_global, p=2, dim=-1)
+        tgt_n = F.normalize(tgt_global, p=2, dim=-1)
         cosine_sim = (pred_n * tgt_n).sum(dim=-1)
         cosine_loss = (1.0 - cosine_sim)
 
-        # Magnitude matching: prevent collapse to near-zero pre-norm vectors
-        pred_mag = pred_embeddings.norm(dim=-1)
-        tgt_mag = target.norm(dim=-1)
+        # Magnitude matching on global vectors
+        pred_mag = pred_global.norm(dim=-1)
+        tgt_mag = tgt_global.norm(dim=-1)
         mag_loss = ((pred_mag - tgt_mag) ** 2) / (tgt_mag ** 2 + 1e-8)
 
         loss = cosine_loss + 0.001 * mag_loss
 
         if valid_mask is not None:
-            valid_mask_2d = valid_mask.view(B, 1, 1).expand(B, H, W)
-            loss = (loss * valid_mask_2d.float()).sum() / (valid_mask_2d.float().sum() + 1e-8)
+            loss = (loss * valid_mask.float()).sum() / (valid_mask.float().sum() + 1e-8)
         else:
             loss = loss.mean()
 
