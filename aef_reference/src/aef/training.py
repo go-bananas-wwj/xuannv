@@ -52,6 +52,9 @@ class Trainer:
         resume_ema_state: dict | None = None,
         seed: int = 42,
         viz_patch_ids: list[str] | None = None,
+        reconstruction_weight: float = 1.0,
+        distill_weight: float = 0.2,
+        spatial_distill_weight: float = 0.0,
     ) -> None:
         self.model = model
         self.dataloader = dataloader
@@ -69,7 +72,11 @@ class Trainer:
         self.grad_accum_steps = grad_accum_steps
         self.viz_patch_ids = viz_patch_ids
 
-        self.loss_fn = AEFLoss()
+        self.loss_fn = AEFLoss(
+            reconstruction_weight=reconstruction_weight,
+            distill_weight=distill_weight,
+            spatial_distill_weight=spatial_distill_weight,
+        )
 
         # Optimizer
         params = list(self.model.parameters())
@@ -367,6 +374,7 @@ class Trainer:
                     steps_per_sec = actual_steps / elapsed if elapsed > 0 else 0
                     eta = (self.max_steps - step) / steps_per_sec / 3600 if steps_per_sec > 0 else 0
                     stage_tag = "[Align]" if step <= self.distill_warmup_steps else "[Normal]"
+                    spatial_distill_val = losses.get('spatial_distill', torch.tensor(0.0)).item()
                     print(
                         f"[Step {step}] {stage_tag} "
                         f"loss={losses['total']:.4f} "
@@ -374,6 +382,7 @@ class Trainer:
                         f"uniform={losses['uniformity']:.4f} "
                         f"consist={losses['consistency']:.4f} "
                         f"distill={losses['distill']:.4f} "
+                        f"spat_dist={spatial_distill_val:.4f} "
                         f"mag={losses['magnitude']:.4f} "
                         f"stripe={losses.get('anti_stripe_embed', torch.tensor(0.0)).item():.4f} "
                         f"lr={lr:.6f} "

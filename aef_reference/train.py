@@ -82,6 +82,9 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--distill-warmup-steps", type=int, default=1000)
     parser.add_argument("--grad-accum-steps", type=int, default=4)
+    parser.add_argument("--recon-weight", type=float, default=1.0)
+    parser.add_argument("--distill-weight", type=float, default=0.2)
+    parser.add_argument("--spatial-distill-weight", type=float, default=0.0)
     args = parser.parse_args()
 
     rank, world_size, local_rank = setup_distributed()
@@ -247,6 +250,9 @@ def main() -> None:
         resume_ema_state=resume_ema_state,
         seed=args.seed,
         viz_patch_ids=["patch_000036", "patch_000069", "patch_000091", "patch_000120", "patch_000150"],
+        reconstruction_weight=args.recon_weight,
+        distill_weight=args.distill_weight,
+        spatial_distill_weight=args.spatial_distill_weight,
     )
 
     try:

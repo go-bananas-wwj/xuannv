@@ -36,6 +36,7 @@ class AEFLoss:
                  channel_decorr_weight: float = 0.0,
                  stripe_weight: float = 0.0,
                  anti_stripe_embed_weight: float = 0.0,
+                 spatial_distill_weight: float = 0.0,
                  ):
 
         self.reconstruction_weight = reconstruction_weight
@@ -54,6 +55,7 @@ class AEFLoss:
         self.channel_decorr_weight = channel_decorr_weight
         self.stripe_weight = stripe_weight
         self.anti_stripe_embed_weight = anti_stripe_embed_weight
+        self.spatial_distill_weight = spatial_distill_weight
 
         self.source_configs = {
             's2': {'weight': 1.0, 'loss_fn': F.l1_loss},
@@ -480,6 +482,45 @@ class AEFLoss:
 
         return loss
 
+    def spatial_gradient_distill_loss(
+        self,
+        pred_embeddings: torch.Tensor,
+        target_embeddings: torch.Tensor,
+    ) -> torch.Tensor:
+        """Spatial gradient distillation: match horizontal and vertical gradients.
+
+        Penalizes stripe patterns by requiring student to have similar spatial
+        variation as AEF target within each row.
+        """
+        if pred_embeddings is None or target_embeddings is None:
+            device = pred_embeddings.device if pred_embeddings is not None else (
+                target_embeddings.device if target_embeddings is not None else torch.device('cpu')
+            )
+            return torch.tensor(0.0, device=device)
+
+        B, H, W, D_pred = pred_embeddings.shape
+        B_t, D_t, H_t, W_t = target_embeddings.shape
+
+        if H_t != H or W_t != W:
+            target_2d = target_embeddings
+            target_2d = F.interpolate(target_2d, size=(H, W), mode='bilinear', align_corners=False)
+        else:
+            target_2d = target_embeddings
+
+        target = rearrange(target_2d, 'b c h w -> b h w c')
+
+        # Horizontal gradient (along width) - key for anti-stripe
+        pred_grad_h = pred_embeddings[:, :, 1:, :] - pred_embeddings[:, :, :-1, :]
+        tgt_grad_h = target[:, :, 1:, :] - target[:, :, :-1, :]
+        grad_h_loss = F.mse_loss(pred_grad_h, tgt_grad_h)
+
+        # Vertical gradient (along height)
+        pred_grad_v = pred_embeddings[:, 1:, :, :] - pred_embeddings[:, :-1, :, :]
+        tgt_grad_v = target[:, 1:, :, :] - target[:, :-1, :, :]
+        grad_v_loss = F.mse_loss(pred_grad_v, tgt_grad_v)
+
+        return grad_h_loss + grad_v_loss
+
     def __call__(self, outputs: Dict[str, Any]) -> Dict[str, torch.Tensor]:
         losses = {}
         device = next(iter(outputs.values())).device if outputs else torch.device('cpu')
@@ -531,8 +572,16 @@ class AEFLoss:
                 outputs['aef_embedding_target'],
                 outputs.get('aef_embedding_valid'),
             )
+            if self.spatial_distill_weight > 0:
+                losses['spatial_distill'] = self.spatial_gradient_distill_loss(
+                    outputs['aef_embedding_pred'],
+                    outputs['aef_embedding_target'],
+                )
+            else:
+                losses['spatial_distill'] = torch.tensor(0.0, device=device)
         else:
             losses['distill'] = torch.tensor(0.0, device=device)
+            losses['spatial_distill'] = torch.tensor(0.0, device=device)
 
         total_loss = (
             self.reconstruction_weight * losses['reconstruction'] +
@@ -547,7 +596,8 @@ class AEFLoss:
             self.channel_decorr_weight * losses['channel_decorr'] +
             self.consistency_weight * losses['consistency'] +
             self.text_weight * losses['clip'] +
-            self.distill_weight * losses['distill']
+            self.distill_weight * losses['distill'] +
+            self.spatial_distill_weight * losses['spatial_distill']
         )
 
         if 'embeddings' in outputs and self.y_grad_weight > 0:
