@@ -116,6 +116,8 @@ class TemporalSummarizer(nn.Module):
         q = self.summarizer_q(valid_periods)                 # (B, C)
         # Pool over time at each (h,w)
         z = self.time_pool(feats_smooth, q, mask=mask)       # (B, H, W, C)
+        # Row centering: eliminate horizontal striping artifacts by removing per-row mean
+        z = z - z.mean(dim=2, keepdim=True)                  # (B, H, W, C)
         # Project to 64D，**训练时不 L2 norm**，保留幅度信息
         mu = self.proj_64(z)                                 # (B, H, W, 64)
         return mu
