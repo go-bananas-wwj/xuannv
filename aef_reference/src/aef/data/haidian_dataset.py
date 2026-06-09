@@ -265,8 +265,7 @@ class HaidianAEFDataset(Dataset):
                 else:
                     source_data[src] = torch.from_numpy(data.copy()).float()
             if aef_embedding is not None:
-                aef_embedding = np.flip(aef_embedding, axis=1)  # (64, H, W) -> flip H
-                aef_embedding = aef_embedding.copy()
+                aef_embedding = torch.flip(aef_embedding, dims=[1])  # (64, H, W) -> flip H
 
         return {
             "source_data": source_data,
