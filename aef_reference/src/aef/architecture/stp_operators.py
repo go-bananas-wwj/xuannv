@@ -7,7 +7,10 @@ from src.aef.architecture.encoder_utils import SinusoidalTimeEncoding
 
 
 class SpaceOperator(nn.Module):
-    """Space operator: ViT-like spatial self-attention at 1/8L resolution."""
+    """Space operator: ViT-like spatial self-attention at 1/8L resolution.
+    Added 2D sinusoidal positional encoding to break y-direction symmetry
+    that causes horizontal striping artifacts.
+    """
     
     def __init__(self, dim: int = 1024, num_heads: int = 8):
         super().__init__()
@@ -27,9 +30,41 @@ class SpaceOperator(nn.Module):
             nn.Linear(dim * 4, dim)
         )
         
+    def _get_2d_sincos_pos_embed(self, H: int, W: int, C: int, device: torch.device):
+        """Generate 2D sinusoidal positional encoding (H*W, C)."""
+        assert C % 4 == 0, "dim must be divisible by 4 for 2D sin/cos encoding"
+        half = C // 2
+        quarter = C // 4
+        
+        # y direction (rows)
+        y_pos = torch.arange(H, dtype=torch.float32, device=device).unsqueeze(1)  # (H, 1)
+        y_freq = torch.exp(torch.arange(0, half, 2, dtype=torch.float32, device=device) *
+                          -(np.log(10000.0) / half))  # (quarter,)
+        y_emb = torch.zeros(H, half, device=device)
+        y_emb[:, 0::2] = torch.sin(y_pos * y_freq)
+        y_emb[:, 1::2] = torch.cos(y_pos * y_freq)
+        
+        # x direction (cols)
+        x_pos = torch.arange(W, dtype=torch.float32, device=device).unsqueeze(1)  # (W, 1)
+        x_freq = torch.exp(torch.arange(0, half, 2, dtype=torch.float32, device=device) *
+                          -(np.log(10000.0) / half))  # (quarter,)
+        x_emb = torch.zeros(W, half, device=device)
+        x_emb[:, 0::2] = torch.sin(x_pos * x_freq)
+        x_emb[:, 1::2] = torch.cos(x_pos * x_freq)
+        
+        # Combine: each position (h, w) gets [y_emb[h], x_emb[w]]
+        pos_embed = torch.zeros(H, W, C, device=device)
+        pos_embed[:, :, :half] = y_emb.unsqueeze(1)  # (H, 1, half) -> (H, W, half)
+        pos_embed[:, :, half:] = x_emb.unsqueeze(0)  # (1, W, half) -> (H, W, half)
+        return pos_embed.reshape(H * W, C)
+        
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, H, W, C = x.shape
         x_flat = rearrange(x, 'b t h w c -> (b t) (h w) c')
+        
+        # Add 2D positional encoding to break y-direction symmetry
+        pos_embed = self._get_2d_sincos_pos_embed(H, W, C, x.device)  # (HW, C)
+        x_flat = x_flat + pos_embed.unsqueeze(0)  # (BT, HW, C)
         
         # Self-attention
         residual = x_flat
