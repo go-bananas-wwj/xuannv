@@ -314,7 +314,7 @@ class AlphaEarthFoundations(nn.Module):
         
         # Add spatial noise to break horizontal striping artifacts from Sentinel-2
         if self.training:
-            noise_scale = 0.05
+            noise_scale = 0.2
             mu_t = mu_t + torch.randn_like(mu_t) * noise_scale
             mu_s = mu_s + torch.randn_like(mu_s) * noise_scale
 
