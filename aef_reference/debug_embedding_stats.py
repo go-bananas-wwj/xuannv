@@ -58,7 +58,8 @@ valid_periods = batch["valid_periods"]
 # Check multiple checkpoints
 checkpoints = {
     "Step 200 (baseline)": "/workspace/xuannv/aef_reference/outputs/aef_distill_seed42/step_000200_seed42.pt",
-    "Step 200 (expN local_sp=5.0, no-distill)": "/workspace/xuannv/aef_reference/outputs/aef_distill_expN_high_local_seed42/step_000200_seed42.pt",
+    "Step 200 (expP fix-uniform + fast-warm)": "/workspace/xuannv/aef_reference/outputs/aef_distill_expP_fixuniform_seed42/step_000200_seed42.pt",
+    "Step 200 (expQ local_sp=20.0, no-distill)": "/workspace/xuannv/aef_reference/outputs/aef_distill_expQ_highlocal_seed42/step_000200_seed42.pt",
 }
 
 for name, path in checkpoints.items():
