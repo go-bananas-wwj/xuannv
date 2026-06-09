@@ -112,17 +112,29 @@ class AEFLoss:
         return total_loss
 
     def batch_uniformity_loss(self, embeddings: torch.Tensor) -> torch.Tensor:
-        """L2 space batch uniformity (lower is better)."""
+        """L2 space batch uniformity (lower is better).
+
+        CRITICAL FIX: compute uniformity across BATCH samples, not spatial pixels.
+        Old code flattened (B,H,W,D) -> (B*H*W,D) and used torch.roll(shifts=1),
+        which forced spatially-adjacent pixels to be orthogonal, directly creating
+        checkerboard/stripe artifacts. Now we global-average-pool over space first
+        so uniformity acts on distinct samples, not spatial neighbours.
+        """
         x = embeddings
         if x.dim() == 5:
+            # (B, T, H, W, D) -> pool over (H,W) -> (B, T, D) -> flatten time -> (B*T, D)
             B, T, H, W, D = x.shape
-            x = rearrange(x, 'b t h w d -> (b t h w) d')
+            x = x.permute(0, 1, 4, 2, 3).reshape(B * T, D, H, W)
+            x = F.adaptive_avg_pool2d(x, (1, 1)).view(B * T, D)
         elif x.dim() == 4:
+            # (B, H, W, D) -> pool over (H,W) -> (B, D)
             B, H, W, D = x.shape
-            x = rearrange(x, 'b h w d -> (b h w) d')
+            x = x.permute(0, 3, 1, 2)  # (B, D, H, W)
+            x = F.adaptive_avg_pool2d(x, (1, 1)).view(B, D)
 
         x = torch.nn.functional.normalize(x, p=2, dim=-1)
         x = torch.where(torch.isnan(x), torch.zeros_like(x), x)
+        # Shift along BATCH dimension (distinct samples), never spatial
         x_prime = torch.roll(x, shifts=1, dims=0)
         dots = (x * x_prime).sum(dim=-1).abs()
         return dots.mean()
