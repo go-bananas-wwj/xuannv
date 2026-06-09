@@ -117,6 +117,7 @@ class Trainer:
             "uniformity": [],
             "consistency": [],
             "distill": [],
+            "magnitude": [],
         }
 
         self.seed = seed
@@ -356,7 +357,7 @@ class Trainer:
             # Logging
             if self.rank == 0:
                 self.loss_history["steps"].append(step)
-                for k in ["total", "reconstruction", "uniformity", "consistency", "distill"]:
+                for k in ["total", "reconstruction", "uniformity", "consistency", "distill", "magnitude"]:
                     self.loss_history[k].append(float(losses[k]))
 
                 if step % self.log_every == 0:
@@ -373,6 +374,7 @@ class Trainer:
                         f"uniform={losses['uniformity']:.4f} "
                         f"consist={losses['consistency']:.4f} "
                         f"distill={losses['distill']:.4f} "
+                        f"mag={losses['magnitude']:.4f} "
                         f"lr={lr:.6f} "
                         f"({steps_per_sec:.2f} step/s, ETA {eta:.1f}h)"
                     )
@@ -404,6 +406,7 @@ class Trainer:
         total_var = 0.0
         total_cov = 0.0
         total_distill = 0.0
+        total_mag = 0.0
         count = 0
 
         for batch in self.val_dataloader:
@@ -442,6 +445,7 @@ class Trainer:
             total_var += float(losses["variance"])
             total_cov += float(losses["covariance"])
             total_distill += float(losses["distill"])
+            total_mag += float(losses["magnitude"])
             count += 1
 
         self.model.train()
@@ -462,22 +466,25 @@ class Trainer:
             var_tensor = torch.tensor(total_var, device=self.device, dtype=torch.float32)
             cov_tensor = torch.tensor(total_cov, device=self.device, dtype=torch.float32)
             distill_tensor = torch.tensor(total_distill, device=self.device, dtype=torch.float32)
-            for t in [recon_tensor, uniform_tensor, var_tensor, cov_tensor, distill_tensor]:
+            mag_tensor = torch.tensor(total_mag, device=self.device, dtype=torch.float32)
+            for t in [recon_tensor, uniform_tensor, var_tensor, cov_tensor, distill_tensor, mag_tensor]:
                 dist.all_reduce(t, op=dist.ReduceOp.SUM)
             avg_recon = float(recon_tensor / count_tensor)
             avg_uniform = float(uniform_tensor / count_tensor)
             avg_var = float(var_tensor / count_tensor)
             avg_cov = float(cov_tensor / count_tensor)
             avg_distill = float(distill_tensor / count_tensor)
+            avg_mag = float(mag_tensor / count_tensor)
         else:
             avg_recon = total_recon / count
             avg_uniform = total_uniform / count
             avg_var = total_var / count
             avg_cov = total_cov / count
             avg_distill = total_distill / count
+            avg_mag = total_mag / count
 
         if self.rank == 0:
-            print(f"[Val] recon={avg_recon:.4f} uniform={avg_uniform:.4f} var={avg_var:.4f} cov={avg_cov:.4f} distill={avg_distill:.4f}")
+            print(f"[Val] recon={avg_recon:.4f} uniform={avg_uniform:.4f} var={avg_var:.4f} cov={avg_cov:.4f} distill={avg_distill:.4f} mag={avg_mag:.4f}")
 
     def _save_checkpoint(self, step: int) -> None:
         self.output_dir.mkdir(parents=True, exist_ok=True)

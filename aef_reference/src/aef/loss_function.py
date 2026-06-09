@@ -114,11 +114,10 @@ class AEFLoss:
     def batch_uniformity_loss(self, embeddings: torch.Tensor) -> torch.Tensor:
         """L2 space batch uniformity (lower is better).
 
-        CRITICAL FIX: compute uniformity across BATCH samples, not spatial pixels.
-        Old code flattened (B,H,W,D) -> (B*H*W,D) and used torch.roll(shifts=1),
-        which forced spatially-adjacent pixels to be orthogonal, directly creating
-        checkerboard/stripe artifacts. Now we global-average-pool over space first
-        so uniformity acts on distinct samples, not spatial neighbours.
+        CRITICAL FIX: compute uniformity across distinct samples, never spatial neighbours.
+        For small per-GPU batch sizes (B < 4), augments the sample pool with spatial
+        pixels to ensure statistical validity. Uses random pair sampling instead of
+        deterministic torch.roll to avoid forcing adjacency orthogonality.
         """
         x = embeddings
         if x.dim() == 5:
@@ -127,16 +126,29 @@ class AEFLoss:
             x = x.permute(0, 1, 4, 2, 3).reshape(B * T, D, H, W)
             x = F.adaptive_avg_pool2d(x, (1, 1)).view(B * T, D)
         elif x.dim() == 4:
-            # (B, H, W, D) -> pool over (H,W) -> (B, D)
             B, H, W, D = x.shape
-            x = x.permute(0, 3, 1, 2)  # (B, D, H, W)
-            x = F.adaptive_avg_pool2d(x, (1, 1)).view(B, D)
+            if B >= 4:
+                # Large batch: pool over space to get per-sample embeddings
+                x = x.permute(0, 3, 1, 2)  # (B, D, H, W)
+                x = F.adaptive_avg_pool2d(x, (1, 1)).view(B, D)
+            else:
+                # Small batch: use spatial pixels to augment sample pool
+                x = x.reshape(B * H * W, D)
 
-        x = torch.nn.functional.normalize(x, p=2, dim=-1)
+        x = F.normalize(x, p=2, dim=-1)
         x = torch.where(torch.isnan(x), torch.zeros_like(x), x)
-        # Shift along BATCH dimension (distinct samples), never spatial
-        x_prime = torch.roll(x, shifts=1, dims=0)
-        dots = (x * x_prime).sum(dim=-1).abs()
+
+        N = x.shape[0]
+        if N < 2:
+            return x.new_tensor(0.0)
+
+        # Random pair sampling avoids deterministic adjacency artifacts
+        K = min(N * 2, 512)
+        idx_i = torch.randint(0, N, (K,), device=x.device)
+        offset = torch.randint(1, N, (K,), device=x.device)
+        idx_j = (idx_i + offset) % N
+
+        dots = (x[idx_i] * x[idx_j]).sum(dim=-1).abs()
         return dots.mean()
 
     def raw_uniformity_loss(self, embeddings: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
@@ -310,11 +322,17 @@ class AEFLoss:
 
         target = rearrange(target_2d, 'b c h w -> b h w c')
 
-        pred_n = torch.nn.functional.normalize(pred_embeddings, p=2, dim=-1)
-        tgt_n = torch.nn.functional.normalize(target, p=2, dim=-1)
+        pred_n = F.normalize(pred_embeddings, p=2, dim=-1)
+        tgt_n = F.normalize(target, p=2, dim=-1)
         cosine_sim = (pred_n * tgt_n).sum(dim=-1)
+        cosine_loss = (1.0 - cosine_sim)
 
-        loss = (1.0 - cosine_sim)
+        # Magnitude matching: prevent collapse to near-zero pre-norm vectors
+        pred_mag = pred_embeddings.norm(dim=-1)
+        tgt_mag = target.norm(dim=-1)
+        mag_loss = ((pred_mag - tgt_mag) ** 2) / (tgt_mag ** 2 + 1e-8)
+
+        loss = cosine_loss + 0.1 * mag_loss
 
         if valid_mask is not None:
             valid_mask_2d = valid_mask.view(B, 1, 1).expand(B, H, W)
