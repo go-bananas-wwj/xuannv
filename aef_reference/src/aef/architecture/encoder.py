@@ -1,17 +1,18 @@
-
 from einops import rearrange
 import torch
 from torch.functional import F 
 import torch.nn as nn
 
 from src.aef.architecture.STPBlock import STPBlock
-from src.aef.architecture.laplacian_pyramid_exchange import LearnedSpatialResampling
 
 
 class STPEncoder(nn.Module):
     """
-    Space Time Precision encoder 
- 
+    Space Time Precision encoder.
+    
+    Key change: space/time pathways now provide global context via GAP + projection
+    instead of upsampling low-res features, which eliminates grid/checkerboard artifacts
+    from bilinear upsampling of coarse feature maps.
     """
     
     def __init__(self, input_channels: int, d_s: int = 1024, d_t: int = 512, d_p: int = 128, num_blocks: int = 15):
@@ -20,7 +21,7 @@ class STPEncoder(nn.Module):
         self.time_dim = d_t
         self.precision_dim = d_p
         
-        # Individual source encoders transform inputs to same latent space
+        # Project inputs to common latent space
         self.input_projection = nn.Linear(input_channels, self.precision_dim)
         
         # Pathway-specific projections
@@ -30,17 +31,15 @@ class STPEncoder(nn.Module):
         # STP blocks as per paper
         self.blocks = nn.ModuleList([STPBlock(d_s, d_t, d_p) for _ in range(num_blocks)])
         
-        # Final learned spatial resampling to full resolution (H, W)
-        # space: 1/8L -> full, time: 1/4L -> full (reduced from 1/16 and 1/8 to avoid grid artifacts)
-        self.final_space_resample = LearnedSpatialResampling(self.space_dim, self.precision_dim, 8.0)
-        self.final_time_resample = LearnedSpatialResampling(self.time_dim, self.precision_dim, 4.0)
+        # Global context projections: low-res space/time -> precision_dim for broadcasting
+        self.space_to_precision = nn.Linear(d_s, d_p)
+        self.time_to_precision = nn.Linear(d_t, d_p)
         
-        # Post-fusion conv to blend pathways and suppress residual grid patterns
-        # Kernel 5x5 to cover larger upsampling block boundaries (8x up from 16x16)
-        self.final_fusion = nn.Sequential(
-            nn.Conv2d(self.precision_dim, self.precision_dim, kernel_size=5, padding=2, groups=1),
+        # Light spatial fusion to blend precision + global context
+        self.spatial_fusion = nn.Sequential(
+            nn.Conv2d(d_p, d_p, kernel_size=3, padding=1),
             nn.GELU(),
-            nn.Conv2d(self.precision_dim, self.precision_dim, kernel_size=5, padding=2, groups=1),
+            nn.Conv2d(d_p, d_p, kernel_size=3, padding=1),
         )
         
         # Output norm
@@ -61,7 +60,7 @@ class STPEncoder(nn.Module):
         x_proj = self.input_projection(x)
         
         # Initialize features at different resolutions using pathway projections
-        # Space pathway: project to space_dim and downsample to 1/8L (was 1/16L)
+        # Space pathway: project to space_dim and downsample to 1/8L
         space_features = self.space_projection(x_proj)
         space_features = F.adaptive_avg_pool2d(
             rearrange(space_features, 'b t h w c -> (b t) c h w'),
@@ -69,7 +68,7 @@ class STPEncoder(nn.Module):
         )
         space_features = rearrange(space_features, '(b t) c h w -> b t h w c', b=B, t=T)
         
-        # Time pathway: project to time_dim and downsample to 1/4L (was 1/8L)
+        # Time pathway: project to time_dim and downsample to 1/4L
         time_features = self.time_projection(x_proj)
         time_features = F.adaptive_avg_pool2d(
             rearrange(time_features, 'b t h w c -> (b t) c h w'),
@@ -90,35 +89,22 @@ class STPEncoder(nn.Module):
                 space_features, time_features, precision_features, timestamps
             )
         
-        # Final learned spatial resampling to precision resolution
-        space_2d = rearrange(space_features, 'b t h w c -> (b t) c h w')
-        time_2d = rearrange(time_features, 'b t h w c -> (b t) c h w')
-        precision_2d = rearrange(precision_features, 'b t h w c -> (b t) c h w')
+        # Global context from space/time: GAP -> project -> broadcast
+        # This avoids upsampling artifacts entirely
+        space_global = space_features.mean(dim=(2, 3))          # (B, T, d_s)
+        space_ctx = self.space_to_precision(space_global)        # (B, T, d_p)
+        space_broadcast = space_ctx.unsqueeze(2).unsqueeze(3).expand(B, T, H, W, self.precision_dim)
         
-        # Resample space and time pathways to precision resolution
-        space_resampled = self.final_space_resample(space_2d)
-        time_resampled = self.final_time_resample(time_2d)
+        time_global = time_features.mean(dim=(2, 3))            # (B, T, d_t)
+        time_ctx = self.time_to_precision(time_global)           # (B, T, d_p)
+        time_broadcast = time_ctx.unsqueeze(2).unsqueeze(3).expand(B, T, H, W, self.precision_dim)
         
-        # Ensure all pathways have the same spatial dimensions
-        target_H, target_W = precision_2d.shape[2:]
+        # Combine: precision (spatial detail) + global context from space/time
+        final_features = precision_features + space_broadcast + time_broadcast
         
-        if space_resampled.shape[2:] != (target_H, target_W):
-            space_resampled = F.interpolate(
-                space_resampled, size=(target_H, target_W), mode='bilinear', align_corners=False
-            )
-        
-        if time_resampled.shape[2:] != (target_H, target_W):
-            time_resampled = F.interpolate(
-                time_resampled, size=(target_H, target_W), mode='bilinear', align_corners=False
-            )
-        
-        # Combine all pathways at precision resolution
-        final_features = space_resampled + time_resampled + precision_2d
-        
-        # Fusion conv to suppress residual grid artifacts from upsampled low-res pathways
-        final_features = self.final_fusion(final_features)
-        
-        # Reshape back and normalize
-        final_features = rearrange(final_features, '(b t) c h w -> b t h w c', b=B, t=T)
+        # Light spatial fusion
+        final_2d = rearrange(final_features, 'b t h w c -> (b t) c h w')
+        final_2d = self.spatial_fusion(final_2d)
+        final_features = rearrange(final_2d, '(b t) c h w -> b t h w c', b=B, t=T)
         
         return self.norm(final_features)

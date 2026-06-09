@@ -3,12 +3,17 @@ from torch import nn
 from torch.functional import F
 from typing import Tuple
 from einops import rearrange
-from src.aef.architecture.laplacian_pyramid_exchange import LearnedSpatialResampling
+
 from src.aef.architecture.stp_operators import SpaceOperator, PrecisionOperator, TimeOperator
 
 
 class STPBlock(nn.Module):
-    """Single STP block with three simultaneous operators and pyramid exchanges."""
+    """Single STP block with three simultaneous operators and global context exchange.
+    
+    Key change: pyramid exchanges now use GAP + broadcast instead of learned
+    upsampling, eliminating grid/checkerboard artifacts from bilinear upsampling
+    of coarse feature maps inside the block loop.
+    """
     
     def __init__(self, space_dim: int = 1024, time_dim: int = 512, precision_dim: int = 128):
         super().__init__()
@@ -20,14 +25,14 @@ class STPBlock(nn.Module):
         self.time_op = TimeOperator(self.time_dim)
         self.precision_op = PrecisionOperator(self.precision_dim)
         
-        # Pyramid exchange resampling (learned Laplacian pyramid rescaling)
-        # space=1/8L, time=1/4L, precision=1/1L
-        self.space_to_time = LearnedSpatialResampling(self.space_dim, self.time_dim, 2.0)
-        self.space_to_precision = LearnedSpatialResampling(self.space_dim, self.precision_dim, 8.0)
-        self.time_to_space = LearnedSpatialResampling(self.time_dim, self.space_dim, 0.5)
-        self.time_to_precision = LearnedSpatialResampling(self.time_dim, self.precision_dim, 4.0)
-        self.precision_to_space = LearnedSpatialResampling(self.precision_dim, self.space_dim, 0.125)
-        self.precision_to_time = LearnedSpatialResampling(self.precision_dim, self.time_dim, 0.25)
+        # Global context projections for cross-scale exchange
+        # space -> precision, time -> precision, etc.
+        self.space_to_precision_proj = nn.Linear(space_dim, precision_dim)
+        self.time_to_precision_proj = nn.Linear(time_dim, precision_dim)
+        self.precision_to_space_proj = nn.Linear(precision_dim, space_dim)
+        self.precision_to_time_proj = nn.Linear(precision_dim, time_dim)
+        self.space_to_time_proj = nn.Linear(space_dim, time_dim)
+        self.time_to_space_proj = nn.Linear(time_dim, space_dim)
         
     def forward(self, space_x: torch.Tensor, time_x: torch.Tensor, precision_x: torch.Tensor, 
                 timestamps: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -39,74 +44,42 @@ class STPBlock(nn.Module):
         
         B, T = space_out.shape[:2]
         
-        # Get spatial dimensions
+        # --- Global context exchange (no upsampling, no grid artifacts) ---
+        
+        # Space global context
+        space_global = space_out.mean(dim=(2, 3))  # (B, T, space_dim)
+        
+        # Time global context
+        time_global = time_out.mean(dim=(2, 3))    # (B, T, time_dim)
+        
+        # Precision global context
+        precision_global = precision_out.mean(dim=(2, 3))  # (B, T, precision_dim)
+        
+        # Exchange via projection + broadcast
+        # space contributes to time and precision
+        space_to_time = self.space_to_time_proj(space_global).unsqueeze(2).unsqueeze(3)  # (B,T,1,1,time_dim)
+        space_to_precision = self.space_to_precision_proj(space_global).unsqueeze(2).unsqueeze(3)  # (B,T,1,1,prec_dim)
+        
+        # time contributes to space and precision
+        time_to_space = self.time_to_space_proj(time_global).unsqueeze(2).unsqueeze(3)  # (B,T,1,1,space_dim)
+        time_to_precision = self.time_to_precision_proj(time_global).unsqueeze(2).unsqueeze(3)  # (B,T,1,1,prec_dim)
+        
+        # precision contributes to space and time
+        precision_to_space = self.precision_to_space_proj(precision_global).unsqueeze(2).unsqueeze(3)  # (B,T,1,1,space_dim)
+        precision_to_time = self.precision_to_time_proj(precision_global).unsqueeze(2).unsqueeze(3)  # (B,T,1,1,time_dim)
+        
+        # Broadcast to spatial dimensions and add
         space_H, space_W = space_out.shape[2:4]
         time_H, time_W = time_out.shape[2:4]
         precision_H, precision_W = precision_out.shape[2:4]
         
-        # Pyramid exchanges - reshape to (BT, C, H, W) for spatial ops
-        space_2d = rearrange(space_out, 'b t h w c -> (b t) c h w')
-        time_2d = rearrange(time_out, 'b t h w c -> (b t) c h w')
-        precision_2d = rearrange(precision_out, 'b t h w c -> (b t) c h w')
+        space_exchange = space_out + time_to_space.expand(B, T, space_H, space_W, self.space_dim) \
+                                   + precision_to_space.expand(B, T, space_H, space_W, self.space_dim)
         
-        # Exchange information between scales with proper resampling        
-        # time_to_space: time_H -> space_H (downsample by 0.5)
-        time_to_space_resampled = self.time_to_space(time_2d)
-        # Ensure output matches space dimensions
-        if time_to_space_resampled.shape[2:] != (space_H, space_W):
-            time_to_space_resampled = F.interpolate(
-                time_to_space_resampled, size=(space_H, space_W), mode='bilinear', align_corners=False
-            )
+        time_exchange = time_out + space_to_time.expand(B, T, time_H, time_W, self.time_dim) \
+                                 + precision_to_time.expand(B, T, time_H, time_W, self.time_dim)
         
-        # precision_to_space: precision_H -> space_H (upsample by 0.125)
-        precision_to_space_resampled = self.precision_to_space(precision_2d)
-        if precision_to_space_resampled.shape[2:] != (space_H, space_W):
-            precision_to_space_resampled = F.interpolate(
-                precision_to_space_resampled, size=(space_H, space_W), mode='bilinear', align_corners=False
-            )
-     
+        precision_exchange = precision_out + space_to_precision.expand(B, T, precision_H, precision_W, self.precision_dim) \
+                                           + time_to_precision.expand(B, T, precision_H, precision_W, self.precision_dim)
         
-        # space_to_time: space_H -> time_H (upsample by 2.0)
-        space_to_time_resampled = self.space_to_time(space_2d)
-        # Ensure output matches time dimensions
-        if space_to_time_resampled.shape[2:] != (time_H, time_W):
-            space_to_time_resampled = F.interpolate(
-                space_to_time_resampled, size=(time_H, time_W), mode='bilinear', align_corners=False
-            )
-        
-        # precision_to_time: precision_H -> time_H (upsample by 0.25)
-        precision_to_time_resampled = self.precision_to_time(precision_2d)
-        # Ensure output matches time dimensions
-        if precision_to_time_resampled.shape[2:] != (time_H, time_W):
-            precision_to_time_resampled = F.interpolate(
-                precision_to_time_resampled, size=(time_H, time_W), mode='bilinear', align_corners=False
-            )
-        
-        # space_to_precision: space_H -> precision_H (downsample by 8.0)
-        space_to_precision_resampled = self.space_to_precision(space_2d)
-        # Ensure output matches precision dimensions
-        if space_to_precision_resampled.shape[2:] != (precision_H, precision_W):
-            space_to_precision_resampled = F.interpolate(
-                space_to_precision_resampled, size=(precision_H, precision_W), mode='bilinear', align_corners=False
-            )
-        
-        # time_to_precision: time_H -> precision_H (downsample by 4.0)
-        time_to_precision_resampled = self.time_to_precision(time_2d)
-        # Ensure output matches precision dimensions
-        if time_to_precision_resampled.shape[2:] != (precision_H, precision_W):
-            time_to_precision_resampled = F.interpolate(
-                time_to_precision_resampled, size=(precision_H, precision_W), mode='bilinear', align_corners=False
-            )
-        
-        # Combine with proper spatial dimensions
-        space_exchange = space_2d + time_to_space_resampled + precision_to_space_resampled
-        time_exchange = time_2d + space_to_time_resampled + precision_to_time_resampled
-        precision_exchange = precision_2d + space_to_precision_resampled + time_to_precision_resampled
-        
-        # Reshape back to (B, T, H, W, C)
-        space_out = rearrange(space_exchange, '(b t) c h w -> b t h w c', b=B, t=T)
-        time_out = rearrange(time_exchange, '(b t) c h w -> b t h w c', b=B, t=T)
-        precision_out = rearrange(precision_exchange, '(b t) c h w -> b t h w c', b=B, t=T)
-        
-        return space_out, time_out, precision_out
-
+        return space_exchange, time_exchange, precision_exchange

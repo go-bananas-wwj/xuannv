@@ -108,9 +108,9 @@ class TemporalSummarizer(nn.Module):
         """
         # Spatial smoothing to suppress residual grid artifacts from encoder upsampling
         B, T, H, W, C = feats.shape
-        feats_2d = feats.view(B * T, H, W, C).permute(0, 3, 1, 2)  # (BT, C, H, W)
+        feats_2d = feats.view(B * T, H, W, C).permute(0, 3, 1, 2).contiguous()  # (BT, C, H, W)
         feats_2d = self.spatial_smooth(feats_2d)
-        feats_smooth = feats_2d.permute(0, 2, 3, 1).view(B, T, H, W, C)
+        feats_smooth = feats_2d.permute(0, 2, 3, 1).contiguous().view(B, T, H, W, C)
         
         # Build single query per sample
         q = self.summarizer_q(valid_periods)                 # (B, C)
