@@ -85,6 +85,7 @@ def main() -> None:
     parser.add_argument("--recon-weight", type=float, default=1.0)
     parser.add_argument("--distill-weight", type=float, default=0.2)
     parser.add_argument("--spatial-distill-weight", type=float, default=0.0)
+    parser.add_argument("--uniformity-weight", type=float, default=0.05)
     args = parser.parse_args()
 
     rank, world_size, local_rank = setup_distributed()
@@ -253,6 +254,7 @@ def main() -> None:
         reconstruction_weight=args.recon_weight,
         distill_weight=args.distill_weight,
         spatial_distill_weight=args.spatial_distill_weight,
+        uniformity_weight=args.uniformity_weight,
     )
 
     try:

@@ -57,9 +57,11 @@ valid_periods = batch["valid_periods"]
 
 # Check multiple checkpoints
 checkpoints = {
-    "Step 200": "/workspace/xuannv/aef_reference/outputs/aef_distill_seed42/step_000200_seed42.pt",
-    "Step 1000": "/workspace/xuannv/aef_reference/outputs/aef_distill_expI_seed42/step_001000_seed42.pt",
-    "Step 2000": "/workspace/xuannv/aef_reference/outputs/aef_distill_expI_seed42/step_002000_seed42.pt",
+    "Step 200 (baseline)": "/workspace/xuannv/aef_reference/outputs/aef_distill_seed42/step_000200_seed42.pt",
+    "Step 1000 (baseline)": "/workspace/xuannv/aef_reference/outputs/aef_distill_expI_seed42/step_001000_seed42.pt",
+    "Step 2000 (baseline)": "/workspace/xuannv/aef_reference/outputs/aef_distill_expI_seed42/step_002000_seed42.pt",
+    "Step 200 (expJ spatial)": "/workspace/xuannv/aef_reference/outputs/aef_distill_expJ_spatial_seed42/step_000200_seed42.pt",
+    "Step 200 (expK no-distill)": "/workspace/xuannv/aef_reference/outputs/aef_distill_expK_nodistill_seed42/step_000200_seed42.pt",
 }
 
 for name, path in checkpoints.items():
@@ -89,15 +91,15 @@ for name, path in checkpoints.items():
     avg_cos_sim = np.mean(cos_sims)
     
     print(f"\n=== {name} ===")
-    print(f"  Row mean std (avg across channels): {row_mean_std:.4f}")
-    print(f"  Within-row std (avg): {within_row_std:.4f}")
-    print(f"  Adjacent row cos_sim: {avg_cos_sim:.4f}")
+    print(f"  Row mean std (avg across channels): {row_mean_std:.6f}")
+    print(f"  Within-row std (avg): {within_row_std:.6f}")
+    print(f"  Adjacent row cos_sim: {avg_cos_sim:.6f}")
     print(f"  Shape: {student_emb.shape}")
     
     # Per-channel row mean std
     for c in range(min(5, D)):
         rm = student_emb[:, :, c].mean(axis=1)
-        print(f"  Channel {c} row mean range: [{rm.min():.4f}, {rm.max():.4f}], std: {rm.std():.4f}")
+        print(f"  Channel {c} row mean range: [{rm.min():.6f}, {rm.max():.6f}], std: {rm.std():.6f}")
 
 # Also check AEF official
 aef_emb_path = f"/workspace/xuannv/data_raw/haidian/aef_embeddings/haidian_2025_patches/{patch_id}.npy"
@@ -116,9 +118,9 @@ for h in range(H - 1):
 avg_cos_sim = np.mean(cos_sims)
 
 print(f"\n=== AEF Official ===")
-print(f"  Row mean std (avg across channels): {row_mean_std:.4f}")
-print(f"  Within-row std (avg): {within_row_std:.4f}")
-print(f"  Adjacent row cos_sim: {avg_cos_sim:.4f}")
+print(f"  Row mean std (avg across channels): {row_mean_std:.6f}")
+print(f"  Within-row std (avg): {within_row_std:.6f}")
+print(f"  Adjacent row cos_sim: {avg_cos_sim:.6f}")
 for c in range(min(5, D)):
     rm = aef_emb[:, :, c].mean(axis=1)
-    print(f"  Channel {c} row mean range: [{rm.min():.4f}, {rm.max():.4f}], std: {rm.std():.4f}")
+    print(f"  Channel {c} row mean range: [{rm.min():.6f}, {rm.max():.6f}], std: {rm.std():.6f}")

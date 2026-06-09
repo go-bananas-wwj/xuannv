@@ -55,6 +55,7 @@ class Trainer:
         reconstruction_weight: float = 1.0,
         distill_weight: float = 0.2,
         spatial_distill_weight: float = 0.0,
+        uniformity_weight: float = 0.05,
     ) -> None:
         self.model = model
         self.dataloader = dataloader
@@ -76,6 +77,7 @@ class Trainer:
             reconstruction_weight=reconstruction_weight,
             distill_weight=distill_weight,
             spatial_distill_weight=spatial_distill_weight,
+            uniformity_weight=uniformity_weight,
         )
 
         # Optimizer
