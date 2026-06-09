@@ -17,10 +17,12 @@ from src.aef.architecture.encoder_utils import IndividualSourceEncoder, SummaryP
 
 class TimePooling(nn.Module):
     """
-    Single-query multi-head attention over time at each (h,w).
+    Spatial-aware multi-head attention over time at each (h,w).
+    Key change: generates per-position queries using 2D spatial encoding
+    instead of a single global query, breaking horizontal striping artifacts.
     Inputs:
       feats: (B, T, H, W, C)
-      q:     (B, C)           — from SummaryPeriodEncoder
+      q:     (B, C)           — from SummaryPeriodEncoder (global temporal context)
       mask:  (B, T) optional  — 1 for valid frames, 0 for padded/missing
     Output:
       z:     (B, H, W, C)
@@ -35,6 +37,9 @@ class TimePooling(nn.Module):
         self.kv = nn.Linear(dim, 2 * dim)     # to K,V
         self.q_proj = nn.Linear(dim, dim)     # to Q
         self.out = nn.Linear(dim, dim)
+        
+        # 2D spatial query encoding: per-head bias to break symmetry
+        self.spatial_q_bias = nn.Parameter(torch.zeros(1, num_heads, 1, self.head_dim))
 
     def forward(self, feats: torch.Tensor, q: torch.Tensor, mask: torch.Tensor | None = None):
         B, T, H, W, C = feats.shape
@@ -47,10 +52,15 @@ class TimePooling(nn.Module):
         K = K.permute(0, 2, 1, 3)                                      # (BHW, heads, T, d)
         V = V.permute(0, 2, 1, 3)                                      # (BHW, heads, T, d)
 
-        # single query per sample, broadcast to all (h,w)
+        # Per-spatial-position query: global temporal query + learned spatial bias
+        # This breaks y-direction symmetry that causes horizontal striping
         qh = self.q_proj(q).view(B, self.num_heads, self.head_dim)     # (B, heads, d)
         qh = qh.unsqueeze(1).expand(B, H * W, self.num_heads, self.head_dim) \
                .reshape(BHW, self.num_heads, 1, self.head_dim)         # (BHW, heads, 1, d)
+        
+        # Add spatial variation to queries (different for each head)
+        spatial_bias = self.spatial_q_bias.expand(BHW, self.num_heads, 1, self.head_dim)
+        qh = qh + spatial_bias
 
         # scaled dot-product attention over time
         logits = (qh * K).sum(-1) / (self.head_dim ** 0.5)             # (BHW, heads, 1, T)

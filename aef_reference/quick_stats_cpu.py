@@ -1,14 +1,9 @@
-"""Quick visualization of embedding for a single checkpoint"""
 import sys
 sys.path.insert(0, "/workspace/xuannv")
 sys.path.insert(0, "/workspace/xuannv/aef_reference")
 
 import torch
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import torch_npu
 from src.aef.architecture.aef_module import AlphaEarthFoundations
 from src.aef.data.haidian_dataset import HaidianAEFDataset, collate_fn
 
@@ -33,9 +28,8 @@ def load_model(checkpoint_path):
     model.load_state_dict(new_state_dict, strict=False)
     return model
 
-device = "npu:0"
+device = "cpu"
 
-# Load sample
 dataset = HaidianAEFDataset(
     data_root="/workspace/xuannv/data_raw/haidian/scenes",
     planet_root="/workspace/xuannv/data_raw/beijing/planetscene",
@@ -58,48 +52,26 @@ source_data = {k: v.to(device) for k, v in batch["source_data"].items()}
 timestamps = {k: v.to(device) for k, v in batch["timestamps"].items()}
 valid_periods = batch["valid_periods"]
 
-def embed_to_rgb(emb):
-    """PCA to RGB"""
-    H, W, D = emb.shape
-    flat = emb.reshape(-1, D)
-    mean = flat.mean(axis=0)
-    centered = flat - mean
-    _, _, vh = np.linalg.svd(centered, full_matrices=False)
-    basis = vh[:3].T
-    proj = centered @ basis
-    proj = (proj - proj.min(axis=0)) / (proj.max(axis=0) - proj.min(axis=0) + 1e-8)
-    return proj.reshape(H, W, 3)
+checkpoint_path = "/workspace/xuannv/aef_reference/outputs/aef_distill_seed42/step_000200_seed42.pt"
+print(f"Loading {checkpoint_path}...")
+model = load_model(checkpoint_path).to(device)
+model.eval()
+print("Running forward...")
+with torch.no_grad():
+    out = model(source_data, timestamps, valid_periods)
 
-# Visualize multiple checkpoints
-checkpoints = {
-    "Baseline (step 200)": "/workspace/xuannv/aef_reference/outputs/aef_distill_seed42/step_000200_seed42.pt",
-    "ExpS 1000-step (step 200)": "/workspace/xuannv/aef_reference/outputs/aef_distill_expS_1000steps_seed42/step_000200_seed42.pt",
-}
+student_emb = out["embeddings"][0].detach().cpu().numpy()
+H, W, D = student_emb.shape
 
-fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+row_means = student_emb.mean(axis=1)
+row_mean_std = row_means.std(axis=0).mean()
+within_row_std = student_emb.std(axis=1).mean()
 
-# AEF Official
-aef_emb_path = f"/workspace/xuannv/data_raw/haidian/aef_embeddings/haidian_2025_patches/{patch_id}.npy"
-aef_emb = np.load(aef_emb_path)
-aef_emb = np.transpose(aef_emb, (1, 2, 0))
-aef_rgb = embed_to_rgb(aef_emb)
-axes[0].imshow(aef_rgb)
-axes[0].set_title("AEF Official")
-axes[0].axis('off')
+row_flat = student_emb.reshape(H, W * D)
+row_norm = row_flat / (np.linalg.norm(row_flat, axis=1, keepdims=True) + 1e-8)
+cos_sims = [np.dot(row_norm[h], row_norm[h+1]) for h in range(H - 1)]
+avg_cos_sim = np.mean(cos_sims)
 
-idx = 1
-for name, path in checkpoints.items():
-    model = load_model(path).to(device)
-    model.eval()
-    with torch.no_grad():
-        out = model(source_data, timestamps, valid_periods)
-    student_emb = out["embeddings"][0].detach().cpu().numpy()
-    student_rgb = embed_to_rgb(student_emb)
-    axes[idx].imshow(student_rgb)
-    axes[idx].set_title(name)
-    axes[idx].axis('off')
-    idx += 1
-
-plt.tight_layout()
-plt.savefig("/workspace/xuannv/aef_reference/debug_viz_comparison.png", dpi=150)
-print("Saved to debug_viz_comparison.png")
+print(f"Row mean std: {row_mean_std:.6f}")
+print(f"Within-row std: {within_row_std:.6f}")
+print(f"Adjacent row cos_sim: {avg_cos_sim:.6f}")

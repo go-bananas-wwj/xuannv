@@ -1,4 +1,3 @@
-"""Quick visualization of embedding for a single checkpoint"""
 import sys
 sys.path.insert(0, "/workspace/xuannv")
 sys.path.insert(0, "/workspace/xuannv/aef_reference")
@@ -30,12 +29,23 @@ def load_model(checkpoint_path):
             new_state_dict[k[7:]] = v
         else:
             new_state_dict[k] = v
-    model.load_state_dict(new_state_dict, strict=False)
+    missing, unexpected = model.load_state_dict(new_state_dict, strict=False)
+    print(f"Missing: {len(missing)}, Unexpected: {len(unexpected)}")
     return model
+
+def embed_to_rgb(emb):
+    H, W, D = emb.shape
+    flat = emb.reshape(-1, D)
+    mean = flat.mean(axis=0)
+    centered = flat - mean
+    _, _, vh = np.linalg.svd(centered, full_matrices=False)
+    basis = vh[:3].T
+    proj = centered @ basis
+    proj = (proj - proj.min(axis=0)) / (proj.max(axis=0) - proj.min(axis=0) + 1e-8)
+    return proj.reshape(H, W, 3)
 
 device = "npu:0"
 
-# Load sample
 dataset = HaidianAEFDataset(
     data_root="/workspace/xuannv/data_raw/haidian/scenes",
     planet_root="/workspace/xuannv/data_raw/beijing/planetscene",
@@ -58,48 +68,37 @@ source_data = {k: v.to(device) for k, v in batch["source_data"].items()}
 timestamps = {k: v.to(device) for k, v in batch["timestamps"].items()}
 valid_periods = batch["valid_periods"]
 
-def embed_to_rgb(emb):
-    """PCA to RGB"""
-    H, W, D = emb.shape
-    flat = emb.reshape(-1, D)
-    mean = flat.mean(axis=0)
-    centered = flat - mean
-    _, _, vh = np.linalg.svd(centered, full_matrices=False)
-    basis = vh[:3].T
-    proj = centered @ basis
-    proj = (proj - proj.min(axis=0)) / (proj.max(axis=0) - proj.min(axis=0) + 1e-8)
-    return proj.reshape(H, W, 3)
-
-# Visualize multiple checkpoints
-checkpoints = {
-    "Baseline (step 200)": "/workspace/xuannv/aef_reference/outputs/aef_distill_seed42/step_000200_seed42.pt",
-    "ExpS 1000-step (step 200)": "/workspace/xuannv/aef_reference/outputs/aef_distill_expS_1000steps_seed42/step_000200_seed42.pt",
-}
-
-fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-
 # AEF Official
 aef_emb_path = f"/workspace/xuannv/data_raw/haidian/aef_embeddings/haidian_2025_patches/{patch_id}.npy"
 aef_emb = np.load(aef_emb_path)
 aef_emb = np.transpose(aef_emb, (1, 2, 0))
 aef_rgb = embed_to_rgb(aef_emb)
+
+# New checkpoint
+checkpoint_path = "/workspace/xuannv/aef_reference/outputs/aef_distill_seed42/step_000200_seed42.pt"
+model = load_model(checkpoint_path).to(device)
+model.eval()
+with torch.no_grad():
+    out = model(source_data, timestamps, valid_periods)
+student_emb = out["embeddings"][0].detach().cpu().numpy()
+student_rgb = embed_to_rgb(student_emb)
+
+fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 axes[0].imshow(aef_rgb)
 axes[0].set_title("AEF Official")
 axes[0].axis('off')
 
-idx = 1
-for name, path in checkpoints.items():
-    model = load_model(path).to(device)
-    model.eval()
-    with torch.no_grad():
-        out = model(source_data, timestamps, valid_periods)
-    student_emb = out["embeddings"][0].detach().cpu().numpy()
-    student_rgb = embed_to_rgb(student_emb)
-    axes[idx].imshow(student_rgb)
-    axes[idx].set_title(name)
-    axes[idx].axis('off')
-    idx += 1
+axes[1].imshow(student_rgb)
+axes[1].set_title("Spatial Q Bias (step 200)")
+axes[1].axis('off')
+
+# Diff
+diff = np.abs(student_rgb - aef_rgb).mean(axis=-1)
+im = axes[2].imshow(diff, cmap='hot')
+axes[2].set_title("|Student - AEF|")
+axes[2].axis('off')
+plt.colorbar(im, ax=axes[2], fraction=0.046)
 
 plt.tight_layout()
-plt.savefig("/workspace/xuannv/aef_reference/debug_viz_comparison.png", dpi=150)
-print("Saved to debug_viz_comparison.png")
+plt.savefig("/workspace/xuannv/aef_reference/debug_viz_spatial_q.png", dpi=150)
+print("Saved to debug_viz_spatial_q.png")
