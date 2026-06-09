@@ -143,10 +143,12 @@ class VonMisesFisherDecoder(nn.Module):
             # Reshape back to spatial grid
             decoded = rearrange(decoded_flat, '(b l1 l2) c -> b l1 l2 c', b=B, l1=L, l2=L)
             
-            # Apply spatial refinement conv to break striping artifacts
-            decoded = rearrange(decoded, 'b l1 l2 c -> b c l1 l2')
-            decoded = decoded + self.spatial_refinement[source](decoded)  # residual connection
-            decoded = rearrange(decoded, 'b c l1 l2 -> b l1 l2 c')
+            # REMOVED: spatial refinement conv allows decoder to reconstruct from
+            # stripe/smooth embeddings, removing the incentive for encoder to learn
+            # spatial details. Without it, encoder MUST learn spatial variation.
+            # decoded = rearrange(decoded, 'b l1 l2 c -> b c l1 l2')
+            # decoded = decoded + self.spatial_refinement[source](decoded)
+            # decoded = rearrange(decoded, 'b c l1 l2 -> b l1 l2 c')
             
             decoded_samples.append(decoded)
         
