@@ -171,7 +171,19 @@ class HaidianAEFDataset(Dataset):
             if len(frames) >= self.max_frames:
                 break
 
-            data = read_tif(tif_path, self.image_size)
+            # 根据源分辨率差异选择重采样策略
+            if source_name == "planet":
+                # Planet 3m 高分辨率大图，需下采样以保持完整地理覆盖
+                data = read_tif(tif_path, self.image_size, resize_mode="area")
+            elif source_name == "landsat":
+                # Landsat 30m 低分辨率小图，需真正上采样而非 edge pad
+                data = read_tif(tif_path, self.image_size, resize_mode="bilinear")
+            elif source_name in ("worldcover", "dynamic_world"):
+                # 分类目标：最近邻插值保持类别值
+                data = read_tif(tif_path, self.image_size, resize_mode="nearest")
+            else:
+                # S1, S2, tianyi_sar 等接近目标分辨率：center crop
+                data = read_tif(tif_path, self.image_size)
             if data is None:
                 continue
             # 过滤包含 NaN/Inf 的帧
