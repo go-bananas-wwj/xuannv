@@ -332,7 +332,7 @@ class AEFLoss:
         tgt_mag = target.norm(dim=-1)
         mag_loss = ((pred_mag - tgt_mag) ** 2) / (tgt_mag ** 2 + 1e-8)
 
-        loss = cosine_loss + 0.1 * mag_loss
+        loss = cosine_loss + 0.001 * mag_loss
 
         if valid_mask is not None:
             valid_mask_2d = valid_mask.view(B, 1, 1).expand(B, H, W)
