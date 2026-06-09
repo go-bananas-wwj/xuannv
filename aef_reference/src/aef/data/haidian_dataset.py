@@ -144,6 +144,24 @@ class HaidianAEFDataset(Dataset):
             out[data == esa_val] = cls_idx
         return out
 
+    @staticmethod
+    def _destripe_s2(data: np.ndarray) -> np.ndarray:
+        """
+        Sentinel-2 destriping: 去除沿列方向的条带噪声。
+        对每通道沿行方向计算中值，减去列中值并加回全局中值。
+        data: (C, H, W) 已归一化
+        """
+        out = data.copy()
+        for c in range(out.shape[0]):
+            # 沿行方向（axis=1）计算每列的中值轮廓
+            col_median = np.median(out[c], axis=0, keepdims=True)  # (1, W)
+            # 估计条带噪声 = 列中值 - 全局中值
+            global_median = np.median(col_median)
+            stripe = col_median - global_median
+            # 去除条带
+            out[c] = out[c] - stripe
+        return out
+
     def _load_source_frames(self, patch_id: str, source_name: str) -> tuple[np.ndarray, list[float]] | None:
         """加载单个源的所有帧数据，返回 (data, timestamps_ms)."""
         if source_name == "planet":
@@ -202,6 +220,9 @@ class HaidianAEFDataset(Dataset):
             else:
                 stats = self.stats.get(source_name, {})
                 data = normalize_source(data, source_name, stats)
+                # 对 S2 数据做 destriping：去除 sentinel-2 条带噪声
+                if source_name == "s2":
+                    data = self._destripe_s2(data)
                 # 归一化后再次检查 NaN
                 if np.isnan(data).any() or np.isinf(data).any():
                     continue
