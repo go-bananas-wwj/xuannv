@@ -252,6 +252,14 @@ class HaidianAEFDataset(Dataset):
         valid_start_ms = min(all_timestamps)
         valid_end_ms = max(all_timestamps)
 
+        # S2 destriping: 减去每行均值（保留全局均值），消除探测器条带差异
+        if "s2" in source_data:
+            s2_data = source_data["s2"].numpy()  # (T, H, W, C)
+            row_means = s2_data.mean(axis=2, keepdims=True)  # (T, H, 1, C)
+            global_mean = row_means.mean(axis=1, keepdims=True)  # (T, 1, 1, C)
+            s2_data = s2_data - (row_means - global_mean)
+            source_data["s2"] = torch.from_numpy(s2_data.copy()).float()
+
         # 加载官方 AEF embedding
         aef_embedding = self._load_aef_embedding(patch_id)
 
