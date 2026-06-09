@@ -90,6 +90,8 @@ class TemporalSummarizer(nn.Module):
         # Channel-only smoothing (1x1 conv to avoid introducing spatial/y-correlation)
         self.spatial_smooth = nn.Conv2d(feature_dim, feature_dim, kernel_size=1)
         self.time_pool = TimePooling(dim=feature_dim, num_heads=num_heads)
+        # Destripe conv: 1x3 kernel only in x-direction to enhance within-row variation
+        self.destripe_conv = nn.Conv2d(feature_dim, feature_dim, kernel_size=(1, 3), padding=(0, 1))
         self.proj_64 = nn.Linear(feature_dim, embed_dim, bias=False)
         # 增大初始化 std，让初始 embedding 更分散，打破坍缩死锁
         nn.init.xavier_normal_(self.proj_64.weight, gain=2.0)
@@ -116,6 +118,12 @@ class TemporalSummarizer(nn.Module):
         q = self.summarizer_q(valid_periods)                 # (B, C)
         # Pool over time at each (h,w)
         z = self.time_pool(feats_smooth, q, mask=mask)       # (B, H, W, C)
+        # Destripe: enhance within-row variation using 1x3 conv (x-direction only)
+        z_destriped = z.permute(0, 3, 1, 2).contiguous()     # (B, C, H, W)
+        z_destriped = z_destriped + self.destripe_conv(z_destriped)
+        z = z_destriped.permute(0, 2, 3, 1).contiguous()     # (B, H, W, C)
+        # Row centering: eliminate horizontal striping artifacts by removing per-row mean
+        z = z - z.mean(dim=2, keepdim=True)                  # (B, H, W, C)
         # Project to 64D，**训练时不 L2 norm**，保留幅度信息
         mu = self.proj_64(z)                                 # (B, H, W, 64)
         return mu
