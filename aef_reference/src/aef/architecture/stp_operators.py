@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,7 +8,11 @@ from src.aef.architecture.encoder_utils import SinusoidalTimeEncoding
 
 
 class SpaceOperator(nn.Module):
-    """Space operator: ViT-like spatial self-attention at 1/16L resolution."""
+    """Space operator: ViT-like spatial self-attention at 1/8L resolution.
+    
+    Includes 2D sinusoidal position encoding to break spatial symmetry
+    and prevent uniform/grid-like artifacts.
+    """
     
     def __init__(self, dim: int = 1024, num_heads: int = 8):
         super().__init__()
@@ -27,8 +32,37 @@ class SpaceOperator(nn.Module):
             nn.Linear(dim * 4, dim)
         )
         
+    def _create_2d_pos_enc(self, H: int, W: int, C: int, device: torch.device) -> torch.Tensor:
+        """Create 2D sinusoidal position encoding (H, W, C)."""
+        half_dim = C // 4
+        # Vertical and horizontal frequencies
+        freq = torch.exp(
+            torch.arange(half_dim, device=device, dtype=torch.float32)
+            * (-np.log(10000.0) / (half_dim - 1))
+        )
+        
+        y_pos = torch.arange(H, device=device, dtype=torch.float32).unsqueeze(1)  # (H, 1)
+        x_pos = torch.arange(W, device=device, dtype=torch.float32).unsqueeze(0)  # (1, W)
+        
+        y_enc = torch.stack([torch.sin(y_pos * f) for f in freq], dim=-1)  # (H, 1, half_dim)
+        x_enc = torch.stack([torch.sin(x_pos * f) for f in freq], dim=-1)  # (1, W, half_dim)
+        
+        # Broadcast and interleave
+        pos_enc = torch.zeros(H, W, C, device=device, dtype=torch.float32)
+        pos_enc[..., :half_dim] = y_enc.expand(H, W, half_dim)
+        pos_enc[..., half_dim:2*half_dim] = x_enc.expand(H, W, half_dim)
+        pos_enc[..., 2*half_dim:3*half_dim] = torch.cos(y_enc.expand(H, W, half_dim))
+        pos_enc[..., 3*half_dim:4*half_dim] = torch.cos(x_enc.expand(H, W, half_dim))
+        
+        return pos_enc
+        
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, H, W, C = x.shape
+        
+        # Add 2D sinusoidal position encoding to break spatial symmetry
+        pos_enc = self._create_2d_pos_enc(H, W, C, x.device)
+        x = x + pos_enc.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W, C)
+        
         x_flat = rearrange(x, 'b t h w c -> (b t) (h w) c')
         
         # Self-attention
@@ -40,7 +74,7 @@ class SpaceOperator(nn.Module):
                        three=3, heads=self.num_heads, d=self.head_dim)
         q, k, v = qkv[0], qkv[1], qkv[2]
         
-        attn = (q @ k.transpose(-2, -1)) * (self.head_dim ** -0.5) # .transpose (-2,1) for swapping (HW, d) -> (d, HW) --> (HW, d) @ (d, HW) = (HW, HW)
+        attn = (q @ k.transpose(-2, -1)) * (self.head_dim ** -0.5)
         attn = F.softmax(attn, dim=-1)
         
         x_attn = attn @ v

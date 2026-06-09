@@ -21,12 +21,13 @@ class STPBlock(nn.Module):
         self.precision_op = PrecisionOperator(self.precision_dim)
         
         # Pyramid exchange resampling (learned Laplacian pyramid rescaling)
+        # space=1/8L, time=1/4L, precision=1/1L
         self.space_to_time = LearnedSpatialResampling(self.space_dim, self.time_dim, 2.0)
-        self.space_to_precision = LearnedSpatialResampling(self.space_dim, self.precision_dim, 16.0)
+        self.space_to_precision = LearnedSpatialResampling(self.space_dim, self.precision_dim, 8.0)
         self.time_to_space = LearnedSpatialResampling(self.time_dim, self.space_dim, 0.5)
-        self.time_to_precision = LearnedSpatialResampling(self.time_dim, self.precision_dim, 8.0)
-        self.precision_to_space = LearnedSpatialResampling(self.precision_dim, self.space_dim, 0.0625)
-        self.precision_to_time = LearnedSpatialResampling(self.precision_dim, self.time_dim, 0.125)
+        self.time_to_precision = LearnedSpatialResampling(self.time_dim, self.precision_dim, 4.0)
+        self.precision_to_space = LearnedSpatialResampling(self.precision_dim, self.space_dim, 0.125)
+        self.precision_to_time = LearnedSpatialResampling(self.precision_dim, self.time_dim, 0.25)
         
     def forward(self, space_x: torch.Tensor, time_x: torch.Tensor, precision_x: torch.Tensor, 
                 timestamps: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:

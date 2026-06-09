@@ -31,8 +31,16 @@ class STPEncoder(nn.Module):
         self.blocks = nn.ModuleList([STPBlock(d_s, d_t, d_p) for _ in range(num_blocks)])
         
         # Final learned spatial resampling to full resolution (H, W)
-        self.final_space_resample = LearnedSpatialResampling(self.space_dim, self.precision_dim, 16.0)
-        self.final_time_resample = LearnedSpatialResampling(self.time_dim, self.precision_dim, 8.0)
+        # space: 1/8L -> full, time: 1/4L -> full (reduced from 1/16 and 1/8 to avoid grid artifacts)
+        self.final_space_resample = LearnedSpatialResampling(self.space_dim, self.precision_dim, 8.0)
+        self.final_time_resample = LearnedSpatialResampling(self.time_dim, self.precision_dim, 4.0)
+        
+        # Post-fusion conv to blend pathways and suppress residual grid patterns
+        self.final_fusion = nn.Sequential(
+            nn.Conv2d(self.precision_dim, self.precision_dim, kernel_size=3, padding=1, groups=1),
+            nn.GELU(),
+            nn.Conv2d(self.precision_dim, self.precision_dim, kernel_size=3, padding=1, groups=1),
+        )
         
         # Output norm
         self.norm = nn.LayerNorm(self.precision_dim)
@@ -52,19 +60,19 @@ class STPEncoder(nn.Module):
         x_proj = self.input_projection(x)
         
         # Initialize features at different resolutions using pathway projections
-        # Space pathway: project to space_dim and downsample to 1/16L
+        # Space pathway: project to space_dim and downsample to 1/8L (was 1/16L)
         space_features = self.space_projection(x_proj)
         space_features = F.adaptive_avg_pool2d(
             rearrange(space_features, 'b t h w c -> (b t) c h w'),
-            (H // 16, W // 16)
+            (H // 8, W // 8)
         )
         space_features = rearrange(space_features, '(b t) c h w -> b t h w c', b=B, t=T)
         
-        # Time pathway: project to time_dim and downsample to 1/8L  
+        # Time pathway: project to time_dim and downsample to 1/4L (was 1/8L)
         time_features = self.time_projection(x_proj)
         time_features = F.adaptive_avg_pool2d(
             rearrange(time_features, 'b t h w c -> (b t) c h w'),
-            (H // 8, W // 8)
+            (H // 4, W // 4)
         )
         time_features = rearrange(time_features, '(b t) c h w -> b t h w c', b=B, t=T)
         
@@ -105,6 +113,9 @@ class STPEncoder(nn.Module):
         
         # Combine all pathways at precision resolution
         final_features = space_resampled + time_resampled + precision_2d
+        
+        # Fusion conv to suppress residual grid artifacts from upsampled low-res pathways
+        final_features = self.final_fusion(final_features)
         
         # Reshape back and normalize
         final_features = rearrange(final_features, '(b t) c h w -> b t h w c', b=B, t=T)
