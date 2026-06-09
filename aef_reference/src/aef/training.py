@@ -56,6 +56,7 @@ class Trainer:
         distill_weight: float = 0.2,
         spatial_distill_weight: float = 0.0,
         uniformity_weight: float = 0.05,
+        local_spatial_weight: float = 0.0,
     ) -> None:
         self.model = model
         self.dataloader = dataloader
@@ -78,6 +79,7 @@ class Trainer:
             distill_weight=distill_weight,
             spatial_distill_weight=spatial_distill_weight,
             uniformity_weight=uniformity_weight,
+            local_spatial_weight=local_spatial_weight,
         )
 
         # Optimizer
@@ -377,11 +379,13 @@ class Trainer:
                     eta = (self.max_steps - step) / steps_per_sec / 3600 if steps_per_sec > 0 else 0
                     stage_tag = "[Align]" if step <= self.distill_warmup_steps else "[Normal]"
                     spatial_distill_val = losses.get('spatial_distill', torch.tensor(0.0)).item()
+                    local_spatial_val = losses.get('local_spatial', torch.tensor(0.0)).item()
                     print(
                         f"[Step {step}] {stage_tag} "
                         f"loss={losses['total']:.4f} "
                         f"recon={losses['reconstruction']:.4f} "
                         f"uniform={losses['uniformity']:.4f} "
+                        f"local_sp={local_spatial_val:.4f} "
                         f"consist={losses['consistency']:.4f} "
                         f"distill={losses['distill']:.4f} "
                         f"spat_dist={spatial_distill_val:.4f} "

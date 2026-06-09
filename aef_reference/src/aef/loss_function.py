@@ -37,6 +37,7 @@ class AEFLoss:
                  stripe_weight: float = 0.0,
                  anti_stripe_embed_weight: float = 0.0,
                  spatial_distill_weight: float = 0.0,
+                 local_spatial_weight: float = 0.0,
                  ):
 
         self.reconstruction_weight = reconstruction_weight
@@ -56,6 +57,7 @@ class AEFLoss:
         self.stripe_weight = stripe_weight
         self.anti_stripe_embed_weight = anti_stripe_embed_weight
         self.spatial_distill_weight = spatial_distill_weight
+        self.local_spatial_weight = local_spatial_weight
 
         self.source_configs = {
             's2': {'weight': 1.0, 'loss_fn': F.l1_loss},
@@ -214,6 +216,25 @@ class AEFLoss:
         # Use a hinge: only penalize when cos_sim > 0.5
         loss = F.relu(cos_sim - 0.5).mean()
         return loss
+
+    def local_spatial_uniformity_loss(self, embeddings: torch.Tensor) -> torch.Tensor:
+        """Penalize spatial smoothness: adjacent pixels should be diverse.
+
+        This directly combats stripe artifacts by requiring that adjacent
+        pixels (both horizontally and vertically) have different embeddings.
+        """
+        if embeddings.dim() != 4:
+            return embeddings.new_tensor(0.0)
+
+        x = F.normalize(embeddings, p=2, dim=-1)
+        x = torch.where(torch.isnan(x), torch.zeros_like(x), x)
+
+        # Horizontal neighbors (along width)
+        h_cos = (x[:, :, 1:, :] * x[:, :, :-1, :]).sum(dim=-1).abs()
+        # Vertical neighbors (along height)
+        v_cos = (x[:, 1:, :, :] * x[:, :-1, :, :]).sum(dim=-1).abs()
+
+        return h_cos.mean() + v_cos.mean()
 
     def raw_uniformity_loss(self, embeddings: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
         """Pre-norm Euclidean uniformity (kept for compatibility, disabled by default)."""
@@ -611,9 +632,13 @@ class AEFLoss:
             losses['coding_rate'] = self.coding_rate_loss(outputs['embeddings'])
             losses['magnitude'] = self.magnitude_loss(outputs['embeddings'])
             losses['channel_decorr'] = self.channel_decorrelation_loss(outputs['embeddings'])
+            if self.local_spatial_weight > 0:
+                losses['local_spatial'] = self.local_spatial_uniformity_loss(outputs['embeddings'])
+            else:
+                losses['local_spatial'] = torch.tensor(0.0, device=device)
         else:
             for k in ['uniformity', 'raw_uniform', 'variance', 'covariance',
-                      'decorr', 'erank', 'coding_rate', 'magnitude', 'channel_decorr']:
+                      'decorr', 'erank', 'coding_rate', 'magnitude', 'channel_decorr', 'local_spatial']:
                 losses[k] = torch.tensor(0.0, device=device)
 
         if 'teacher_embeddings' in outputs and 'student_embeddings' in outputs:
@@ -656,7 +681,8 @@ class AEFLoss:
             self.channel_decorr_weight * losses['channel_decorr'] +
             self.consistency_weight * losses['consistency'] +
             self.text_weight * losses['clip'] +
-            self.distill_weight * losses['distill']
+            self.distill_weight * losses['distill'] +
+            self.local_spatial_weight * losses['local_spatial']
         )
 
         if 'embeddings' in outputs and self.y_grad_weight > 0:
