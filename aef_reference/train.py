@@ -112,28 +112,28 @@ def main() -> None:
     # required_sources 只要求 S2 存在，缺失的其他源在 _stack_inputs 中用零填充
     required_sources = ["s2"]
     train_dataset = HaidianAEFDataset(
-        data_root="data_raw/haidian/scenes",
-        planet_root="data_raw/beijing/planetscene",
-        stats_dir="statistics/haidian",
+        data_root="/workspace/xuannv/data_raw/haidian/scenes",
+        planet_root="/workspace/xuannv/data_raw/beijing/planetscene",
+        stats_dir="/workspace/xuannv/statistics/haidian",
         split="train",
         image_size=128,
         source_names=source_names,
         required_sources=required_sources,
         max_frames=16,
-        aef_embedding_root="data_raw/haidian/aef_embeddings/haidian_2025_patches",
+        aef_embedding_root="/workspace/xuannv/data_raw/haidian/aef_embeddings/haidian_2025_patches",
         start_date="20251201",
         end_date="20260430",
     )
     val_dataset = HaidianAEFDataset(
-        data_root="data_raw/haidian/scenes",
-        planet_root="data_raw/beijing/planetscene",
-        stats_dir="statistics/haidian",
+        data_root="/workspace/xuannv/data_raw/haidian/scenes",
+        planet_root="/workspace/xuannv/data_raw/beijing/planetscene",
+        stats_dir="/workspace/xuannv/statistics/haidian",
         split="val",
         image_size=128,
         source_names=source_names,
         required_sources=required_sources,
         max_frames=16,
-        aef_embedding_root="data_raw/haidian/aef_embeddings/haidian_2025_patches",
+        aef_embedding_root="/workspace/xuannv/data_raw/haidian/aef_embeddings/haidian_2025_patches",
         start_date="20251201",
         end_date="20260430",
     )
