@@ -35,11 +35,11 @@ class STPEncoder(nn.Module):
         self.space_to_precision = nn.Linear(d_s, d_p)
         self.time_to_precision = nn.Linear(d_t, d_p)
         
-        # Light spatial fusion to blend precision + global context
+        # Light channel fusion (1x1 conv to avoid introducing spatial/y-correlation)
         self.spatial_fusion = nn.Sequential(
-            nn.Conv2d(d_p, d_p, kernel_size=3, padding=1),
+            nn.Conv2d(d_p, d_p, kernel_size=1),
             nn.GELU(),
-            nn.Conv2d(d_p, d_p, kernel_size=3, padding=1),
+            nn.Conv2d(d_p, d_p, kernel_size=1),
         )
         
         # Output norm

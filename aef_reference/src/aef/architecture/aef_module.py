@@ -87,8 +87,8 @@ class TemporalSummarizer(nn.Module):
         self.embed_dim = embed_dim
 
         self.summarizer_q = SummaryPeriodEncoder(dim=feature_dim)
-        # Spatial smoothing before time pooling to suppress residual grid artifacts
-        self.spatial_smooth = nn.Conv2d(feature_dim, feature_dim, kernel_size=3, padding=1, groups=1)
+        # Channel-only smoothing (1x1 conv to avoid introducing spatial/y-correlation)
+        self.spatial_smooth = nn.Conv2d(feature_dim, feature_dim, kernel_size=1)
         self.time_pool = TimePooling(dim=feature_dim, num_heads=num_heads)
         self.proj_64 = nn.Linear(feature_dim, embed_dim, bias=False)
         # 增大初始化 std，让初始 embedding 更分散，打破坍缩死锁
