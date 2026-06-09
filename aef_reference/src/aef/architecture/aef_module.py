@@ -173,6 +173,9 @@ class AlphaEarthFoundations(nn.Module):
 
         # Summarizer produces 64D embeddings on S^63
         self.summarizer = TemporalSummarizer(feature_dim=d_p, embed_dim=64)
+        
+        # BatchNorm to break horizontal striping artifacts
+        self.embedding_bn = nn.BatchNorm2d(64)
 
         # VMF implicit decoder for sources
         self.decoder = VonMisesFisherDecoder(
@@ -312,11 +315,14 @@ class AlphaEarthFoundations(nn.Module):
         feats_student = self.encoder(x_student, ts_student)
         mu_s = self.summarizer(feats_student, ts_student, vp)  # (B, H, W, 64)
         
-        # Add spatial noise to break horizontal striping artifacts from Sentinel-2
-        if self.training:
-            noise_scale = 0.2
-            mu_t = mu_t + torch.randn_like(mu_t) * noise_scale
-            mu_s = mu_s + torch.randn_like(mu_s) * noise_scale
+        # BatchNorm to break horizontal striping by normalizing per-channel statistics
+        mu_t = mu_t.permute(0, 3, 1, 2)  # (B, C, H, W)
+        mu_t = self.embedding_bn(mu_t)
+        mu_t = mu_t.permute(0, 2, 3, 1)  # (B, H, W, C)
+        
+        mu_s = mu_s.permute(0, 3, 1, 2)
+        mu_s = self.embedding_bn(mu_s)
+        mu_s = mu_s.permute(0, 2, 3, 1)
 
         B, H2, W2, _ = mu_t.shape
         if geometry_metadata is None:
