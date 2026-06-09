@@ -462,6 +462,17 @@ class AEFLoss:
                 # Horizontal gradient (along width) - key for anti-stripe
                 pred_grad_h = pred_embeddings[:, :, 1:, :] - pred_embeddings[:, :, :-1, :]
                 tgt_grad_h = target[:, :, 1:, :] - target[:, :, :-1, :]
+                # Avoid NaN from F.normalize on zero vectors
+                pred_grad_h = torch.where(
+                    pred_grad_h.norm(dim=-1, keepdim=True) < 1e-6,
+                    torch.randn_like(pred_grad_h) * 1e-4,
+                    pred_grad_h,
+                )
+                tgt_grad_h = torch.where(
+                    tgt_grad_h.norm(dim=-1, keepdim=True) < 1e-6,
+                    torch.randn_like(tgt_grad_h) * 1e-4,
+                    tgt_grad_h,
+                )
                 pred_grad_h_n = F.normalize(pred_grad_h, p=2, dim=-1)
                 tgt_grad_h_n = F.normalize(tgt_grad_h, p=2, dim=-1)
                 grad_h_cosine_sim = (pred_grad_h_n * tgt_grad_h_n).sum(dim=-1)
@@ -471,6 +482,16 @@ class AEFLoss:
                 # Vertical gradient (along height)
                 pred_grad_v = pred_embeddings[:, 1:, :, :] - pred_embeddings[:, :-1, :, :]
                 tgt_grad_v = target[:, 1:, :, :] - target[:, :-1, :, :]
+                pred_grad_v = torch.where(
+                    pred_grad_v.norm(dim=-1, keepdim=True) < 1e-6,
+                    torch.randn_like(pred_grad_v) * 1e-4,
+                    pred_grad_v,
+                )
+                tgt_grad_v = torch.where(
+                    tgt_grad_v.norm(dim=-1, keepdim=True) < 1e-6,
+                    torch.randn_like(tgt_grad_v) * 1e-4,
+                    tgt_grad_v,
+                )
                 pred_grad_v_n = F.normalize(pred_grad_v, p=2, dim=-1)
                 tgt_grad_v_n = F.normalize(tgt_grad_v, p=2, dim=-1)
                 grad_v_cosine_sim = (pred_grad_v_n * tgt_grad_v_n).sum(dim=-1)
