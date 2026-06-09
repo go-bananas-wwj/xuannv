@@ -120,12 +120,12 @@ class TemporalSummarizer(nn.Module):
         # Pool over time at each (h,w)
         z = self.time_pool(feats_smooth, q, mask=mask)       # (B, H, W, C)
         # Destripe: enhance within-row variation using 1x3 conv (x-direction only)
-        if os.environ.get('USE_DESTRIPE', 'true').lower() == 'true':
+        if os.environ.get('USE_DESTRIPE', 'false').lower() == 'true':
             z_destriped = z.permute(0, 3, 1, 2).contiguous()     # (B, C, H, W)
             z_destriped = z_destriped + 0.1 * self.destripe_conv(z_destriped)
             z = z_destriped.permute(0, 2, 3, 1).contiguous()     # (B, H, W, C)
         # Row centering: eliminate horizontal striping artifacts by removing per-row mean
-        if os.environ.get('USE_ROW_CENTER', 'true').lower() == 'true':
+        if os.environ.get('USE_ROW_CENTER', 'false').lower() == 'true':
             z = z - z.mean(dim=2, keepdim=True)                  # (B, H, W, C)
         # Project to 64D，**训练时不 L2 norm**，保留幅度信息
         mu = self.proj_64(z)                                 # (B, H, W, 64)
