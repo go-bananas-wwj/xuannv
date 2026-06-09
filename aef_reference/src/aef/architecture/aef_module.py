@@ -311,6 +311,12 @@ class AlphaEarthFoundations(nn.Module):
         ts_student = student_ts_dict[first_src]
         feats_student = self.encoder(x_student, ts_student)
         mu_s = self.summarizer(feats_student, ts_student, vp)  # (B, H, W, 64)
+        
+        # Add spatial noise to break horizontal striping artifacts from Sentinel-2
+        if self.training:
+            noise_scale = 0.05
+            mu_t = mu_t + torch.randn_like(mu_t) * noise_scale
+            mu_s = mu_s + torch.randn_like(mu_s) * noise_scale
 
         B, H2, W2, _ = mu_t.shape
         if geometry_metadata is None:
