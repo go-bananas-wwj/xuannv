@@ -375,6 +375,7 @@ class Trainer:
                         f"consist={losses['consistency']:.4f} "
                         f"distill={losses['distill']:.4f} "
                         f"mag={losses['magnitude']:.4f} "
+                        f"stripe={losses.get('anti_stripe_embed', torch.tensor(0.0)).item():.4f} "
                         f"lr={lr:.6f} "
                         f"({steps_per_sec:.2f} step/s, ETA {eta:.1f}h)"
                     )

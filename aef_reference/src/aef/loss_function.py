@@ -34,6 +34,8 @@ class AEFLoss:
                  magnitude_weight: float = 0.0,
                  y_grad_weight: float = 0.0,
                  channel_decorr_weight: float = 0.0,
+                 stripe_weight: float = 0.0,
+                 anti_stripe_embed_weight: float = 0.0,
                  ):
 
         self.reconstruction_weight = reconstruction_weight
@@ -50,6 +52,8 @@ class AEFLoss:
         self.magnitude_weight = magnitude_weight
         self.y_grad_weight = y_grad_weight
         self.channel_decorr_weight = channel_decorr_weight
+        self.stripe_weight = stripe_weight
+        self.anti_stripe_embed_weight = anti_stripe_embed_weight
 
         self.source_configs = {
             's2': {'weight': 1.0, 'loss_fn': F.l1_loss},
@@ -82,6 +86,8 @@ class AEFLoss:
             self.consistency_weight = float(os.environ.get('CONSISTENCY_WEIGHT', '0.02'))
             self.y_grad_weight = float(os.environ.get('Y_GRAD_WEIGHT', '0.0'))
             self.channel_decorr_weight = float(os.environ.get('CHANNEL_DECORR_WEIGHT', '0.0'))
+            self.stripe_weight = float(os.environ.get('STRIPE_WEIGHT', '0.0'))
+            self.anti_stripe_embed_weight = float(os.environ.get('ANTI_STRIPE_EMBED_WEIGHT', '0.0'))
             self.text_weight = 0.001
         else:
             raise ValueError(f"Unknown stage: {stage}")
@@ -119,9 +125,11 @@ class AEFLoss:
                     dx = (pred_spatial[:, :, :, 1:] - pred_spatial[:, :, :, :-1]).abs().mean()
                     spatial_smooth = 0.5 * (dx + dy)
                     
-                    # Also penalize embedding striping directly
-                    # If prediction is stripy, embedding is likely stripy too
-                    loss = loss + 0.1 * spatial_smooth
+                    # Stripe penalty: penalize when y-gradient dominates x-gradient
+                    # This specifically targets horizontal striping artifacts
+                    stripe_penalty = F.relu(dy - dx)
+                    
+                    loss = loss + 0.1 * spatial_smooth + self.stripe_weight * stripe_penalty
 
                 if total_loss is None:
                     total_loss = config['weight'] * loss
@@ -171,6 +179,39 @@ class AEFLoss:
 
         dots = (x[idx_i] * x[idx_j]).sum(dim=-1).abs()
         return dots.mean()
+
+    def anti_stripe_embedding_loss(self, embeddings: torch.Tensor) -> torch.Tensor:
+        """Penalize high cosine similarity between adjacent rows in embedding space.
+        This directly targets horizontal striping artifacts by encouraging
+        each row to have distinct patterns from its neighbors.
+        
+        Args:
+            embeddings: (B, H, W, D) spatial embeddings
+        Returns:
+            Loss scalar (higher when adjacent rows are too similar)
+        """
+        if embeddings.dim() != 4:
+            return embeddings.new_tensor(0.0)
+        
+        B, H, W, D = embeddings.shape
+        if H < 2:
+            return embeddings.new_tensor(0.0)
+        
+        # Flatten each row to (B, H, W*D)
+        rows = embeddings.reshape(B, H, W * D)
+        
+        # Normalize each row
+        rows_norm = F.normalize(rows, p=2, dim=-1)
+        rows_norm = torch.where(torch.isnan(rows_norm), torch.zeros_like(rows_norm), rows_norm)
+        
+        # Cosine similarity between adjacent rows
+        # We want this to be low (rows should be different)
+        cos_sim = (rows_norm[:, :-1, :] * rows_norm[:, 1:, :]).sum(dim=-1)
+        
+        # Penalize high similarity (cos_sim close to 1)
+        # Use a hinge: only penalize when cos_sim > 0.5
+        loss = F.relu(cos_sim - 0.5).mean()
+        return loss
 
     def raw_uniformity_loss(self, embeddings: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
         """Pre-norm Euclidean uniformity (kept for compatibility, disabled by default)."""
@@ -514,6 +555,12 @@ class AEFLoss:
             total_loss = total_loss + self.y_grad_weight * losses['y_grad']
         else:
             losses['y_grad'] = torch.tensor(0.0, device=device)
+
+        if 'embeddings' in outputs and self.anti_stripe_embed_weight > 0:
+            losses['anti_stripe_embed'] = self.anti_stripe_embedding_loss(outputs['embeddings'])
+            total_loss = total_loss + self.anti_stripe_embed_weight * losses['anti_stripe_embed']
+        else:
+            losses['anti_stripe_embed'] = torch.tensor(0.0, device=device)
 
         losses['total'] = total_loss
 

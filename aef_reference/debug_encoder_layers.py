@@ -1,92 +1,84 @@
-"""逐步检查 encoder 每一层的 y-corr"""
-import os
-os.environ["ASCEND_LAUNCH_BLOCKING"] = "1"
+"""Debug encoder layer by layer"""
 import sys
 sys.path.insert(0, "/workspace/xuannv")
+sys.path.insert(0, "/workspace/xuannv/aef_reference")
 
 import torch
-import torch_npu
 import numpy as np
-from einops import rearrange
+import torch_npu
 from src.aef.architecture.encoder import STPEncoder
 
-torch.manual_seed(42)
+def adjacent_row_cos_sim(t):
+    """t: (H, W, C)"""
+    sims = []
+    for h in range(t.shape[0] - 1):
+        row_h = t[h, :, :].reshape(-1)
+        row_hp1 = t[h+1, :, :].reshape(-1)
+        sim = torch.cosine_similarity(row_h, row_hp1, dim=0)
+        sims.append(sim.item())
+    return np.mean(sims)
 
-def y_corr(arr):
-    """Compute mean y-correlation."""
-    B, T, H, W, D = arr.shape
-    corrs = []
-    for bi in range(B):
-        for t in range(T):
-            for c in range(D):
-                for yi in range(H - 1):
-                    c1 = np.corrcoef(arr[bi, t, yi, :, c], arr[bi, t, yi+1, :, c])[0, 1]
-                    if not np.isnan(c1):
-                        corrs.append(c1)
-    return np.mean(corrs)
-
-# Random input
-B, T, H, W, C = 2, 4, 128, 128, 20
-x = torch.randn(B, T, H, W, C).npu()
-ts = torch.randn(B, T).npu()
-
-encoder = STPEncoder(input_channels=C, d_s=64, d_t=32, d_p=16, num_blocks=2).npu()
+# Create a simple encoder
+encoder = STPEncoder(input_channels=19, d_s=1024, d_t=512, d_p=128, num_blocks=15)
+device = "npu:0"
+encoder = encoder.to(device)
 encoder.eval()
 
+B, T, H, W, C = 1, 4, 128, 128, 19
+torch.manual_seed(42)
+x = torch.randn(B, T, H, W, C, device=device)
+timestamps = torch.rand(B, T, device=device)
+
 with torch.no_grad():
-    # Step 1: input_projection
+    # Step by step through encoder
     x_proj = encoder.input_projection(x)
-    print(f"1. input_projection: y_corr={y_corr(x_proj.cpu().numpy()):.4f}")
+    print(f"x_proj adjacent_row_cos_sim: {adjacent_row_cos_sim(x_proj[0, 0]):.4f}")
     
-    # Step 2: space_projection + pool
-    space = encoder.space_projection(x_proj)
-    space = torch.nn.functional.adaptive_avg_pool2d(
-        rearrange(space, 'b t h w c -> (b t) c h w'),
+    space_features = encoder.space_projection(x_proj)
+    space_features = torch.nn.functional.adaptive_avg_pool2d(
+        space_features.permute(0, 1, 4, 2, 3).reshape(B*T, -1, H, W),
         (H // 8, W // 8)
     )
-    space = rearrange(space, '(b t) c h w -> b t h w c', b=B, t=T)
-    print(f"2. space_projection+pool: y_corr={y_corr(space.cpu().numpy()):.4f}")
+    space_features = space_features.view(B, T, -1, H//8, W//8).permute(0, 1, 3, 4, 2)
+    print(f"space_features (after init) adjacent_row_cos_sim: {adjacent_row_cos_sim(space_features[0, 0]):.4f}")
     
-    # Step 3: time_projection + pool
-    time = encoder.time_projection(x_proj)
-    time = torch.nn.functional.adaptive_avg_pool2d(
-        rearrange(time, 'b t h w c -> (b t) c h w'),
+    time_features = encoder.time_projection(x_proj)
+    time_features = torch.nn.functional.adaptive_avg_pool2d(
+        time_features.permute(0, 1, 4, 2, 3).reshape(B*T, -1, H, W),
         (H // 4, W // 4)
     )
-    time = rearrange(time, '(b t) c h w -> b t h w c', b=B, t=T)
-    print(f"3. time_projection+pool: y_corr={y_corr(time.cpu().numpy()):.4f}")
+    time_features = time_features.view(B, T, -1, H//4, W//4).permute(0, 1, 3, 4, 2)
+    print(f"time_features (after init) adjacent_row_cos_sim: {adjacent_row_cos_sim(time_features[0, 0]):.4f}")
     
-    # Step 4: precision (pool at full res)
-    prec = torch.nn.functional.adaptive_avg_pool2d(
-        rearrange(x_proj, 'b t h w c -> (b t) c h w'),
+    precision_features = torch.nn.functional.adaptive_avg_pool2d(
+        x_proj.permute(0, 1, 4, 2, 3).reshape(B*T, -1, H, W),
         (H, W)
     )
-    prec = rearrange(prec, '(b t) c h w -> b t h w c', b=B, t=T)
-    print(f"4. precision_pool: y_corr={y_corr(prec.cpu().numpy()):.4f}")
+    precision_features = precision_features.view(B, T, -1, H, W).permute(0, 1, 3, 4, 2)
+    print(f"precision_features (after init) adjacent_row_cos_sim: {adjacent_row_cos_sim(precision_features[0, 0]):.4f}")
     
-    # Step 5: After STP blocks
+    # Run through blocks one by one
     for i, block in enumerate(encoder.blocks):
-        space, time, prec = block(space, time, prec, ts)
-        print(f"5. STP block {i}: space_y={y_corr(space.cpu().numpy()):.4f}, time_y={y_corr(time.cpu().numpy()):.4f}, prec_y={y_corr(prec.cpu().numpy()):.4f}")
+        space_features, time_features, precision_features = block(
+            space_features, time_features, precision_features, timestamps
+        )
+        if i % 3 == 0 or i == 14:
+            print(f"Block {i}: precision adjacent_row_cos_sim={adjacent_row_cos_sim(precision_features[0, 0]):.4f}, "
+                  f"space adjacent_row_cos_sim={adjacent_row_cos_sim(space_features[0, 0]):.4f}")
     
-    # Step 6: Final combination
-    space_global = space.mean(dim=(2, 3))
+    # Final combination
+    space_global = space_features.mean(dim=(2, 3))
     space_ctx = encoder.space_to_precision(space_global)
     space_broadcast = space_ctx.unsqueeze(2).unsqueeze(3).expand(B, T, H, W, encoder.precision_dim)
     
-    time_global = time.mean(dim=(2, 3))
+    time_global = time_features.mean(dim=(2, 3))
     time_ctx = encoder.time_to_precision(time_global)
     time_broadcast = time_ctx.unsqueeze(2).unsqueeze(3).expand(B, T, H, W, encoder.precision_dim)
     
-    final = prec + space_broadcast + time_broadcast
-    print(f"6. after combine: y_corr={y_corr(final.cpu().numpy()):.4f}")
+    final_features = precision_features + space_broadcast + time_broadcast
+    print(f"final_features (before fusion) adjacent_row_cos_sim: {adjacent_row_cos_sim(final_features[0, 0]):.4f}")
     
-    # Step 7: spatial_fusion
-    final_2d = rearrange(final, 'b t h w c -> (b t) c h w')
+    final_2d = final_features.permute(0, 1, 4, 2, 3).reshape(B*T, -1, H, W)
     final_2d = encoder.spatial_fusion(final_2d)
-    final = rearrange(final_2d, '(b t) c h w -> b t h w c', b=B, t=T)
-    print(f"7. after spatial_fusion: y_corr={y_corr(final.cpu().numpy()):.4f}")
-    
-    # Step 8: norm
-    final = encoder.norm(final)
-    print(f"8. after norm: y_corr={y_corr(final.cpu().numpy()):.4f}")
+    final_features = final_2d.view(B, T, -1, H, W).permute(0, 1, 3, 4, 2)
+    print(f"final_features (after fusion) adjacent_row_cos_sim: {adjacent_row_cos_sim(final_features[0, 0]):.4f}")
