@@ -16,10 +16,12 @@ from src.aef.architecture.encoder_utils import IndividualSourceEncoder, SummaryP
 
 class TimePooling(nn.Module):
     """
-    Single-query multi-head attention over time at each (h,w).
+    Spatial-aware multi-head attention over time at each (h,w).
+    Key change: generates per-position queries from local spatial features
+    instead of a single global query, breaking horizontal striping artifacts.
     Inputs:
       feats: (B, T, H, W, C)
-      q:     (B, C)           — from SummaryPeriodEncoder
+      q:     (B, C)           — from SummaryPeriodEncoder (global temporal bias)
       mask:  (B, T) optional  — 1 for valid frames, 0 for padded/missing
     Output:
       z:     (B, H, W, C)
@@ -32,7 +34,10 @@ class TimePooling(nn.Module):
         assert self.head_dim * num_heads == dim, "dim must be divisible by num_heads"
 
         self.kv = nn.Linear(dim, 2 * dim)     # to K,V
-        self.q_proj = nn.Linear(dim, dim)     # to Q
+        # Per-position query: generated from spatial features via 1x1 conv
+        self.q_proj = nn.Conv2d(dim, dim, kernel_size=1)
+        # Global temporal bias projection (for time-conditioning)
+        self.q_bias_proj = nn.Linear(dim, dim)
         self.out = nn.Linear(dim, dim)
 
     def forward(self, feats: torch.Tensor, q: torch.Tensor, mask: torch.Tensor | None = None):
@@ -46,10 +51,17 @@ class TimePooling(nn.Module):
         K = K.permute(0, 2, 1, 3)                                      # (BHW, heads, T, d)
         V = V.permute(0, 2, 1, 3)                                      # (BHW, heads, T, d)
 
-        # single query per sample, broadcast to all (h,w)
-        qh = self.q_proj(q).view(B, self.num_heads, self.head_dim)     # (B, heads, d)
-        qh = qh.unsqueeze(1).expand(B, H * W, self.num_heads, self.head_dim) \
-               .reshape(BHW, self.num_heads, 1, self.head_dim)         # (BHW, heads, 1, d)
+        # Per-spatial-position query: from mean temporal feature at each (h,w)
+        # This ensures each spatial location has its own query based on local features
+        q_input = feats.mean(dim=1).permute(0, 3, 1, 2)               # (B, C, H, W)
+        q_map = self.q_proj(q_input).permute(0, 2, 3, 1)               # (B, H, W, C)
+        qh = q_map.reshape(BHW, self.num_heads, 1, self.head_dim)     # (BHW, heads, 1, d)
+
+        # Add global temporal bias (q) to all positions for time-conditioning
+        q_bias = self.q_bias_proj(q).view(B, self.num_heads, self.head_dim)  # (B, heads, d)
+        q_bias = q_bias.unsqueeze(1).expand(B, H * W, self.num_heads, self.head_dim) \
+                   .reshape(BHW, self.num_heads, 1, self.head_dim)
+        qh = qh + q_bias
 
         # scaled dot-product attention over time
         logits = (qh * K).sum(-1) / (self.head_dim ** 0.5)             # (BHW, heads, 1, T)
