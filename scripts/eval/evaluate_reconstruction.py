@@ -128,11 +128,11 @@ def evaluate_reconstruction(model, dataset, cfg, device, months: list[int], num_
     loss_types = [t.get("loss_type", 0) if isinstance(t, dict) else 0 for t in target_sources]
 
     # 收集所有可用的 (patch_id, year, month) 样本
+    # monthly_samples 格式: list[(patch_id, year, month), ...]
     samples = []
-    for pid in dataset.patches:
-        for mi, (year, month) in enumerate(dataset.monthly_samples):
-            if month in months and (pid, year, month) in dataset.sample_map:
-                samples.append((pid, year, month, mi))
+    for sample_idx, (pid, year, month) in enumerate(dataset.monthly_samples):
+        if month in months:
+            samples.append((sample_idx, pid, year, month))
 
     # 随机采样
     rng = np.random.RandomState(42)
@@ -144,8 +144,8 @@ def evaluate_reconstruction(model, dataset, cfg, device, months: list[int], num_
     results: dict[str, list] = {name: {"psnr": [], "ssim": []} for name in source_names}
 
     t0 = time.time()
-    for idx, (pid, year, month, mi) in enumerate(samples):
-        item = dataset[dataset.sample_map[(pid, year, month)]]
+    for idx, (sample_idx, pid, year, month) in enumerate(samples):
+        item = dataset[sample_idx]
         vs, ve = month_to_window(year, month)
 
         def _to(x):
