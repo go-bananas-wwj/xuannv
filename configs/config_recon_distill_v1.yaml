@@ -155,7 +155,7 @@ training:
   temporal_magnitude_weight: 0.0
   pixel_change_supervision_weight: 0.0
   change_consistency_weight: 0.0
-  memory_bank_size: 0
+  memory_bank_size: 512
   text_contrastive_weight: 0.0
   vicreg_weight: 0.0
   dino_weight: 0.0
