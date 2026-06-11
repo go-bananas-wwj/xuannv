@@ -251,7 +251,8 @@ def main():
                     f"--config {args.config} "
                     f"--checkpoint {ckpt_path} "
                     f"--output {eval_json_path} "
-                    f"--device npu:{local_rank}"
+                    f"--device npu:{local_rank} "
+                    f"--skip-cd"
                 )
                 logger.Print(f"  [FullEval] Running downstream evaluation for epoch {epoch + 1}...")
                 import subprocess
@@ -274,6 +275,36 @@ def main():
                         logger.Print(f"  [FullEval] Error reading results: {e}")
                 else:
                     logger.Print(f"  [FullEval] Failed: {result.stderr[:200]}")
+
+                # ★ 重建质量评估（PSNR / SSIM）
+                recon_eval_script = Path(__file__).parent.parent / "eval" / "evaluate_reconstruction.py"
+                if recon_eval_script.exists():
+                    recon_json_path = Path(cfg.experiment.output_dir) / f"recon_epoch_{epoch + 1}.json"
+                    recon_cmd = (
+                        f"cd /workspace/xuannv && "
+                        f"{sys.executable} {recon_eval_script} "
+                        f"--config {args.config} "
+                        f"--checkpoint {ckpt_path} "
+                        f"--output {recon_json_path} "
+                        f"--device npu:{local_rank} "
+                        f"--num-samples 30"
+                    )
+                    logger.Print(f"  [ReconEval] Running reconstruction evaluation for epoch {epoch + 1}...")
+                    try:
+                        recon_result = subprocess.run(recon_cmd, shell=True, capture_output=True, text=True, timeout=3600)
+                        if recon_result is not None and recon_result.returncode == 0:
+                            with open(recon_json_path) as f:
+                                recon_res = json.load(f)
+                            for src_name, metrics in recon_res.items():
+                                logger.Print(
+                                    f"  [ReconEval] {src_name}: "
+                                    f"PSNR={metrics.get('psnr_mean', 0):.2f}±{metrics.get('psnr_std', 0):.2f} "
+                                    f"SSIM={metrics.get('ssim_mean', 0):.4f}±{metrics.get('ssim_std', 0):.4f}"
+                                )
+                        else:
+                            logger.Print(f"  [ReconEval] Failed: {recon_result.stderr[:200]}")
+                    except Exception as e:
+                        logger.Print(f"  [ReconEval] Error: {e}")
             if dist.is_initialized():
                 dist.barrier()
 
