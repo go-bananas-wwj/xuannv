@@ -15,6 +15,8 @@ from pathlib import Path
 import numpy as np
 import rasterio
 from rasterio.errors import RasterioIOError
+from rasterio.transform import from_bounds
+from rasterio.warp import Resampling as RioResampling, reproject
 
 # 论文设计: 3类输入源
 INPUT_SOURCES = ["s2", "s1", "landsat"]
@@ -127,7 +129,6 @@ def read_tif(path: Path | str, image_size: int, resampling: str = "bilinear") ->
             if image_size <= 0 or (src.width == image_size and src.height == image_size):
                 data = src.read().astype(np.float32)
             else:
-                from rasterio.enums import Resampling as RioResampling
                 rio_mode = RioResampling.nearest if resampling == "nearest" else RioResampling.bilinear
                 data = src.read(
                     out_shape=(src.count, image_size, image_size),
@@ -137,6 +138,52 @@ def read_tif(path: Path | str, image_size: int, resampling: str = "bilinear") ->
             data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
             return data
     except (RasterioIOError, OSError):
+        return None
+
+
+def read_tif_aligned(
+    path: Path | str,
+    dst_bounds: tuple[float, float, float, float],
+    dst_shape: tuple[int, int],
+    dst_crs: str | rasterio.crs.CRS,
+    resampling: str = "bilinear",
+    fill_value: float = 0.0,
+) -> np.ndarray | None:
+    """读取单张 TIFF 并按目标地理 bounds/shape 重投影，保持真实 GSD.
+
+    Args:
+        path: TIFF 文件路径.
+        dst_bounds: (left, bottom, right, top) 目标地理范围.
+        dst_shape: (height, width) 目标像素尺寸.
+        dst_crs: 目标坐标参考系.
+        resampling: "bilinear"（连续/光学/SAR）或 "nearest"（分类/含 NaN）.
+        fill_value: 无数据区域填充值.
+
+    Returns:
+        (C, H, W) float32 数组；失败返回 None.
+    """
+    try:
+        rio_mode = RioResampling.nearest if resampling == "nearest" else RioResampling.bilinear
+        dst_transform = from_bounds(
+            dst_bounds[0], dst_bounds[1], dst_bounds[2], dst_bounds[3],
+            width=dst_shape[1], height=dst_shape[0],
+        )
+        with rasterio.open(path) as src:
+            dst = np.full((src.count, *dst_shape), fill_value, dtype=np.float32)
+            reproject(
+                source=rasterio.band(src, list(range(1, src.count + 1))),
+                destination=dst,
+                src_transform=src.transform,
+                src_crs=src.crs,
+                dst_transform=dst_transform,
+                dst_crs=dst_crs,
+                resampling=rio_mode,
+                src_nodata=src.nodata if src.nodata is not None else 0,
+                dst_nodata=fill_value,
+            )
+            dst = np.nan_to_num(dst, nan=fill_value, posinf=fill_value, neginf=fill_value)
+            return dst
+    except (RasterioIOError, OSError, rasterio.errors.CRSError):
         return None
 
 
