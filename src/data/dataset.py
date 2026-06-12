@@ -14,6 +14,7 @@ import random
 from pathlib import Path
 
 import numpy as np
+import rasterio
 import torch
 from torch.utils.data import Dataset
 
@@ -21,8 +22,10 @@ from src.data.transforms import (
     INPUT_SOURCES,
     TARGET_SOURCES,
     SOURCE_TYPE_MAP,
+    CATEGORICAL_SOURCES,
     label_to_timestamp_ms,
     read_tif,
+    read_tif_aligned,
     normalize_data,
     WC_CLASS_MAP,
 )
@@ -199,6 +202,15 @@ class HarbinPatchDataset(Dataset):
         self.merge_hr_into_lr = getattr(d, "merge_hr_into_lr", False)
         self.cfg = cfg
 
+        # ★ 多分辨率输入配置
+        self.use_multires = getattr(d, "use_multires", False)
+        self.patch_size_m = getattr(d, "patch_size_m", 1280.0)
+        self.source_gsd = getattr(d, "source_gsd", {})
+        self.source_image_sizes = getattr(d, "source_image_sizes", None) or {}
+        self.common_spatial_size = getattr(cfg.model, "common_spatial_size", (64, 64))
+        # 缓存每个 patch 的统一地理 bounds 与 CRS（多分辨率模式下使用）
+        self._patch_bounds: dict[str, tuple] = {}
+
         self.temporal_window_augmentation = d.temporal_window_augmentation
         self.temporal_window_prob = d.temporal_window_prob
         self.temporal_window_min_frames = d.temporal_window_min_frames
@@ -323,6 +335,33 @@ class HarbinPatchDataset(Dataset):
             raise FileNotFoundError(f"No patches found in {self.data_root}")
         return patches
 
+    def _get_source_shape(self, source_name: str) -> tuple[int, int]:
+        """多分辨率模式下：返回该源在统一地理范围内的像素尺寸。"""
+        if source_name in self.source_image_sizes:
+            shape = self.source_image_sizes[source_name]
+            if isinstance(shape, int):
+                return (shape, shape)
+            return tuple(shape)
+        gsd = self.source_gsd.get(source_name, 10.0)
+        size = int(round(self.patch_size_m / gsd))
+        return (size, size)
+
+    def _compute_patch_bounds(self, patch_id: str) -> tuple[tuple[float, float, float, float], rasterio.crs.CRS]:
+        """多分辨率模式下：以第一个可用输入源的 bounds 作为统一地理范围。"""
+        if patch_id in self._patch_bounds:
+            return self._patch_bounds[patch_id]
+        for src_name in self.input_sources:
+            src_dir = self._resolve_source_dir(src_name, patch_id)
+            if src_dir is not None:
+                tif_files = sorted(src_dir.glob("*.tif"))
+                if tif_files:
+                    with rasterio.open(tif_files[0]) as ds:
+                        bounds = ds.bounds
+                        crs = ds.crs
+                        self._patch_bounds[patch_id] = (bounds, crs)
+                        return bounds, crs
+        raise FileNotFoundError(f"No input source found for patch {patch_id}")
+
     def _load_stats(self, stats_dir: Path | None) -> dict:
         stats: dict[str, dict[str, dict[str, float]]] = {}
         if stats_dir is None or not stats_dir.exists():
@@ -381,6 +420,12 @@ class HarbinPatchDataset(Dataset):
     def _preload_all(self) -> None:
         """预加载所有数据到内存 — 支持持久化缓存 (DDP 安全: 仅 rank 0 预加载)."""
         import time, hashlib
+
+        # ★ 多分辨率模式：暂不预加载（缓存结构需重新设计），按需求加载
+        if self.use_multires:
+            print("[Dataset] 多分辨率模式：禁用内存预加载，按需求从磁盘读取")
+            return
+
         # ★ 每个实验独立缓存：将实验名+关键采样参数纳入哈希，彻底避免并发竞争
         exp_name = getattr(self.cfg.experiment, 'name', 'unknown')
         cache_inputs = [
@@ -581,6 +626,10 @@ class HarbinPatchDataset(Dataset):
                     hr_files[p.stem] = p
 
         if not tif_files and not hr_files:
+            if self.use_multires:
+                h, w = self._get_source_shape(source_name)
+                return (np.zeros((0, self.input_dim, h, w), dtype=np.float32),
+                        np.zeros(0, dtype=np.float64))
             return (np.zeros((0, self.input_dim, self.image_size, self.image_size), dtype=np.float32),
                     np.zeros(0, dtype=np.float64))
 
@@ -599,9 +648,18 @@ class HarbinPatchDataset(Dataset):
         frames_list: list[np.ndarray] = []
         timestamps: list[float] = []
 
+        # ★ 多分辨率模式：按真实 GSD 重投影
+        if self.use_multires:
+            dst_bounds, dst_crs = self._compute_patch_bounds(patch_id)
+            dst_shape = self._get_source_shape(source_name)
+            resampling = "nearest" if source_name in CATEGORICAL_SOURCES else "bilinear"
+
         for tif_path in tif_files:
             stem = tif_path.stem
-            data = read_tif(tif_path, self.image_size)
+            if self.use_multires:
+                data = read_tif_aligned(tif_path, dst_bounds, dst_shape, dst_crs, resampling=resampling)
+            else:
+                data = read_tif(tif_path, self.image_size)
             if data is None:
                 continue
             # ★ 跨区域波段对齐
@@ -609,7 +667,10 @@ class HarbinPatchDataset(Dataset):
             data = self._normalize(data, source_name)
 
             if hr_name and stem in hr_files:
-                hr_data = read_tif(hr_files[stem], self.image_size)
+                if self.use_multires:
+                    hr_data = read_tif_aligned(hr_files[stem], dst_bounds, dst_shape, dst_crs, resampling=resampling)
+                else:
+                    hr_data = read_tif(hr_files[stem], self.image_size)
                 if hr_data is not None:
                     hr_data = self._normalize(hr_data, hr_name)
                     data = np.concatenate([data, hr_data], axis=0)
@@ -619,6 +680,10 @@ class HarbinPatchDataset(Dataset):
             timestamps.append(float(label_to_timestamp_ms(stem)))
 
         if not frames_list:
+            if self.use_multires:
+                h, w = self._get_source_shape(source_name)
+                return (np.zeros((0, self.input_dim, h, w), dtype=np.float32),
+                        np.zeros(0, dtype=np.float64))
             return (np.zeros((0, self.input_dim, self.image_size, self.image_size), dtype=np.float32),
                     np.zeros(0, dtype=np.float64))
 
@@ -641,6 +706,98 @@ class HarbinPatchDataset(Dataset):
             return None
 
         return tif_files
+
+    def _load_target_multires(
+        self,
+        patch_id: str,
+        tgt_name: str,
+        year: int,
+        month_a: int,
+        month_b: int,
+        is_categorical: bool,
+    ) -> np.ndarray | None:
+        """多分辨率模式下加载单个目标源，保持其真实分辨率."""
+        dst_bounds, dst_crs = self._compute_patch_bounds(patch_id)
+        dst_shape = self._get_source_shape(tgt_name)
+        resampling = "nearest" if is_categorical else "bilinear"
+
+        if tgt_name == "dem":
+            src_dir = self._resolve_source_dir("dem", patch_id)
+            if src_dir is not None:
+                tif_files = sorted(src_dir.glob("*.tif"))
+                if tif_files:
+                    data = read_tif_aligned(tif_files[0], dst_bounds, dst_shape, dst_crs, resampling=resampling)
+                    if data is not None:
+                        data = self._normalize(data, "dem")
+                        return self._pad_channels(data, self.reconstruction_channels)
+            return None
+
+        if tgt_name in ("s2", "s1", "landsat", "tianyi_sar", "planet"):
+            if month_b == month_a:
+                # 同月：从已加载输入帧中随机选一帧作为目标
+                if tgt_name in self.input_sources:
+                    s_idx = self.input_sources.index(tgt_name)
+                    frames, ts = self._load_monthly_frames(patch_id, tgt_name, year, month_a)
+                    if len(frames) > 0:
+                        random_idx = random.randint(0, len(frames) - 1)
+                        data = frames[random_idx]
+                        return self._pad_channels(data, self.reconstruction_channels)
+            else:
+                tgt_frames, tgt_ts = self._load_monthly_frames(patch_id, tgt_name, year, month_b)
+                if len(tgt_frames) > 0:
+                    random_idx = random.randint(0, len(tgt_frames) - 1)
+                    data = tgt_frames[random_idx]
+                    return self._pad_channels(data, self.reconstruction_channels)
+            return None
+
+        return None
+
+    def _load_target_legacy(
+        self,
+        patch_id: str,
+        tgt_name: str,
+        year: int,
+        month_a: int,
+        month_b: int,
+        source_frames: np.ndarray,
+        source_mask: np.ndarray,
+        is_categorical: bool,
+    ) -> np.ndarray | None:
+        """ legacy 模式加载单个目标源，与输入同分辨率."""
+        if tgt_name == "dem":
+            if tgt_name in self._cache.get(patch_id, {}):
+                return self._cache[patch_id][tgt_name][0][0]
+            src_dir = self.data_root / patch_id / tgt_name
+            if not src_dir.exists():
+                src_dir = self.data_root / tgt_name / patch_id
+            if src_dir.exists():
+                tif_files = sorted(src_dir.glob("*.tif"))
+                if tif_files:
+                    data = read_tif(tif_files[0], 0)
+                    if data is not None:
+                        return self._normalize(data, tgt_name)
+            return None
+
+        if tgt_name in ("s2", "s1", "landsat"):
+            if month_b == month_a:
+                if tgt_name in self.input_sources:
+                    s_idx = self.input_sources.index(tgt_name)
+                    valid_indices = [i for i in range(self.max_frames) if source_mask[s_idx, i]]
+                    if valid_indices:
+                        random_idx = random.choice(valid_indices)
+                        data = source_frames[s_idx, random_idx].copy()
+                        if len(valid_indices) > 1:
+                            source_mask[random_idx] = False
+                            source_frames[s_idx, random_idx] = 0.0
+                        return data
+            else:
+                tgt_frames, tgt_ts = self._load_monthly_frames(patch_id, tgt_name, year, month_b)
+                if len(tgt_frames) > 0:
+                    random_idx = random.randint(0, len(tgt_frames) - 1)
+                    return tgt_frames[random_idx]
+            return None
+
+        return None
 
     def _preload_teacher_tokens(self) -> None:
         """一次性把所有月份的 OlmoEarth teacher tokens 加载进内存（fp16）.
@@ -1161,12 +1318,13 @@ class HarbinPatchDataset(Dataset):
         mask = (ts >= start_ms) & (ts <= end_ms)
         return frames[mask], ts[mask]
     
-    def _get_item(self, idx: int) -> dict[str, torch.Tensor]:
+    def _get_item(self, idx: int) -> dict[str, Any]:
         """V13: 月度采样 — 每个样本 = (patch, month), 输入/目标都是当月1帧.
         Round 2: 支持跨时相重建 (输入 month_A, 目标 month_B).
+        多分辨率模式: source_frames / target_images 改为 List[Tensor].
         """
         patch_id, year, month_a = self.monthly_samples[idx]
-        
+
         # Round 2: 决定是否使用跨时相采样
         month_b = month_a
         if self.training and self.cross_temporal and self.cross_temporal_prob > 0:
@@ -1174,7 +1332,7 @@ class HarbinPatchDataset(Dataset):
                 month_b = self._sample_target_month(patch_id, year, month_a)
                 if month_b is None:
                     month_b = month_a  # fallback
-        
+
         month = month_a  # 输入月份
         S_inp = self.num_input_sources
         T = self.max_frames
@@ -1183,39 +1341,59 @@ class HarbinPatchDataset(Dataset):
         S_tgt = self.num_target_sources
         M = self.metadata_dim
 
-        # 1. 加载输入 — 当月每源随机1帧
-        source_frames = np.zeros((S_inp, T, C, H, W), dtype=np.float32)
+        # 1. 加载输入
         source_ts = np.zeros((S_inp, T), dtype=np.float64)
         source_mask = np.zeros((S_inp, T), dtype=bool)
         source_input_mask = np.ones(S_inp, dtype=bool)
         source_type_ids = np.zeros(S_inp, dtype=np.int64)
-        
-        # 记录当月所有时间戳（用于 valid_period）
         all_monthly_ts: list[float] = []
 
-        for s_idx, src_name in enumerate(self.input_sources):
-            frames, ts = self._load_monthly_frames(patch_id, src_name, year, month)
-            n_avail = len(frames)
-
-            if n_avail == 0:
-                source_input_mask[s_idx] = False
-                continue
-
-            # V13-fix: 加载当月所有可用帧（而非只选1帧），让 frame drop / valid_period 真正生效
-            n_use = min(n_avail, self.max_frames)
-            if self.training and n_avail > n_use:
-                # 训练时随机采样，避免总是偏向最早日期的帧
-                use_indices = sorted(random.sample(range(n_avail), n_use))
-            else:
-                # 验证时等间距采样
-                step = max(1, n_avail / n_use)
-                use_indices = [min(int(i * step), n_avail - 1) for i in range(n_use)]
-            for i, idx in enumerate(use_indices):
-                source_frames[s_idx, i] = frames[idx]
-                source_ts[s_idx, i] = ts[idx]
-                source_mask[s_idx, i] = True
-                all_monthly_ts.append(float(ts[idx]))
-            source_type_ids[s_idx] = SOURCE_TYPE_MAP.get(src_name, 0)
+        if self.use_multires:
+            source_frames_list: list[np.ndarray] = []
+            for s_idx, src_name in enumerate(self.input_sources):
+                frames, ts = self._load_monthly_frames(patch_id, src_name, year, month)
+                n_avail = len(frames)
+                if n_avail == 0:
+                    source_input_mask[s_idx] = False
+                    h, w = self._get_source_shape(src_name)
+                    source_frames_list.append(np.zeros((0, C, h, w), dtype=np.float32))
+                    continue
+                n_use = min(n_avail, self.max_frames)
+                if self.training and n_avail > n_use:
+                    use_indices = sorted(random.sample(range(n_avail), n_use))
+                else:
+                    step = max(1, n_avail / n_use)
+                    use_indices = [min(int(i * step), n_avail - 1) for i in range(n_use)]
+                selected = frames[use_indices]
+                selected_ts = ts[use_indices]
+                source_frames_list.append(selected)
+                source_ts[s_idx, :n_use] = selected_ts
+                source_mask[s_idx, :n_use] = True
+                all_monthly_ts.extend(float(t) for t in selected_ts)
+                source_type_ids[s_idx] = SOURCE_TYPE_MAP.get(src_name, 0)
+            # 统一空间参考（用于增强 / mask）
+            ref_h, ref_w = self.common_spatial_size
+        else:
+            source_frames = np.zeros((S_inp, T, C, H, W), dtype=np.float32)
+            for s_idx, src_name in enumerate(self.input_sources):
+                frames, ts = self._load_monthly_frames(patch_id, src_name, year, month)
+                n_avail = len(frames)
+                if n_avail == 0:
+                    source_input_mask[s_idx] = False
+                    continue
+                n_use = min(n_avail, self.max_frames)
+                if self.training and n_avail > n_use:
+                    use_indices = sorted(random.sample(range(n_avail), n_use))
+                else:
+                    step = max(1, n_avail / n_use)
+                    use_indices = [min(int(i * step), n_avail - 1) for i in range(n_use)]
+                for i, fidx in enumerate(use_indices):
+                    source_frames[s_idx, i] = frames[fidx]
+                    source_ts[s_idx, i] = ts[fidx]
+                    source_mask[s_idx, i] = True
+                    all_monthly_ts.append(float(ts[fidx]))
+                source_type_ids[s_idx] = SOURCE_TYPE_MAP.get(src_name, 0)
+            ref_h, ref_w = H, W
 
         # 2. valid_period = 当月范围
         if all_monthly_ts:
@@ -1227,69 +1405,38 @@ class HarbinPatchDataset(Dataset):
             import calendar
             valid_end = datetime(year, month, calendar.monthrange(year, month)[1], 23, 59, 59).timestamp() * 1000
 
-        # 3. 构建目标 — 与输入同一帧（自编码器），保持原始分辨率
-        target_res = H  # 128×128，与输入同分辨率
-        tgt_ch = max(self.reconstruction_channels, self.num_classes)
-        target_images = np.zeros((S_tgt, tgt_ch, target_res, target_res), dtype=np.float32)
+        # 3. 构建目标
         target_relative_time = np.zeros(S_tgt, dtype=np.float32)
         target_metadata = np.zeros((S_tgt, M), dtype=np.float32)
         target_mask = np.zeros(S_tgt, dtype=bool)
         target_loss_type = np.zeros(S_tgt, dtype=np.int64)
         target_source_idx = np.zeros(S_tgt, dtype=np.int64)
-        
         patch_label = self._get_worldcover_label(patch_id)
 
-        for t_idx, (tgt_name, loss_type, sensor_src) in enumerate(self.target_sources):
-            is_categorical = loss_type == 1
-            if tgt_name == "dem":
-                # 静态目标
-                if tgt_name in self._cache.get(patch_id, {}):
-                    data = self._cache[patch_id][tgt_name][0][0]
-                    data = self._resize_to_target(data, target_res, is_categorical=is_categorical)
-                    target_images[t_idx, :data.shape[0]] = data
+        if self.use_multires:
+            target_images_list: list[np.ndarray] = []
+            for t_idx, (tgt_name, loss_type, sensor_src) in enumerate(self.target_sources):
+                is_categorical = loss_type == 1
+                data = self._load_target_multires(patch_id, tgt_name, year, month_a, month_b, is_categorical)
+                if data is not None:
+                    target_images_list.append(data)
                     target_mask[t_idx] = True
                     target_loss_type[t_idx] = loss_type
                     target_source_idx[t_idx] = t_idx
-                    target_relative_time[t_idx] = 0.5
+                    gap_months = month_b - month_a
+                    target_relative_time[t_idx] = gap_months / 12.0 + 0.5
                 else:
-                    # 新结构: patch_id / tgt_name
-                    src_dir = self.data_root / patch_id / tgt_name
-                    if not src_dir.exists():
-                        # 旧结构: tgt_name / patch_id
-                        src_dir = self.data_root / tgt_name / patch_id
-                    if src_dir.exists():
-                        tif_files = sorted(src_dir.glob("*.tif"))
-                        if tif_files:
-                            data = read_tif(tif_files[0], 0)
-                            if data is not None:
-                                data = self._normalize(data, tgt_name)
-                                data = self._resize_to_target(data, target_res, is_categorical=is_categorical)
-                                target_images[t_idx, :data.shape[0]] = data
-                                target_mask[t_idx] = True
-                                target_loss_type[t_idx] = loss_type
-                                target_source_idx[t_idx] = t_idx
-                                target_relative_time[t_idx] = 0.5
-            elif tgt_name in ("s2", "s1", "landsat"):
-                # Round 2: 动态目标从 month_B 加载（跨时相重建）
-                data = None
-                if month_b == month_a:
-                    # 同月：从可用输入帧中随机采样1帧作为目标
-                    s_idx = self.input_sources.index(tgt_name)
-                    valid_indices = [i for i in range(self.max_frames) if source_mask[s_idx, i]]
-                    if valid_indices:
-                        random_idx = random.choice(valid_indices)
-                        data = source_frames[s_idx, random_idx].copy()
-                        # 关键修复：从输入中排除目标帧，避免重建变成复制
-                        if len(valid_indices) > 1:
-                            source_mask[s_idx, random_idx] = False
-                            source_frames[s_idx, random_idx] = 0.0
-                else:
-                    # 跨月：从 month_B 加载目标帧，同样随机采样1帧
-                    tgt_frames, tgt_ts = self._load_monthly_frames(patch_id, tgt_name, year, month_b)
-                    if len(tgt_frames) > 0:
-                        random_idx = random.randint(0, len(tgt_frames) - 1)
-                        data = tgt_frames[random_idx]
-                
+                    # 占位空张量，保持 list 长度一致
+                    h, w = self._get_source_shape(tgt_name) if tgt_name in self.source_gsd else (ref_h, ref_w)
+                    ch = max(self.reconstruction_channels, self.num_classes)
+                    target_images_list.append(np.zeros((ch, h, w), dtype=np.float32))
+        else:
+            target_res = H
+            tgt_ch = max(self.reconstruction_channels, self.num_classes)
+            target_images = np.zeros((S_tgt, tgt_ch, target_res, target_res), dtype=np.float32)
+            for t_idx, (tgt_name, loss_type, sensor_src) in enumerate(self.target_sources):
+                is_categorical = loss_type == 1
+                data = self._load_target_legacy(patch_id, tgt_name, year, month_a, month_b, source_frames, source_mask, is_categorical)
                 if data is not None:
                     data = self._pad_channels(data, self.reconstruction_channels)
                     data = self._resize_to_target(data, target_res, is_categorical=is_categorical)
@@ -1297,23 +1444,33 @@ class HarbinPatchDataset(Dataset):
                     target_mask[t_idx] = True
                     target_loss_type[t_idx] = loss_type
                     target_source_idx[t_idx] = t_idx
-                    # Round 2: target_relative_time 表示 month_B 相对于 month_A 的偏移
                     gap_months = month_b - month_a
-                    target_relative_time[t_idx] = gap_months / 12.0 + 0.5  # 归一化到 [0,1] 附近
-            # else: worldcover/dynamic_world/jrc_water 已去掉
+                    target_relative_time[t_idx] = gap_months / 12.0 + 0.5
 
-        # 4. 空间增强
+        # 4. 空间增强（同步应用到所有源/目标）
         if self.training:
-            if random.random() < 0.5:
-                source_frames = source_frames[..., ::-1, :].copy()
-                target_images = target_images[..., ::-1, :].copy()
-            if random.random() < 0.5:
-                source_frames = source_frames[..., ::-1].copy()
-                target_images = target_images[..., ::-1].copy()
+            flip_h = random.random() < 0.5
+            flip_v = random.random() < 0.5
+            if self.use_multires:
+                for i in range(len(source_frames_list)):
+                    if flip_h:
+                        source_frames_list[i] = source_frames_list[i][..., ::-1, :].copy()
+                    if flip_v:
+                        source_frames_list[i] = source_frames_list[i][..., ::-1].copy()
+                for i in range(len(target_images_list)):
+                    if flip_h:
+                        target_images_list[i] = target_images_list[i][..., ::-1, :].copy()
+                    if flip_v:
+                        target_images_list[i] = target_images_list[i][..., ::-1].copy()
+            else:
+                if flip_h:
+                    source_frames = source_frames[..., ::-1, :].copy()
+                    target_images = target_images[..., ::-1, :].copy()
+                if flip_v:
+                    source_frames = source_frames[..., ::-1].copy()
+                    target_images = target_images[..., ::-1].copy()
 
-        # 5. 双时间窗口 — V14 Fix: 添加±3个月锚点扩大时间跨度
-        # 原始 all_monthly_ts 只跨越~30天（单月），gap≈0.4m，temporal contrastive 信号太弱
-        # 添加3个月前/后的合成锚点后，ts_sorted 跨越~6个月，gap≈2-3个月，信号有效
+        # 5. 双时间窗口
         from datetime import datetime as _dt
         current_ts = sorted(int(t) for t in all_monthly_ts if t > 0)
         _m3_before_y, _m3_before_m = (year, month - 3) if month > 3 else (year - 1, month + 9)
@@ -1323,13 +1480,11 @@ class HarbinPatchDataset(Dataset):
         ts_sorted = sorted([_anchor_before] + current_ts + [_anchor_after])
         w1_start, w1_end, w2_start, w2_end = self._sample_dual_windows(ts_sorted)
 
-        # 6. 跨时相空间掩码
+        # 6. 跨时相空间掩码 / 重建掩码
         spatial_mask = self._generate_spatial_mask() if self.training else None
-        
-        # V13-MAE: 生成重建掩码（随机mask 50%空间区域）
         recon_mask = self._generate_recon_mask() if self.training else None
 
-        # Round 2: 计算目标月份的时间范围
+        # Round 2: 目标时间范围
         if month_b != month_a:
             from datetime import datetime
             import calendar
@@ -1338,11 +1493,10 @@ class HarbinPatchDataset(Dataset):
         else:
             target_valid_start = valid_start
             target_valid_end = valid_end
-        
-        return {
+
+        result: dict[str, Any] = {
             "patch_id": patch_id,
             "year_month": (year, month),
-            "source_frames": torch.from_numpy(source_frames),
             "source_timestamps_ms": torch.from_numpy(source_ts),
             "source_frame_mask": torch.from_numpy(source_mask),
             "source_input_mask": torch.from_numpy(source_input_mask),
@@ -1353,12 +1507,10 @@ class HarbinPatchDataset(Dataset):
             "valid_end_w1": torch.tensor(w1_end, dtype=torch.float64),
             "valid_start_w2": torch.tensor(w2_start, dtype=torch.float64),
             "valid_end_w2": torch.tensor(w2_end, dtype=torch.float64),
-            # Round 2: 新增目标时间窗口
             "target_valid_start_ms": torch.tensor(target_valid_start, dtype=torch.float32),
             "target_valid_end_ms": torch.tensor(target_valid_end, dtype=torch.float32),
-            "spatial_mask": torch.from_numpy(spatial_mask) if spatial_mask is not None else torch.ones((self.image_size, self.image_size), dtype=torch.float32),
-            "recon_mask": torch.from_numpy(recon_mask) if recon_mask is not None else torch.ones((target_res, target_res), dtype=torch.float32),
-            "target_images": torch.from_numpy(target_images),
+            "spatial_mask": torch.from_numpy(spatial_mask) if spatial_mask is not None else torch.ones((ref_h, ref_w), dtype=torch.float32),
+            "recon_mask": torch.from_numpy(recon_mask) if recon_mask is not None else torch.ones((ref_h, ref_w), dtype=torch.float32),
             "target_relative_time": torch.from_numpy(target_relative_time),
             "target_metadata": torch.from_numpy(target_metadata),
             "target_mask": torch.from_numpy(target_mask),
@@ -1369,3 +1521,10 @@ class HarbinPatchDataset(Dataset):
             **self._load_teacher_tokens(patch_id, year, month_a),
             **self._load_aef_embedding(patch_id),
         }
+        if self.use_multires:
+            result["source_frames"] = [torch.from_numpy(f) for f in source_frames_list]
+            result["target_images"] = [torch.from_numpy(t) for t in target_images_list]
+        else:
+            result["source_frames"] = torch.from_numpy(source_frames)
+            result["target_images"] = torch.from_numpy(target_images)
+        return result

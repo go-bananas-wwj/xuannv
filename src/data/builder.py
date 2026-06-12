@@ -1,11 +1,33 @@
 """DataLoader 构建工厂."""
 from __future__ import annotations
 
-from torch.utils.data import DataLoader, DistributedSampler
+import torch
+from torch.utils.data import DataLoader, DistributedSampler, default_collate
 
 from src.config import Config
 from src.data.dataset import HarbinPatchDataset
 from src.data.multi_region_dataset import MultiRegionPatchDataset
+
+
+def _collate_tensor_list(key: str, batch: list[dict]) -> list[torch.Tensor]:
+    """对 List[Tensor] 类型的字段按索引堆叠."""
+    n_items = len(batch[0][key])
+    return [torch.stack([b[key][i] for b in batch]) for i in range(n_items)]
+
+
+def multires_collate_fn(batch: list[dict]) -> dict:
+    """支持 source_frames / target_images 为 List[Tensor] 的 collate."""
+    if not batch:
+        return {}
+    first = batch[0]
+    collated: dict = {}
+    for key in first.keys():
+        val = first[key]
+        if key in ("source_frames", "target_images") and isinstance(val, list):
+            collated[key] = _collate_tensor_list(key, batch)
+        else:
+            collated[key] = default_collate([b[key] for b in batch])
+    return collated
 
 
 def build_dataloader(
@@ -46,6 +68,7 @@ def build_dataloader(
 
     # Data is pre-loaded in memory (dataset._cache), no need for background workers
     num_workers = 0
+    use_multires = getattr(cfg.data, "use_multires", False)
     return DataLoader(
         dataset,
         batch_size=cfg.data.batch_size,
@@ -54,4 +77,5 @@ def build_dataloader(
         num_workers=num_workers,
         pin_memory=True,
         drop_last=training,
+        collate_fn=multires_collate_fn if use_multires else None,
     )
