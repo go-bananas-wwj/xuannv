@@ -157,7 +157,7 @@ def extract_all(args):
     end     = min(start + chunk, total)
     patches = all_patches[start:end]
 
-    months = DEFAULT_MONTHS
+    months = parse_months(args.months) if args.months else DEFAULT_MONTHS
     crop_ratio = getattr(args, 'center_crop_ratio', 1.0)
     print(f"[提取] GPU 分片 {args.gpu_idx}/{args.total_gpus} → "
           f"patch {start}:{end} ({len(patches)} 个), {len(months)} 个月"
@@ -273,6 +273,32 @@ def merge_npy(args):
     print(f"       shape={spatial_maps.shape}  patches={len(patch_ids)}  months={all_months}")
 
 
+# ── 月份解析 ───────────────────────────────────────────────────────────────────
+
+def parse_months(months_str: str) -> list[tuple[int, int]]:
+    """解析月份字符串，格式: 'YYYY-MM,YYYY-MM' 或 'YYYY-MM:YYYY-MM'。"""
+    months = []
+    for part in months_str.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if ":" in part:
+            start_str, end_str = part.split(":", 1)
+            start_y, start_m = map(int, start_str.split("-"))
+            end_y, end_m = map(int, end_str.split("-"))
+            y, m = start_y, start_m
+            while (y, m) <= (end_y, end_m):
+                months.append((y, m))
+                m += 1
+                if m > 12:
+                    m = 1
+                    y += 1
+        else:
+            y, m = map(int, part.split("-"))
+            months.append((y, m))
+    return months
+
+
 # ── 参数解析 & 入口 ──────────────────────────────────────────────────────────
 
 def main():
@@ -289,6 +315,8 @@ def main():
     pa.add_argument("--merge-npy-dir", default="",          help="--merge-only 时的 npy 目录")
     pa.add_argument("--center-crop-ratio", type=float, default=1.0,
                     help="中心裁剪比例（默认 1.0 不裁剪，0.75 保留中心 75% 区域）")
+    pa.add_argument("--months",       default="",
+                    help="提取月份，格式 '2025-04:2025-10' 或 '2025-04,2025-05'，默认使用 DEFAULT_MONTHS")
     args = pa.parse_args()
 
     if args.merge_only:
