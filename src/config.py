@@ -75,6 +75,17 @@ class DataConfig:
     patch_list: list[str] | None = None
     # V14: 多区域混合训练 manifest
     multi_region_manifest: str | None = None
+    # ★ 多分辨率输入：地理 patch 大小（米）与各源真实 GSD
+    patch_size_m: float = 1280.0
+    source_gsd: dict = field(default_factory=lambda: {
+        "s2": 10.0,
+        "s1": 10.0,
+        "landsat": 30.0,
+        "tianyi_sar": 10.0,
+        "planet": 3.0,
+    })
+    # 可显式覆盖每源输出 shape；None 时按 patch_size_m / source_gsd 自动计算
+    source_image_sizes: dict | None = None
 
 
 @dataclass
@@ -113,6 +124,22 @@ class ModelConfig:
     distill_hidden_dim: int = 512
     distill_teacher_dim: int = 768
     distill_teacher_spatial_size: int = 32
+    # ★ 多分辨率输入：公共空间分辨率与 per-source stem 下采样stride
+    common_spatial_size: tuple[int, int] = (64, 64)
+    source_stem_stride: dict = field(default_factory=lambda: {
+        "s2": 2,
+        "s1": 2,
+        "landsat": 1,
+        "tianyi_sar": 2,
+        "planet": 8,
+    })
+    source_stem_layers: dict = field(default_factory=lambda: {
+        "s2": 1,
+        "s1": 1,
+        "landsat": 1,
+        "tianyi_sar": 1,
+        "planet": 1,
+    })
 
 
 @dataclass
