@@ -910,17 +910,12 @@ class DDPv13Trainer:
     def _compute_recon_loss(self, predictions, batch):
         """计算重建损失，应用源特定权重."""
         from src.training.loops import compute_recon_loss
-        base_loss = compute_recon_loss(
+        return compute_recon_loss(
             predictions, batch["target_images"], batch["target_mask"],
             batch.get("target_loss_type"), self.cfg.data.num_classes,
             recon_mask=batch.get("recon_mask"),
+            source_recon_weights=self.source_recon_weights.tolist() if self.source_recon_weights is not None else None,
         )
-        target_source_idx = batch.get("target_source_idx")
-        if target_source_idx is not None:
-            weights = self.source_recon_weights[target_source_idx]
-            weight_factor = weights.mean()
-            return base_loss * weight_factor
-        return base_loss
 
     @torch.no_grad()
     def evaluate_knn(self, dataloader: DataLoader, max_batches: int | None = None) -> dict:
