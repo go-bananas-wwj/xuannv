@@ -29,6 +29,7 @@ evaluation/data/
 evaluation/results/
 logs/
 cache/
+backups/
 
 # IDE
 .vscode/
