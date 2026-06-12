@@ -149,6 +149,8 @@ def evaluate_reconstruction(model, dataset, cfg, device, months: list[int], num_
         vs, ve = month_to_window(year, month)
 
         def _to(x):
+            if isinstance(x, list):
+                return [t.unsqueeze(0).to(device) for t in x]
             return x.unsqueeze(0).to(device)
 
         use_bf16 = getattr(cfg.training, "use_bf16", True)
@@ -166,12 +168,20 @@ def evaluate_reconstruction(model, dataset, cfg, device, months: list[int], num_
                 skip_decoder=False,
             )
 
-        recon = out.reconstructions.float()  # [1, T_tgt, C, H, W]
-        target = item["target_images"].to(device).float()  # [T_tgt, C, H, W]
+        recon = out.reconstructions
+        target = _to(item["target_images"])
+        if isinstance(recon, list):
+            recon = [r.float() for r in recon]
+        else:
+            recon = recon.float()  # [1, T_tgt, C, H, W]
+        if isinstance(target, list):
+            target = [t.float() for t in target]
+        else:
+            target = target.float()  # [T_tgt, C, H, W]
         target_mask = item["target_mask"].to(device).bool()  # [T_tgt]
         target_loss_type = item["target_loss_type"].to(device).long()  # [T_tgt]
 
-        T = recon.shape[1]
+        T = len(recon) if isinstance(recon, list) else recon.shape[1]
         for t_idx in range(T):
             if not target_mask[t_idx].item():
                 continue
@@ -179,8 +189,13 @@ def evaluate_reconstruction(model, dataset, cfg, device, months: list[int], num_
             src_name = source_names[t_idx]
             loss_type = loss_types[t_idx]
 
-            pred_t = recon[0, t_idx].cpu().numpy()  # [C, H, W]
-            tgt_t = target[t_idx].cpu().numpy()  # [C, H, W]
+            if isinstance(recon, list):
+                # 多分辨率下每个 decoder 输出 [B, T_tgt, C, H, W]，取当前源对应位置
+                pred_t = recon[t_idx][0, t_idx].cpu().numpy()  # [C, H, W]
+                tgt_t = target[t_idx][0].cpu().numpy()  # [pad_ch, H, W]
+            else:
+                pred_t = recon[0, t_idx].cpu().numpy()  # [C, H, W]
+                tgt_t = target[t_idx].cpu().numpy()  # [C, H, W]
 
             if loss_type == 1:
                 # 分类目标: pred 是 logits [num_classes, H, W]，取 argmax

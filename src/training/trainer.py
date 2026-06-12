@@ -53,7 +53,7 @@ DEFAULT_SOURCE_RECON_WEIGHTS = [1.0, 1.0, 1.0, 0.05]  # S2, S1, Landsat, DEM
 
 
 def _build_student_view(
-    source_frames: torch.Tensor,
+    source_frames: torch.Tensor | list[torch.Tensor],
     source_timestamps_ms: torch.Tensor,
     source_frame_mask: torch.Tensor,
     source_input_mask: torch.Tensor,
@@ -61,13 +61,14 @@ def _build_student_view(
     source_drop_rate: float,
     front_drop_prob: float,
     back_drop_prob: float,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, dict[str, float]]:
+) -> tuple[torch.Tensor | list[torch.Tensor], torch.Tensor, torch.Tensor, dict[str, float]]:
     """构建 Student 的扰动输入视图 — 对齐 AEF 原文 S2.2.5.
 
     ★ v41 FIX: 完全向量化改写，消除所有 GPU→CPU 同步（.item() 调用）。
        原实现每 step 触发数百次同步，训练速度下降 10-100 倍。
     """
-    frames = source_frames.clone()
+    is_list = isinstance(source_frames, list)
+    frames = [f.clone() for f in source_frames] if is_list else source_frames.clone()
     frame_mask = source_frame_mask.clone()
     input_mask = source_input_mask.clone()
     stats = {
@@ -316,8 +317,13 @@ class DDPv13Trainer:
         iterator = itertools.islice(dataloader, max_steps) if max_steps else dataloader
         for step, batch in enumerate(iterator):
             t0 = time.time()
-            batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v
-                     for k, v in batch.items()}
+            def _move_to_device(v):
+                if isinstance(v, torch.Tensor):
+                    return v.to(self.device)
+                if isinstance(v, list) and v and isinstance(v[0], torch.Tensor):
+                    return [x.to(self.device) for x in v]
+                return v
+            batch = {k: _move_to_device(v) for k, v in batch.items()}
             t_data = time.time() - t0
 
             max_steps = getattr(t, 'max_steps_per_epoch', None)
@@ -931,8 +937,13 @@ class DDPv13Trainer:
         import itertools
         iterator = itertools.islice(dataloader, max_batches) if max_batches else dataloader
         for batch in iterator:
-            batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v
-                     for k, v in batch.items()}
+            def _move_to_device(v):
+                if isinstance(v, torch.Tensor):
+                    return v.to(self.device)
+                if isinstance(v, list) and v and isinstance(v[0], torch.Tensor):
+                    return [x.to(self.device) for x in v]
+                return v
+            batch = {k: _move_to_device(v) for k, v in batch.items()}
             if "label" not in batch:
                 continue
             use_bf16_eval = getattr(self.cfg.training, 'use_bf16', True)

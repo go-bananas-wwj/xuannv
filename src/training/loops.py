@@ -54,13 +54,20 @@ def compute_recon_loss(
         pred_t = preds_list[t_idx]
         tgt_t = tgts_list[t_idx]
         B = pred_t.shape[0]
-        valid_b = target_mask[:, t_idx].bool() if target_mask is not None else torch.ones(B, dtype=torch.bool, device=device)
+        if target_mask is not None:
+            valid_b = target_mask[:, t_idx].bool().to(device)
+        else:
+            valid_b = torch.ones(B, dtype=torch.bool, device=device)
         if not valid_b.any():
             total_loss = total_loss + pred_t.sum() * 0.0
             continue
 
         pred_t = pred_t[valid_b]
         tgt_t = tgt_t[valid_b]
+        # 多分辨率模式下 target 可能被 pad 到统一通道数，按 prediction 通道截断
+        pred_c = pred_t.shape[2]
+        if tgt_t.shape[1] > pred_c:
+            tgt_t = tgt_t[:, :pred_c]
         pixel_valid = (~torch.isnan(tgt_t)).float()
 
         loss_type = 0
@@ -75,6 +82,13 @@ def compute_recon_loss(
             mask = pixel_valid
             if recon_mask is not None:
                 rm = recon_mask[valid_b]
+                # 多分辨率模式下 recon_mask 可能与目标分辨率不一致，需要插值
+                if rm.shape[-2:] != tgt_t.shape[-2:]:
+                    rm = torch.nn.functional.interpolate(
+                        rm.unsqueeze(1).float(),
+                        size=tgt_t.shape[-2:],
+                        mode="nearest",
+                    ).squeeze(1)
                 mask = mask * rm[:, None, :, :]
             diff = torch.abs(pred_t - tgt_t) * mask
             denom = mask.sum().clamp(min=1.0)

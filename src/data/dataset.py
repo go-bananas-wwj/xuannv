@@ -721,6 +721,8 @@ class HarbinPatchDataset(Dataset):
         dst_shape = self._get_source_shape(tgt_name)
         resampling = "nearest" if is_categorical else "bilinear"
 
+        ch = max(self.reconstruction_channels, self.num_classes)
+
         if tgt_name == "dem":
             src_dir = self._resolve_source_dir("dem", patch_id)
             if src_dir is not None:
@@ -729,7 +731,7 @@ class HarbinPatchDataset(Dataset):
                     data = read_tif_aligned(tif_files[0], dst_bounds, dst_shape, dst_crs, resampling=resampling)
                     if data is not None:
                         data = self._normalize(data, "dem")
-                        return self._pad_channels(data, self.reconstruction_channels)
+                        return self._pad_channels(data, ch)
             return None
 
         if tgt_name in ("s2", "s1", "landsat", "tianyi_sar", "planet"):
@@ -741,13 +743,13 @@ class HarbinPatchDataset(Dataset):
                     if len(frames) > 0:
                         random_idx = random.randint(0, len(frames) - 1)
                         data = frames[random_idx]
-                        return self._pad_channels(data, self.reconstruction_channels)
+                        return self._pad_channels(data, ch)
             else:
                 tgt_frames, tgt_ts = self._load_monthly_frames(patch_id, tgt_name, year, month_b)
                 if len(tgt_frames) > 0:
                     random_idx = random.randint(0, len(tgt_frames) - 1)
                     data = tgt_frames[random_idx]
-                    return self._pad_channels(data, self.reconstruction_channels)
+                    return self._pad_channels(data, ch)
             return None
 
         return None
@@ -1437,6 +1439,8 @@ class HarbinPatchDataset(Dataset):
                     h, w = self._get_source_shape(tgt_name) if tgt_name in self.source_gsd else (ref_h, ref_w)
                     ch = max(self.reconstruction_channels, self.num_classes)
                     target_images_list.append(np.zeros((ch, h, w), dtype=np.float32))
+                    target_loss_type[t_idx] = loss_type
+                    target_source_idx[t_idx] = t_idx
         else:
             target_res = H
             tgt_ch = max(self.reconstruction_channels, self.num_classes)

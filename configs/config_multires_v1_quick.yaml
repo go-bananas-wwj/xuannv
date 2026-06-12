@@ -5,13 +5,14 @@
 _base_: config_multires_v1.yaml
 
 experiment:
-  name: quick_multires_v1_0612
-  output_dir: /workspace/xuannv/outputs/quick_multires_v1_0612
+  name: quick_multires_v4_0612
+  output_dir: /workspace/xuannv/outputs/quick_multires_v4_0612
 
 data:
   max_patches: 10
   batch_size: 1
   preload: false
+  recon_mask_ratio: 0.0  # 多分辨率模式下暂时关闭 MAE 重建掩码
 
 training:
   epochs: 5

@@ -30,26 +30,23 @@ data:
     s1: 10
     landsat: 30
     tianyi_sar: 10
-    planet: 3
 
-  # 5 路输入
-  num_input_sources: 5
+  # 4 路输入（当前海淀数据暂缺 planet，先验证 s2/s1/landsat/tianyi_sar 多分辨率）
+  num_input_sources: 4
   input_sources:
     - s2
     - s1
     - landsat
     - tianyi_sar
-    - planet
 
   source_channels:
     s2: 6
     s1: 2
     landsat: 6
     tianyi_sar: 1
-    planet: 4
 
-  # 5 个目标源
-  num_target_sources: 5
+  # 4 个目标源
+  num_target_sources: 4
   target_sources:
     - name: s2
       loss_type: 0
@@ -67,10 +64,6 @@ data:
       loss_type: 0
       sensor_src: tianyi_sar
       out_channels: 1
-    - name: planet
-      loss_type: 0
-      sensor_src: planet
-      out_channels: 4
 
   random_target_frame: true
   spatial_augmentation: true
@@ -120,19 +113,16 @@ model:
     s1: 2
     landsat: 1
     tianyi_sar: 2
-    planet: 8
   source_stem_layers:
     s2: 1
     s1: 1
     landsat: 1
     tianyi_sar: 1
-    planet: 1
   source_channels:
     s2: 6
     s1: 2
     landsat: 6
     tianyi_sar: 1
-    planet: 4
 
 training:
   epochs: 80
@@ -193,7 +183,7 @@ training:
   aef_batch_uniformity_weight: 0.0
 
   # 源重建权重（与 target_sources 顺序一致）
-  source_recon_weights: [1.0, 1.0, 1.0, 1.0, 1.0]
+  source_recon_weights: [1.0, 1.0, 1.0, 1.0]
 
   teacher_momentum: 0.996
   teacher_dropout_rate: 0.1
