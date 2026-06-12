@@ -1353,10 +1353,11 @@ class HarbinPatchDataset(Dataset):
             for s_idx, src_name in enumerate(self.input_sources):
                 frames, ts = self._load_monthly_frames(patch_id, src_name, year, month)
                 n_avail = len(frames)
+                h, w = self._get_source_shape(src_name)
                 if n_avail == 0:
                     source_input_mask[s_idx] = False
-                    h, w = self._get_source_shape(src_name)
-                    source_frames_list.append(np.zeros((0, C, h, w), dtype=np.float32))
+                    # 填充到 max_frames 个零帧，保证所有源 T 一致便于 stack
+                    source_frames_list.append(np.zeros((T, C, h, w), dtype=np.float32))
                     continue
                 n_use = min(n_avail, self.max_frames)
                 if self.training and n_avail > n_use:
@@ -1366,10 +1367,16 @@ class HarbinPatchDataset(Dataset):
                     use_indices = [min(int(i * step), n_avail - 1) for i in range(n_use)]
                 selected = frames[use_indices]
                 selected_ts = ts[use_indices]
+                # pad 到 T
+                if n_use < T:
+                    pad = np.zeros((T - n_use, C, h, w), dtype=np.float32)
+                    selected = np.concatenate([selected, pad], axis=0)
+                    pad_ts = np.zeros(T - n_use, dtype=np.float64)
+                    selected_ts = np.concatenate([selected_ts, pad_ts])
                 source_frames_list.append(selected)
-                source_ts[s_idx, :n_use] = selected_ts
+                source_ts[s_idx, :] = selected_ts
                 source_mask[s_idx, :n_use] = True
-                all_monthly_ts.extend(float(t) for t in selected_ts)
+                all_monthly_ts.extend(float(t) for t in selected_ts[:n_use])
                 source_type_ids[s_idx] = SOURCE_TYPE_MAP.get(src_name, 0)
             # 统一空间参考（用于增强 / mask）
             ref_h, ref_w = self.common_spatial_size

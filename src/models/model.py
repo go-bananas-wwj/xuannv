@@ -37,7 +37,7 @@ class CosineClassificationHead(nn.Module):
 class AEFOutput:
     embedding_map: torch.Tensor          # [B, D, H, W]
     embedding: torch.Tensor              # [B, D]
-    reconstructions: torch.Tensor        # [B, T_tgt, C, H, W]
+    reconstructions: torch.Tensor | list[torch.Tensor]  # [B, T_tgt, C, H, W] 或 per-source list
     logits: torch.Tensor                 # [B, num_classes]
     pre_norm_embedding: torch.Tensor     # [B, D]  L2 norm 前
     pre_norm_map: torch.Tensor | None = None  # [B, D, H, W]  L2 norm 前空间 embedding
@@ -68,6 +68,7 @@ class AEFModel(nn.Module):
             from src.data.transforms import INPUT_SOURCES
             input_sources = INPUT_SOURCES[:d.num_input_sources]
 
+        self.common_spatial_size = tuple(getattr(m, "common_spatial_size", (64, 64)))
         self.sensor_encoder_bank = SensorEncoderBank(
             num_sensor_types=m.num_sensor_types,
             input_dim=m.input_dim,
@@ -76,6 +77,9 @@ class AEFModel(nn.Module):
             source_channels=getattr(m, "source_channels", None),
             stem_channels=getattr(m, "stem_channels", None),
             input_sources=input_sources,
+            source_stem_stride=getattr(m, "source_stem_stride", None),
+            source_stem_layers=getattr(m, "source_stem_layers", None),
+            common_spatial_size=self.common_spatial_size,
         )
         self.time_encoder = TimeCodeEncoder(m.time_code_dim)
         self.time_to_summary = nn.Linear(m.time_code_dim, m.precision_dim)
@@ -112,8 +116,10 @@ class AEFModel(nn.Module):
             tgt_list = [(t["name"], t["loss_type"], t["sensor_src"]) for t in target_sources]
         else:
             tgt_list = TARGET_SOURCES[:num_tgt]
+        self.use_multires = getattr(d, "use_multires", False)
         self.per_source_decoders = nn.ModuleList()
         self._per_source_out_channels: list[int] = []
+        self._target_output_sizes: list[tuple[int, int]] = []
         for t_idx, (tgt_name, loss_type, sensor_src) in enumerate(tgt_list):
             # 从 target_sources 配置中读取 out_channels，支持 per-source
             out_ch = m.reconstruction_channels
@@ -134,6 +140,11 @@ class AEFModel(nn.Module):
                 )
                 self._per_source_out_channels.append(out_ch)
             self.per_source_decoders.append(dec)
+            # 输出分辨率
+            if self.use_multires:
+                self._target_output_sizes.append(self._get_target_shape(tgt_name))
+            else:
+                self._target_output_sizes.append((self.image_size, self.image_size))
 
         # 分类头
         self.classification_head = CosineClassificationHead(m.embedding_dim, d.num_classes)
@@ -159,9 +170,24 @@ class AEFModel(nn.Module):
         else:
             self.distill_head = None
 
+    def _get_target_shape(self, tgt_name: str) -> tuple[int, int]:
+        """多分辨率模式下，根据 source_gsd / source_image_sizes 推导目标分辨率."""
+        d = self.cfg.data
+        source_image_sizes = getattr(d, "source_image_sizes", None) or {}
+        if tgt_name in source_image_sizes:
+            shape = source_image_sizes[tgt_name]
+            if isinstance(shape, int):
+                return (shape, shape)
+            return tuple(shape)
+        source_gsd = getattr(d, "source_gsd", {})
+        gsd = source_gsd.get(tgt_name, 10.0)
+        patch_size_m = getattr(d, "patch_size_m", 1280.0)
+        size = int(round(patch_size_m / gsd))
+        return (size, size)
+
     def encode_frames(
         self,
-        source_frames: torch.Tensor,
+        source_frames: torch.Tensor | list[torch.Tensor],
         source_timestamps_ms: torch.Tensor,
         source_frame_mask: torch.Tensor,
         source_input_mask: torch.Tensor,
@@ -170,19 +196,29 @@ class AEFModel(nn.Module):
         valid_end_ms: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """编码输入帧 → summary_map, window_code, attention."""
-        # 兼容单源 [B,T,C,H,W] 或多源 [B,S,T,C,H,W]
-        if source_frames.dim() == 5:
-            source_frames = source_frames[:, None, ...]
-            source_timestamps_ms = source_timestamps_ms[:, None, ...]
-            source_frame_mask = source_frame_mask[:, None, ...]
-            source_input_mask = source_input_mask[None, :] if source_input_mask.dim() == 1 else source_input_mask
-            source_type_ids = source_type_ids[None, :] if source_type_ids.dim() == 1 else source_type_ids
+        is_multires = isinstance(source_frames, list)
 
-        # 传感器编码
+        if not is_multires:
+            # 兼容单源 [B,T,C,H,W] 或多源 [B,S,T,C,H,W]
+            if source_frames.dim() == 5:
+                source_frames = source_frames[:, None, ...]
+                source_timestamps_ms = source_timestamps_ms[:, None, ...]
+                source_frame_mask = source_frame_mask[:, None, ...]
+                source_input_mask = source_input_mask[None, :] if source_input_mask.dim() == 1 else source_input_mask
+                source_type_ids = source_type_ids[None, :] if source_type_ids.dim() == 1 else source_type_ids
+
+        # 传感器编码（已支持 list[Tensor]）
         encoded = self.sensor_encoder_bank(source_frames, source_type_ids)
 
         # 展平
-        B, S, T, C, H, W = encoded.shape
+        if is_multires:
+            B = source_frames[0].shape[0]
+            S = len(source_frames)
+            T = source_frames[0].shape[1]
+            C = encoded.shape[3]
+            H, W = encoded.shape[-2:]
+        else:
+            B, S, T, C, H, W = encoded.shape
         frames = encoded.reshape(B, S * T, C, H, W)
         timestamps = source_timestamps_ms.reshape(B, S * T).float()  # 转 float32 适配 AMP
 
@@ -237,7 +273,7 @@ class AEFModel(nn.Module):
 
     def forward(
         self,
-        source_frames: torch.Tensor,
+        source_frames: torch.Tensor | list[torch.Tensor],
         source_timestamps_ms: torch.Tensor,
         source_frame_mask: torch.Tensor,
         source_input_mask: torch.Tensor,
@@ -256,8 +292,12 @@ class AEFModel(nn.Module):
         target_valid_start_ms: torch.Tensor | None = None,
         target_valid_end_ms: torch.Tensor | None = None,
     ) -> AEFOutput:
+        is_multires = isinstance(source_frames, list)
         if source_type_ids is None:
-            if source_frames.dim() == 6:
+            if is_multires:
+                S = len(source_frames)
+                source_type_ids = torch.zeros(source_frames[0].shape[0], S, dtype=torch.long, device=source_frames[0].device)
+            elif source_frames.dim() == 6:
                 source_type_ids = torch.zeros(source_frames.shape[:2], dtype=torch.long, device=source_frames.device)
             else:
                 source_type_ids = torch.zeros(source_frames.shape[0], dtype=torch.long, device=source_frames.device)
@@ -284,7 +324,8 @@ class AEFModel(nn.Module):
             dual_pre_w2 = pre_norm_map_w2
 
         # Dummy 激活所有 sensor encoder 参数（避免 DDP 未使用参数报错）
-        dummy_sensor = torch.tensor(0.0, device=source_frames.device)
+        device = source_frames[0].device if is_multires else source_frames.device
+        dummy_sensor = torch.tensor(0.0, device=device)
         for encoder in self.sensor_encoder_bank.encoders.values():
             for p in encoder.parameters():
                 dummy_sensor = dummy_sensor + p.sum() * 0.0
@@ -294,12 +335,18 @@ class AEFModel(nn.Module):
         B = summary_map.shape[0]
         if skip_decoder:
             # 返回 dummy 值，只保留 embedding 相关输出
-            # 重建目标分辨率与原始输入同分辨率 (128x128)
             num_classes = self.cfg.data.num_classes
             num_tgt = self.cfg.data.num_target_sources
-            reconstructions = torch.zeros(B, num_tgt, max(self._per_source_out_channels),
-                                          self.image_size, self.image_size,
-                                          device=embedding_map.device, dtype=embedding_map.dtype)
+            if is_multires:
+                reconstructions = [
+                    torch.zeros(B, out_ch, *self.common_spatial_size,
+                                device=embedding_map.device, dtype=embedding_map.dtype)
+                    for out_ch in self._per_source_out_channels
+                ]
+            else:
+                reconstructions = torch.zeros(B, num_tgt, max(self._per_source_out_channels),
+                                              self.image_size, self.image_size,
+                                              device=embedding_map.device, dtype=embedding_map.dtype)
             logits = torch.zeros(B, num_classes, device=embedding_map.device, dtype=embedding_map.dtype)
             aux_logits = torch.zeros(B, num_classes, device=embedding_map.device, dtype=embedding_map.dtype)
             bottleneck_logits = torch.zeros(B, num_classes, device=embedding_map.device, dtype=embedding_map.dtype)
@@ -311,7 +358,10 @@ class AEFModel(nn.Module):
                 + self.aux_cls_head(summary_pooled).sum() * 0.0
                 + self.bottleneck_cls_head(pre_norm).sum() * 0.0
             )
-            reconstructions = reconstructions + dummy_cls.view(1, 1, 1, 1, 1)
+            if is_multires:
+                reconstructions = [r + dummy_cls.view(1, 1, 1, 1) for r in reconstructions]
+            else:
+                reconstructions = reconstructions + dummy_cls.view(1, 1, 1, 1, 1)
             return AEFOutput(
                 embedding_map=embedding_map,
                 embedding=embedding,
@@ -369,65 +419,90 @@ class AEFModel(nn.Module):
             target_metadata = target_metadata[:, None, :]
         cond_meta = target_metadata.reshape(B * T_tgt, -1)
 
-        max_ch = max(max(self._per_source_out_channels), self.cfg.data.num_classes)
-        dec_h, dec_w = flat_map.shape[2], flat_map.shape[3]  # decoder 输出分辨率 (通常 64x64)
-        flat_recon = torch.zeros(B * T_tgt, max_ch, dec_h, dec_w, device=flat_map.device, dtype=flat_map.dtype)
-
-        if target_source_idx is not None:
-            flat_src_idx = target_source_idx.reshape(B * T_tgt)
+        if is_multires:
+            # 多分辨率模式：每个目标独立解码并输出到各自分辨率
+            reconstructions: list[torch.Tensor] = []
             dummy_dec = torch.tensor(0.0, device=flat_map.device, dtype=flat_map.dtype)
             for src_id, dec in enumerate(self.per_source_decoders):
-                mask = (flat_src_idx == src_id)
-                if mask.any():
-                    out = dec(
-                        flat_map[mask],
-                        window_code=cond_window[mask],
-                        relative_time=cond_reltime[mask],
-                        metadata=cond_meta[mask],
-                    )
-                    out_ch = self._per_source_out_channels[src_id]
-                    flat_recon[mask, :out_ch] = out.to(flat_recon.dtype)
-                # 始终执行 dummy forward，确保所有 decoder 参数在每次 iteration 中都被 DDP 检测到
-                # 使用极小非零系数 (1e-12) 防止梯度被 PyTorch 优化掉
-                _z = torch.zeros(1, flat_map.shape[1], flat_map.shape[2], flat_map.shape[3],
-                                 device=flat_map.device, dtype=flat_map.dtype)
-                _w = torch.zeros(1, cond_window.shape[1], device=flat_map.device, dtype=flat_map.dtype)
-                _r = torch.zeros(1, cond_reltime.shape[1], device=flat_map.device, dtype=flat_map.dtype)
-                _m = torch.zeros(1, cond_meta.shape[1], device=flat_map.device, dtype=flat_map.dtype)
-                _out = dec(_z, window_code=_w, relative_time=_r, metadata=_m)
-                dummy_dec = dummy_dec + _out.sum() * 1e-12
-            flat_recon = flat_recon + dummy_dec.view(1, 1, 1, 1)
+                tgt_h, tgt_w = self._target_output_sizes[src_id]
+                out_ch = self._per_source_out_channels[src_id]
+                # 所有样本都过该 decoder（target_source_idx 用于在 loss 中选择对应 target）
+                out = dec(
+                    flat_map,
+                    window_code=cond_window,
+                    relative_time=cond_reltime,
+                    metadata=cond_meta,
+                )  # [B*T_tgt, out_ch, dec_h, dec_w]
+                # 插值到目标分辨率
+                if out.shape[-2:] != (tgt_h, tgt_w):
+                    out = F.interpolate(out, size=(tgt_h, tgt_w), mode="bilinear", align_corners=False)
+                out = out.to(flat_map.dtype)
+                # reshape 回 [B, T_tgt, out_ch, tgt_h, tgt_w]
+                out = out.reshape(B, T_tgt, out_ch, tgt_h, tgt_w)
+                reconstructions.append(out)
+                dummy_dec = dummy_dec + out.sum() * 1e-12
+            # 加 dummy 梯度确保所有 decoder 参数参与 backward
+            reconstructions = [r + dummy_dec.view(1, 1, 1, 1, 1) for r in reconstructions]
         else:
-            # 默认: 全部用第一个 decoder
-            out = self.per_source_decoders[0](
-                flat_map,
-                window_code=cond_window,
-                relative_time=cond_reltime,
-                metadata=cond_meta,
-            )
-            flat_recon[:, :self._per_source_out_channels[0]] = out.to(flat_recon.dtype)
-            # 对剩余 decoder 执行 dummy forward，确保 DDP 所有参数参与梯度
-            dummy_dec = torch.tensor(0.0, device=flat_map.device, dtype=flat_map.dtype)
-            for src_id, dec in enumerate(self.per_source_decoders[1:], start=1):
-                _z = torch.zeros(1, flat_map.shape[1], flat_map.shape[2], flat_map.shape[3],
-                                 device=flat_map.device, dtype=flat_map.dtype)
-                _w = torch.zeros(1, cond_window.shape[1], device=flat_map.device, dtype=flat_map.dtype)
-                _r = torch.zeros(1, cond_reltime.shape[1], device=flat_map.device, dtype=flat_map.dtype)
-                _m = torch.zeros(1, cond_meta.shape[1], device=flat_map.device, dtype=flat_map.dtype)
-                _out = dec(_z, window_code=_w, relative_time=_r, metadata=_m)
-                dummy_dec = dummy_dec + _out.sum() * 1e-12
-            flat_recon = flat_recon + dummy_dec.view(1, 1, 1, 1)
+            max_ch = max(max(self._per_source_out_channels), self.cfg.data.num_classes)
+            dec_h, dec_w = flat_map.shape[2], flat_map.shape[3]  # decoder 输出分辨率 (通常 64x64)
+            flat_recon = torch.zeros(B * T_tgt, max_ch, dec_h, dec_w, device=flat_map.device, dtype=flat_map.dtype)
 
-        # ★ 新增: bilinear upsample 回到原始分辨率 (128x128)
-        if dec_h != self.image_size or dec_w != self.image_size:
-            flat_recon = F.interpolate(
-                flat_recon,
-                size=(self.image_size, self.image_size),
-                mode='bilinear',
-                align_corners=False,
-            )
+            if target_source_idx is not None:
+                flat_src_idx = target_source_idx.reshape(B * T_tgt)
+                dummy_dec = torch.tensor(0.0, device=flat_map.device, dtype=flat_map.dtype)
+                for src_id, dec in enumerate(self.per_source_decoders):
+                    mask = (flat_src_idx == src_id)
+                    if mask.any():
+                        out = dec(
+                            flat_map[mask],
+                            window_code=cond_window[mask],
+                            relative_time=cond_reltime[mask],
+                            metadata=cond_meta[mask],
+                        )
+                        out_ch = self._per_source_out_channels[src_id]
+                        flat_recon[mask, :out_ch] = out.to(flat_recon.dtype)
+                    # 始终执行 dummy forward，确保所有 decoder 参数在每次 iteration 中都被 DDP 检测到
+                    # 使用极小非零系数 (1e-12) 防止梯度被 PyTorch 优化掉
+                    _z = torch.zeros(1, flat_map.shape[1], flat_map.shape[2], flat_map.shape[3],
+                                     device=flat_map.device, dtype=flat_map.dtype)
+                    _w = torch.zeros(1, cond_window.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                    _r = torch.zeros(1, cond_reltime.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                    _m = torch.zeros(1, cond_meta.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                    _out = dec(_z, window_code=_w, relative_time=_r, metadata=_m)
+                    dummy_dec = dummy_dec + _out.sum() * 1e-12
+                flat_recon = flat_recon + dummy_dec.view(1, 1, 1, 1)
+            else:
+                # 默认: 全部用第一个 decoder
+                out = self.per_source_decoders[0](
+                    flat_map,
+                    window_code=cond_window,
+                    relative_time=cond_reltime,
+                    metadata=cond_meta,
+                )
+                flat_recon[:, :self._per_source_out_channels[0]] = out.to(flat_recon.dtype)
+                # 对剩余 decoder 执行 dummy forward，确保 DDP 所有参数参与梯度
+                dummy_dec = torch.tensor(0.0, device=flat_map.device, dtype=flat_map.dtype)
+                for src_id, dec in enumerate(self.per_source_decoders[1:], start=1):
+                    _z = torch.zeros(1, flat_map.shape[1], flat_map.shape[2], flat_map.shape[3],
+                                     device=flat_map.device, dtype=flat_map.dtype)
+                    _w = torch.zeros(1, cond_window.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                    _r = torch.zeros(1, cond_reltime.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                    _m = torch.zeros(1, cond_meta.shape[1], device=flat_map.device, dtype=flat_map.dtype)
+                    _out = dec(_z, window_code=_w, relative_time=_r, metadata=_m)
+                    dummy_dec = dummy_dec + _out.sum() * 1e-12
+                flat_recon = flat_recon + dummy_dec.view(1, 1, 1, 1)
 
-        reconstructions = flat_recon.reshape(B, T_tgt, max_ch, self.image_size, self.image_size)
+            # ★ 新增: bilinear upsample 回到原始分辨率 (128x128)
+            if dec_h != self.image_size or dec_w != self.image_size:
+                flat_recon = F.interpolate(
+                    flat_recon,
+                    size=(self.image_size, self.image_size),
+                    mode='bilinear',
+                    align_corners=False,
+                )
+
+            reconstructions = flat_recon.reshape(B, T_tgt, max_ch, self.image_size, self.image_size)
 
         # 分类头 (不使用，但保留参数以兼容旧 checkpoint)
         logits = self.classification_head(embedding)
@@ -457,7 +532,10 @@ class AEFModel(nn.Module):
         dummy_cls = (logits.sum() + aux_logits.sum() + bottleneck_logits.sum()) * 0.0
         if patch_id_logits is None and self.patch_id_head is not None:
             dummy_cls = dummy_cls  # head exists, logits computed
-        reconstructions = reconstructions + dummy_cls.view(1, 1, 1, 1, 1)
+        if isinstance(reconstructions, list):
+            reconstructions = [r + dummy_cls.view(1, 1, 1, 1, 1) for r in reconstructions]
+        else:
+            reconstructions = reconstructions + dummy_cls.view(1, 1, 1, 1, 1)
 
         # ★ OlmoEarth 蒸馏：student pre_norm_map → teacher 768D 空间
         distill_map = None
@@ -488,7 +566,7 @@ class AEFModel(nn.Module):
 
     def encode_dual_window(
         self,
-        source_frames: torch.Tensor,
+        source_frames: torch.Tensor | list[torch.Tensor],
         source_timestamps_ms: torch.Tensor,
         source_frame_mask: torch.Tensor,
         source_input_mask: torch.Tensor,
@@ -506,7 +584,7 @@ class AEFModel(nn.Module):
             pre_w1: [B, D, H, W] pre-norm (window 1) — 用于 temporal loss
             pre_w2: [B, D, H, W] pre-norm (window 2) — 用于 temporal loss
         """
-        B = source_frames.shape[0]  # 无论 5D [B,T,C,H,W] 还是 6D [B,S,T,C,H,W]，第0维都是 batch
+        B = source_frames[0].shape[0] if isinstance(source_frames, list) else source_frames.shape[0]
         dev = source_frames.device
         num_tgt = self.cfg.data.num_target_sources
         meta_dim = getattr(self.cfg.data, "metadata_dim", 4)
@@ -547,7 +625,7 @@ class AEFModel(nn.Module):
 
     def encode_dual_window_explicit_diff(
         self,
-        source_frames: torch.Tensor,
+        source_frames: torch.Tensor | list[torch.Tensor],
         source_timestamps_ms: torch.Tensor,
         source_frame_mask: torch.Tensor,
         source_input_mask: torch.Tensor,
