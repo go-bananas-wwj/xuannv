@@ -1,0 +1,20 @@
+# ============================================================
+# xuannv 多分辨率输入 v1 quick-diag 配置
+# ============================================================
+
+_base_: config_multires_v1.yaml
+
+experiment:
+  name: quick_multires_v1_0612
+  output_dir: /workspace/xuannv/outputs/quick_multires_v1_0612
+
+data:
+  max_patches: 10
+  batch_size: 1
+  preload: false
+
+training:
+  epochs: 5
+  max_steps_per_epoch: 20
+  save_every: 1
+  eval_every: 1

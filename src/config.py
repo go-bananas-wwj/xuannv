@@ -75,7 +75,8 @@ class DataConfig:
     patch_list: list[str] | None = None
     # V14: 多区域混合训练 manifest
     multi_region_manifest: str | None = None
-    # ★ 多分辨率输入：地理 patch 大小（米）与各源真实 GSD
+    # ★ 多分辨率输入
+    use_multires: bool = False
     patch_size_m: float = 1280.0
     source_gsd: dict = field(default_factory=lambda: {
         "s2": 10.0,
