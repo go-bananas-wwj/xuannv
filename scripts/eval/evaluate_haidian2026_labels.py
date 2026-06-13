@@ -42,6 +42,10 @@ warnings.filterwarnings("ignore")
 def parse_args():
     pa = argparse.ArgumentParser()
     pa.add_argument("--embedding-file", required=True)
+    pa.add_argument("--second-embedding-file", default="",
+                    help="第二时相 embedding npz，提供则与第一时相拼接 [emb1; emb2]")
+    pa.add_argument("--second-month", default="",
+                    help="第二时相月份，如 2026-04")
     pa.add_argument("--label-dir", default="/workspace/xuannv/haidian_label/labeljson")
     pa.add_argument("--output-dir", required=True)
     pa.add_argument("--device", default="npu:0")
@@ -113,8 +117,12 @@ def resize_mask(mask: np.ndarray, size: int) -> np.ndarray:
     return (np.array(img) > 0).astype(np.uint8)
 
 
-def build_dataset(npz_path: str, label_dir: Path, month: str):
-    """返回 {patch_id: (embedding [D,H,W], label [C,H,W])} 字典."""
+def build_dataset(npz_path: str, label_dir: Path, month: str,
+                  second_npz_path: str | None = None, second_month: str | None = None):
+    """返回 {patch_id: (embedding [D,H,W], label [C,H,W])} 字典.
+
+    如果提供 second_npz_path，则按 patch_id 对齐两期 embedding 并在通道维度拼接。
+    """
     data = np.load(npz_path)
     spatial_maps = data["spatial_maps"].astype(np.float32)  # [N, M, D, H, W]
     month_labels = list(data["month_labels"])
@@ -126,6 +134,19 @@ def build_dataset(npz_path: str, label_dir: Path, month: str):
     spatial_maps = spatial_maps[:, mi]  # [N, D, H, W]
     _, D, H, W = spatial_maps.shape
 
+    # 可选第二时相
+    second_maps: dict[str, np.ndarray] | None = None
+    if second_npz_path is not None:
+        data2 = np.load(second_npz_path)
+        spatial_maps2 = data2["spatial_maps"].astype(np.float32)
+        month_labels2 = list(data2["month_labels"])
+        patch_ids2 = [str(p) for p in data2["patch_ids"]]
+        if second_month not in month_labels2:
+            raise ValueError(f"第二时相月份 {second_month} 不在 embedding 中: {month_labels2}")
+        mi2 = month_labels2.index(second_month)
+        spatial_maps2 = spatial_maps2[:, mi2]
+        second_maps = {pid: spatial_maps2[i] for i, pid in enumerate(patch_ids2)}
+
     results = {}
     for i, pid in enumerate(patch_ids):
         json_path = label_dir / f"{pid}_20260430_rgb_uint8.json"
@@ -134,9 +155,15 @@ def build_dataset(npz_path: str, label_dir: Path, month: str):
         masks = load_label_json(json_path, image_size=(427, 427))
         label = np.stack([resize_mask(masks[name], H) for name in CLASS_NAMES], axis=0)  # [C, H, W]
         emb = spatial_maps[i]  # [D, H, W]
+        if second_maps is not None:
+            if pid not in second_maps:
+                continue
+            emb2 = second_maps[pid]
+            emb = np.concatenate([emb, emb2], axis=0)  # [2D, H, W]
         results[pid] = (emb, label)
 
-    return results, (D, H, W)
+    D_out = emb.shape[0]
+    return results, (D_out, H, W)
 
 
 class TinyMLP(nn.Module):
@@ -460,8 +487,14 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"[加载] embedding: {args.embedding_file}")
+    if args.second_embedding_file:
+        print(f"[加载] 第二时相 embedding: {args.second_embedding_file} month={args.second_month}")
     print(f"[加载] labels: {label_dir}")
-    results, (D, H, W) = build_dataset(args.embedding_file, label_dir, args.month)
+    results, (D, H, W) = build_dataset(
+        args.embedding_file, label_dir, args.month,
+        second_npz_path=args.second_embedding_file or None,
+        second_month=args.second_month or None,
+    )
     print(f"[信息] 有效标注 patch 数: {len(results)}, embedding: D={D}, H={H}, W={W}")
 
     print("\n" + "=" * 60)
@@ -481,6 +514,7 @@ def main():
 
     summary = {
         "month": args.month,
+        "second_month": args.second_month if args.second_embedding_file else None,
         "n_patches": len(results),
         "embedding_shape": [D, H, W],
         "multiclass": multi_reports,

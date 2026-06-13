@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""可视化海淀区 2026 标注与 MLP 预测结果。
+"""可视化海淀区 2026 标注与 MLP 预测结果（支持双时相 embedding）。
 
 用法:
     python scripts/eval/visualize_haidian2026_predictions.py \
-        --embedding-file outputs/exp_multires_v1_0612/eval_best40/patch_embeddings.npz \
+        --embedding-file outputs/exp_multires_v1_0612/embeddings_202512/patch_embeddings.npz \
+        --month 2025-12 \
+        --second-embedding-file outputs/exp_multires_v1_0612/embeddings_202604/patch_embeddings.npz \
+        --second-month 2026-04 \
         --label-dir /workspace/xuannv/haidian_label/labeljson \
-        --output-dir outputs/exp_multires_v1_0612/haidian2026_eval/visualizations \
+        --output-dir outputs/exp_multires_v1_0612/haidian2026_eval_bitemporal/visualizations \
         --device npu:0 \
         --n-examples 4
 """
@@ -37,21 +40,23 @@ from scripts.eval.evaluate_haidian2026_labels import (
 def parse_args():
     pa = argparse.ArgumentParser()
     pa.add_argument("--embedding-file", required=True)
+    pa.add_argument("--month", default="2025-10")
+    pa.add_argument("--second-embedding-file", default="")
+    pa.add_argument("--second-month", default="")
     pa.add_argument("--label-dir", default="/workspace/xuannv/haidian_label/labeljson")
     pa.add_argument("--output-dir", required=True)
     pa.add_argument("--device", default="npu:0")
-    pa.add_argument("--month", default="2025-10")
     pa.add_argument("--n-examples", type=int, default=4)
     pa.add_argument("--seed", type=int, default=42)
     return pa.parse_args()
 
 
-def load_s2_rgb(patch_id: str) -> np.ndarray | None:
-    """加载 patch 的第一帧 S2 RGB 图像用于可视化。"""
+def load_s2_rgb_for_month(patch_id: str, year_month: str) -> np.ndarray | None:
+    """加载指定月份的第一帧 S2 RGB。year_month 格式如 2025-12。"""
     s2_dir = Path(f"/workspace/xuannv/data_raw/haidian/scenes/{patch_id}/s2")
     if not s2_dir.exists():
         return None
-    tifs = sorted(s2_dir.glob("*.tif"))
+    tifs = sorted(s2_dir.glob(f"{year_month.replace('-', '')}*.tif"))
     if not tifs:
         return None
     with rasterio.open(tifs[0]) as src:
@@ -76,7 +81,7 @@ def rasterize_label(json_path: Path, image_size: tuple[int, int] = (427, 427)) -
 
 
 def visualize_patch(pid: str, emb: np.ndarray, label_json: Path, model: nn.Module,
-                    device: torch.device, output_path: Path):
+                    device: torch.device, output_path: Path, month1: str, month2: str | None):
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
 
@@ -88,15 +93,16 @@ def visualize_patch(pid: str, emb: np.ndarray, label_json: Path, model: nn.Modul
 
     label_427 = rasterize_label(label_json)
     label_64 = np.array(Image.fromarray((label_427 * 40).astype(np.uint8)).resize((W, H), Image.Resampling.NEAREST))
-    # restore classes (rough nearest)
     label_64 = np.rint(label_64 / 40).astype(np.int64)
     label_64 = np.clip(label_64, 0, len(CLASS_NAMES))
 
-    rgb = load_s2_rgb(pid)
-    if rgb is None:
-        rgb = np.zeros((H, W, 3))
-    else:
-        rgb = np.array(Image.fromarray((rgb * 255).astype(np.uint8)).resize((W, H), Image.Resampling.BILINEAR)) / 255.0
+    def resize_rgb(rgb):
+        if rgb is None:
+            return np.zeros((H, W, 3))
+        return np.array(Image.fromarray((rgb * 255).astype(np.uint8)).resize((W, H), Image.Resampling.BILINEAR)) / 255.0
+
+    rgb1 = resize_rgb(load_s2_rgb_for_month(pid, month1))
+    rgb2 = resize_rgb(load_s2_rgb_for_month(pid, month2)) if month2 else np.zeros((H, W, 3))
 
     colors = [
         "#006400",  # gongdi
@@ -109,21 +115,29 @@ def visualize_patch(pid: str, emb: np.ndarray, label_json: Path, model: nn.Modul
     ]
     names = ["施工工地", "建筑用地", "疑似违建", "农用地变化", "建筑消失", "施工道路", "背景"]
 
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    axes[0].imshow(rgb)
-    axes[0].set_title(f"{pid} S2 RGB")
+    ncols = 4 if month2 else 3
+    fig, axes = plt.subplots(1, ncols, figsize=(5 * ncols, 5))
+    axes[0].imshow(rgb1)
+    axes[0].set_title(f"{pid} S2 {month1}")
     axes[0].axis("off")
 
-    axes[1].imshow(label_64, cmap=plt.cm.colors.ListedColormap(colors), vmin=0, vmax=len(colors)-1)
-    axes[1].set_title("2026 标注")
-    axes[1].axis("off")
+    if month2:
+        axes[1].imshow(rgb2)
+        axes[1].set_title(f"{pid} S2 {month2}")
+        axes[1].axis("off")
 
-    axes[2].imshow(pred, cmap=plt.cm.colors.ListedColormap(colors), vmin=0, vmax=len(colors)-1)
-    axes[2].set_title("MLP 预测")
-    axes[2].axis("off")
+    ax_label = axes[2] if month2 else axes[1]
+    ax_label.imshow(label_64, cmap=plt.cm.colors.ListedColormap(colors), vmin=0, vmax=len(colors)-1)
+    ax_label.set_title("2026 标注")
+    ax_label.axis("off")
+
+    ax_pred = axes[3] if month2 else axes[2]
+    ax_pred.imshow(pred, cmap=plt.cm.colors.ListedColormap(colors), vmin=0, vmax=len(colors)-1)
+    ax_pred.set_title("MLP 预测")
+    ax_pred.axis("off")
 
     patches = [mpatches.Patch(color=colors[i], label=names[i]) for i in range(len(colors))]
-    axes[2].legend(handles=patches, loc="upper left", bbox_to_anchor=(1.05, 1))
+    ax_pred.legend(handles=patches, loc="upper left", bbox_to_anchor=(1.05, 1))
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
@@ -144,7 +158,11 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    results, (D, H, W) = build_dataset(args.embedding_file, label_dir, args.month)
+    results, (D, H, W) = build_dataset(
+        args.embedding_file, label_dir, args.month,
+        second_npz_path=args.second_embedding_file or None,
+        second_month=args.second_month or None,
+    )
     print(f"[信息] 有效 patch: {len(results)}, embedding: {D}x{H}x{W}")
 
     # 80/20 split same as eval script
@@ -192,7 +210,7 @@ def main():
         emb, _ = results[pid]
         label_json = label_dir / f"{pid}_20260430_rgb_uint8.json"
         out_path = output_dir / f"{pid}_mlp_pred.png"
-        visualize_patch(pid, emb, label_json, model, device, out_path)
+        visualize_patch(pid, emb, label_json, model, device, out_path, args.month, args.second_month or None)
 
 
 if __name__ == "__main__":
