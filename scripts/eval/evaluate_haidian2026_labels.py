@@ -33,6 +33,7 @@ from sklearn.metrics import (
     confusion_matrix,
     f1_score,
     jaccard_score,
+    roc_auc_score,
 )
 
 warnings.filterwarnings("ignore")
@@ -350,6 +351,101 @@ def binary_construction_eval(results: dict, D: int, H: int, W: int, k: int, devi
     return reports
 
 
+def per_class_binary_eval(results: dict, D: int, H: int, W: int, k: int, device: torch.device, seed: int):
+    """为每个类别单独训练一个二分类头（one-vs-rest），评估独立任务效果."""
+    rng = np.random.RandomState(seed)
+    pids = list(results.keys())
+    rng.shuffle(pids)
+    n_train = int(len(pids) * 0.8)
+    train_pids = set(pids[:n_train])
+
+    per_class_reports: dict[str, dict] = {}
+
+    for cls_idx, cls_name in enumerate(CLASS_NAMES):
+        print(f"\n  [{cls_name}] {CLASS_NAMES_CN[cls_name]} — 独立二分类")
+
+        X_train, y_train = [], []
+        X_test, y_test = [], []
+        for pid, (emb, label) in results.items():
+            emb_flat = emb.reshape(D, -1).T
+            cls_mask = label[cls_idx].astype(np.int64).flatten()
+            if pid in train_pids:
+                X_train.append(emb_flat)
+                y_train.append(cls_mask)
+            else:
+                X_test.append(emb_flat)
+                y_test.append(cls_mask)
+
+        X_train = np.concatenate(X_train, 0)
+        y_train = np.concatenate(y_train, 0)
+        X_test = np.concatenate(X_test, 0)
+        y_test = np.concatenate(y_test, 0)
+
+        pos_ratio = y_train.mean()
+        print(f"    train={len(y_train)} test={len(y_test)} pos_ratio={pos_ratio:.4f}")
+        if pos_ratio < 1e-6:
+            print("    正样本为空，跳过")
+            continue
+
+        reports = {}
+
+        # kNN
+        y_pred = knn_eval(X_train, y_train, X_test, k, device)
+        reports["knn"] = compute_metrics(y_test, y_pred, 2)
+        print(f"    kNN  : OA={reports['knn']['oa']:.4f} BAcc={reports['knn']['bacc']:.4f} F1={reports['knn']['mf1']:.4f} IoU={reports['knn']['miou']:.4f}")
+
+        # Linear
+        clf = LogisticRegression(max_iter=500, n_jobs=4, class_weight="balanced", random_state=seed)
+        clf.fit(X_train, y_train)
+        y_pred = clf.predict(X_test)
+        reports["linear"] = compute_metrics(y_test, y_pred, 2)
+        # AUC
+        try:
+            reports["linear"]["auc"] = float(roc_auc_score(y_test, clf.predict_proba(X_test)[:, 1]))
+        except Exception:
+            reports["linear"]["auc"] = 0.0
+        print(f"    Linear: OA={reports['linear']['oa']:.4f} BAcc={reports['linear']['bacc']:.4f} F1={reports['linear']['mf1']:.4f} IoU={reports['linear']['miou']:.4f} AUC={reports['linear']['auc']:.4f}")
+
+        # MLP (dedicated head)
+        mlp = TinyMLP(D, 2, hidden=128).to(device)
+        opt = torch.optim.AdamW(mlp.parameters(), lr=1e-3, weight_decay=1e-4)
+        Xt = torch.from_numpy(X_train).float().to(device)
+        yt = torch.from_numpy(y_train).to(device)
+        batch = 4096
+        for epoch in range(50):
+            mlp.train()
+            perm = torch.randperm(len(Xt), device=device)
+            for i in range(0, len(Xt), batch):
+                b = perm[i:i+batch]
+                loss = F.cross_entropy(mlp(Xt[b]), yt[b])
+                opt.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(mlp.parameters(), 1.0)
+                opt.step()
+
+        mlp.eval()
+        preds = []
+        probs = []
+        with torch.no_grad():
+            Xe = torch.from_numpy(X_test).float().to(device)
+            for i in range(0, len(Xe), batch):
+                logits = mlp(Xe[i:i+batch])
+                probs.append(torch.softmax(logits, dim=1)[:, 1].cpu().numpy())
+                preds.append(logits.argmax(dim=1).cpu().numpy())
+        y_pred = np.concatenate(preds)
+        y_prob = np.concatenate(probs)
+        reports["mlp"] = compute_metrics(y_test, y_pred, 2)
+        try:
+            reports["mlp"]["auc"] = float(roc_auc_score(y_test, y_prob))
+        except Exception:
+            reports["mlp"]["auc"] = 0.0
+        print(f"    MLP  : OA={reports['mlp']['oa']:.4f} BAcc={reports['mlp']['bacc']:.4f} F1={reports['mlp']['mf1']:.4f} IoU={reports['mlp']['miou']:.4f} AUC={reports['mlp']['auc']:.4f}")
+
+        per_class_reports[cls_name] = reports
+
+    return per_class_reports
+
+
 def main():
     args = parse_args()
     if "npu" in args.device:
@@ -378,12 +474,18 @@ def main():
     print("=" * 60)
     binary_reports = binary_construction_eval(results, D, H, W, args.k, device, args.seed)
 
+    print("\n" + "=" * 60)
+    print("任务三：每个类别独立二分类（one-vs-rest，专用 MLP 头）")
+    print("=" * 60)
+    per_class_reports = per_class_binary_eval(results, D, H, W, args.k, device, args.seed)
+
     summary = {
         "month": args.month,
         "n_patches": len(results),
         "embedding_shape": [D, H, W],
         "multiclass": multi_reports,
         "binary_construction": binary_reports,
+        "per_class_binary": per_class_reports,
     }
     out_json = output_dir / "metrics.json"
     with open(out_json, "w") as f:
