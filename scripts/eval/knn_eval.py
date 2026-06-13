@@ -52,8 +52,8 @@ def load_label(patch_id: str, label_dir: str, fname: str, data_roots: list[Path]
     local_id = patch_id.split('_', 1)[1] if '_' in patch_id and not patch_id.startswith('patch_') else patch_id
     for data_root in data_roots:
         candidates = [
-            data_root / label_dir / patch_id / fname,
-            data_root / label_dir / local_id / fname,
+            data_root / patch_id / label_dir / fname,
+            data_root / local_id / label_dir / fname,
         ]
         for path in candidates:
             if path.exists():

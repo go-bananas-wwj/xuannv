@@ -130,6 +130,8 @@ def extract_embedding(model, dataset, patch_month_index, cfg,
     item = dataset[patch_month_index[key]]
 
     def _to(x):
+        if isinstance(x, list):
+            return [t.unsqueeze(0).to(device) for t in x]
         return x.unsqueeze(0).to(device)
 
     use_bf16 = getattr(cfg.training, 'use_bf16', True)
