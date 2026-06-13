@@ -1,0 +1,228 @@
+# ============================================================
+# xuannv 多分辨率输入 v2 配置
+# 目标: 引入 Planet 3m + 课程学习反坍缩 + AEF 蒸馏
+# 创建时间: 2026-06-13
+# ============================================================
+
+experiment:
+  name: exp_multires_v2_0613
+  seed: 42
+  output_dir: /workspace/xuannv/outputs/exp_multires_v2_0613
+
+data:
+  dataset_type: harbin_patches
+  manifest_path: /workspace/xuannv/data_raw/haidian/scenes
+  stats_dir: /workspace/xuannv/statistics/haidian
+  batch_size: 1
+  num_workers: 0
+  image_size: 128
+  max_frames: 24
+  num_samples: 320
+  num_classes: 11
+  input_dim: 6
+  metadata_dim: 4
+
+  use_multires: true
+  patch_size_m: 1280
+  source_gsd:
+    s2: 10
+    s1: 10
+    landsat: 30
+    tianyi_sar: 10
+    planet: 3
+
+  num_input_sources: 5
+  input_sources:
+    - s2
+    - s1
+    - landsat
+    - tianyi_sar
+    - planet
+
+  source_channels:
+    s2: 6
+    s1: 2
+    landsat: 6
+    tianyi_sar: 1
+    planet: 4
+
+  num_target_sources: 5
+  target_sources:
+    - name: s2
+      loss_type: 0
+      sensor_src: s2
+      out_channels: 6
+    - name: s1
+      loss_type: 0
+      sensor_src: s1
+      out_channels: 2
+    - name: landsat
+      loss_type: 0
+      sensor_src: landsat
+      out_channels: 6
+    - name: tianyi_sar
+      loss_type: 0
+      sensor_src: tianyi_sar
+      out_channels: 1
+    - name: planet
+      loss_type: 0
+      sensor_src: planet
+      out_channels: 4
+
+  random_target_frame: true
+  spatial_augmentation: true
+  temporal_window_augmentation: true
+  temporal_window_prob: 0.5
+  temporal_window_min_frames: 4
+  temporal_window_max_frames: 24
+  preload: false
+
+  recon_mask_ratio: 0.85
+  recon_mask_patch_size: 16
+
+  filter_2025_monthly: false
+
+  aef_embed_dir: /workspace/xuannv/data_raw/haidian/aef_embeddings/haidian_2025_patches
+  use_dual_teacher: false
+  teacher_embed_dir: null
+  olmoearth_tokens_root: null
+
+model:
+  input_dim: 6
+  stem_dim: 128
+  precision_dim: 128
+  time_dim: 256
+  space_dim: 256
+  embedding_dim: 64
+  time_code_dim: 64
+  window_code_dim: 64
+  relative_time_code_dim: 16
+  num_blocks: 8
+  num_heads: 8
+  vmf_kappa: 8000.0
+  bottleneck_noise_scale: 0.02
+  metadata_dim: 4
+  num_sensor_types: 16
+  gradient_checkpointing: true
+  per_source_decoders: true
+  decoder_hidden_mult: 1
+  skip_l2_norm_training: true
+  use_distill_head: false
+
+  common_spatial_size: [64, 64]
+  source_stem_stride:
+    s2: 2
+    s1: 2
+    landsat: 1
+    tianyi_sar: 2
+    planet: 4
+  source_stem_layers:
+    s2: 1
+    s1: 1
+    landsat: 1
+    tianyi_sar: 1
+    planet: 2
+  source_channels:
+    s2: 6
+    s1: 2
+    landsat: 6
+    tianyi_sar: 1
+    planet: 4
+
+training:
+  epochs: 100
+  gradient_accumulation_steps: 4
+  lr: 0.0001
+  lr_min: 0.000001
+  weight_decay: 0.01
+  grad_clip_norm: 1.0
+
+  reconstruction_weight: 1.0
+  consistency_weight: 0.0
+  classification_weight: 0.0
+
+  use_pre_norm_uniform: true
+  pre_norm_uniform_weight: 0.5
+  batch_uniformity_weight: 0.0
+  use_spatial_vicreg: true
+  variance_weight: 0.25
+  covariance_weight: 0.001
+  vicreg_min_std: 1.0
+  decorrelation_weight: 0.0
+  orthogonality_weight: 0.0
+  coding_rate_weight: 0.0
+  erank_loss_weight: 0.2
+  temporal_gap_aware_weight: 0.0
+  temporal_contrastive_weight: 0.1
+
+  aef_spatial_distill_weight: 0.5
+  aef_global_distill_weight: 0.25
+
+  olmoearth_spatial_distill_weight: 0.0
+  olmoearth_global_distill_weight: 0.0
+
+  inter_patch_infonce_weight: 0.1
+  inter_patch_infonce_temperature: 0.1
+  inter_variance_weight: 0.0
+  inter_variance_min_std: 0.3
+  inter_decorr_weight: 0.0
+  temporal_cosine_pixel_weight: 0.0
+  patch_id_loss_weight: 0.0
+  lmim_weight: 0.0
+  hyperspherical_uniform_weight: 0.0
+  spherical_variance_weight: 0.0
+  temporal_magnitude_weight: 0.0
+  pixel_change_supervision_weight: 0.0
+  change_consistency_weight: 0.0
+  memory_bank_size: 512
+  text_contrastive_weight: 0.0
+  vicreg_weight: 0.0
+  dino_weight: 0.0
+  koleo_weight: 0.0
+  pixel_temporal_info_nce_weight: 0.0
+  l2_temporal_weight: 0.0
+  ct_reconstruction_weight: 0.0
+  aux_classification_weight: 0.0
+  bottleneck_cls_weight: 0.0
+  encoder_uniform_weight: 0.0
+  aef_batch_uniformity_weight: 0.0
+
+  source_recon_weights: [1.0, 1.0, 1.0, 1.0, 0.5]
+
+  teacher_momentum: 0.996
+  teacher_dropout_rate: 0.1
+  student_frame_drop_rate: 0.5
+  student_source_drop_rate: 0.3
+  student_front_drop_prob: 0.15
+  student_back_drop_prob: 0.15
+
+  kappa_start: 8000.0
+  kappa_end: 8000.0
+  kappa_warmup_epochs: 0
+
+  lr_schedule: cosine_no_restart
+  warmup_epochs: 10
+  recon_warmup_epochs: 0
+
+  max_steps_per_epoch: 200
+
+  save_every: 10
+  save_best_balanced: true
+  eval_every: 10
+  early_stop_patience: 100
+
+  use_curriculum: true
+  curriculum_epochs: 20
+  curriculum_recon_weight: 0.1
+  curriculum_pre_norm_uniform_weight: 3.0
+  curriculum_erank_loss_weight: 1.0
+  curriculum_start_weight: 0.3
+  curriculum_end_weight: 1.0
+
+  decoder_cond_dropout: 0.6
+  temporal_magnitude_temperature: 0.1
+  temporal_use_spatial_weight: true
+
+evaluation:
+  knn_k: 5
+  bootstrap_samples: 100
