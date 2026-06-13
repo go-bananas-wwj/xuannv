@@ -208,7 +208,7 @@ training:
 
   save_every: 1
   save_best_balanced: false
-  eval_every: 0
+  eval_every: 1000
   early_stop_patience: 100
 
   use_curriculum: true
