@@ -97,7 +97,7 @@ class TinyMLP(nn.Module):
 
 def load_worldcover(patch_id: str) -> np.ndarray | None:
     """加载 WorldCover 标注，返回 int8 类别数组（-1 = invalid）。"""
-    d = HAIDIAN_ROOT / "worldcover" / patch_id
+    d = HAIDIAN_ROOT / patch_id / "worldcover"
     tifs = sorted(d.glob("*.tif"))
     if not tifs:
         return None
@@ -111,7 +111,7 @@ def load_worldcover(patch_id: str) -> np.ndarray | None:
 
 def load_jrc_water(patch_id: str) -> np.ndarray | None:
     """加载 JRC Water，返回 int8 二值数组（0=陆地, 1=水体, -1=invalid）。"""
-    d = HAIDIAN_ROOT / "jrc_water" / patch_id
+    d = HAIDIAN_ROOT / patch_id / "jrc_water"
     tifs = sorted(d.glob("*.tif"))
     if not tifs:
         return None
@@ -127,7 +127,7 @@ def load_jrc_water(patch_id: str) -> np.ndarray | None:
 
 def load_dynamic_world(patch_id: str) -> np.ndarray | None:
     """加载 Dynamic World，返回 int8 类别数组（round 后 0-8，-1=invalid）。"""
-    d = HAIDIAN_ROOT / "dynamic_world" / patch_id
+    d = HAIDIAN_ROOT / patch_id / "dynamic_world"
     tifs = sorted(d.glob("*.tif"))
     if not tifs:
         return None
