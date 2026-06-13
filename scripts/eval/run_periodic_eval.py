@@ -176,11 +176,11 @@ def knn_semantic_segmentation(embeddings: dict, dataset, month_idx: int = 4):
         label_dir = dataset._resolve_source_dir("worldcover", pid)
         if label_dir is None:
             continue
-        label_path = label_dir / "static.tif"
-        if not label_path.exists():
+        label_files = sorted(label_dir.glob("*.tif"))
+        if not label_files:
             continue
         try:
-            with rasterio.open(label_path) as src:
+            with rasterio.open(label_files[0]) as src:
                 label = src.read(1)
         except Exception:
             continue
