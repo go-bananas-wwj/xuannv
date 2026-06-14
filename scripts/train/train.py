@@ -203,6 +203,7 @@ def main():
             logger.Print(
                 f"[{time.strftime('%H:%M:%S')}] Epoch {epoch + 1:03d}/{cfg.training.epochs} | "
                 f"total={losses['total']:.3f} recon={losses['recon']:.3f} cls={losses.get('cls', 0.0):.3f} "
+                f"sem_seg={losses.get('sem_seg', 0.0):.3f} "
                 f"var={losses['var']:.3f} cov={losses['cov']:.3f} l2unif={losses['l2unif']:.3f} "
                 f"erank={losses.get('erank', 0.0):.1f} "
                 f"aef=[sp={aef_sp:.3f},gl={aef_gl:.3f}] olmo=[sp={olmo_sp:.3f},gl={olmo_gl:.3f}] "

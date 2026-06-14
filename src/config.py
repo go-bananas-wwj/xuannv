@@ -69,6 +69,9 @@ class DataConfig:
     cross_temporal: bool = False
     cross_temporal_prob: float = 0.0
     cross_temporal_min_gap_months: int = 2
+    # 像素级语义分割监督
+    semantic_seg_sources: list[str] = field(default_factory=list)
+    semantic_seg_ignore_index: int = 255
     # 快速验证: 随机采样部分 patch
     max_patches: int | None = None
     # 精确指定 patch 列表（优先级高于 max_patches）
@@ -164,6 +167,7 @@ class TrainingConfig:
     uniformity_adaptive: bool = True
     consistency_weight: float = 0.15
     classification_weight: float = 0.05
+    semantic_seg_weight: float = 0.0
     coding_rate_weight: float = 0.0
     text_contrastive_weight: float = 0.0
     # 反坍缩四件套

@@ -240,6 +240,10 @@ class HarbinPatchDataset(Dataset):
         self.cross_temporal_prob = getattr(d, "cross_temporal_prob", 0.0)
         self.cross_temporal_min_gap = getattr(d, "cross_temporal_min_gap_months", 2)
 
+        # ★ 像素级语义分割标签（可选）：如 ["worldcover"]
+        self.semantic_seg_sources = getattr(d, "semantic_seg_sources", [])
+        self.semantic_seg_ignore_index = getattr(d, "semantic_seg_ignore_index", 255)
+
         self.patches = self._discover_patches()
         # V13-fix: 支持随机采样部分 patch 用于快速验证
         max_patches = getattr(d, 'max_patches', None)
@@ -975,6 +979,45 @@ class HarbinPatchDataset(Dataset):
             pass
         return 0
 
+    def _load_semantic_label(self, patch_id: str, source_name: str, target_size: tuple[int, int]) -> np.ndarray | None:
+        """加载像素级语义分割标签并 resize 到 target_size.
+
+        Args:
+            patch_id: patch id
+            source_name: 如 "worldcover"
+            target_size: (H, W)
+
+        Returns:
+            [H, W] int64 label map，无效值为 ignore_index
+        """
+        if source_name != "worldcover":
+            return None
+        try:
+            from PIL import Image
+            src_dir = self._resolve_source_dir(source_name, patch_id)
+            if src_dir is None:
+                return None
+            tif_files = sorted(src_dir.glob("*.tif"))
+            if not tif_files:
+                return None
+            data = read_tif(tif_files[0], 0)
+            if data is None:
+                return None
+            raw = data[0] if data.ndim == 3 else data
+            mapped = np.full_like(raw, self.semantic_seg_ignore_index, dtype=np.int64)
+            for val, idx in WC_CLASS_MAP.items():
+                mapped[raw == val] = idx
+            # resize 到 target_size，最近邻避免引入新类别
+            if mapped.shape != target_size:
+                label_img = Image.fromarray(mapped.astype(np.uint8))
+                label_img = label_img.resize((target_size[1], target_size[0]), Image.Resampling.NEAREST)
+                mapped = np.array(label_img, dtype=np.int64)
+                # 255 可能会因 uint8 映射后需要恢复 ignore_index
+                mapped[mapped == 255] = self.semantic_seg_ignore_index
+            return mapped
+        except Exception:
+            return None
+
     def _sample_long_gap_windows(self, ts_sorted: list[int]) -> tuple[float, float, float, float]:
         """长间隔窗口采样 (gap ≥ long_min_gap_ms)."""
         min_frames = getattr(self, '_min_window_frames', 4)
@@ -1458,7 +1501,17 @@ class HarbinPatchDataset(Dataset):
                     gap_months = month_b - month_a
                     target_relative_time[t_idx] = gap_months / 12.0 + 0.5
 
-        # 4. 空间增强（同步应用到所有源/目标）
+        # 4. 加载像素级语义分割标签（可选）
+        semantic_labels_list: list[np.ndarray] = []
+        if self.semantic_seg_sources:
+            lbl_size = (ref_h, ref_w) if self.use_multires else (target_res, target_res)
+            for sem_src in self.semantic_seg_sources:
+                lbl = self._load_semantic_label(patch_id, sem_src, lbl_size)
+                if lbl is None:
+                    lbl = np.full(lbl_size, self.semantic_seg_ignore_index, dtype=np.int64)
+                semantic_labels_list.append(lbl)
+
+        # 5. 空间增强（同步应用到所有源/目标/标签）
         if self.training:
             flip_h = random.random() < 0.5
             flip_v = random.random() < 0.5
@@ -1473,13 +1526,22 @@ class HarbinPatchDataset(Dataset):
                         target_images_list[i] = target_images_list[i][..., ::-1, :].copy()
                     if flip_v:
                         target_images_list[i] = target_images_list[i][..., ::-1].copy()
+                for i in range(len(semantic_labels_list)):
+                    if flip_h:
+                        semantic_labels_list[i] = semantic_labels_list[i][:, ::-1].copy()
+                    if flip_v:
+                        semantic_labels_list[i] = semantic_labels_list[i][::-1, :].copy()
             else:
                 if flip_h:
                     source_frames = source_frames[..., ::-1, :].copy()
                     target_images = target_images[..., ::-1, :].copy()
+                    for i in range(len(semantic_labels_list)):
+                        semantic_labels_list[i] = semantic_labels_list[i][:, ::-1].copy()
                 if flip_v:
                     source_frames = source_frames[..., ::-1].copy()
                     target_images = target_images[..., ::-1].copy()
+                    for i in range(len(semantic_labels_list)):
+                        semantic_labels_list[i] = semantic_labels_list[i][::-1, :].copy()
 
         # 5. 双时间窗口
         from datetime import datetime as _dt
@@ -1538,4 +1600,11 @@ class HarbinPatchDataset(Dataset):
         else:
             result["source_frames"] = torch.from_numpy(source_frames)
             result["target_images"] = torch.from_numpy(target_images)
+
+        if semantic_labels_list:
+            result["semantic_labels"] = torch.from_numpy(np.stack(semantic_labels_list, axis=0)).long()
+        else:
+            # 保持 key 一致，方便 collate 和 trainer 判断
+            lbl_shape = (ref_h, ref_w) if self.use_multires else (target_res, target_res)
+            result["semantic_labels"] = torch.zeros((0, *lbl_shape), dtype=torch.long)
         return result

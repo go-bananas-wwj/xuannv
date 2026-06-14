@@ -47,6 +47,7 @@ class AEFOutput:
     dual_pre_w2: torch.Tensor | None = None  # [B, D, H, W] 第二窗口 pre_norm (用于 temporal loss)
     patch_id_logits: torch.Tensor | None = None  # [B*H*W, num_patches] 空间token级实例判别logits
     patch_id_spatial_hw: int = 1  # H*W 空间token数，供 trainer 扩展 labels
+    semantic_seg_logits: torch.Tensor | None = None  # [B, num_classes, H, W] 像素级语义分割 logits
     distill_map: 'torch.Tensor | None' = None     # [B, 768, 32, 32] 投影后的空间表征（蒸馏用）
     distill_global: 'torch.Tensor | None' = None  # [B, 768] 投影后全局向量（蒸馏用）
 
@@ -150,6 +151,13 @@ class AEFModel(nn.Module):
         self.classification_head = CosineClassificationHead(m.embedding_dim, d.num_classes)
         self.aux_cls_head = CosineClassificationHead(m.precision_dim, d.num_classes)
         self.bottleneck_cls_head = CosineClassificationHead(m.embedding_dim, d.num_classes)
+
+        # ★ 像素级语义分割头（可选）：直接在 embedding_map 上预测 WorldCover 等类别
+        semantic_seg_sources = getattr(d, "semantic_seg_sources", [])
+        if semantic_seg_sources:
+            self.semantic_seg_head = nn.Conv2d(m.embedding_dim, d.num_classes, kernel_size=1)
+        else:
+            self.semantic_seg_head = None
 
         # ★ 实例判别头: 预测 patch 身份 (0 ~ num_patches-1)，迫使全局 embedding 多样化
         t = cfg.training
@@ -358,6 +366,9 @@ class AEFModel(nn.Module):
                 + self.aux_cls_head(summary_pooled).sum() * 0.0
                 + self.bottleneck_cls_head(pre_norm).sum() * 0.0
             )
+            if self.semantic_seg_head is not None:
+                # 语义分割头也要过一遍 dummy forward，保证 DDP 参数参与 backward
+                dummy_cls = dummy_cls + self.semantic_seg_head(embedding_map).sum() * 0.0
             if is_multires:
                 reconstructions = [r + dummy_cls.view(1, 1, 1, 1) for r in reconstructions]
             else:
@@ -373,6 +384,7 @@ class AEFModel(nn.Module):
                 summary_pooled=summary_pooled,
                 bottleneck_logits=bottleneck_logits,
                 dual_pre_w2=dual_pre_w2,
+                semantic_seg_logits=None,
             )
 
         if target_relative_time.dim() == 1:
@@ -537,6 +549,11 @@ class AEFModel(nn.Module):
         else:
             reconstructions = reconstructions + dummy_cls.view(1, 1, 1, 1, 1)
 
+        # ★ 像素级语义分割 logits（可选）
+        semantic_seg_logits = None
+        if self.semantic_seg_head is not None:
+            semantic_seg_logits = self.semantic_seg_head(embedding_map)
+
         # ★ OlmoEarth 蒸馏：student pre_norm_map → teacher 768D 空间
         distill_map = None
         distill_global = None
@@ -560,6 +577,7 @@ class AEFModel(nn.Module):
             dual_pre_w2=dual_pre_w2,
             patch_id_logits=patch_id_logits,
             patch_id_spatial_hw=patch_id_spatial_hw,
+            semantic_seg_logits=semantic_seg_logits,
             distill_map=distill_map,
             distill_global=distill_global,
         )

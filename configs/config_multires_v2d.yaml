@@ -1,0 +1,17 @@
+_base_: config_multires_v2c.yaml
+
+experiment:
+  name: exp_multires_v2d_0614
+  output_dir: /workspace/xuannv/outputs/exp_multires_v2d_0614
+
+data:
+  # 像素级语义分割监督：WorldCover
+  semantic_seg_sources: ["worldcover"]
+  semantic_seg_ignore_index: 255
+
+training:
+  # 从 epoch_50 继续，再跑 30 个 epoch
+  epochs: 80
+
+  # 语义分割 CE loss 权重
+  semantic_seg_weight: 1.0

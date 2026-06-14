@@ -509,6 +509,20 @@ class DDPv13Trainer:
                     if student_out.distill_map is not None:
                         dummy_cls = dummy_cls + student_out.distill_map.sum() * 0.0
 
+                # ★ 像素级语义分割监督（WorldCover 等）
+                semantic_seg_w = getattr(t, 'semantic_seg_weight', 0.0)
+                semantic_seg_loss = torch.tensor(0.0, device=self.device)
+                if semantic_seg_w > 0 and "semantic_labels" in batch and student_out.semantic_seg_logits is not None:
+                    sem_logits = student_out.semantic_seg_logits.float()  # [B, C, H, W]
+                    sem_labels = batch["semantic_labels"]  # [B, S_sem, H, W]
+                    if sem_labels.shape[1] > 0:
+                        sem_target = sem_labels[:, 0, :, :]  # [B, H, W]
+                        ignore_idx = getattr(self.cfg.data, 'semantic_seg_ignore_index', 255)
+                        semantic_seg_loss = F.cross_entropy(sem_logits, sem_target, ignore_index=ignore_idx)
+                elif student_out.semantic_seg_logits is not None:
+                    # Dummy: 确保 semantic_seg_head 参数参与 backward
+                    dummy_cls = dummy_cls + student_out.semantic_seg_logits.sum() * 0.0
+
             # === VICReg Variance + Covariance (L2-norm 或 Pre-norm 空间) + Memory Bank ===
             # V13: 支持在 L2-norm 空间计算 VICReg，强制模型在球面上学习时间方向
             if use_l2_vicreg:
@@ -813,6 +827,7 @@ class DDPv13Trainer:
                 + aef_global_w * aef_global_val
                 + olmo_spatial_w * olmo_spatial_val
                 + olmo_global_w * olmo_global_val
+                + semantic_seg_w * semantic_seg_loss
             )
 
             if torch.isnan(total) or torch.isinf(total):
@@ -869,6 +884,7 @@ class DDPv13Trainer:
                 "total": total.item() * accum_steps,
                 "recon": recon.item(),
                 "cls": cls.item(),
+                "sem_seg": semantic_seg_loss.item(),
                 "var": var.item(),
                 "cov": cov.item(),
                 "l2unif": l2_uniform.item(),
@@ -889,7 +905,7 @@ class DDPv13Trainer:
                 if step == 0 or step == step_total - 1 or step % print_interval == 0:
                     step_msg = (f"\n[Step {step:3d}/{step_total}] "
                           f"total={total.item()*accum_steps:.3f} "
-                          f"recon={recon.item():.3f} cls={cls.item():.3f} "
+                          f"recon={recon.item():.3f} cls={cls.item():.3f} sem_seg={semantic_seg_loss.item():.3f} "
                           f"var={var.item():.3f} cov={cov.item():.3f} "
                           f"l2unif={l2_uniform.item():.3f} "
                           f"erank={erank:.1f} "
