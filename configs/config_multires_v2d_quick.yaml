@@ -5,6 +5,7 @@ experiment:
   output_dir: /workspace/xuannv/outputs/exp_multires_v2d_quick_0614
 
 training:
-  epochs: 2
+  # 从 epoch 51 开始跑 2 个 epoch，所以总 epoch 数 = 53
+  epochs: 53
   max_steps_per_epoch: 10
   save_every: 1
