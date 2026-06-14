@@ -574,10 +574,13 @@ class DDPv13Trainer:
             # ★ v39 FIX: 改在 all_pre（含 memory bank，N≈4112）上计算
             #   之前用 gathered_pre（N=16），max erank=16 << D=64，推散力严重不足
             #   改用 all_pre 后 N>>D，max erank≈64，直接优化列方差均匀分布
-            # ★ v40: 使用 curriculum 动态 erank_loss_w（已在 train_epoch 开头计算）
+            # ★ v42: 若 memory bank 中样本为 detach，则 all_pre 上的梯度会被严重稀释；
+            #        此时改在 gathered_pre 上计算，保证反坍缩梯度完整。
+            erank_use_gathered = getattr(t, 'erank_use_gathered_pre', False)
+            erank_input = gathered_pre if erank_use_gathered else all_pre
             erank_loss_val = torch.tensor(0.0, device=self.device)
-            if erank_loss_w > 0 and all_pre is not None and all_pre.shape[0] >= 2:
-                erank_loss_val = erank_maximization_loss(all_pre.float())
+            if erank_loss_w > 0 and erank_input is not None and erank_input.shape[0] >= 2:
+                erank_loss_val = erank_maximization_loss(erank_input.float())
 
             # V28: MCR² Coding Rate Loss — 直接 log-det 优化（绕过 VICReg 的 N<D 梯度上界问题）
             # 在 all_pre（含 memory bank，N >> D）上计算，保证协方差矩阵满秩

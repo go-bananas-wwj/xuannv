@@ -1,0 +1,10 @@
+_base_: config_multires_v2c.yaml
+
+experiment:
+  name: exp_multires_v2c_quick_0614
+  output_dir: /workspace/xuannv/outputs/exp_multires_v2c_quick_0614
+
+training:
+  epochs: 2
+  max_steps_per_epoch: 20
+  save_every: 1
