@@ -1,11 +1,323 @@
 from __future__ import annotations
 
+import argparse
+import json
+import re
+import warnings
+from collections import Counter
+from pathlib import Path
 from typing import Any
 
+import numpy as np
+import torch
+from PIL import Image, ImageDraw
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    accuracy_score,
+    balanced_accuracy_score,
+    f1_score,
+    jaccard_score,
+    roc_auc_score,
+)
+from sklearn.neural_network import MLPClassifier
 
-def run_task(*args: Any, **kwargs: Any) -> dict[str, Any]:
-    raise NotImplementedError("run_task 将在 Task 3 实现。")
+from . import backbone
+
+warnings.filterwarnings("ignore")
+
+LABEL_NORMALIZE = {
+    "gongdi": "gongdi",
+    "jiazhudongdi": "jianzhudongdi",
+    "jianzhudongdi": "jianzhudongdi",
+    "weijian": "weijian",
+    "nongyongdi": "nongyongdi",
+    "chachu": "chaichu",
+    "chaichu": "chaichu",
+    "daolubianhuo": "daolubianhua",
+    "daolubianhua": "daolubianhua",
+}
+
+CLASS_NAMES = [
+    "gongdi",
+    "jianzhudongdi",
+    "weijian",
+    "nongyongdi",
+    "chaichu",
+    "daolubianhua",
+]
+
+CLASS_NAMES_CN = {
+    "gongdi": "施工工地",
+    "jianzhudongdi": "建筑用地",
+    "weijian": "疑似违建",
+    "nongyongdi": "农用地变化",
+    "chaichu": "建筑消失",
+    "daolubianhua": "施工道路",
+}
 
 
-def run_all_tasks(*args: Any, **kwargs: Any) -> dict[str, dict[str, Any]]:
-    raise NotImplementedError("run_all_tasks 将在 Task 3 实现。")
+def load_label_json(
+    json_path: Path, image_size: tuple[int, int] = (427, 427)
+) -> dict[str, np.ndarray]:
+    with open(json_path) as f:
+        data = json.load(f)
+
+    h, w = image_size
+    masks: dict[str, np.ndarray] = {
+        name: np.zeros((h, w), dtype=np.uint8) for name in CLASS_NAMES
+    }
+
+    for shape in data.get("shapes", []):
+        raw_label = shape.get("label", "").strip().lower()
+        norm_label = LABEL_NORMALIZE.get(raw_label)
+        if norm_label is None or norm_label not in masks:
+            continue
+        pts = [(int(p[0]), int(p[1])) for p in shape["points"]]
+        if len(pts) < 3:
+            continue
+        img = Image.new("L", (w, h), 0)
+        ImageDraw.Draw(img).polygon(pts, outline=1, fill=1)
+        masks[norm_label] |= np.array(img, dtype=np.uint8)
+
+    return masks
+
+
+def resize_mask(mask: np.ndarray, size: int) -> np.ndarray:
+    img = Image.fromarray((mask * 255).astype(np.uint8))
+    img = img.resize((size, size), Image.Resampling.NEAREST)
+    return (np.array(img) > 0).astype(np.uint8)
+
+
+def discover_labeled_patches(label_dir: Path) -> list[str]:
+    pids: set[str] = set()
+    for f in label_dir.glob("*.json"):
+        m = re.search(r"(patch_\d+)", f.name)
+        if m:
+            pids.add(m.group(1))
+    return sorted(pids)
+
+
+def _extract_embeddings(
+    model: Any,
+    dataset: Any,
+    patch_ids: list[str],
+    device: str,
+) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
+    emb_dec = backbone.extract_embeddings_for_patches(
+        model, dataset, patch_ids, 2025, 12, device
+    )
+    emb_apr = backbone.extract_embeddings_for_patches(
+        model, dataset, patch_ids, 2026, 4, device
+    )
+    return emb_dec, emb_apr
+
+
+def run_task(
+    task_name: str,
+    model_dir: str,
+    label_dir: str,
+    output_dir: str,
+    device: str = "npu:0",
+    mode: str = "bitemporal",
+    classifier: str = "linear",
+    seed: int = 42,
+    patch_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    if task_name not in CLASS_NAMES:
+        raise ValueError(f"未知任务: {task_name}，可选: {CLASS_NAMES}")
+    if mode not in ("single", "bitemporal"):
+        raise ValueError(f"未知 mode: {mode}")
+    if classifier not in ("linear", "mlp"):
+        raise ValueError(f"未知 classifier: {classifier}")
+
+    out_dir = Path(output_dir) / task_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    model, dataset, cfg = backbone.load_production_model(model_dir, device=device)
+    label_dir = Path(label_dir)
+
+    candidate_pids = patch_ids if patch_ids else discover_labeled_patches(label_dir)
+    valid_pids = [
+        p
+        for p in candidate_pids
+        if (label_dir / f"{p}_20260430_rgb_uint8.json").exists()
+    ]
+
+    if len(valid_pids) < 2:
+        result = {"skipped": True, "reason": "带标注的 patch 不足 2 个"}
+        (out_dir / "metrics.json").write_text(
+            json.dumps(result, ensure_ascii=False, indent=2)
+        )
+        return result
+
+    rng = np.random.RandomState(seed)
+    rng.shuffle(valid_pids)
+    n_train = max(1, int(len(valid_pids) * 0.8))
+    train_pids = set(valid_pids[:n_train])
+    test_pids = valid_pids[n_train:]
+
+    emb_dec, emb_apr = _extract_embeddings(model, dataset, valid_pids, device)
+
+    X_train, y_train, X_test, y_test = [], [], [], []
+    test_patch_ids: list[str] = []
+    test_label_maps: list[np.ndarray] = []
+    H = W = None
+
+    for pid in valid_pids:
+        if pid not in emb_apr:
+            continue
+        emb = emb_apr[pid]
+        if mode == "bitemporal":
+            if pid not in emb_dec:
+                continue
+            emb = np.concatenate([emb, emb_dec[pid]], axis=0)
+
+        D, H, W = emb.shape
+        json_path = label_dir / f"{pid}_20260430_rgb_uint8.json"
+        masks = load_label_json(json_path, image_size=(427, 427))
+        label_mask = resize_mask(masks[task_name], H)
+
+        emb_flat = emb.reshape(D, -1).T
+        label_flat = label_mask.flatten()
+
+        if pid in train_pids:
+            X_train.append(emb_flat)
+            y_train.append(label_flat)
+        else:
+            X_test.append(emb_flat)
+            y_test.append(label_flat)
+            test_patch_ids.append(pid)
+            test_label_maps.append(label_mask)
+
+    if not X_train or not X_test:
+        result = {"skipped": True, "reason": "训练集或测试集为空"}
+        (out_dir / "metrics.json").write_text(
+            json.dumps(result, ensure_ascii=False, indent=2)
+        )
+        return result
+
+    X_train = np.concatenate(X_train, 0)
+    y_train = np.concatenate(y_train, 0)
+    X_test = np.concatenate(X_test, 0)
+    y_test = np.concatenate(y_test, 0)
+
+    pos_ratio = y_train.mean()
+    if pos_ratio < 1e-6:
+        result = {"skipped": True, "reason": "训练集无正例"}
+        (out_dir / "metrics.json").write_text(
+            json.dumps(result, ensure_ascii=False, indent=2)
+        )
+        return result
+
+    if classifier == "linear":
+        clf = LogisticRegression(
+            max_iter=500, n_jobs=4, class_weight="balanced", random_state=seed
+        )
+        clf.fit(X_train, y_train)
+    else:
+        sample_weight = np.where(
+            y_train == 1, 1.0 / max(pos_ratio, 1e-6), 1.0 / (1 - pos_ratio)
+        )
+        sample_weight = sample_weight / sample_weight.mean()
+        clf = MLPClassifier(
+            hidden_layer_sizes=(128,),
+            max_iter=200,
+            random_state=seed,
+            early_stopping=False,
+        )
+        clf.fit(X_train, y_train, sample_weight=sample_weight)
+
+    y_pred = clf.predict(X_test)
+    prob = clf.predict_proba(X_test)[:, 1] if hasattr(clf, "predict_proba") else None
+
+    metrics: dict[str, Any] = {
+        "task": task_name,
+        "mode": mode,
+        "classifier": classifier,
+        "n_train_patches": len(train_pids),
+        "n_test_patches": len(test_pids),
+        "pos_ratio": float(pos_ratio),
+        "accuracy": float(accuracy_score(y_test, y_pred)),
+        "balanced_accuracy": float(balanced_accuracy_score(y_test, y_pred)),
+        "f1": float(f1_score(y_test, y_pred, zero_division=0)),
+        "iou": float(jaccard_score(y_test, y_pred, zero_division=0)),
+    }
+    if prob is not None and len(np.unique(y_test)) == 2:
+        metrics["auc"] = float(roc_auc_score(y_test, prob))
+    else:
+        metrics["auc"] = 0.0
+
+    if prob is not None and H is not None and W is not None:
+        prob_map = np.zeros((len(test_patch_ids), H, W), dtype=np.float32)
+        label_map = np.zeros((len(test_patch_ids), H, W), dtype=np.uint8)
+        offset = 0
+        for idx in range(len(test_patch_ids)):
+            n_pix = H * W
+            prob_map[idx] = prob[offset : offset + n_pix].reshape(H, W)
+            label_map[idx] = y_test[offset : offset + n_pix].reshape(H, W)
+            offset += n_pix
+        np.savez_compressed(
+            out_dir / "pred.npz",
+            patch_ids=np.array(test_patch_ids),
+            prob_map=prob_map,
+            label_map=label_map,
+        )
+
+    (out_dir / "metrics.json").write_text(
+        json.dumps(metrics, ensure_ascii=False, indent=2)
+    )
+    return metrics
+
+
+def run_all_tasks(
+    model_dir: str,
+    label_dir: str,
+    output_dir: str,
+    device: str = "npu:0",
+    mode: str = "bitemporal",
+    classifier: str = "linear",
+    patch_ids: list[str] | None = None,
+) -> dict[str, dict]:
+    summary: dict[str, dict] = {}
+    for task in CLASS_NAMES:
+        print(f"\n[run_all_tasks] 开始任务: {task} ({CLASS_NAMES_CN[task]})")
+        summary[task] = run_task(
+            task,
+            model_dir,
+            label_dir,
+            output_dir,
+            device,
+            mode,
+            classifier,
+            patch_ids=patch_ids,
+        )
+    (Path(output_dir) / "metrics_all.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2)
+    )
+    return summary
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="海淀 6 任务推理")
+    parser.add_argument("--model-dir", default="model")
+    parser.add_argument("--label-dir", default="/workspace/xuannv/haidian_label/labeljson")
+    parser.add_argument("--output-dir", default="outputs/haidian")
+    parser.add_argument("--device", default="npu:0")
+    parser.add_argument("--mode", default="bitemporal", choices=["single", "bitemporal"])
+    parser.add_argument("--classifier", default="linear", choices=["linear", "mlp"])
+    parser.add_argument("--seed", type=int, default=42)
+    args = parser.parse_args()
+
+    run_all_tasks(
+        model_dir=args.model_dir,
+        label_dir=args.label_dir,
+        output_dir=args.output_dir,
+        device=args.device,
+        mode=args.mode,
+        classifier=args.classifier,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
