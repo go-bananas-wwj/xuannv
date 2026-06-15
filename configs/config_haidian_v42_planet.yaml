@@ -1,19 +1,24 @@
 # ============================================================
-# xuannv 多分辨率输入 v1 配置
-# 目标: 引入 Planet 3m 高分辨率数据，同时保持天仪 SAR/S2/S1/Landsat 真实 GSD
-# 创建时间: 2026-06-12
+# xuannv 海淀嵌入底座 v42 — 引入 PlanetScope 3m 高分辨率补充源
+# 创建时间: 2026-06-16
+#
+# 基础: v41 (Barlow Twins 硬约束 + VICReg 超权重)
+# 变更:
+#   - 增加第 5 路输入 planet (4 通道 BGRN, 256x256)
+#   - 开启多分辨率输入 (use_multires=true)
+#   - 为 planet 指定 source_image_sizes=256 与 stem_stride=4
 # ============================================================
 
 experiment:
-  name: exp_multires_v1_0612
+  name: exp_v42_haidian_planet_0616
   seed: 42
-  output_dir: /workspace/xuannv/outputs/exp_multires_v1_0612
+  output_dir: /workspace/xuannv/outputs/exp_v42_haidian_planet_0616
 
 data:
   dataset_type: harbin_patches
   manifest_path: /workspace/xuannv/data_raw/haidian/scenes
   stats_dir: /workspace/xuannv/statistics/haidian
-  batch_size: 1
+  batch_size: 2
   num_workers: 0
   image_size: 128
   max_frames: 24
@@ -22,16 +27,21 @@ data:
   input_dim: 6
   metadata_dim: 4
 
-  # ★ 多分辨率输入开关
+  # ★ 多分辨率输入
   use_multires: true
-  patch_size_m: 1280
+  patch_size_m: 1280.0
   source_gsd:
-    s2: 10
-    s1: 10
-    landsat: 30
-    tianyi_sar: 10
+    s2: 10.0
+    s1: 10.0
+    landsat: 30.0
+    tianyi_sar: 10.0
+    planet: 3.0
 
-  # 5 路输入（含 PlanetScope 3m 高分辨率补充源）
+  # 显式指定 planet 输出尺寸，避免按 1280/3 自动计算成 427x427
+  source_image_sizes:
+    planet: 256
+
+  # ★ 5 路输入（含 PlanetScope）
   num_input_sources: 5
   input_sources:
     - s2
@@ -47,12 +57,8 @@ data:
     tianyi_sar: 1
     planet: 4
 
-  # 显式指定 planet 输出尺寸，避免按 1280/3 自动计算成 427x427
-  source_image_sizes:
-    planet: 256
-
-  # 4 个目标源
-  num_target_sources: 4
+  # 6 个目标源（与 v41 一致）
+  num_target_sources: 6
   target_sources:
     - name: s2
       loss_type: 0
@@ -66,10 +72,18 @@ data:
       loss_type: 0
       sensor_src: landsat
       out_channels: 6
-    - name: tianyi_sar
+    - name: dem
       loss_type: 0
-      sensor_src: tianyi_sar
+      sensor_src: null
       out_channels: 1
+    - name: worldcover
+      loss_type: 1
+      sensor_src: null
+      out_channels: 11
+    - name: dynamic_world
+      loss_type: 1
+      sensor_src: null
+      out_channels: 9
 
   random_target_frame: true
   spatial_augmentation: true
@@ -77,18 +91,12 @@ data:
   temporal_window_prob: 0.5
   temporal_window_min_frames: 4
   temporal_window_max_frames: 24
-  # ★ 多分辨率模式：禁用预加载，按需求读取
   preload: false
 
   recon_mask_ratio: 0.85
   recon_mask_patch_size: 16
 
   filter_2025_monthly: false
-
-  aef_embed_dir: /workspace/xuannv/data_raw/haidian/aef_embeddings/haidian_2025_patches
-  use_dual_teacher: false
-  teacher_embed_dir: null
-  olmoearth_tokens_root: null
 
 model:
   input_dim: 6
@@ -110,7 +118,9 @@ model:
   per_source_decoders: true
   decoder_hidden_mult: 1
   skip_l2_norm_training: true
-  use_distill_head: false
+  use_2d_pos_enc: false
+  pos_enc_2d_height: 8
+  pos_enc_2d_width: 8
 
   # ★ 多分辨率模型配置
   common_spatial_size: [64, 64]
@@ -134,51 +144,48 @@ model:
     planet: 4
 
 training:
-  epochs: 80
+  epochs: 40
   gradient_accumulation_steps: 4
   lr: 0.0001
   lr_min: 0.000001
   weight_decay: 0.01
   grad_clip_norm: 1.0
 
-  reconstruction_weight: 1.0
+  # ★★★ 核心损失组合 (复用 v41) ★★★
+  reconstruction_weight: 0.08
   consistency_weight: 0.0
-  classification_weight: 0.0
+  classification_weight: 0.03
+
+  decorrelation_weight: 5.0
+
+  use_spatial_vicreg: true
+  variance_weight: 2.0
+  covariance_weight: 1.0
+  vicreg_min_std: 1.0
+
+  orthogonality_weight: 0.01
 
   use_pre_norm_uniform: false
   pre_norm_uniform_weight: 0.0
   batch_uniformity_weight: 0.0
-  use_spatial_vicreg: false
-  variance_weight: 0.0
-  covariance_weight: 0.0
-  vicreg_min_std: 1.0
-  decorrelation_weight: 0.0
-  orthogonality_weight: 0.0
-  coding_rate_weight: 0.0
   erank_loss_weight: 0.0
-  temporal_gap_aware_weight: 0.0
-  temporal_contrastive_weight: 0.0
-
-  aef_spatial_distill_weight: 0.5
-  aef_global_distill_weight: 0.25
-
-  olmoearth_spatial_distill_weight: 0.0
-  olmoearth_global_distill_weight: 0.0
+  aef_batch_uniformity_weight: 0.0
 
   inter_patch_infonce_weight: 0.0
   inter_patch_infonce_temperature: 0.1
   inter_variance_weight: 0.0
   inter_variance_min_std: 0.3
   inter_decorr_weight: 0.0
+  temporal_contrastive_weight: 0.0
   temporal_cosine_pixel_weight: 0.0
   patch_id_loss_weight: 0.0
   lmim_weight: 0.0
+  temporal_gap_aware_weight: 0.0
   hyperspherical_uniform_weight: 0.0
   spherical_variance_weight: 0.0
   temporal_magnitude_weight: 0.0
   pixel_change_supervision_weight: 0.0
   change_consistency_weight: 0.0
-  memory_bank_size: 512
   text_contrastive_weight: 0.0
   vicreg_weight: 0.0
   dino_weight: 0.0
@@ -189,10 +196,10 @@ training:
   aux_classification_weight: 0.0
   bottleneck_cls_weight: 0.0
   encoder_uniform_weight: 0.0
-  aef_batch_uniformity_weight: 0.0
 
-  # 源重建权重（与 target_sources 顺序一致）
-  source_recon_weights: [1.0, 1.0, 1.0, 1.0]
+  memory_bank_size: 4096
+
+  source_recon_weights: [1.0, 1.0, 1.0, 0.02, 0.1, 0.1]
 
   teacher_momentum: 0.996
   teacher_dropout_rate: 0.1
@@ -212,12 +219,10 @@ training:
   max_steps_per_epoch: 200
 
   save_every: 10
-  save_best_balanced: false
-  eval_every: 10
+  save_best_balanced: true
+  best_balanced_uniform_min: 0.0
+  best_balanced_uniform_max: 0.3
   early_stop_patience: 100
-
-  use_curriculum: false
-  curriculum_epochs: 0
 
   decoder_cond_dropout: 0.6
   temporal_magnitude_temperature: 0.1

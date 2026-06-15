@@ -51,21 +51,20 @@ def compute_recon_loss(
     n_valid = 0
 
     for t_idx in range(T):
-        pred_t = preds_list[t_idx]
+        pred_src = preds_list[t_idx]
         tgt_t = tgts_list[t_idx]
-        B = pred_t.shape[0]
+        B = pred_src.shape[0]
         if target_mask is not None:
             valid_b = target_mask[:, t_idx].bool().to(device)
         else:
             valid_b = torch.ones(B, dtype=torch.bool, device=device)
         if not valid_b.any():
-            total_loss = total_loss + pred_t.sum() * 0.0
+            total_loss = total_loss + pred_src.sum() * 0.0
             continue
 
-        pred_t = pred_t[valid_b]
         tgt_t = tgt_t[valid_b]
         # 多分辨率模式下 target 可能被 pad 到统一通道数，按 prediction 通道截断
-        pred_c = pred_t.shape[2]
+        pred_c = pred_src.shape[2] if pred_src.dim() == 5 else pred_src.shape[1]
         if tgt_t.shape[1] > pred_c:
             tgt_t = tgt_t[:, :pred_c]
         pixel_valid = (~torch.isnan(tgt_t)).float()
@@ -75,25 +74,33 @@ def compute_recon_loss(
             lt = target_loss_type[valid_b, t_idx]
             loss_type = int(lt[0].item()) if lt.numel() > 0 else 0
 
-        if loss_type == 1:
-            tgt_labels = tgt_t.argmax(dim=1).long()
-            loss_t = F.cross_entropy(pred_t[:, :num_classes], tgt_labels, reduction='mean')
-        else:
-            mask = pixel_valid
-            if recon_mask is not None:
-                rm = recon_mask[valid_b]
-                # 多分辨率模式下 recon_mask 可能与目标分辨率不一致，需要插值
-                if rm.shape[-2:] != tgt_t.shape[-2:]:
-                    rm = torch.nn.functional.interpolate(
-                        rm.unsqueeze(1).float(),
-                        size=tgt_t.shape[-2:],
-                        mode="nearest",
-                    ).squeeze(1)
-                mask = mask * rm[:, None, :, :]
-            diff = torch.abs(pred_t - tgt_t) * mask
-            denom = mask.sum().clamp(min=1.0)
-            loss_t = diff.sum() / denom
+        # 多分辨率下每个源可能预测多个时间步 (B, T_inner, C, H, W)，目标只有单帧，对 T_inner 求平均
+        inner_steps = pred_src.shape[1] if pred_src.dim() == 5 else 1
+        inner_loss = torch.tensor(0.0, device=device)
+        for inner_idx in range(inner_steps):
+            pred_t = pred_src[:, inner_idx][valid_b] if pred_src.dim() == 5 else pred_src[valid_b]
 
+            if loss_type == 1:
+                tgt_labels = tgt_t.argmax(dim=1).long()
+                loss_t = F.cross_entropy(pred_t[:, :num_classes], tgt_labels, reduction='mean')
+            else:
+                mask = pixel_valid
+                if recon_mask is not None:
+                    rm = recon_mask[valid_b]
+                    # 多分辨率模式下 recon_mask 可能与目标分辨率不一致，需要插值
+                    if rm.shape[-2:] != tgt_t.shape[-2:]:
+                        rm = torch.nn.functional.interpolate(
+                            rm.unsqueeze(1).float(),
+                            size=tgt_t.shape[-2:],
+                            mode="nearest",
+                        ).squeeze(1)
+                    mask = mask * rm[:, None, :, :]
+                diff = torch.abs(pred_t - tgt_t) * mask
+                denom = mask.sum().clamp(min=1.0)
+                loss_t = diff.sum() / denom
+            inner_loss = inner_loss + loss_t
+
+        loss_t = inner_loss / max(inner_steps, 1)
         weight = source_recon_weights[t_idx] if source_recon_weights is not None else 1.0
         total_loss = total_loss + loss_t * weight
         n_valid += 1

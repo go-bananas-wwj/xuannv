@@ -25,7 +25,7 @@ import numpy as np
 
 from src.data.transforms import read_tif
 
-SOURCES = ["s2", "s1", "landsat", "dem", "worldcover", "dynamic_world", "jrc_water"]
+SOURCES = ["s2", "s1", "landsat", "planet", "dem", "worldcover", "dynamic_world", "jrc_water"]
 
 
 def compute_source_stats(data_root: Path, source_name: str, s2_dir: str,
@@ -65,7 +65,7 @@ def compute_source_stats(data_root: Path, source_name: str, s2_dir: str,
                     data[data == -128] = np.nan
 
                 # 光学源：log(x+1)/10 变换
-                if source_name in {"s2", "s2_hr", "landsat"}:
+                if source_name in {"s2", "s2_hr", "landsat", "planet"}:
                     if data.max() < 2.0:
                         data = data * 10000.0
                     data = np.log(np.clip(data, 0, None) + 1) / 10.0

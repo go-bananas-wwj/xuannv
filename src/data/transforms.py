@@ -18,8 +18,8 @@ from rasterio.errors import RasterioIOError
 from rasterio.transform import from_bounds
 from rasterio.warp import Resampling as RioResampling, reproject
 
-# 论文设计: 3类输入源
-INPUT_SOURCES = ["s2", "s1", "landsat"]
+# 论文设计: 3类基础输入源 + 可选高分辨率补充源
+INPUT_SOURCES = ["s2", "s1", "landsat", "planet"]
 
 # 7类目标源: (name, loss_type, sensor_src)
 # loss_type: 0=MSE  1=CrossEntropy  2=Dice  3=CE+Dice  4=SmoothL1  5=Huber
@@ -40,12 +40,13 @@ SOURCE_TYPE_MAP = {
     "dem": 3,
     "worldcover": 4,
     "dynamic_world": 5,
-    "jrc_water": 6,
-    "tianyi_sar": 7,   # 天仪卫星 X 波段 SAR（1通道 VV，已是 dB 值）
+    "planet": 6,       # PlanetScope 3m 高分辨率光学（BGRN 4 通道）
+    "jrc_water": 7,
+    "tianyi_sar": 5,   # 天仪卫星 X 波段 SAR（1通道 VV，已是 dB 值）
 }
 
 # 预处理常量 (对齐原版 AEF)
-LOG_TRANSFORM_SOURCES = {"s2", "landsat", "s2_hr"}
+LOG_TRANSFORM_SOURCES = {"s2", "landsat", "s2_hr", "planet"}  # PlanetScope SR 与 S2 同为 0-10000 反射率
 SAR_SOURCES = {"s1", "s1_hr", "tianyi_sar"}   # 天仪 SAR 已是 dB 值，走同一 clip[-30,10] 分支
 SAR_CLIP_RANGE = (-30.0, 10.0)
 CATEGORICAL_SOURCES = {"worldcover", "dynamic_world"}
