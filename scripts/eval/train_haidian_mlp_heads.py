@@ -23,6 +23,7 @@ import torch.nn.functional as F
 from PIL import Image, ImageDraw
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score
 from sklearn.model_selection import StratifiedKFold
+from torch.utils.data import TensorDataset, DataLoader, WeightedRandomSampler
 
 try:
     import torch_npu  # noqa: F401
@@ -101,6 +102,7 @@ def build_task_data(
     label_dir: str,
     task: str,
     use_diff: bool = False,
+    target_size: int = 128,
 ):
     """构建某个任务的全量像素级特征与标签.
 
@@ -123,13 +125,18 @@ def build_task_data(
         img_h = ann.get("imageHeight", 427)
         img_w = ann.get("imageWidth", 427)
 
-        mask = rasterize_task_mask(json_path, task, img_h, img_w).reshape(-1)
+        # 先在原分辨率栅格化，再 resize 到 target_size
+        mask = rasterize_task_mask(json_path, task, img_h, img_w)
+        mask = np.array(
+            Image.fromarray(mask).resize((target_size, target_size), Image.Resampling.NEAREST),
+            dtype=np.uint8,
+        ).reshape(-1)
 
-        # 上采样 embedding 到 label 分辨率
+        # embedding 上采样到 target_size
         dec_t = torch.from_numpy(emb_dec[i]).float().unsqueeze(0)  # [1, D, H, W]
         apr_t = torch.from_numpy(emb_apr[i]).float().unsqueeze(0)
-        dec_up = F.interpolate(dec_t, size=(img_h, img_w), mode="bilinear", align_corners=False)
-        apr_up = F.interpolate(apr_t, size=(img_h, img_w), mode="bilinear", align_corners=False)
+        dec_up = F.interpolate(dec_t, size=(target_size, target_size), mode="bilinear", align_corners=False)
+        apr_up = F.interpolate(apr_t, size=(target_size, target_size), mode="bilinear", align_corners=False)
         dec = dec_up.squeeze(0).permute(1, 2, 0).reshape(-1, D).numpy()
         apr = apr_up.squeeze(0).permute(1, 2, 0).reshape(-1, D).numpy()
 
@@ -179,6 +186,17 @@ def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     }
 
 
+def find_best_threshold(y_true: np.ndarray, scores: np.ndarray) -> tuple[float, float]:
+    """在验证集上搜索使 F1 最大的阈值."""
+    best_th, best_f1 = 0.5, 0.0
+    for th in np.linspace(0.05, 0.95, 37):
+        pred = (scores >= th).astype(np.int64)
+        f1 = f1_score(y_true, pred, zero_division=0)
+        if f1 > best_f1:
+            best_th, best_f1 = th, f1
+    return best_th, best_f1
+
+
 def train_one_fold(
     X_train: np.ndarray,
     y_train: np.ndarray,
@@ -190,33 +208,42 @@ def train_one_fold(
     lr: float = 1e-3,
     batch_size: int = 4096,
     patience: int = 10,
+    num_train_samples: int = 200000,
 ) -> tuple[MLPHead, dict]:
     in_dim = X_train.shape[1]
     model = MLPHead(in_dim, hidden_dim).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
-    pos_weight = compute_pos_weight(y_train)
-    criterion = nn.BCEWithLogitsLoss(
-        pos_weight=torch.tensor([pos_weight], dtype=torch.float32, device=device)
-    )
 
     X_train_t = torch.from_numpy(X_train).to(device)
     y_train_t = torch.from_numpy(y_train).float().to(device)
     X_val_t = torch.from_numpy(X_val).to(device)
     y_val_t = torch.from_numpy(y_val).float().to(device)
 
+    # WeightedRandomSampler：让正例像素被更频繁采样
+    sample_weights = np.where(y_train == 1, 10.0, 1.0)
+    sampler = WeightedRandomSampler(
+        weights=torch.from_numpy(sample_weights).float(),
+        num_samples=min(num_train_samples, len(y_train)),
+        replacement=True,
+    )
+    train_loader = DataLoader(
+        TensorDataset(X_train_t, y_train_t),
+        batch_size=batch_size,
+        sampler=sampler,
+    )
+
+    criterion = nn.BCEWithLogitsLoss()
+
     best_f1 = -1.0
     best_state = None
     patience_counter = 0
 
-    n = len(X_train_t)
     for epoch in range(epochs):
         model.train()
-        perm = torch.randperm(n)
-        for start in range(0, n, batch_size):
-            idx = perm[start : start + batch_size]
-            logits = model(X_train_t[idx])
-            loss = criterion(logits, y_train_t[idx])
+        for xb, yb in train_loader:
+            logits = model(xb)
+            loss = criterion(logits, yb)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -225,8 +252,8 @@ def train_one_fold(
         model.eval()
         with torch.no_grad():
             val_logits = model(X_val_t)
-            val_pred = (torch.sigmoid(val_logits) > 0.5).cpu().numpy().astype(np.int64)
-        val_f1 = f1_score(y_val, val_pred, zero_division=0)
+            val_scores = torch.sigmoid(val_logits).cpu().numpy()
+        _, val_f1 = find_best_threshold(y_val, val_scores)
         if val_f1 > best_f1:
             best_f1 = val_f1
             best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
@@ -240,8 +267,11 @@ def train_one_fold(
     model.eval()
     with torch.no_grad():
         val_logits = model(X_val_t)
-        val_pred = (torch.sigmoid(val_logits) > 0.5).cpu().numpy().astype(np.int64)
+        val_scores = torch.sigmoid(val_logits).cpu().numpy()
+    best_th, _ = find_best_threshold(y_val, val_scores)
+    val_pred = (val_scores >= best_th).astype(np.int64)
     metrics = evaluate(y_val, val_pred)
+    metrics["threshold"] = float(best_th)
     return model, metrics
 
 
@@ -255,6 +285,8 @@ def main() -> int:
     parser.add_argument("--hidden-dim", type=int, default=256)
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--use-diff", action="store_true", help="加入 apr-dec 差分特征")
+    parser.add_argument("--target-size", type=int, default=128,
+                        help="将 label 和 embedding 统一到的空间分辨率（默认 128）")
     args = parser.parse_args()
 
     out_dir = Path(args.output_dir)
@@ -268,7 +300,8 @@ def main() -> int:
     for task in TASKS:
         print(f"\n[Task] {task}")
         X, y, pidx = build_task_data(
-            patch_ids, emb_dec, emb_apr, args.label_dir, task, use_diff=args.use_diff
+            patch_ids, emb_dec, emb_apr, args.label_dir, task,
+            use_diff=args.use_diff, target_size=args.target_size
         )
         if X is None:
             print(f"[Task] {task} 无数据")
