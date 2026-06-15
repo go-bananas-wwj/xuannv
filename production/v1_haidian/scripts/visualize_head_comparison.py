@@ -41,6 +41,7 @@ TASK_CN = {
     "nongyongdi": "农用地变化",
     "chaichu": "建筑消失",
     "daolubianhua": "施工道路",
+    "shigongjiandu": "施工工地监测",
 }
 
 HEAD_CN = {
@@ -76,6 +77,11 @@ def parse_args():
         "--heads",
         default="linear,mlp_torch,unet",
         help="逗号分隔的 head 列表",
+    )
+    parser.add_argument(
+        "--task",
+        default=None,
+        help="只可视化指定任务（例如 shigongjiandu），不指定则处理所有任务",
     )
     return parser.parse_args()
 
@@ -236,7 +242,11 @@ def main() -> int:
 
     emb_dec, emb_apr = _load_embeddings(cache_path)
 
-    for task in TASK_CN.keys():
+    task_list = [args.task] if args.task else list(TASK_CN.keys())
+    if args.task and args.task not in TASK_CN:
+        raise ValueError(f"未知任务: {args.task}，可选: {list(TASK_CN.keys())}")
+
+    for task in task_list:
         # 加载每个 head 的预测和任务级 AUC
         head_data: dict[str, dict] = {}
         head_auc: dict[str, float | None] = {}

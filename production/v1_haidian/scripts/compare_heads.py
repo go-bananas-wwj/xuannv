@@ -28,21 +28,30 @@ from xuannv_v1 import backbone, haidian_tasks
 
 
 HEAD_CHOICES = ["linear", "mlp_torch", "unet"]
-TASK_NAMES = haidian_tasks.CLASS_NAMES
-TASK_NAMES_CN = haidian_tasks.CLASS_NAMES_CN
+TASK_NAMES = haidian_tasks.CLASS_NAMES + list(haidian_tasks.MERGED_TASKS.keys())
+TASK_NAMES_CN = {
+    **haidian_tasks.CLASS_NAMES_CN,
+    "shigongjiandu": "施工工地监测",
+}
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="海淀 6 任务下游头横向对比")
+    parser = argparse.ArgumentParser(description="海淀下游头横向对比")
     parser.add_argument("--model-dir", default="model")
     parser.add_argument("--label-dir", default="/workspace/xuannv/haidian_label/labeljson")
     parser.add_argument("--output-dir", default="outputs/head_ablation")
+    parser.add_argument("--cache", default=None, help="embedding 缓存路径（默认 output-dir/.cache/embeddings.npz）")
     parser.add_argument("--device", default="npu:0")
     parser.add_argument("--mode", default="bitemporal", choices=["single", "bitemporal"])
     parser.add_argument(
         "--heads",
         default=",".join(HEAD_CHOICES),
         help="逗号分隔的 head 列表，例如 linear,mlp_torch,unet",
+    )
+    parser.add_argument(
+        "--task",
+        default=None,
+        help="只运行指定任务（例如 shigongjiandu），不指定则运行全部 6 个原始任务",
     )
     parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args()
@@ -58,8 +67,13 @@ def _load_metrics(head_out_dir: Path) -> dict[str, dict]:
 
 def _build_table(results: dict[str, dict[str, dict]]) -> list[dict]:
     rows: list[dict] = []
-    for task in TASK_NAMES:
-        cn = TASK_NAMES_CN[task]
+    if not results:
+        return rows
+    # 从第一个 head 的结果中推导实际运行的任务列表
+    first_head = next(iter(results.values()))
+    actual_tasks = list(first_head.keys())
+    for task in actual_tasks:
+        cn = TASK_NAMES_CN.get(task, task)
         for head, metrics_by_task in results.items():
             m = metrics_by_task.get(task, {})
             if not m or m.get("skipped"):
@@ -99,7 +113,7 @@ def _build_table(results: dict[str, dict[str, dict]]) -> list[dict]:
 
 def _plot_comparison(rows: list[dict], out_dir: Path) -> None:
     heads = sorted({r["head"] for r in rows})
-    tasks = TASK_NAMES
+    tasks = sorted({r["task"] for r in rows}, key=lambda t: list(TASK_NAMES_CN.keys()).index(t) if t in TASK_NAMES_CN else 999)
     x = np.arange(len(tasks))
     width = 0.25
 
@@ -123,7 +137,7 @@ def _plot_comparison(rows: list[dict], out_dir: Path) -> None:
             vals = [v if v is not None else 0.0 for v in vals]
             ax.bar(x + i * width, vals, width, label=head)
         ax.set_xticks(x + width * (len(heads) - 1) / 2)
-        ax.set_xticklabels([TASK_NAMES_CN[t] for t in tasks], rotation=15, ha="right")
+        ax.set_xticklabels([TASK_NAMES_CN.get(t, t) for t in tasks], rotation=15, ha="right")
         ax.set_ylabel(title)
         ax.set_title(f"各任务 {title} 对比")
         ax.legend()
@@ -188,11 +202,17 @@ def main() -> int:
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    tasks: list[str] | None = None
+    if args.task:
+        if args.task not in TASK_NAMES:
+            raise ValueError(f"未知任务: {args.task}，可选: {TASK_NAMES}")
+        tasks = [args.task]
+
     print("[compare_heads] 加载生产 backbone ...")
     model, dataset, _ = backbone.load_production_model(args.model_dir, device=args.device)
 
     label_dir = Path(args.label_dir)
-    cache_path = out_dir / ".cache" / "embeddings.npz"
+    cache_path = Path(args.cache) if args.cache else out_dir / ".cache" / "embeddings.npz"
     emb_dec, emb_apr = _load_or_extract_embeddings(
         model, dataset, label_dir, cache_path, args.device
     )
@@ -213,6 +233,7 @@ def main() -> int:
             dataset=dataset,
             emb_dec=emb_dec,
             emb_apr=emb_apr,
+            tasks=tasks,
         )
         results[head] = summary
 

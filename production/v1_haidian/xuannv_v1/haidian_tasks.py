@@ -55,6 +55,25 @@ CLASS_NAMES_CN = {
     "daolubianhua": "施工道路",
 }
 
+# 合并任务：将多个细分类别合并成一个下游任务进行训练/评估
+MERGED_TASKS = {
+    "shigongjiandu": ["gongdi", "jianzhudongdi", "weijian", "daolubianhua"],
+}
+
+
+def _merged_mask(masks: dict[str, np.ndarray], task_name: str) -> np.ndarray:
+    """获取某个任务（含合并任务）对应的二值 mask."""
+    sources = MERGED_TASKS.get(task_name, [task_name])
+    # 用第一个存在的 mask 初始化尺寸
+    first = next((masks[s] for s in sources if s in masks), None)
+    if first is None:
+        raise ValueError(f"任务 {task_name} 找不到任何源 mask")
+    merged = np.zeros_like(first)
+    for src in sources:
+        if src in masks:
+            merged |= masks[src]
+    return merged
+
 
 def load_label_json(
     json_path: Path, image_size: tuple[int, int] = (427, 427)
@@ -125,12 +144,13 @@ def _stratified_split(
     rng: np.random.RandomState,
     train_ratio: float = 0.8,
 ) -> tuple[set[str] | None, list[str] | None, str | None]:
-    """按每个 patch 是否包含任务正例像素进行分层 80/20 划分。"""
+    """按每个 patch 是否包含任务正例像素进行分层 80/20 划分（支持合并任务）。"""
     pos_pids: list[str] = []
     neg_pids: list[str] = []
     for pid in patch_ids:
         masks = load_label_json(label_dir / f"{pid}_20260430_rgb_uint8.json")
-        if masks[task_name].any():
+        task_mask = _merged_mask(masks, task_name)
+        if task_mask.any():
             pos_pids.append(pid)
         else:
             neg_pids.append(pid)
@@ -179,8 +199,10 @@ def run_task(
     emb_dec: dict[str, np.ndarray] | None = None,
     emb_apr: dict[str, np.ndarray] | None = None,
 ) -> dict[str, Any]:
-    if task_name not in CLASS_NAMES:
-        raise ValueError(f"未知任务: {task_name}，可选: {CLASS_NAMES}")
+    if task_name not in CLASS_NAMES and task_name not in MERGED_TASKS:
+        raise ValueError(
+            f"未知任务: {task_name}，可选: {CLASS_NAMES} 或 {list(MERGED_TASKS.keys())}"
+        )
     if mode not in ("single", "bitemporal"):
         raise ValueError(f"未知 mode: {mode}")
     if classifier not in ("linear", "mlp", "mlp_torch", "unet"):
@@ -241,7 +263,8 @@ def run_task(
         D, H, W = emb.shape
         json_path = label_dir / f"{pid}_20260430_rgb_uint8.json"
         masks = load_label_json(json_path, image_size=(427, 427))
-        label_mask = resize_mask(masks[task_name], H)
+        task_mask = _merged_mask(masks, task_name)
+        label_mask = resize_mask(task_mask, H)
 
         if pid in train_pids:
             train_features_spatial.append(emb)
@@ -390,12 +413,15 @@ def run_all_tasks(
     dataset: Any = None,
     emb_dec: dict[str, np.ndarray] | None = None,
     emb_apr: dict[str, np.ndarray] | None = None,
+    tasks: list[str] | None = None,
 ) -> dict[str, dict]:
     if model is None or dataset is None:
         model, dataset, _ = backbone.load_production_model(model_dir, device=device)
+    task_list = tasks if tasks is not None else CLASS_NAMES
     summary: dict[str, dict] = {}
-    for task in CLASS_NAMES:
-        print(f"\n[run_all_tasks] 开始任务: {task} ({CLASS_NAMES_CN[task]})")
+    for task in task_list:
+        task_cn = CLASS_NAMES_CN.get(task, task)
+        print(f"\n[run_all_tasks] 开始任务: {task} ({task_cn})")
         summary[task] = run_task(
             task,
             model_dir,
