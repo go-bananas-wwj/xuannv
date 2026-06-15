@@ -110,7 +110,7 @@ def _find_monthly_idx(dataset: HarbinPatchDataset, patch_id: str, year: int, mon
 
 
 def _batchify(batch: dict, device: torch.device) -> dict:
-    """把 dataset __getitem__ 返回的 dict 转成 model.forward 接受的 batch dict（batch=1）."""
+    """把 dataset __getitem__ 返回的 dict 转成 model.forward 接受的 batch=1 dict."""
     out: dict = {}
     for k, v in batch.items():
         if k not in FORWARD_KEYS:
@@ -123,27 +123,26 @@ def _batchify(batch: dict, device: torch.device) -> dict:
 
 
 def _collate_pair_batches(samples: list[dict], device: torch.device) -> tuple[dict, dict, torch.Tensor]:
-    """把 B 个 (before_dict, after_dict, label) 样本拼成 batch."""
+    """把 B 个 (before_dict, after_dict, label) 样本拼成 batch（每个单样本已有 batch=1 维度）."""
     before_list = [s["before"] for s in samples]
     after_list = [s["after"] for s in samples]
     labels = np.stack([s["label"] for s in samples], axis=0)  # [B, H, W]
     label_t = torch.from_numpy(labels).float().to(device).unsqueeze(1)  # [B, 1, H, W]
 
-    def _stack(key: str, src_list: list[dict]) -> torch.Tensor | list[torch.Tensor]:
+    def _cat(key: str, src_list: list[dict]):
         first = src_list[0][key]
         if isinstance(first, torch.Tensor):
-            return torch.stack([s[key] for s in src_list], dim=0).to(device)
+            return torch.cat([s[key] for s in src_list], dim=0).to(device)
         if isinstance(first, list):
-            # list of per-source tensors, 每个元素 shape [T, C, h, w]
             n_sources = len(first)
             return [
-                torch.stack([s[key][i] for s in src_list], dim=0).to(device)
+                torch.cat([s[key][i] for s in src_list], dim=0).to(device)
                 for i in range(n_sources)
             ]
         raise TypeError(f"unsupported type for key {key}: {type(first)}")
 
-    before_batch = {k: _stack(k, before_list) for k in FORWARD_KEYS}
-    after_batch = {k: _stack(k, after_list) for k in FORWARD_KEYS}
+    before_batch = {k: _cat(k, before_list) for k in FORWARD_KEYS}
+    after_batch = {k: _cat(k, after_list) for k in FORWARD_KEYS}
     return before_batch, after_batch, label_t
 
 
