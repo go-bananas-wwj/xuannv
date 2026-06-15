@@ -37,6 +37,9 @@ backups/
 *.swp
 *.swo
 
+# Haidian 微调部署目录（大 checkpoint 不提交）
+model_finetuned_haidian_cd_phase2/
+
 # Logs
 *.log
 logs/
