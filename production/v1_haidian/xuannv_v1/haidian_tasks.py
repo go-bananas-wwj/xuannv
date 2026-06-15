@@ -277,7 +277,7 @@ def run_task(
 
     if classifier == "linear":
         clf = LogisticRegression(
-            max_iter=500, n_jobs=4, class_weight="balanced", random_state=seed
+            max_iter=500, class_weight="balanced", random_state=seed
         )
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=ConvergenceWarning)

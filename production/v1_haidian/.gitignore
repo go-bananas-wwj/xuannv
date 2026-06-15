@@ -1,5 +1,4 @@
 model/epoch_80.pt
-model/CHECKPOINT_SOURCE
 outputs/
 __pycache__/
 *.pyc

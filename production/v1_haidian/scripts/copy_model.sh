@@ -23,13 +23,17 @@ if [ ! -f "$SRC_CFG" ]; then
 fi
 
 cp -v "$SRC_CFG" "$DEST_DIR/config_multires_v1.yaml"
-cp -v "$SRC_CKPT" "$DEST_DIR/epoch_80.pt"
 
-{
-    echo "# Checkpoint 来源记录"
-    echo "source_checkpoint=$SRC_CKPT"
-    echo "source_config=$SRC_CFG"
-    echo "copied_at=$(date -Iseconds)"
-} > "$DEST_DIR/CHECKPOINT_SOURCE"
+if [ "$SRC_CKPT" -nt "$DEST_DIR/epoch_80.pt" ]; then
+    cp -v "$SRC_CKPT" "$DEST_DIR/epoch_80.pt"
+    {
+        echo "# Checkpoint 来源记录"
+        echo "source_checkpoint=$SRC_CKPT"
+        echo "source_config=$SRC_CFG"
+        echo "copied_at=$(date -Iseconds)"
+    } > "$DEST_DIR/CHECKPOINT_SOURCE"
+else
+    echo "checkpoint 已是最新，跳过复制"
+fi
 
 echo "生产模型已复制到 $DEST_DIR"

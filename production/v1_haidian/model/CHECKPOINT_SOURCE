@@ -1,0 +1,4 @@
+# Checkpoint 来源记录
+source_checkpoint=/workspace/xuannv/outputs/exp_multires_v1_0612_backup/epoch_80.pt
+source_config=/workspace/xuannv/configs/config_multires_v1.yaml
+copied_at=2026-06-15T13:00:53+08:00
