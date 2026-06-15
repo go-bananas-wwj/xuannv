@@ -213,7 +213,16 @@ def main() -> int:
         prob_maps = data["prob_map"]  # [N, H, W]
         label_maps = data["label_map"]  # [N, H, W]
 
-        print(f"\n[Task] {task} - {len(patch_ids)} patches")
+        # 只可视化包含真实标注正样本的 patch
+        positive_indices = [i for i, lab in enumerate(label_maps) if lab.sum() > 0]
+        if not positive_indices:
+            print(f"\n[Task] {task} - 无包含正样本的 patch，跳过")
+            continue
+        patch_ids = [patch_ids[i] for i in positive_indices]
+        prob_maps = prob_maps[positive_indices]
+        label_maps = label_maps[positive_indices]
+
+        print(f"\n[Task] {task} - 共 {len(patch_ids)} 个含正样本的 patch")
         for idx, pid in enumerate(patch_ids):
             emb_before = backbone.extract_embedding_for_month(model, dataset, pid, 2025, 12, args.device)
             emb_after = backbone.extract_embedding_for_month(model, dataset, pid, 2026, 4, args.device)

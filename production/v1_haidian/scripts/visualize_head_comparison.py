@@ -262,7 +262,20 @@ def main() -> int:
         if not head_data or not common_pids:
             continue
 
-        print(f"\n[Task] {task} - 公共测试 patch: {len(common_pids)}")
+        # 只可视化包含真实标注正样本的 patch
+        ref_head = next(iter(head_data))
+        ref = head_data[ref_head]
+        positive_pids = {
+            pid
+            for pid in common_pids
+            if ref["labels"][ref["pids"].index(pid)].sum() > 0
+        }
+        if not positive_pids:
+            print(f"\n[Task] {task} - 无包含正样本的公共 patch，跳过")
+            continue
+        common_pids = positive_pids
+
+        print(f"\n[Task] {task} - 含正样本的公共 patch: {len(common_pids)}")
         for pid in sorted(common_pids):
             head_probs = {}
             true_label = None
