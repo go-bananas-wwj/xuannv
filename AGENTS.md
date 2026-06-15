@@ -353,6 +353,42 @@ python scripts/eval/auc_eval.py \
 
 ---
 
+## 海淀标注下游任务（haidian_label）
+
+### 数据位置
+
+- 标注 JSON：`/workspace/xuannv/haidian_label/labeljson/`
+- 说明文档：`/workspace/xuannv/haidian_label/说明文档.docx`
+- 对应 Planet RGB 时相：
+  - before：`/workspace/xuannv/data_raw/beijing/planetscene/{patch_id}/20251209.tif`
+  - after：`/workspace/xuannv/data_raw/beijing/planetscene/{patch_id}/20260430.tif`
+
+### 标注内容
+
+共 63 个 patch，每个 patch 有 2026-04-30 的矢量标注（labelme 格式），包含 6 个下游任务类别：
+
+| 任务标签 | 含义 | 头类型 |
+|----------|------|--------|
+| `chachu` | 拆除 | 独立二分类 MLP |
+| `daolubianhuo` | 道路变化 | 独立二分类 MLP |
+| `gongdi` | 工地 | 独立二分类 MLP |
+| `jiazhudongdi` | 建筑动土 | 独立二分类 MLP |
+| `nongyongdi` | 农用动土 | 独立二分类 MLP |
+| `weijian` | 违建 | 独立二分类 MLP |
+
+### 输入与评估协议
+
+1. **输入**：使用 pre-trained backbone 分别提取每个 patch 的 **2025-12** 和 **2026-04-30** 两个时相的 `embedding_map`，拼接（或差分）后作为下游 MLP 头的输入。
+2. **标签**：将 labelme polygon 栅格化为与 `embedding_map` 对齐的二值 mask（正例=该类，负例=背景）。
+3. **划分**：63 patch 按 patch 分层划分为训练/测试（如 80%/20%），避免同一 patch 同时出现在 train/test。
+4. **评估指标**：每个任务单独报告 **Accuracy、Precision、Recall、F1、IoU**；因类别极度不平衡，IoU/F1 是主要指标。
+
+### 推荐 checkpoint
+
+优先使用当前 kNN 效果最好的 `exp_multires_v2d_quick_0614/epoch_53.pt`；若效果不佳，可回退到 `exp_multires_v2c_0614/epoch_50.pt` 对比。
+
+---
+
 ## 开发规范
 
 ### Python 代码风格
