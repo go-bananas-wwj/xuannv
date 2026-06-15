@@ -89,8 +89,10 @@ def parse_args():
 def _load_embeddings(cache_path: Path) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
     data = np.load(cache_path, allow_pickle=False)
     pids = [str(p) for p in data["patch_ids"]]
-    emb_dec = {pid: data["emb_dec"][i] for i, pid in enumerate(pids)}
-    emb_apr = {pid: data["emb_apr"][i] for i, pid in enumerate(pids)}
+    emb_dec_arr = data["emb_dec"]
+    emb_apr_arr = data["emb_apr"]
+    emb_dec = {pid: emb_dec_arr[i] for i, pid in enumerate(pids)}
+    emb_apr = {pid: emb_apr_arr[i] for i, pid in enumerate(pids)}
     return emb_dec, emb_apr
 
 

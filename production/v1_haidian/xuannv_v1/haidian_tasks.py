@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from PIL import Image, ImageDraw
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import LogisticRegression
@@ -23,7 +24,7 @@ from sklearn.metrics import (
 from sklearn.neural_network import MLPClassifier
 
 from . import backbone
-from .haidian_heads import PixelMLPHead, PixelMLPHeadV2, UNetHead
+from .haidian_heads import CDHead, PixelMLPHead, PixelMLPHeadV2, PixelMLPHeadV3, UNetHead
 
 LABEL_NORMALIZE = {
     "gongdi": "gongdi",
@@ -111,6 +112,41 @@ def resize_mask(mask: np.ndarray, size: int) -> np.ndarray:
     img = Image.fromarray((mask * 255).astype(np.uint8))
     img = img.resize((size, size), Image.Resampling.NEAREST)
     return (np.array(img) > 0).astype(np.uint8)
+
+
+def _build_upsampled_pixel_features(
+    features_before: list[np.ndarray],
+    features_after: list[np.ndarray],
+    labels: list[np.ndarray],
+    target_size: int = 128,
+) -> tuple[np.ndarray, np.ndarray]:
+    """将 embedding 上采样到 target_size 并与 label 对齐，构造像素级特征.
+
+    每个像素特征 = [after_embedding, before_embedding, after - before]
+    返回 X: [N_pixels, D*3], y: [N_pixels]
+    """
+    X_list: list[np.ndarray] = []
+    y_list: list[np.ndarray] = []
+    for emb_before, emb_after, label in zip(features_before, features_after, labels):
+        # label  resize 到 target_size
+        lbl = Image.fromarray((label * 255).astype(np.uint8)).resize(
+            (target_size, target_size), Image.Resampling.NEAREST
+        )
+        y = (np.array(lbl) > 0).astype(np.uint8).reshape(-1)
+
+        # embedding 上采样到 target_size (bilinear)
+        D = emb_after.shape[0]
+        dec_t = torch.from_numpy(emb_before).float().unsqueeze(0)  # [1, D, H, W]
+        apr_t = torch.from_numpy(emb_after).float().unsqueeze(0)
+        dec_up = F.interpolate(dec_t, size=(target_size, target_size), mode="bilinear", align_corners=False)
+        apr_up = F.interpolate(apr_t, size=(target_size, target_size), mode="bilinear", align_corners=False)
+        dec = dec_up.squeeze(0).permute(1, 2, 0).reshape(-1, D).numpy()
+        apr = apr_up.squeeze(0).permute(1, 2, 0).reshape(-1, D).numpy()
+        diff = apr - dec
+        X = np.concatenate([apr, dec, diff], axis=1).astype(np.float32)
+        X_list.append(X)
+        y_list.append(y)
+    return np.concatenate(X_list, axis=0), np.concatenate(y_list, axis=0)
 
 
 def discover_labeled_patches(label_dir: Path) -> list[str]:
@@ -205,7 +241,9 @@ def run_task(
         )
     if mode not in ("single", "bitemporal"):
         raise ValueError(f"未知 mode: {mode}")
-    if classifier not in ("linear", "mlp", "mlp_torch", "mlp_torch_v2", "unet"):
+    if classifier not in (
+        "linear", "mlp", "mlp_torch", "mlp_torch_v2", "unet", "cdhead", "mlp_diff_upsample"
+    ):
         raise ValueError(f"未知 classifier: {classifier}")
 
     out_dir = Path(output_dir) / task_name
@@ -243,10 +281,14 @@ def run_task(
     if emb_dec is None or emb_apr is None:
         emb_dec, emb_apr = _extract_embeddings(model, dataset, valid_pids, device)
 
-    # 空间特征/标签，用于支持 U-Net 等空间头
+    # 空间特征/标签，用于支持 U-Net / CD head 等空间头
     train_features_spatial: list[np.ndarray] = []
+    train_features_before: list[np.ndarray] = []
+    train_features_after: list[np.ndarray] = []
     train_labels_spatial: list[np.ndarray] = []
     test_features_spatial: list[np.ndarray] = []
+    test_features_before: list[np.ndarray] = []
+    test_features_after: list[np.ndarray] = []
     test_labels_spatial: list[np.ndarray] = []
     test_patch_ids: list[str] = []
     test_shapes: set[tuple[int, int]] = set()
@@ -254,11 +296,15 @@ def run_task(
     for pid in valid_pids:
         if pid not in emb_apr:
             continue
-        emb = emb_apr[pid]
+        emb_after = emb_apr[pid]
+        emb_before = emb_after
         if mode == "bitemporal":
             if pid not in emb_dec:
                 continue
-            emb = np.concatenate([emb, emb_dec[pid]], axis=0)
+            emb_before = emb_dec[pid]
+            emb = np.concatenate([emb_after, emb_before], axis=0)
+        else:
+            emb = emb_after
 
         D, H, W = emb.shape
         json_path = label_dir / f"{pid}_20260430_rgb_uint8.json"
@@ -268,9 +314,13 @@ def run_task(
 
         if pid in train_pids:
             train_features_spatial.append(emb)
+            train_features_before.append(emb_before)
+            train_features_after.append(emb_after)
             train_labels_spatial.append(label_mask)
         else:
             test_features_spatial.append(emb)
+            test_features_before.append(emb_before)
+            test_features_after.append(emb_after)
             test_labels_spatial.append(label_mask)
             test_patch_ids.append(pid)
             test_shapes.add((H, W))
@@ -303,6 +353,23 @@ def run_task(
         y_train = np.stack(train_labels_spatial, axis=0).astype(np.float32)
         X_test = np.stack(test_features_spatial, axis=0).astype(np.float32)
         y_test = np.concatenate([l.flatten() for l in test_labels_spatial], 0)
+    elif classifier == "cdhead":
+        X_train_before = np.stack(train_features_before, axis=0).astype(np.float32)
+        X_train_after = np.stack(train_features_after, axis=0).astype(np.float32)
+        y_train = np.stack(train_labels_spatial, axis=0).astype(np.float32)
+        X_test_before = np.stack(test_features_before, axis=0).astype(np.float32)
+        X_test_after = np.stack(test_features_after, axis=0).astype(np.float32)
+        y_test = np.concatenate([l.flatten() for l in test_labels_spatial], 0)
+    elif classifier == "mlp_diff_upsample":
+        target_size = 128
+        X_train, y_train = _build_upsampled_pixel_features(
+            train_features_before, train_features_after, train_labels_spatial, target_size
+        )
+        X_test, y_test = _build_upsampled_pixel_features(
+            test_features_before, test_features_after, test_labels_spatial, target_size
+        )
+        # 后续 metrics 用 target_size 作为空间尺寸
+        H = W = target_size
     else:
         raise ValueError(f"未知 classifier: {classifier}")
 
@@ -365,6 +432,29 @@ def run_task(
         clf.fit(X_train, y_train)
         prob_spatial = clf.predict_proba(X_test)  # [N, H, W]
         prob = prob_spatial.reshape(-1)
+    elif classifier == "cdhead":
+        # CDHead 使用 Conv2d，在当前 NPU 编译环境偶发 tbe 导入失败；
+        # 该头参数量小，使用 CPU 训练完全可行。为控制 CPU 耗时，使用轻量配置。
+        clf = CDHead(
+            embedding_dim=int(X_train_after.shape[1]),
+            hidden_dim=64,
+            epochs=60,
+            batch_size=32,
+            patience=15,
+            device="cpu",
+        )
+        clf.fit(X_train_after, X_train_before, y_train)
+        prob_spatial = clf.predict_proba(X_test_after, X_test_before)  # [N, H, W]
+        prob = prob_spatial.reshape(-1)
+    elif classifier == "mlp_diff_upsample":
+        clf = PixelMLPHeadV3(
+            input_dim=int(X_train.shape[1]),
+            hidden=(256, 128),
+            dropout=0.3,
+            device=device,
+        )
+        clf.fit(X_train, y_train)
+        prob = clf.predict_proba(X_test)
 
     y_pred = (prob > 0.5).astype(np.uint8)
 

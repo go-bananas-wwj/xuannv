@@ -16,6 +16,7 @@ from typing import Any
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 
 matplotlib.use("Agg")
 matplotlib.rcParams["font.sans-serif"] = ["WenQuanYi Micro Hei"]
@@ -27,7 +28,7 @@ sys.path.insert(0, str(PROD_DIR))
 from xuannv_v1 import backbone, haidian_tasks
 
 
-HEAD_CHOICES = ["linear", "mlp_torch", "mlp_torch_v2", "unet"]
+HEAD_CHOICES = ["linear", "mlp_torch", "mlp_torch_v2", "unet", "cdhead", "mlp_diff_upsample"]
 TASK_NAMES = haidian_tasks.CLASS_NAMES + list(haidian_tasks.MERGED_TASKS.keys())
 TASK_NAMES_CN = {
     **haidian_tasks.CLASS_NAMES_CN,
@@ -41,6 +42,7 @@ def parse_args():
     parser.add_argument("--label-dir", default="/workspace/xuannv/haidian_label/labeljson")
     parser.add_argument("--output-dir", default="outputs/head_ablation")
     parser.add_argument("--cache", default=None, help="embedding 缓存路径（默认 output-dir/.cache/embeddings.npz）")
+    parser.add_argument("--checkpoint", default=None, help="微调后的 model checkpoint 路径（覆盖 model-dir/epoch_80.pt）")
     parser.add_argument("--device", default="npu:0")
     parser.add_argument("--mode", default="bitemporal", choices=["single", "bitemporal"])
     parser.add_argument(
@@ -161,8 +163,11 @@ def _load_or_extract_embeddings(
         print(f"[compare_heads] 加载 embedding 缓存: {cache_path}")
         data = np.load(cache_path, allow_pickle=False)
         pids = [str(p) for p in data["patch_ids"]]
-        emb_dec = {pid: data["emb_dec"][i] for i, pid in enumerate(pids)}
-        emb_apr = {pid: data["emb_apr"][i] for i, pid in enumerate(pids)}
+        # 先整体读出数组，避免在 dict comprehension 里反复解压 npz
+        emb_dec_arr = data["emb_dec"]
+        emb_apr_arr = data["emb_apr"]
+        emb_dec = {pid: emb_dec_arr[i] for i, pid in enumerate(pids)}
+        emb_apr = {pid: emb_apr_arr[i] for i, pid in enumerate(pids)}
         return emb_dec, emb_apr
 
     print("[compare_heads] 提取全部标注 patch 的 embedding ...")
@@ -210,9 +215,20 @@ def main() -> int:
 
     print("[compare_heads] 加载生产 backbone ...")
     model, dataset, _ = backbone.load_production_model(args.model_dir, device=args.device)
+    if args.checkpoint:
+        ckpt_path = Path(args.checkpoint)
+        print(f"[compare_heads] 加载微调 checkpoint: {ckpt_path}")
+        state = torch.load(ckpt_path, map_location="cpu")
+        model.load_state_dict(state["model_state_dict"], strict=False)
+        model.eval()
 
     label_dir = Path(args.label_dir)
-    cache_path = Path(args.cache) if args.cache else out_dir / ".cache" / "embeddings.npz"
+    if args.cache:
+        cache_path = Path(args.cache)
+    elif args.checkpoint:
+        cache_path = out_dir / ".cache" / f"embeddings_{Path(args.checkpoint).stem}.npz"
+    else:
+        cache_path = out_dir / ".cache" / "embeddings.npz"
     emb_dec, emb_apr = _load_or_extract_embeddings(
         model, dataset, label_dir, cache_path, args.device
     )
