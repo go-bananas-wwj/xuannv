@@ -89,6 +89,7 @@ def parse_args():
     parser.add_argument("--patience", type=int, default=10, help="验证 F1 不提升早停 epoch 数")
     parser.add_argument("--freeze-sensor-encoder", type=int, default=1, choices=[0, 1])
     parser.add_argument("--pos-weight", type=float, default=10.0, help="正例像素 BCE 权重（<=0 则自动计算）")
+    parser.add_argument("--resume-model", type=str, default=None, help="从指定 model checkpoint（含 model_state_dict）继续微调，覆盖 model-dir/epoch_80.pt")
     parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args()
 
@@ -243,7 +244,7 @@ def main() -> int:
     # 1. 加载生产模型
     model_dir = Path(args.model_dir)
     cfg_path = model_dir / "config_multires_v1.yaml"
-    ckpt_path = model_dir / "epoch_80.pt"
+    ckpt_path = Path(args.resume_model) if args.resume_model else model_dir / "epoch_80.pt"
     cfg = load_config(cfg_path)
 
     labeled_pids = _discover_labeled_patches(label_dir)

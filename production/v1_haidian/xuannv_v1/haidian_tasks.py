@@ -382,6 +382,7 @@ def run_task(
         return result
 
     # 训练下游头
+    threshold = 0.5
     if classifier == "linear":
         clf = LogisticRegression(
             max_iter=500, class_weight="balanced", random_state=seed
@@ -432,6 +433,7 @@ def run_task(
         clf.fit(X_train, y_train)
         prob_spatial = clf.predict_proba(X_test)  # [N, H, W]
         prob = prob_spatial.reshape(-1)
+        threshold = getattr(clf, "threshold", 0.5)
     elif classifier == "cdhead":
         # CDHead 使用 Conv2d，在当前 NPU 编译环境偶发 tbe 导入失败；
         # 该头参数量小，使用 CPU 训练完全可行。为控制 CPU 耗时，使用轻量配置。
@@ -455,8 +457,9 @@ def run_task(
         )
         clf.fit(X_train, y_train)
         prob = clf.predict_proba(X_test)
+        threshold = getattr(clf, "threshold", 0.5)
 
-    y_pred = (prob > 0.5).astype(np.uint8)
+    y_pred = (prob > threshold).astype(np.uint8)
 
     metrics: dict[str, Any] = {
         "task": task_name,
@@ -465,6 +468,7 @@ def run_task(
         "n_train_patches": len(train_pids),
         "n_test_patches": len(test_pids),
         "pos_ratio": float(pos_ratio),
+        "threshold": float(threshold),
         "accuracy": float(accuracy_score(y_test, y_pred)),
         "balanced_accuracy": float(balanced_accuracy_score(y_test, y_pred)),
         "f1": float(f1_score(y_test, y_pred, zero_division=0)),

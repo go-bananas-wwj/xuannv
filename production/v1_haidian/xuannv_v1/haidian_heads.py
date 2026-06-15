@@ -340,6 +340,7 @@ class PixelMLPHeadV3:
         self.num_train_samples = num_train_samples
         self.model = _MLPPixelNet(input_dim, hidden, dropout).to(self.device)
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
+        self.threshold = 0.5
 
     @staticmethod
     def _focal_dice_loss(
@@ -460,6 +461,27 @@ class PixelMLPHeadV3:
         if best_state is not None:
             self.model.load_state_dict(best_state)
 
+        # 在验证集上选择使 F1 最大的阈值
+        self.model.eval()
+        val_probs: list[np.ndarray] = []
+        val_labels: list[np.ndarray] = []
+        with torch.no_grad():
+            for xb, yb in val_loader:
+                xb = xb.to(self.device)
+                logits = self.model(xb)
+                p = torch.sigmoid(logits).cpu().numpy()
+                val_probs.append(p)
+                val_labels.append(yb.numpy())
+        val_probs = np.concatenate(val_probs, axis=0).flatten()
+        val_labels = np.concatenate(val_labels, axis=0).flatten()
+        from sklearn.metrics import precision_recall_curve
+        prec, rec, thr = precision_recall_curve(val_labels, val_probs)
+        f1s = 2 * prec * rec / np.clip(prec + rec, 1e-9, None)
+        best_idx = int(np.argmax(f1s))
+        self.threshold = float(thr[best_idx]) if best_idx < len(thr) else 0.5
+        if np.isnan(self.threshold) or self.threshold <= 0 or self.threshold >= 1:
+            self.threshold = 0.5
+
     def predict_proba(self, X_test: np.ndarray) -> np.ndarray:
         self.model.eval()
         probs: list[np.ndarray] = []
@@ -533,6 +555,7 @@ class UNetHead:
         self.patience = patience
         self.model = _UNet(in_channels, base_channels).to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
+        self.threshold = 0.5
 
     def _make_loader(
         self, X: np.ndarray, y: np.ndarray, shuffle: bool = True
@@ -569,6 +592,7 @@ class UNetHead:
 
         best_loss = float("inf")
         patience_counter = 0
+        best_state: dict | None = None
 
         self.model.train()
         for epoch in range(self.epochs):
@@ -597,10 +621,36 @@ class UNetHead:
             if val_loss < best_loss:
                 best_loss = val_loss
                 patience_counter = 0
+                best_state = {k: v.cpu().clone() for k, v in self.model.state_dict().items()}
             else:
                 patience_counter += 1
                 if patience_counter >= self.patience:
                     break
+
+        if best_state is not None:
+            self.model.load_state_dict(best_state)
+
+        # 在验证集上选择使 F1 最大的阈值
+        self.model.eval()
+        val_probs: list[np.ndarray] = []
+        val_labels: list[np.ndarray] = []
+        with torch.no_grad():
+            for xb, yb in val_loader:
+                xb = xb.to(self.device)
+                logits = self.model(xb)
+                p = torch.sigmoid(logits).cpu().numpy()
+                val_probs.append(p)
+                val_labels.append(yb.numpy())
+        val_probs = np.concatenate(val_probs, axis=0).flatten()
+        val_labels = np.concatenate(val_labels, axis=0).flatten()
+        from sklearn.metrics import precision_recall_curve, f1_score
+        prec, rec, thr = precision_recall_curve(val_labels, val_probs)
+        f1s = 2 * prec * rec / np.clip(prec + rec, 1e-9, None)
+        best_idx = int(np.argmax(f1s))
+        self.threshold = float(thr[best_idx]) if best_idx < len(thr) else 0.5
+        # 若最佳阈值导致全 0/全 1，回退到 0.5
+        if np.isnan(self.threshold) or self.threshold <= 0 or self.threshold >= 1:
+            self.threshold = 0.5
 
     def predict_proba(self, X_test: np.ndarray) -> np.ndarray:
         self.model.eval()
