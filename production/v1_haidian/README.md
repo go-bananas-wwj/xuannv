@@ -7,6 +7,9 @@
 2. WorldCover kNN 语义分割
 3. 哈尔滨双时相变化检测（cosine distance）
 
+> 注：下方目录结构为最终完整形态。执行 Task 1 后会生成 `model/` 与 `scripts/copy_model.sh`；
+> `xuannv_v1/`、`tests/` 以及 `run_*.sh` 脚本会在后续任务中生成。
+
 ## 目录结构
 
 ```
