@@ -60,6 +60,12 @@ def _resolve_month_pair(
     else:
         resolved_after = min(sorted_months, key=lambda m: abs(_month_key(*m) - desired_after_key))
 
+    if _month_key(*resolved_before) >= _month_key(*resolved_after):
+        raise ValueError(
+            f"无法为 {desired_before}/{desired_after} 解析出有效的前后月份对，"
+            f"实际得到 {resolved_before}/{resolved_after}"
+        )
+
     return resolved_before, resolved_after
 
 
@@ -163,9 +169,13 @@ def run_change_detection(
             available = patch_to_months.get(pid, [])
             if not available:
                 continue
-            resolved_before, resolved_after = _resolve_month_pair(
-                desired_before, desired_after, available
-            )
+            try:
+                resolved_before, resolved_after = _resolve_month_pair(
+                    desired_before, desired_after, available
+                )
+            except ValueError as exc:
+                warnings.warn(f"[changedetection] {period} {pid} 月份解析失败，跳过: {exc}")
+                continue
             if resolved_before != desired_before or resolved_after != desired_after:
                 warnings.warn(
                     f"{period} {pid}: 使用可用月份 {resolved_before}/{resolved_after} "
@@ -279,17 +289,30 @@ def run_change_detection(
     result: dict[str, Any] = {"periods": period_results}
 
     if evaluate and all_labels:
-        all_scores_arr = np.array(all_scores)
-        all_labels_arr = np.array(all_labels)
-        result["global"] = {
-            "auc": float(roc_auc_score(all_labels_arr, all_scores_arr)),
-            "changed_mean": float(all_scores_arr[all_labels_arr == 1].mean()),
-            "unchanged_mean": float(all_scores_arr[all_labels_arr == 0].mean()),
-            "separation": float(
-                all_scores_arr[all_labels_arr == 1].mean()
-                - all_scores_arr[all_labels_arr == 0].mean()
-            ),
-        }
+        scores_arr = np.array(all_scores)
+        labels_arr = np.array(all_labels)
+        if 0 < labels_arr.sum() < len(labels_arr):
+            result["global"] = {
+                "auc": float(roc_auc_score(labels_arr, scores_arr)),
+                "changed_mean": float(scores_arr[labels_arr == 1].mean()),
+                "unchanged_mean": float(scores_arr[labels_arr == 0].mean()),
+                "separation": float(
+                    scores_arr[labels_arr == 1].mean()
+                    - scores_arr[labels_arr == 0].mean()
+                ),
+            }
+        else:
+            result["global"] = {
+                "auc": None,
+                "note": "全局样本中只存在单一类别，无法计算 AUC",
+                "changed_mean": float(scores_arr[labels_arr == 1].mean())
+                if labels_arr.sum() > 0
+                else None,
+                "unchanged_mean": float(scores_arr[labels_arr == 0].mean())
+                if labels_arr.sum() < len(labels_arr)
+                else None,
+                "separation": None,
+            }
 
     (out_dir / "metrics.json").write_text(
         json.dumps(result, ensure_ascii=False, indent=2)

@@ -56,3 +56,18 @@ def test_june_change_score_shape():
     # 月度采样时要求 > 0.5；季度近似若仍低于该阈值，则放宽到 > 0.4。
     assert saved["periods"]["june"]["auc"] > 0.4
     assert metrics["periods"]["june"]["auc"] > 0.4
+
+
+def test_resolve_month_pair_normal():
+    available = [(2025, 1), (2025, 4), (2025, 7), (2025, 10)]
+    before, after = changedetection._resolve_month_pair(
+        (2025, 4), (2025, 6), available
+    )
+    assert before == (2025, 4)
+    assert after == (2025, 7)
+
+
+def test_resolve_month_pair_invalid_raises():
+    available = [(2025, 1), (2025, 4)]
+    with pytest.raises(ValueError):
+        changedetection._resolve_month_pair((2025, 4), (2025, 6), available)
