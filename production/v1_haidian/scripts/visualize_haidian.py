@@ -21,7 +21,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
-from matplotlib.colors import ListedColormap
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from sklearn.decomposition import PCA
 
 warnings.filterwarnings("ignore")
@@ -31,8 +31,13 @@ matplotlib.use("Agg")
 matplotlib.rcParams["font.sans-serif"] = ["WenQuanYi Micro Hei"]
 matplotlib.rcParams["axes.unicode_minus"] = False
 
-# 二值标签 colormap：背景浅灰，正样本红色，便于观察稀疏变化
+# 真实 label：背景浅灰，正样本红色
 _LABEL_CMAP = ListedColormap(["#e8e8e8", "#d62728"])
+
+# 预测 label：预测分数从浅蓝到深红连续显示
+_PRED_CMAP = LinearSegmentedColormap.from_list(
+    "pred", ["#ADD8E6", "#8B0000"]
+)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from xuannv_v1 import backbone
@@ -93,27 +98,44 @@ def _draw_row5(fig, axes, before_rgb, after_rgb, before_emb_rgb, after_emb_rgb, 
             fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
 
-def _draw_row2(axes, true_label, pred_label):
-    """绘制下方 2 个子图."""
-    titles = ["真实 label", "预测 label"]
-    for ax, label, title in zip(axes, [true_label, pred_label], titles):
-        im = ax.imshow(label, cmap=_LABEL_CMAP, vmin=0, vmax=1, interpolation="nearest")
-        ax.set_title(title, fontsize=10)
-        ax.axis("off")
-        # 标出正样本比例，避免稀疏目标被忽略
-        pos_ratio = label.mean() * 100
-        ax.text(
-            0.02,
-            0.98,
-            f"正样本: {label.sum()} ({pos_ratio:.2f}%)",
-            transform=ax.transAxes,
-            fontsize=8,
-            verticalalignment="top",
-            color="black",
-            bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"),
-        )
-        fig = ax.figure
-        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, ticks=[0, 1])
+def _draw_row2(axes, true_label, pred_prob):
+    """绘制下方 2 个子图：真实 label 二值显示，预测 label 用预测分数连续显示."""
+    # 真实 label
+    ax_true = axes[0]
+    im_true = ax_true.imshow(
+        true_label, cmap=_LABEL_CMAP, vmin=0, vmax=1, interpolation="nearest"
+    )
+    ax_true.set_title("真实 label", fontsize=10)
+    ax_true.axis("off")
+    pos_ratio = true_label.mean() * 100
+    ax_true.text(
+        0.02,
+        0.98,
+        f"正样本: {true_label.sum()} ({pos_ratio:.2f}%)",
+        transform=ax_true.transAxes,
+        fontsize=8,
+        verticalalignment="top",
+        color="black",
+        bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"),
+    )
+    ax_true.figure.colorbar(im_true, ax=ax_true, fraction=0.046, pad=0.04, ticks=[0, 1])
+
+    # 预测 label：用预测概率分数，颜色从浅蓝到深红
+    ax_pred = axes[1]
+    im_pred = ax_pred.imshow(pred_prob, cmap=_PRED_CMAP, vmin=0, vmax=1)
+    ax_pred.set_title("预测 label (分数)", fontsize=10)
+    ax_pred.axis("off")
+    ax_pred.text(
+        0.02,
+        0.98,
+        f"均值: {pred_prob.mean():.3f}\nmax: {pred_prob.max():.3f}",
+        transform=ax_pred.transAxes,
+        fontsize=8,
+        verticalalignment="top",
+        color="black",
+        bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"),
+    )
+    ax_pred.figure.colorbar(im_pred, ax=ax_pred, fraction=0.046, pad=0.04)
 
 
 def visualize_patch(
@@ -143,8 +165,6 @@ def visualize_patch(
     before_emb_rgb, _ = _embed_to_rgb(before_emb, pca)
     after_emb_rgb, _ = _embed_to_rgb(after_emb, pca)
 
-    pred_label = (prob > 0.5).astype(np.uint8)
-
     fig = plt.figure(figsize=(18, 7))
     gs = fig.add_gridspec(2, 5, hspace=0.3, wspace=0.3)
 
@@ -153,7 +173,7 @@ def visualize_patch(
 
     ax_true = fig.add_subplot(gs[1, :2])
     ax_pred = fig.add_subplot(gs[1, 3:])
-    _draw_row2([ax_true, ax_pred], true_label, pred_label)
+    _draw_row2([ax_true, ax_pred], true_label, prob)
 
     task_cn = {
         "gongdi": "施工工地",

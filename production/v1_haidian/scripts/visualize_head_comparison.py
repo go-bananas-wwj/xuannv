@@ -21,7 +21,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
-from matplotlib.colors import ListedColormap
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from sklearn.decomposition import PCA
 
 warnings.filterwarnings("ignore")
@@ -30,6 +30,9 @@ matplotlib.rcParams["font.sans-serif"] = ["WenQuanYi Micro Hei"]
 matplotlib.rcParams["axes.unicode_minus"] = False
 
 _LABEL_CMAP = ListedColormap(["#e8e8e8", "#d62728"])
+_PRED_CMAP = LinearSegmentedColormap.from_list(
+    "pred", ["#ADD8E6", "#8B0000"]
+)
 
 TASK_CN = {
     "gongdi": "施工工地",
@@ -125,13 +128,14 @@ def _draw_head_pred(ax_prob, ax_pred, prob: np.ndarray, true_label: np.ndarray, 
     ax_prob.axis("off")
     ax_prob.figure.colorbar(im, ax=ax_prob, fraction=0.046, pad=0.04)
 
-    pred = (prob > 0.5).astype(np.uint8)
-    im2 = ax_pred.imshow(pred, cmap=_LABEL_CMAP, vmin=0, vmax=1, interpolation="nearest")
-    ax_pred.set_title(f"{HEAD_CN.get(head, head)} 预测", fontsize=10)
+    # 预测 label 用预测分数连续显示：浅蓝 -> 深红
+    im2 = ax_pred.imshow(prob, cmap=_PRED_CMAP, vmin=0, vmax=1)
+    ax_pred.set_title(f"{HEAD_CN.get(head, head)} 预测 label", fontsize=10)
     ax_pred.axis("off")
-    ax_pred.figure.colorbar(im2, ax=ax_pred, fraction=0.046, pad=0.04, ticks=[0, 1])
+    ax_pred.figure.colorbar(im2, ax=ax_pred, fraction=0.046, pad=0.04)
 
-    # 计算该 patch 的 F1/IoU
+    # 计算该 patch 的 F1/IoU（仍用 0.5 阈值）
+    pred = (prob > 0.5).astype(np.uint8)
     tp = ((pred == 1) & (true_label == 1)).sum()
     fp = ((pred == 1) & (true_label == 0)).sum()
     fn = ((pred == 0) & (true_label == 1)).sum()
