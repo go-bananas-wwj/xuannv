@@ -147,6 +147,152 @@ class PixelMLPHead:
         return np.concatenate(probs, axis=0)
 
 
+class PixelMLPHeadV2:
+    """改进版像素级 MLP：Focal Loss + Dice Loss，按验证 IoU 早停.
+
+    主要解决原 MLP 假阳性过多的问题：
+    - Focal Loss 降低大量简单背景样本的权重；
+    - Dice Loss 直接优化重叠区域；
+    - 验证 IoU 早停保留最好的 checkpoint。
+    """
+
+    def __init__(
+        self,
+        input_dim: int,
+        hidden: Sequence[int] = (64, 64),
+        dropout: float = 0.3,
+        lr: float = 1e-3,
+        epochs: int = 100,
+        batch_size: int = 4096,
+        device: str = "cpu",
+        patience: int = 15,
+        gamma: float = 2.0,
+        alpha: float = 0.25,
+    ) -> None:
+        self.device = torch.device(device)
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.patience = patience
+        self.gamma = gamma
+        self.alpha = alpha
+        self.model = _MLPPixelNet(input_dim, hidden, dropout).to(self.device)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
+
+    def _make_loader(
+        self, X: np.ndarray, y: np.ndarray, shuffle: bool = True
+    ) -> DataLoader:
+        dataset = TensorDataset(
+            torch.from_numpy(X).float(),
+            torch.from_numpy(y).float(),
+        )
+        return DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            shuffle=shuffle,
+            drop_last=False,
+        )
+
+    @staticmethod
+    def _focal_loss(
+        logits: torch.Tensor,
+        targets: torch.Tensor,
+        gamma: float,
+        alpha: float | None,
+    ) -> torch.Tensor:
+        bce = nn.functional.binary_cross_entropy_with_logits(
+            logits, targets, reduction="none"
+        )
+        probs = torch.sigmoid(logits)
+        p_t = probs * targets + (1 - probs) * (1 - targets)
+        weight = (1 - p_t) ** gamma
+        if alpha is not None:
+            alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
+            weight = alpha_t * weight
+        return (weight * bce).mean()
+
+    @staticmethod
+    def _dice_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        probs = torch.sigmoid(logits)
+        intersection = (probs * targets).sum()
+        union = probs.sum() + targets.sum()
+        return 1 - (2 * intersection + 1e-6) / (union + 1e-6)
+
+    @staticmethod
+    def _iou(
+        logits: torch.Tensor,
+        targets: torch.Tensor,
+        threshold: float = 0.5,
+    ) -> float:
+        probs = torch.sigmoid(logits)
+        preds = (probs >= threshold).float()
+        intersection = (preds * targets).sum()
+        union = (preds + targets).clamp_max(1).sum()
+        return (intersection / (union + 1e-6)).item()
+
+    def fit(self, X_train: np.ndarray, y_train: np.ndarray) -> None:
+        n = len(y_train)
+        perm = np.random.permutation(n)
+        split = int(n * 0.9)
+        tr_idx, val_idx = perm[:split], perm[split:]
+        X_tr, y_tr = X_train[tr_idx], y_train[tr_idx]
+        X_val, y_val = X_train[val_idx], y_train[val_idx]
+
+        train_loader = self._make_loader(X_tr, y_tr, shuffle=True)
+        val_loader = self._make_loader(X_val, y_val, shuffle=False)
+
+        best_iou = -1.0
+        patience_counter = 0
+        best_state: dict | None = None
+
+        self.model.train()
+        for epoch in range(self.epochs):
+            for xb, yb in train_loader:
+                xb = xb.to(self.device)
+                yb = yb.to(self.device)
+                logits = self.model(xb)
+                loss = self._focal_loss(logits, yb, self.gamma, self.alpha) + self._dice_loss(logits, yb)
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+
+            # validation IoU
+            self.model.eval()
+            val_ious: list[float] = []
+            with torch.no_grad():
+                for xb, yb in val_loader:
+                    xb = xb.to(self.device)
+                    yb = yb.to(self.device)
+                    logits = self.model(xb)
+                    val_ious.append(self._iou(logits, yb))
+            self.model.train()
+            val_iou = float(np.mean(val_ious))
+
+            if val_iou > best_iou:
+                best_iou = val_iou
+                patience_counter = 0
+                best_state = {k: v.cpu().clone() for k, v in self.model.state_dict().items()}
+            else:
+                patience_counter += 1
+                if patience_counter >= self.patience:
+                    break
+
+        if best_state is not None:
+            self.model.load_state_dict(best_state)
+
+    def predict_proba(self, X_test: np.ndarray) -> np.ndarray:
+        self.model.eval()
+        probs: list[np.ndarray] = []
+        dataset = TensorDataset(torch.from_numpy(X_test).float())
+        loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
+        with torch.no_grad():
+            for (xb,) in loader:
+                xb = xb.to(self.device)
+                logits = self.model(xb)
+                p = torch.sigmoid(logits).cpu().numpy()
+                probs.append(p)
+        return np.concatenate(probs, axis=0)
+
+
 class _UNet(nn.Module):
     """轻量 U-Net，输入 [B, C, H, W]，输出 [B, H, W] logits."""
 

@@ -25,4 +25,4 @@ python scripts/compare_heads.py \
     --device npu:0 \
     --mode bitemporal \
     --task shigongjiandu \
-    --heads linear,mlp_torch,unet
+    --heads linear,mlp_torch,mlp_torch_v2,unet

@@ -23,7 +23,7 @@ from sklearn.metrics import (
 from sklearn.neural_network import MLPClassifier
 
 from . import backbone
-from .haidian_heads import PixelMLPHead, UNetHead
+from .haidian_heads import PixelMLPHead, PixelMLPHeadV2, UNetHead
 
 LABEL_NORMALIZE = {
     "gongdi": "gongdi",
@@ -205,7 +205,7 @@ def run_task(
         )
     if mode not in ("single", "bitemporal"):
         raise ValueError(f"未知 mode: {mode}")
-    if classifier not in ("linear", "mlp", "mlp_torch", "unet"):
+    if classifier not in ("linear", "mlp", "mlp_torch", "mlp_torch_v2", "unet"):
         raise ValueError(f"未知 classifier: {classifier}")
 
     out_dir = Path(output_dir) / task_name
@@ -289,7 +289,7 @@ def run_task(
     H, W = next(iter(test_shapes))
 
     # 按 head 类型构造训练/测试数据
-    if classifier in ("linear", "mlp", "mlp_torch"):
+    if classifier in ("linear", "mlp", "mlp_torch", "mlp_torch_v2"):
         X_train = np.concatenate(
             [f.reshape(f.shape[0], -1).T for f in train_features_spatial], 0
         )
@@ -343,6 +343,15 @@ def run_task(
         clf = PixelMLPHead(
             input_dim=int(X_train.shape[1]),
             hidden=(128,),
+            device=device,
+        )
+        clf.fit(X_train, y_train)
+        prob = clf.predict_proba(X_test)
+    elif classifier == "mlp_torch_v2":
+        clf = PixelMLPHeadV2(
+            input_dim=int(X_train.shape[1]),
+            hidden=(64, 64),
+            dropout=0.3,
             device=device,
         )
         clf.fit(X_train, y_train)
@@ -453,7 +462,7 @@ def main() -> int:
     parser.add_argument(
         "--classifier",
         default="linear",
-        choices=["linear", "mlp", "mlp_torch", "unet"],
+        choices=["linear", "mlp", "mlp_torch", "mlp_torch_v2", "unet"],
     )
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()

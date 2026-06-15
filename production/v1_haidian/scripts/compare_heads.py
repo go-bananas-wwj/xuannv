@@ -27,7 +27,7 @@ sys.path.insert(0, str(PROD_DIR))
 from xuannv_v1 import backbone, haidian_tasks
 
 
-HEAD_CHOICES = ["linear", "mlp_torch", "unet"]
+HEAD_CHOICES = ["linear", "mlp_torch", "mlp_torch_v2", "unet"]
 TASK_NAMES = haidian_tasks.CLASS_NAMES + list(haidian_tasks.MERGED_TASKS.keys())
 TASK_NAMES_CN = {
     **haidian_tasks.CLASS_NAMES_CN,
