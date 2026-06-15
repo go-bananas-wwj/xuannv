@@ -27,6 +27,42 @@ PERIODS = {
 }
 
 
+def _month_key(year: int, month: int) -> int:
+    return year * 12 + month
+
+
+def _resolve_month_pair(
+    desired_before: tuple[int, int],
+    desired_after: tuple[int, int],
+    available_months: list[tuple[int, int]],
+) -> tuple[tuple[int, int], tuple[int, int]]:
+    """从 patch 的可用月份中，为 before/after 选择最接近且不越过 desired 的月份.
+
+    - before: 选择 <= desired_before 且最接近的可用月；若没有则选最接近的可用月。
+    - after: 选择 >= desired_after 且最接近的可用月；若没有则选最接近的可用月。
+    """
+    if not available_months:
+        raise ValueError("available_months 为空")
+
+    sorted_months = sorted(available_months)
+    desired_before_key = _month_key(*desired_before)
+    desired_after_key = _month_key(*desired_after)
+
+    candidates_before = [m for m in sorted_months if _month_key(*m) <= desired_before_key]
+    if candidates_before:
+        resolved_before = max(candidates_before, key=lambda m: _month_key(*m))
+    else:
+        resolved_before = min(sorted_months, key=lambda m: abs(_month_key(*m) - desired_before_key))
+
+    candidates_after = [m for m in sorted_months if _month_key(*m) >= desired_after_key]
+    if candidates_after:
+        resolved_after = min(candidates_after, key=lambda m: _month_key(*m))
+    else:
+        resolved_after = min(sorted_months, key=lambda m: abs(_month_key(*m) - desired_after_key))
+
+    return resolved_before, resolved_after
+
+
 def _harbin_cfg(cfg: Any) -> Any:
     cfg.data.manifest_path = "/workspace/xuannv/data_raw/harbin/scenes"
     cfg.data.stats_dir = "/workspace/xuannv/statistics/harbin"
@@ -101,6 +137,8 @@ def run_change_detection(
     if patch_limit is not None:
         patch_ids = patch_ids[:patch_limit]
 
+    patch_to_months = {pid: dataset._patch_months[pid] for pid in patch_ids}
+
     period_results: dict[str, Any] = {}
     all_scores: list[float] = []
     all_labels: list[int] = []
@@ -116,15 +154,42 @@ def run_change_detection(
         if period not in PERIODS:
             raise ValueError(f"未知 period: {period}")
         pinfo = PERIODS[period]
-        before_y, before_m = pinfo["before"]
-        after_y, after_m = pinfo["after"]
+        desired_before = pinfo["before"]
+        desired_after = pinfo["after"]
 
-        emb_before = backbone.extract_embeddings_for_patches(
-            model, dataset, patch_ids, before_y, before_m, device
-        )
-        emb_after = backbone.extract_embeddings_for_patches(
-            model, dataset, patch_ids, after_y, after_m, device
-        )
+        emb_before: dict[str, np.ndarray] = {}
+        emb_after: dict[str, np.ndarray] = {}
+        for pid in patch_ids:
+            available = patch_to_months.get(pid, [])
+            if not available:
+                continue
+            resolved_before, resolved_after = _resolve_month_pair(
+                desired_before, desired_after, available
+            )
+            if resolved_before != desired_before or resolved_after != desired_after:
+                warnings.warn(
+                    f"{period} {pid}: 使用可用月份 {resolved_before}/{resolved_after} "
+                    f"替代 {desired_before}/{desired_after}"
+                )
+            try:
+                eb = backbone.extract_embedding_for_month(
+                    model, dataset, pid, resolved_before[0], resolved_before[1], device
+                )
+                emb_before[pid] = eb
+            except Exception as exc:
+                warnings.warn(
+                    f"[changedetection] {period} {pid} before {resolved_before} 提取失败，跳过: {exc}"
+                )
+            try:
+                ea = backbone.extract_embedding_for_month(
+                    model, dataset, pid, resolved_after[0], resolved_after[1], device
+                )
+                emb_after[pid] = ea
+            except Exception as exc:
+                warnings.warn(
+                    f"[changedetection] {period} {pid} after {resolved_after} 提取失败，跳过: {exc}"
+                )
+
         common_pids = [p for p in patch_ids if p in emb_before and p in emb_after]
         if not common_pids:
             continue
