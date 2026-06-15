@@ -21,6 +21,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
+from matplotlib.colors import ListedColormap
 from sklearn.decomposition import PCA
 
 warnings.filterwarnings("ignore")
@@ -29,6 +30,9 @@ matplotlib.use("Agg")
 # 使用系统自带中文字体，避免标题显示为方块
 matplotlib.rcParams["font.sans-serif"] = ["WenQuanYi Micro Hei"]
 matplotlib.rcParams["axes.unicode_minus"] = False
+
+# 二值标签 colormap：背景浅灰，正样本红色，便于观察稀疏变化
+_LABEL_CMAP = ListedColormap(["#e8e8e8", "#d62728"])
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from xuannv_v1 import backbone
@@ -93,9 +97,23 @@ def _draw_row2(axes, true_label, pred_label):
     """绘制下方 2 个子图."""
     titles = ["真实 label", "预测 label"]
     for ax, label, title in zip(axes, [true_label, pred_label], titles):
-        ax.imshow(label, cmap="Set1", vmin=0, vmax=1)
+        im = ax.imshow(label, cmap=_LABEL_CMAP, vmin=0, vmax=1, interpolation="nearest")
         ax.set_title(title, fontsize=10)
         ax.axis("off")
+        # 标出正样本比例，避免稀疏目标被忽略
+        pos_ratio = label.mean() * 100
+        ax.text(
+            0.02,
+            0.98,
+            f"正样本: {label.sum()} ({pos_ratio:.2f}%)",
+            transform=ax.transAxes,
+            fontsize=8,
+            verticalalignment="top",
+            color="black",
+            bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"),
+        )
+        fig = ax.figure
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, ticks=[0, 1])
 
 
 def visualize_patch(
