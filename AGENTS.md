@@ -369,23 +369,78 @@ python scripts/eval/auc_eval.py \
 
 | 任务标签 | 含义 | 头类型 |
 |----------|------|--------|
-| `chachu` | 拆除 | 独立二分类 MLP |
+| `chachu` | 建筑消失 | 独立二分类 MLP |
 | `daolubianhuo` | 道路变化 | 独立二分类 MLP |
-| `gongdi` | 工地 | 独立二分类 MLP |
-| `jiazhudongdi` | 建筑动土 | 独立二分类 MLP |
-| `nongyongdi` | 农用动土 | 独立二分类 MLP |
-| `weijian` | 违建 | 独立二分类 MLP |
+| `gongdi` | 施工工地 | 独立二分类 MLP |
+| `jianzhudongdi` | 建筑用地 | 独立二分类 MLP |
+| `nongyongdi` | 农用地变化 | 独立二分类 MLP |
+| `weijian` | 疑似违建 | 独立二分类 MLP |
 
 ### 输入与评估协议
 
-1. **输入**：使用 pre-trained backbone 分别提取每个 patch 的 **2025-12** 和 **2026-04-30** 两个时相的 `embedding_map`，拼接（或差分）后作为下游 MLP 头的输入。
-2. **标签**：将 labelme polygon 栅格化为与 `embedding_map` 对齐的二值 mask（正例=该类，负例=背景）。
-3. **划分**：63 patch 按 patch 分层划分为训练/测试（如 80%/20%），避免同一 patch 同时出现在 train/test。
-4. **评估指标**：每个任务单独报告 **Accuracy、Precision、Recall、F1、IoU**；因类别极度不平衡，IoU/F1 是主要指标。
+1. **提取 embedding**：
+   ```bash
+   python scripts/eval/extract_haidian_embeddings.py \
+       --config configs/config_multires_v1.yaml \
+       --checkpoint outputs/exp_multires_v1_0612_backup/epoch_80.pt \
+       --output out/haidian_label/embeddings_v1e80.npz \
+       --device npu:0
+   ```
+   输出 key：`patch_ids`、`emb_dec`（2025-12）、`emb_apr`（2026-04）。
+
+2. **格式转换**：`extract_haidian_embeddings.py` 的输出 key 与 `evaluate_haidian2026_labels.py` 不一致，需先用转换脚本：
+   ```bash
+   python scripts/eval/convert_haidian_npz.py \
+       --input out/haidian_label/embeddings_v1e80.npz \
+       --output out/haidian_label/embeddings_v1e80_monthly.npz \
+       --dec-month 2025-12 --apr-month 2026-04
+   ```
+
+3. **评估**：支持单时相与双时相拼接：
+   ```bash
+   # 单时相 2026-04
+   python scripts/eval/evaluate_haidian2026_labels.py \
+       --embedding-file out/haidian_label/embeddings_v1e80_monthly.npz \
+       --label-dir /workspace/xuannv/haidian_label/labeljson \
+       --output-dir out/haidian_label/eval_v1e80_single \
+       --device npu:0 --month 2026-04
+
+   # 双时相 2025-12 + 2026-04
+   python scripts/eval/evaluate_haidian2026_labels.py \
+       --embedding-file out/haidian_label/embeddings_v1e80_monthly.npz \
+       --second-embedding-file out/haidian_label/embeddings_v1e80_monthly.npz \
+       --label-dir /workspace/xuannv/haidian_label/labeljson \
+       --output-dir out/haidian_label/eval_v1e80_bitemporal \
+       --device npu:0 --month 2026-04 --second-month 2025-12
+   ```
+
+4. **评估指标**：因 6 类任务正例像素极度稀疏（如 `chaichu` 在 128×128 中仅约 47 个正例），**AUC 是主要可比指标**；IoU/F1 受阈值/类别不平衡影响极大，仅作参考。
+
+### 最新结果（2026-06-15）
+
+双时相（2025-12 + 2026-04）AUC 对比：
+
+| 类别 | v1e40 Linear | v1e40 MLP | v1e80 Linear | v1e80 MLP | v2c50 Linear | v2c50 MLP | v2d53 Linear | v2d53 MLP |
+|------|--------------|-----------|--------------|-----------|--------------|-----------|--------------|-----------|
+| 施工工地 (gongdi) | 0.818 | 0.773 | **0.896** | **0.878** | 0.434 | 0.478 | 0.434 | 0.499 |
+| 建筑用地 (jianzhudongdi) | 0.741 | 0.769 | **0.748** | 0.740 | 0.325 | 0.412 | 0.324 | 0.381 |
+| 疑似违建 (weijian) | 0.756 | **0.716** | **0.787** | 0.404 | 0.317 | 0.360 | 0.456 | 0.369 |
+| 农用地变化 (nongyongdi) | 0.882 | 0.782 | 0.905 | 0.510 | 0.744 | **0.845** | 0.727 | **0.846** |
+| 建筑消失 (chaichu) | 0.594 | 0.501 | 0.628 | **0.613** | **0.732** | 0.729 | **0.743** | 0.691 |
+| 施工道路 (daolubianhua) | 0.657 | 0.658 | **0.857** | **0.901** | 0.676 | 0.663 | 0.736 | 0.627 |
+
+### 关键结论
+
+- **v1 backbone 在 haidian_label 上显著优于 v2/v2d 系列**：`施工工地`、`建筑用地`、`疑似违建`、`施工道路` 4 个任务 AUC 差距最大。
+- **v2 仅在 `农用地变化`、`建筑消失` 上有优势**，可能与 Planet/SAR 高分辨率输入或语义头微调有关。
+- **v2c50 与 v2d53 差距很小**，说明 v2d 的 WorldCover 语义头微调不是导致建筑/施工类任务变差的主因，而是 v2 backbone 本身在这些任务上弱于 v1。
+- **MLP 在极度不平衡数据上不稳定**：v1e80 的 `农用地变化` Linear AUC 0.905，MLP 却只有 0.510；因此推荐优先使用 Linear Probe 作为对比基准。
 
 ### 推荐 checkpoint
 
-优先使用当前 kNN 效果最好的 `exp_multires_v2d_quick_0614/epoch_53.pt`；若效果不佳，可回退到 `exp_multires_v2c_0614/epoch_50.pt` 对比。
+- **Linear Probe 首选**：`outputs/exp_multires_v1_0612_backup/epoch_80.pt`
+- **MLP 头首选**：`outputs/exp_multires_v1_0612_backup/epoch_best_miou0.3788_ep40.pt`（MLP 更稳定）
+- v2 系列暂不作为 haidian_label 下游任务的首选 backbone。
 
 ---
 
