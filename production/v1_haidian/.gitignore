@@ -1,5 +1,6 @@
 model/epoch_80.pt
 outputs/
+visualizations/
 __pycache__/
 *.pyc
 *.egg-info/
