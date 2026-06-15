@@ -9,8 +9,10 @@ from typing import Any
 
 import geopandas as gpd
 import numpy as np
+import rasterio
 import torch
-from shapely.geometry import Point, box
+from rasterio.features import rasterize
+from shapely.geometry import box
 from sklearn.metrics import roc_auc_score
 
 from . import backbone
@@ -18,10 +20,10 @@ from . import backbone
 warnings.filterwarnings("ignore")
 
 PERIODS = {
-    "june": {"before": (2025, 4), "after": (2025, 7)},
-    "aug": {"before": (2025, 7), "after": (2025, 10)},
-    "September": {"before": (2025, 7), "after": (2025, 10)},
-    "October": {"before": (2025, 7), "after": (2025, 10)},
+    "june": {"before": (2025, 4), "after": (2025, 6)},
+    "aug": {"before": (2025, 6), "after": (2025, 8)},
+    "September": {"before": (2025, 8), "after": (2025, 9)},
+    "October": {"before": (2025, 9), "after": (2025, 10)},
 }
 
 
@@ -47,11 +49,14 @@ def _load_grid(grid_path: Path) -> dict[str, tuple]:
 
 
 def _load_changes(annot_dir: Path) -> dict[str, list]:
+    if not annot_dir.exists():
+        raise FileNotFoundError(f"annot_dir does not exist: {annot_dir}")
     period_changes: dict[str, list] = {p: [] for p in PERIODS}
     for shp_name in ["june.shp", "aug.shp", "September.shp", "October.shp"]:
         period = shp_name.replace(".shp", "")
         path = annot_dir / shp_name
         if not path.exists():
+            warnings.warn(f"missing shapefile, skipping: {path}")
             continue
         try:
             gdf = gpd.read_file(path)
@@ -99,8 +104,6 @@ def run_change_detection(
     period_results: dict[str, Any] = {}
     all_scores: list[float] = []
     all_labels: list[int] = []
-    all_ch_means: list[float] = []
-    all_unch_means: list[float] = []
 
     evaluate = annot_dir is not None and grid_path is not None
     if evaluate:
@@ -164,17 +167,25 @@ def run_change_detection(
             eb = emb_before[local_pid]
             ea = emb_after[local_pid]
             H, W = eb.shape[1], eb.shape[2]
-            changed_mask = np.zeros((H, W), dtype=bool)
 
-            for geom in changes:
-                if not box(minx, miny, maxx, maxy).intersects(geom):
-                    continue
-                for y in range(H):
-                    for x in range(W):
-                        px = minx + (x + 0.5) / W * (maxx - minx)
-                        py = maxy - (y + 0.5) / H * (maxy - miny)
-                        if geom.buffer(1.0).contains(Point(px, py)):
-                            changed_mask[y, x] = True
+            patch_box = box(minx, miny, maxx, maxy)
+            intersecting_geoms = [
+                geom for geom in changes if patch_box.intersects(geom)
+            ]
+            if not intersecting_geoms:
+                continue
+
+            transform = rasterio.Affine.translation(minx, maxy) * rasterio.Affine.scale(
+                (maxx - minx) / W, (miny - maxy) / H
+            )
+            changed_mask = rasterize(
+                intersecting_geoms,
+                out_shape=(H, W),
+                fill=0,
+                default_value=1,
+                all_touched=True,
+                transform=transform,
+            ).astype(bool)
 
             dist_map = 1.0 - np.sum(eb * ea, axis=0)
             lflat = changed_mask.flatten()
@@ -189,8 +200,6 @@ def run_change_detection(
 
             all_scores.extend(sflat.tolist())
             all_labels.extend(lflat.tolist())
-            all_ch_means.append(p_ch[-1])
-            all_unch_means.append(p_unch[-1])
 
         if p_labels and 0 < sum(p_labels) < len(p_labels):
             period_results[period] = {
@@ -205,11 +214,16 @@ def run_change_detection(
     result: dict[str, Any] = {"periods": period_results}
 
     if evaluate and all_labels:
+        all_scores_arr = np.array(all_scores)
+        all_labels_arr = np.array(all_labels)
         result["global"] = {
-            "auc": float(roc_auc_score(all_labels, all_scores)),
-            "changed_mean": float(np.mean(all_ch_means)),
-            "unchanged_mean": float(np.mean(all_unch_means)),
-            "separation": float(np.mean(all_ch_means) - np.mean(all_unch_means)),
+            "auc": float(roc_auc_score(all_labels_arr, all_scores_arr)),
+            "changed_mean": float(all_scores_arr[all_labels_arr == 1].mean()),
+            "unchanged_mean": float(all_scores_arr[all_labels_arr == 0].mean()),
+            "separation": float(
+                all_scores_arr[all_labels_arr == 1].mean()
+                - all_scores_arr[all_labels_arr == 0].mean()
+            ),
         }
 
     (out_dir / "metrics.json").write_text(

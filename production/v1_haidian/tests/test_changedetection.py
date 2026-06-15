@@ -36,7 +36,7 @@ def test_june_change_score_shape():
         periods=["june"],
         annot_dir="/workspace/哈尔滨松北新区变化检测汇总文件/变化检测shp文件",
         grid_path="/workspace/index/harbin/grid/harbin_grid.geojson",
-        patch_ids=["patch_000033", "patch_000039", "patch_000040"],
+        patch_limit=3,
     )
 
     out_path = PROD_DIR / "outputs" / "test_changedetection" / "change_score_june.npz"
@@ -51,3 +51,5 @@ def test_june_change_score_shape():
     assert metrics_path.exists()
     saved = json.loads(metrics_path.read_text())
     assert "june" in saved["periods"]
+    assert saved["periods"]["june"]["auc"] > 0.5
+    assert metrics["periods"]["june"]["auc"] > 0.5
