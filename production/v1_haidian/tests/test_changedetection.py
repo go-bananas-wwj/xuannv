@@ -7,7 +7,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import torch
 
 PROD_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROD_DIR))
@@ -16,26 +15,34 @@ from xuannv_v1 import changedetection
 
 
 @pytest.fixture(autouse=True)
-def _torch_threads_and_cleanup():
-    prev = torch.get_num_threads()
-    torch.set_num_threads(64)
+def clean_test_outputs():
+    """每次测试前清理测试输出目录。"""
     out_dir = PROD_DIR / "outputs" / "test_changedetection"
     if out_dir.exists():
         shutil.rmtree(out_dir)
     yield
-    torch.set_num_threads(prev)
 
 
 @pytest.mark.slow
+@pytest.mark.usefixtures("torch_threads")
 def test_june_change_score_shape():
+    annot_dir = Path("/workspace/哈尔滨松北新区变化检测汇总文件/变化检测shp文件")
+    grid_path = Path("/workspace/index/harbin/grid/harbin_grid.geojson")
+    if not annot_dir.exists():
+        pytest.skip(f"annotation directory not found: {annot_dir}")
+    if not grid_path.exists():
+        pytest.skip(f"grid file not found: {grid_path}")
+
     # 选择包含 june 变化标注的 patch，确保 period_results 能计算出 AUC。
     metrics = changedetection.run_change_detection(
         model_dir=str(PROD_DIR / "model"),
         output_dir=str(PROD_DIR / "outputs" / "test_changedetection"),
         device="cpu",
         periods=["june"],
-        annot_dir="/workspace/哈尔滨松北新区变化检测汇总文件/变化检测shp文件",
-        grid_path="/workspace/index/harbin/grid/harbin_grid.geojson",
+        annot_dir=str(annot_dir),
+        grid_path=str(grid_path),
+        # patch_limit is redundant when patch_ids is explicitly provided,
+        # but kept to exercise the argument path.
         patch_limit=3,
         patch_ids=["patch_000033", "patch_000039", "patch_000040"],
     )
@@ -46,7 +53,9 @@ def test_june_change_score_shape():
     data = np.load(out_path)
     assert "patch_ids" in data
     assert "scores" in data
-    assert data["scores"].ndim == 3
+    assert data["scores"].shape == (len(data["patch_ids"]), 64, 64), (
+        f"unexpected score shape: {data['scores'].shape}"
+    )
 
     metrics_path = PROD_DIR / "outputs" / "test_changedetection" / "metrics.json"
     assert metrics_path.exists()
