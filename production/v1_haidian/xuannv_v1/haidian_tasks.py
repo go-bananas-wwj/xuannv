@@ -23,6 +23,7 @@ from sklearn.metrics import (
 from sklearn.neural_network import MLPClassifier
 
 from . import backbone
+from .haidian_heads import PixelMLPHead, UNetHead
 
 LABEL_NORMALIZE = {
     "gongdi": "gongdi",
@@ -175,12 +176,14 @@ def run_task(
     patch_ids: list[str] | None = None,
     model: Any = None,
     dataset: Any = None,
+    emb_dec: dict[str, np.ndarray] | None = None,
+    emb_apr: dict[str, np.ndarray] | None = None,
 ) -> dict[str, Any]:
     if task_name not in CLASS_NAMES:
         raise ValueError(f"未知任务: {task_name}，可选: {CLASS_NAMES}")
     if mode not in ("single", "bitemporal"):
         raise ValueError(f"未知 mode: {mode}")
-    if classifier not in ("linear", "mlp"):
+    if classifier not in ("linear", "mlp", "mlp_torch", "unet"):
         raise ValueError(f"未知 classifier: {classifier}")
 
     out_dir = Path(output_dir) / task_name
@@ -215,11 +218,15 @@ def run_task(
         )
         return result
 
-    emb_dec, emb_apr = _extract_embeddings(model, dataset, valid_pids, device)
+    if emb_dec is None or emb_apr is None:
+        emb_dec, emb_apr = _extract_embeddings(model, dataset, valid_pids, device)
 
-    X_train, y_train, X_test, y_test = [], [], [], []
+    # 空间特征/标签，用于支持 U-Net 等空间头
+    train_features_spatial: list[np.ndarray] = []
+    train_labels_spatial: list[np.ndarray] = []
+    test_features_spatial: list[np.ndarray] = []
+    test_labels_spatial: list[np.ndarray] = []
     test_patch_ids: list[str] = []
-    test_label_maps: list[np.ndarray] = []
     test_shapes: set[tuple[int, int]] = set()
 
     for pid in valid_pids:
@@ -236,20 +243,16 @@ def run_task(
         masks = load_label_json(json_path, image_size=(427, 427))
         label_mask = resize_mask(masks[task_name], H)
 
-        emb_flat = emb.reshape(D, -1).T
-        label_flat = label_mask.flatten()
-
         if pid in train_pids:
-            X_train.append(emb_flat)
-            y_train.append(label_flat)
+            train_features_spatial.append(emb)
+            train_labels_spatial.append(label_mask)
         else:
-            X_test.append(emb_flat)
-            y_test.append(label_flat)
+            test_features_spatial.append(emb)
+            test_labels_spatial.append(label_mask)
             test_patch_ids.append(pid)
-            test_label_maps.append(label_mask)
             test_shapes.add((H, W))
 
-    if not X_train or not X_test:
+    if not train_features_spatial or not test_features_spatial:
         result = {"skipped": True, "reason": "训练集或测试集为空"}
         (out_dir / "metrics.json").write_text(
             json.dumps(result, ensure_ascii=False, indent=2)
@@ -262,10 +265,23 @@ def run_task(
         )
     H, W = next(iter(test_shapes))
 
-    X_train = np.concatenate(X_train, 0)
-    y_train = np.concatenate(y_train, 0)
-    X_test = np.concatenate(X_test, 0)
-    y_test = np.concatenate(y_test, 0)
+    # 按 head 类型构造训练/测试数据
+    if classifier in ("linear", "mlp", "mlp_torch"):
+        X_train = np.concatenate(
+            [f.reshape(f.shape[0], -1).T for f in train_features_spatial], 0
+        )
+        y_train = np.concatenate([l.flatten() for l in train_labels_spatial], 0)
+        X_test = np.concatenate(
+            [f.reshape(f.shape[0], -1).T for f in test_features_spatial], 0
+        )
+        y_test = np.concatenate([l.flatten() for l in test_labels_spatial], 0)
+    elif classifier == "unet":
+        X_train = np.stack(train_features_spatial, axis=0).astype(np.float32)
+        y_train = np.stack(train_labels_spatial, axis=0).astype(np.float32)
+        X_test = np.stack(test_features_spatial, axis=0).astype(np.float32)
+        y_test = np.concatenate([l.flatten() for l in test_labels_spatial], 0)
+    else:
+        raise ValueError(f"未知 classifier: {classifier}")
 
     pos_ratio = y_train.mean()
     if pos_ratio < 1e-6:
@@ -275,6 +291,7 @@ def run_task(
         )
         return result
 
+    # 训练下游头
     if classifier == "linear":
         clf = LogisticRegression(
             max_iter=500, class_weight="balanced", random_state=seed
@@ -282,7 +299,8 @@ def run_task(
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=ConvergenceWarning)
             clf.fit(X_train, y_train)
-    else:
+        prob = clf.predict_proba(X_test)[:, 1]
+    elif classifier == "mlp":
         sample_weight = np.where(
             y_train == 1, 1.0 / max(pos_ratio, 1e-6), 1.0 / (1 - pos_ratio)
         )
@@ -297,9 +315,26 @@ def run_task(
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=ConvergenceWarning)
             clf.fit(X_train, y_train, sample_weight=sample_weight)
+        prob = clf.predict_proba(X_test)[:, 1]
+    elif classifier == "mlp_torch":
+        clf = PixelMLPHead(
+            input_dim=int(X_train.shape[1]),
+            hidden=(128,),
+            device=device,
+        )
+        clf.fit(X_train, y_train)
+        prob = clf.predict_proba(X_test)
+    elif classifier == "unet":
+        clf = UNetHead(
+            in_channels=int(X_train.shape[1]),
+            base_channels=32,
+            device=device,
+        )
+        clf.fit(X_train, y_train)
+        prob_spatial = clf.predict_proba(X_test)  # [N, H, W]
+        prob = prob_spatial.reshape(-1)
 
-    y_pred = clf.predict(X_test)
-    prob = clf.predict_proba(X_test)[:, 1] if hasattr(clf, "predict_proba") else None
+    y_pred = (prob > 0.5).astype(np.uint8)
 
     metrics: dict[str, Any] = {
         "task": task_name,
@@ -351,8 +386,13 @@ def run_all_tasks(
     mode: str = "bitemporal",
     classifier: str = "linear",
     patch_ids: list[str] | None = None,
+    model: Any = None,
+    dataset: Any = None,
+    emb_dec: dict[str, np.ndarray] | None = None,
+    emb_apr: dict[str, np.ndarray] | None = None,
 ) -> dict[str, dict]:
-    model, dataset, _ = backbone.load_production_model(model_dir, device=device)
+    if model is None or dataset is None:
+        model, dataset, _ = backbone.load_production_model(model_dir, device=device)
     summary: dict[str, dict] = {}
     for task in CLASS_NAMES:
         print(f"\n[run_all_tasks] 开始任务: {task} ({CLASS_NAMES_CN[task]})")
@@ -367,6 +407,8 @@ def run_all_tasks(
             model=model,
             dataset=dataset,
             patch_ids=patch_ids,
+            emb_dec=emb_dec,
+            emb_apr=emb_apr,
         )
     (Path(output_dir) / "metrics_all.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2)
@@ -382,7 +424,11 @@ def main() -> int:
     parser.add_argument("--output-dir", default="outputs/haidian")
     parser.add_argument("--device", default="npu:0")
     parser.add_argument("--mode", default="bitemporal", choices=["single", "bitemporal"])
-    parser.add_argument("--classifier", default="linear", choices=["linear", "mlp"])
+    parser.add_argument(
+        "--classifier",
+        default="linear",
+        choices=["linear", "mlp", "mlp_torch", "unet"],
+    )
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
