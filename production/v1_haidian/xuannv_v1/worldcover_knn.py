@@ -52,6 +52,39 @@ def _load_worldcover_label(
     return mapped, mask
 
 
+def _has_worldcover_label(patch_id: str, label_dir: Path) -> bool:
+    patch_label_dir = label_dir / patch_id / "worldcover"
+    if not patch_label_dir.exists():
+        return False
+    return any(f.suffix.lower() == ".tif" for f in patch_label_dir.iterdir())
+
+
+def _write_placeholder(
+    out_dir: Path,
+    patch_ids: list[str],
+    H: int,
+    W: int,
+    k: int,
+    note: str,
+) -> dict[str, Any]:
+    pred_classes = -np.ones((len(patch_ids), H, W), dtype=np.int64)
+    np.savez_compressed(
+        out_dir / "pred_worldcover.npz",
+        patch_ids=np.array(patch_ids),
+        pred_classes=pred_classes,
+    )
+    result = {
+        "task": "worldcover",
+        "k": k,
+        "note": note,
+    }
+    (out_dir / "metrics.json").write_text(
+        json.dumps(result, ensure_ascii=False, indent=2)
+    )
+    print(f"[worldcover_knn] {result['note']}")
+    return result
+
+
 def run_worldcover_knn(
     model_dir: str,
     label_dir: str,
@@ -69,32 +102,36 @@ def run_worldcover_knn(
     if not patch_ids:
         raise ValueError("数据集中没有 patch")
 
+    H, W = getattr(cfg.model, "common_spatial_size", [64, 64])
+
     label_dir = Path(label_dir)
-    if not label_dir.exists():
-        H, W = getattr(cfg.model, "common_spatial_size", [64, 64])
-        pred_classes = -np.ones((len(patch_ids), H, W), dtype=np.int64)
-        np.savez_compressed(
-            out_dir / "pred_worldcover.npz",
-            patch_ids=np.array(patch_ids),
-            pred_classes=pred_classes,
+    labeled_pids = [
+        pid for pid in patch_ids if _has_worldcover_label(pid, label_dir)
+    ]
+
+    if not labeled_pids:
+        return _write_placeholder(
+            out_dir,
+            patch_ids,
+            H,
+            W,
+            k,
+            "未提供有效 WorldCover 标签，仅输出占位预测图。",
         )
-        result = {
-            "task": "worldcover",
-            "k": k,
-            "note": "未提供有效 WorldCover 标签，仅输出占位预测图。",
-        }
-        (out_dir / "metrics.json").write_text(
-            json.dumps(result, ensure_ascii=False, indent=2)
-        )
-        print(f"[worldcover_knn] {result['note']}")
-        return result
 
     embeddings = backbone.extract_embeddings_for_patches(
-        model, dataset, patch_ids, 2025, 6, device
+        model, dataset, labeled_pids, 2025, 6, device
     )
-    valid_pids = [p for p in patch_ids if p in embeddings]
+    valid_pids = [p for p in labeled_pids if p in embeddings]
     if not valid_pids:
-        raise ValueError("没有成功提取任何 embedding")
+        return _write_placeholder(
+            out_dir,
+            patch_ids,
+            H,
+            W,
+            k,
+            "未成功提取任何带 WorldCover 标签的 embedding，仅输出占位预测图。",
+        )
 
     emb0 = embeddings[valid_pids[0]]
     D, H, W = emb0.shape
@@ -113,22 +150,14 @@ def run_worldcover_knn(
         all_pidx.append(np.full(mask.sum(), pidx))
 
     if not all_X:
-        pred_classes = -np.ones((len(valid_pids), H, W), dtype=np.int64)
-        np.savez_compressed(
-            out_dir / "pred_worldcover.npz",
-            patch_ids=np.array(valid_pids),
-            pred_classes=pred_classes,
+        return _write_placeholder(
+            out_dir,
+            patch_ids,
+            H,
+            W,
+            k,
+            "未提供有效 WorldCover 标签，仅输出占位预测图。",
         )
-        result = {
-            "task": "worldcover",
-            "k": k,
-            "note": "未提供有效 WorldCover 标签，仅输出占位预测图。",
-        }
-        (out_dir / "metrics.json").write_text(
-            json.dumps(result, ensure_ascii=False, indent=2)
-        )
-        print(f"[worldcover_knn] {result['note']}")
-        return result
 
     all_X = np.concatenate(all_X, 0)
     all_y = np.concatenate(all_y, 0)
@@ -206,11 +235,12 @@ def main() -> int:
     parser.add_argument(
         "--label-dir",
         default="/workspace/xuannv/data_raw/haidian/scenes",
-        help="包含 patch_id/worldcover/static.tif 的数据根目录；为空则仅输出占位图",
+        help="包含 patch_id/worldcover/*.tif 的数据根目录；为空则仅输出占位图",
     )
     parser.add_argument("--output-dir", default="outputs/worldcover")
     parser.add_argument("--device", default="npu:0")
     parser.add_argument("--k", type=int, default=5)
+    parser.add_argument("--split-ratio", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -220,6 +250,7 @@ def main() -> int:
         output_dir=args.output_dir,
         device=args.device,
         k=args.k,
+        split_ratio=args.split_ratio,
         seed=args.seed,
     )
     return 0
