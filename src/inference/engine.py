@@ -126,6 +126,9 @@ def extract_embedding_for_month(
     for k, v in batch.items():
         if isinstance(v, torch.Tensor):
             batch_dev[k] = v.unsqueeze(0).to(device)
+        elif isinstance(v, list) and v and isinstance(v[0], torch.Tensor):
+            # multires: source_frames/target_images 是 list[Tensor]，需要给每个 tensor 加 batch 维
+            batch_dev[k] = [t.unsqueeze(0).to(device) for t in v]
         else:
             batch_dev[k] = v
 
@@ -189,6 +192,9 @@ def extract_embedding_map(
     for k, v in batch.items():
         if isinstance(v, torch.Tensor):
             batch_dev[k] = v.unsqueeze(0).to(device)
+        elif isinstance(v, list) and v and isinstance(v[0], torch.Tensor):
+            # multires: source_frames/target_images 是 list[Tensor]，需要给每个 tensor 加 batch 维
+            batch_dev[k] = [t.unsqueeze(0).to(device) for t in v]
         else:
             batch_dev[k] = v
 

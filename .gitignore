@@ -74,3 +74,4 @@ aef_reference/outputs_olmoearth/
 
 # NPU CANN 运行时缓存
 kernel_meta/
+out/haidian_label/*.npz
