@@ -206,9 +206,9 @@ def train_one_fold(
     hidden_dim: int = 256,
     epochs: int = 50,
     lr: float = 1e-3,
-    batch_size: int = 4096,
+    batch_size: int = 8192,
     patience: int = 10,
-    num_train_samples: int = 200000,
+    num_train_samples: int = 50000,
 ) -> tuple[MLPHead, dict]:
     in_dim = X_train.shape[1]
     model = MLPHead(in_dim, hidden_dim).to(device)
@@ -294,19 +294,19 @@ def main() -> int:
     device = torch.device(args.device)
 
     patch_ids, emb_dec, emb_apr = load_embeddings(args.embedding_file)
-    print(f"[Data] patches={len(patch_ids)}, emb_shape={emb_dec.shape}")
+    print(f"[Data] patches={len(patch_ids)}, emb_shape={emb_dec.shape}", flush=True)
 
     summary = {}
     for task in TASKS:
-        print(f"\n[Task] {task}")
+        print(f"\n[Task] {task}", flush=True)
         X, y, pidx = build_task_data(
             patch_ids, emb_dec, emb_apr, args.label_dir, task,
             use_diff=args.use_diff, target_size=args.target_size
         )
         if X is None:
-            print(f"[Task] {task} 无数据")
+            print(f"[Task] {task} 无数据", flush=True)
             continue
-        print(f"[Task] {task} pixels={len(y)} pos={y.sum()} neg={len(y)-y.sum()}")
+        print(f"[Task] {task} pixels={len(y)} pos={y.sum()} neg={len(y)-y.sum()}", flush=True)
 
         # 按 patch 是否有正例做 StratifiedKFold，保证每折都有正负 patch
         patch_has_pos = np.array([y[pidx == i].sum() > 0 for i in range(len(patch_ids))], dtype=np.int64)
@@ -317,12 +317,12 @@ def main() -> int:
             val_mask = np.isin(pidx, val_pidx)
             X_train, y_train = X[train_mask], y[train_mask]
             X_val, y_val = X[val_mask], y[val_mask]
-            print(f"  Fold {fold}: train={len(y_train)} pos={y_train.sum()} val={len(y_val)} pos={y_val.sum()}")
+            print(f"  Fold {fold}: train={len(y_train)} pos={y_train.sum()} val={len(y_val)} pos={y_val.sum()}", flush=True)
             _, metrics = train_one_fold(
                 X_train, y_train, X_val, y_val, device,
                 hidden_dim=args.hidden_dim, epochs=args.epochs,
             )
-            print(f"  Fold {fold}: {metrics}")
+            print(f"  Fold {fold}: {metrics}", flush=True)
             fold_results.append(metrics)
 
         # 汇总 mean/std

@@ -1,65 +1,70 @@
 {
   "folds": [
     {
-      "accuracy": 0.9997156450490807,
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1": 0.0,
-      "iou": 0.0,
-      "tp": 0,
-      "fp": 674,
-      "fn": 0
-    },
-    {
-      "accuracy": 0.9991503102801909,
+      "accuracy": 1.0,
       "precision": 0.0,
       "recall": 0.0,
       "f1": 0.0,
       "iou": 0.0,
       "tp": 0,
       "fp": 0,
-      "fn": 2014
+      "fn": 0,
+      "threshold": 0.5
     },
     {
-      "accuracy": 0.9988305164333113,
+      "accuracy": 0.9991689828725961,
       "precision": 0.0,
       "recall": 0.0,
       "f1": 0.0,
       "iou": 0.0,
       "tp": 0,
-      "fp": 389,
-      "fn": 2383
+      "fp": 0,
+      "fn": 177,
+      "threshold": 0.5
     },
     {
-      "accuracy": 0.9998153521016039,
+      "accuracy": 0.9989999624399039,
       "precision": 0.0,
       "recall": 0.0,
       "f1": 0.0,
       "iou": 0.0,
       "tp": 0,
-      "fp": 404,
-      "fn": 0
+      "fp": 0,
+      "fn": 213,
+      "threshold": 0.5
     },
     {
-      "accuracy": 0.9831399100892708,
+      "accuracy": 1.0,
       "precision": 0.0,
       "recall": 0.0,
       "f1": 0.0,
       "iou": 0.0,
       "tp": 0,
-      "fp": 36889,
-      "fn": 0
+      "fp": 0,
+      "fn": 0,
+      "threshold": 0.5
+    },
+    {
+      "accuracy": 1.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "iou": 0.0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "threshold": 0.5
     }
   ],
   "mean": {
-    "accuracy": 0.9961303467906916,
+    "accuracy": 0.9996337890625,
     "precision": 0.0,
     "recall": 0.0,
     "f1": 0.0,
     "iou": 0.0
   },
   "std": {
-    "accuracy": 0.006505323497160054,
+    "accuracy": 0.0004516884620882985,
     "precision": 0.0,
     "recall": 0.0,
     "f1": 0.0,
