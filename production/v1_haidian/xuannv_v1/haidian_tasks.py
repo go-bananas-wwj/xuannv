@@ -11,6 +11,7 @@ from typing import Any
 import numpy as np
 import torch
 from PIL import Image, ImageDraw
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
@@ -22,8 +23,6 @@ from sklearn.metrics import (
 from sklearn.neural_network import MLPClassifier
 
 from . import backbone
-
-warnings.filterwarnings("ignore")
 
 LABEL_NORMALIZE = {
     "gongdi": "gongdi",
@@ -62,7 +61,13 @@ def load_label_json(
     with open(json_path) as f:
         data = json.load(f)
 
-    h, w = image_size
+    h = data.get("imageHeight")
+    w = data.get("imageWidth")
+    if h is None or w is None:
+        h, w = image_size
+    h = int(h)
+    w = int(w)
+
     masks: dict[str, np.ndarray] = {
         name: np.zeros((h, w), dtype=np.uint8) for name in CLASS_NAMES
     }
@@ -112,6 +117,52 @@ def _extract_embeddings(
     return emb_dec, emb_apr
 
 
+def _stratified_split(
+    patch_ids: list[str],
+    label_dir: Path,
+    task_name: str,
+    rng: np.random.RandomState,
+    train_ratio: float = 0.8,
+) -> tuple[set[str] | None, list[str] | None, str | None]:
+    """按每个 patch 是否包含任务正例像素进行分层 80/20 划分。"""
+    pos_pids: list[str] = []
+    neg_pids: list[str] = []
+    for pid in patch_ids:
+        masks = load_label_json(label_dir / f"{pid}_20260430_rgb_uint8.json")
+        if masks[task_name].any():
+            pos_pids.append(pid)
+        else:
+            neg_pids.append(pid)
+
+    n_pos = len(pos_pids)
+    n_neg = len(neg_pids)
+    if n_pos == 0:
+        return None, None, "无正例 patch"
+
+    rng.shuffle(pos_pids)
+    rng.shuffle(neg_pids)
+
+    if n_pos == 1:
+        train_pos = pos_pids
+        test_pos: list[str] = []
+    else:
+        n_train_pos = max(1, int(n_pos * train_ratio))
+        n_train_pos = min(n_train_pos, n_pos - 1)
+        train_pos = pos_pids[:n_train_pos]
+        test_pos = pos_pids[n_train_pos:]
+
+    n_train_neg = max(0, int(n_neg * train_ratio))
+    train_neg = neg_pids[:n_train_neg]
+    test_neg = neg_pids[n_train_neg:]
+
+    if not test_pos and not test_neg:
+        return None, None, "无法划分训练集和测试集"
+
+    train_pids = set(train_pos + train_neg)
+    test_pids = test_pos + test_neg
+    return train_pids, test_pids, None
+
+
 def run_task(
     task_name: str,
     model_dir: str,
@@ -122,6 +173,8 @@ def run_task(
     classifier: str = "linear",
     seed: int = 42,
     patch_ids: list[str] | None = None,
+    model: Any = None,
+    dataset: Any = None,
 ) -> dict[str, Any]:
     if task_name not in CLASS_NAMES:
         raise ValueError(f"未知任务: {task_name}，可选: {CLASS_NAMES}")
@@ -133,7 +186,8 @@ def run_task(
     out_dir = Path(output_dir) / task_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    model, dataset, cfg = backbone.load_production_model(model_dir, device=device)
+    if model is None or dataset is None:
+        model, dataset, _ = backbone.load_production_model(model_dir, device=device)
     label_dir = Path(label_dir)
 
     candidate_pids = patch_ids if patch_ids else discover_labeled_patches(label_dir)
@@ -151,17 +205,22 @@ def run_task(
         return result
 
     rng = np.random.RandomState(seed)
-    rng.shuffle(valid_pids)
-    n_train = max(1, int(len(valid_pids) * 0.8))
-    train_pids = set(valid_pids[:n_train])
-    test_pids = valid_pids[n_train:]
+    train_pids, test_pids, split_reason = _stratified_split(
+        valid_pids, label_dir, task_name, rng
+    )
+    if split_reason:
+        result = {"skipped": True, "reason": split_reason}
+        (out_dir / "metrics.json").write_text(
+            json.dumps(result, ensure_ascii=False, indent=2)
+        )
+        return result
 
     emb_dec, emb_apr = _extract_embeddings(model, dataset, valid_pids, device)
 
     X_train, y_train, X_test, y_test = [], [], [], []
     test_patch_ids: list[str] = []
     test_label_maps: list[np.ndarray] = []
-    H = W = None
+    test_shapes: set[tuple[int, int]] = set()
 
     for pid in valid_pids:
         if pid not in emb_apr:
@@ -188,6 +247,7 @@ def run_task(
             y_test.append(label_flat)
             test_patch_ids.append(pid)
             test_label_maps.append(label_mask)
+            test_shapes.add((H, W))
 
     if not X_train or not X_test:
         result = {"skipped": True, "reason": "训练集或测试集为空"}
@@ -195,6 +255,12 @@ def run_task(
             json.dumps(result, ensure_ascii=False, indent=2)
         )
         return result
+
+    if len(test_shapes) != 1:
+        raise ValueError(
+            f"test patch embeddings have inconsistent spatial sizes: {test_shapes}"
+        )
+    H, W = next(iter(test_shapes))
 
     X_train = np.concatenate(X_train, 0)
     y_train = np.concatenate(y_train, 0)
@@ -213,19 +279,24 @@ def run_task(
         clf = LogisticRegression(
             max_iter=500, n_jobs=4, class_weight="balanced", random_state=seed
         )
-        clf.fit(X_train, y_train)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=ConvergenceWarning)
+            clf.fit(X_train, y_train)
     else:
         sample_weight = np.where(
             y_train == 1, 1.0 / max(pos_ratio, 1e-6), 1.0 / (1 - pos_ratio)
         )
         sample_weight = sample_weight / sample_weight.mean()
+        sample_weight = np.clip(sample_weight, a_min=None, a_max=1000.0)
         clf = MLPClassifier(
             hidden_layer_sizes=(128,),
             max_iter=200,
             random_state=seed,
             early_stopping=False,
         )
-        clf.fit(X_train, y_train, sample_weight=sample_weight)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=ConvergenceWarning)
+            clf.fit(X_train, y_train, sample_weight=sample_weight)
 
     y_pred = clf.predict(X_test)
     prob = clf.predict_proba(X_test)[:, 1] if hasattr(clf, "predict_proba") else None
@@ -244,6 +315,9 @@ def run_task(
     }
     if prob is not None and len(np.unique(y_test)) == 2:
         metrics["auc"] = float(roc_auc_score(y_test, prob))
+    elif len(np.unique(y_test)) < 2:
+        metrics["auc"] = None
+        metrics["auc_note"] = "test set has only one class"
     else:
         metrics["auc"] = 0.0
 
@@ -278,6 +352,7 @@ def run_all_tasks(
     classifier: str = "linear",
     patch_ids: list[str] | None = None,
 ) -> dict[str, dict]:
+    model, dataset, _ = backbone.load_production_model(model_dir, device=device)
     summary: dict[str, dict] = {}
     for task in CLASS_NAMES:
         print(f"\n[run_all_tasks] 开始任务: {task} ({CLASS_NAMES_CN[task]})")
@@ -289,6 +364,8 @@ def run_all_tasks(
             device,
             mode,
             classifier,
+            model=model,
+            dataset=dataset,
             patch_ids=patch_ids,
         )
     (Path(output_dir) / "metrics_all.json").write_text(
@@ -298,6 +375,7 @@ def run_all_tasks(
 
 
 def main() -> int:
+    warnings.filterwarnings("ignore")
     parser = argparse.ArgumentParser(description="海淀 6 任务推理")
     parser.add_argument("--model-dir", default="model")
     parser.add_argument("--label-dir", default="/workspace/xuannv/haidian_label/labeljson")
