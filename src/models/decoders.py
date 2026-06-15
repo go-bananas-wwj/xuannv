@@ -114,8 +114,17 @@ class ContinuousDecoder(nn.Module):
 
         # 2. 逐像素 MLP
         B, D, H, W = x.shape
-        x_flat = x.permute(0, 2, 3, 1).reshape(B * H * W, D)
-        out_flat = self.mlp(x_flat)
+        x_flat = x.permute(0, 2, 3, 1).reshape(B * H * W, D).contiguous()
+        hidden = self.mlp[:-1](x_flat)
+        final = self.mlp[-1]
+        # Workaround: oneDNN on this CPU build cannot create a matmul primitive
+        # when the output dimension is 1. Compute the final linear manually.
+        if final.out_features == 1 and hidden.device.type == "cpu":
+            out_flat = (hidden * final.weight).sum(dim=-1, keepdim=True)
+            if final.bias is not None:
+                out_flat = out_flat + final.bias
+        else:
+            out_flat = final(hidden)
         out = out_flat.reshape(B, H, W, -1).permute(0, 3, 1, 2)
         return out
 
@@ -156,7 +165,16 @@ class CategoricalDecoder(nn.Module):
     ) -> torch.Tensor:
         x = self.injector(embedding_map, window_code, relative_time, metadata)
         B, D, H, W = x.shape
-        x_flat = x.permute(0, 2, 3, 1).reshape(B * H * W, D)
-        out_flat = self.mlp(x_flat)
+        x_flat = x.permute(0, 2, 3, 1).reshape(B * H * W, D).contiguous()
+        hidden = self.mlp[:-1](x_flat)
+        final = self.mlp[-1]
+        # Workaround: oneDNN on this CPU build cannot create a matmul primitive
+        # when the output dimension is 1. Compute the final linear manually.
+        if final.out_features == 1 and hidden.device.type == "cpu":
+            out_flat = (hidden * final.weight).sum(dim=-1, keepdim=True)
+            if final.bias is not None:
+                out_flat = out_flat + final.bias
+        else:
+            out_flat = final(hidden)
         out = out_flat.reshape(B, H, W, -1).permute(0, 3, 1, 2)
         return out
