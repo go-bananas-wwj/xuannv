@@ -82,7 +82,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pred-npz", default="outputs/eval_phase2best_all/cdhead/shigongjiandu/pred.npz")
     parser.add_argument("--data-root", default="/workspace/xuannv/data_raw/haidian/scenes")
-    parser.add_argument("--output-dir", default="visualizations")
+    parser.add_argument("--output-dir", default="visualizations/cdhead_shigongjiandu")
     parser.add_argument("--max-patches", type=int, default=6, help="最多可视化多少个含正样本 patch")
     args = parser.parse_args()
 
